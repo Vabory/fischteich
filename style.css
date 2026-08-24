@@ -74,13 +74,13 @@ button:focus-visible {
     linear-gradient(160deg, #0c1024, #050711 72%);
 }
 
-.menu-screen::before {
-  position: absolute;
-  inset: 0;
-  background: var(--menu-background-image, none) center / cover no-repeat;
-  content: "";
-  opacity: 0.72;
-  pointer-events: none;
+.menu-screen {
+  place-items: end center;
+  background-color: #050711;
+  background-image: url("assets/menu-background.png");
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .menu-card,
@@ -101,22 +101,9 @@ button:focus-visible {
   text-transform: uppercase;
 }
 
-h1,
 h2,
 p {
   margin-top: 0;
-}
-
-h1 {
-  margin-bottom: clamp(38px, 9vh, 74px);
-  font-size: clamp(3rem, 15vw, 5.6rem);
-  line-height: 0.87;
-  letter-spacing: -0.065em;
-  text-shadow: 0 8px 35px rgb(0 0 0 / 42%);
-}
-
-h1::first-line {
-  color: var(--pink);
 }
 
 h2 {
@@ -127,7 +114,40 @@ h2 {
 
 .menu-actions {
   display: grid;
-  gap: 13px;
+  gap: 12px;
+}
+
+.menu-card {
+  width: min(82vw, 320px);
+}
+
+.menu-actions .primary-button,
+.menu-actions .secondary-button {
+  min-height: 50px;
+  padding: 11px 18px;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  background:
+    linear-gradient(rgb(5 10 24 / 86%), rgb(8 14 31 / 86%)) padding-box,
+    linear-gradient(105deg, rgb(78 112 218 / 88%), rgb(241 90 154 / 88%)) border-box;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 28%);
+  color: #fff;
+  font-size: 0.96rem;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  transition:
+    transform 110ms ease-out,
+    filter 110ms ease-out,
+    box-shadow 110ms ease-out;
+}
+
+.menu-actions button:active {
+  filter: brightness(1.18);
+  box-shadow:
+    0 4px 12px rgb(0 0 0 / 24%),
+    0 0 0 1px rgb(255 255 255 / 18%);
+  transform: scale(0.975);
 }
 
 .primary-button,
@@ -469,9 +489,13 @@ h2 {
   gap: 10px;
 }
 
+@media (max-height: 700px) {
+  .menu-actions { gap: 8px; }
+  .menu-actions .primary-button,
+  .menu-actions .secondary-button { min-height: 46px; padding-block: 9px; }
+}
+
 @media (max-height: 620px) {
-  h1 { margin-bottom: 28px; font-size: clamp(2.7rem, 13vw, 4.2rem); }
-  .menu-actions { gap: 9px; }
   .primary-button, .secondary-button, .fish-button { min-height: 50px; padding-block: 11px; }
 }
 

@@ -120,11 +120,11 @@ h2 {
 
 .menu-actions {
   display: grid;
-  gap: 12px;
+  gap: 4px;
 }
 
 .menu-card {
-  width: min(82vw, 320px);
+  width: min(60vw, 220px);
   transform: translateY(
     min(
       25px,
@@ -135,31 +135,32 @@ h2 {
 
 .menu-actions .primary-button,
 .menu-actions .secondary-button {
-  min-height: 50px;
-  padding: 11px 18px;
-  border: 1px solid transparent;
-  border-radius: 15px;
-  background:
-    linear-gradient(rgb(5 10 24 / 86%), rgb(8 14 31 / 86%)) padding-box,
-    linear-gradient(105deg, rgb(78 112 218 / 88%), rgb(241 90 154 / 88%)) border-box;
-  box-shadow: 0 6px 16px rgb(0 0 0 / 28%);
-  color: #fff;
-  font-size: 0.96rem;
-  letter-spacing: 0.01em;
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  line-height: 0;
   transition:
     transform 110ms ease-out,
-    filter 110ms ease-out,
-    box-shadow 110ms ease-out;
+    filter 110ms ease-out;
+}
+
+.menu-actions img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .menu-actions button:active {
-  filter: brightness(1.18);
-  box-shadow:
-    0 4px 12px rgb(0 0 0 / 24%),
-    0 0 0 1px rgb(255 255 255 / 18%);
-  transform: scale(0.975);
+  filter: brightness(0.92);
+  box-shadow: none;
+  transform: scale(0.97);
 }
 
 .primary-button,
@@ -502,9 +503,7 @@ h2 {
 }
 
 @media (max-height: 700px) {
-  .menu-actions { gap: 8px; }
-  .menu-actions .primary-button,
-  .menu-actions .secondary-button { min-height: 46px; padding-block: 9px; }
+  .menu-card { width: min(56vw, 200px); }
 }
 
 @media (max-height: 620px) {

@@ -76,17 +76,7 @@ button:focus-visible {
 
 .menu-screen {
   place-items: end center;
-  background: #050711 url("assets/menu-background.png") center center / cover no-repeat;
-}
-
-.menu-screen::before {
-  position: absolute;
-  inset: 0;
-  background: url("assets/menu-background.png") center 40px / cover no-repeat;
-  content: "";
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 38px, #000 52px);
-  mask-image: linear-gradient(to bottom, transparent 38px, #000 52px);
+  background: #050711 url("assets/menu-background.png?v=2") center center / cover no-repeat;
 }
 
 .menu-card,
@@ -133,8 +123,7 @@ h2 {
   );
 }
 
-.menu-actions .primary-button,
-.menu-actions .secondary-button {
+.menu-actions button {
   display: block;
   width: 100%;
   min-height: 0;

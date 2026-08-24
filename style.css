@@ -210,6 +210,10 @@ h2 {
   top: max(16px, env(safe-area-inset-top));
   left: 50%;
   margin: 0;
+  padding: 3px 7px;
+  border-radius: 9px;
+  background: rgb(8 11 24 / 72%);
+  box-shadow: 0 0 10px rgb(8 11 24 / 85%);
   font-size: clamp(1rem, 4.6vw, 1.28rem);
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -220,10 +224,10 @@ h2 {
 #play-zone {
   position: fixed;
   z-index: 1;
-  top: calc(max(16px, env(safe-area-inset-top)) + 58px);
-  right: max(8px, env(safe-area-inset-right));
-  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 84px);
-  left: max(8px, env(safe-area-inset-left));
+  top: max(3px, env(safe-area-inset-top));
+  right: max(3px, env(safe-area-inset-right));
+  bottom: max(3px, env(safe-area-inset-bottom));
+  left: max(3px, env(safe-area-inset-left));
   touch-action: none;
 }
 
@@ -313,6 +317,18 @@ h2 {
   left: 0;
   pointer-events: auto;
   animation: button-in 220ms ease-out;
+}
+
+.fish-button:disabled {
+  background: #424756;
+  box-shadow: none;
+  color: #aeb3c1;
+  cursor: default;
+  opacity: 0.78;
+}
+
+.fish-button:disabled:active {
+  transform: none;
 }
 
 @keyframes button-in {

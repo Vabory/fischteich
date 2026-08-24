@@ -9,7 +9,8 @@ const TEAM_COLORS = [
   { name: "Orange", color: "#F28C28" },
 ];
 
-const MARKER_GAP = 10;
+const MARKER_GAP = 7;
+const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
 const menuScreen = document.querySelector("#menu-screen");
 const gameScreen = document.querySelector("#game-screen");
@@ -69,15 +70,35 @@ function startGame(teamCount) {
 
 function updateGameUi() {
   fishCounter.textContent = `Fische im Teich: ${state.players.length}`;
-  drawButton.hidden = state.players.length < 2 || state.frozen;
+  drawButton.hidden = state.frozen;
+  drawButton.disabled = state.players.length < 2 || state.frozen;
 }
 
 function distanceBetween(first, second) {
   return Math.hypot(first.x - second.x, first.y - second.y);
 }
 
-function isValidPosition(position, bounds) {
+function overlapsUiElement(position, rectangle) {
+  const nearestX = Math.max(rectangle.left, Math.min(position.x, rectangle.right));
+  const nearestY = Math.max(rectangle.top, Math.min(position.y, rectangle.bottom));
+  const distance = Math.hypot(position.x - nearestX, position.y - nearestY);
+
+  return distance < state.markerSize / 2 + UI_CLEARANCE;
+}
+
+function getPlacementLayout() {
+  return {
+    bounds: playZone.getBoundingClientRect(),
+    blockedUi: [
+      document.querySelector("#leave-game").getBoundingClientRect(),
+      drawButton.getBoundingClientRect(),
+    ],
+  };
+}
+
+function isValidPosition(position, layout) {
   const radius = state.markerSize / 2;
+  const { bounds, blockedUi } = layout;
 
   if (
     position.x < bounds.left + radius ||
@@ -85,6 +106,10 @@ function isValidPosition(position, bounds) {
     position.y < bounds.top + radius ||
     position.y > bounds.bottom - radius
   ) {
+    return false;
+  }
+
+  if (blockedUi.some((rectangle) => overlapsUiElement(position, rectangle))) {
     return false;
   }
 
@@ -96,7 +121,7 @@ function isValidPosition(position, bounds) {
 
 function findPlacement(x, y) {
   const requestedPosition = { x, y };
-  const bounds = playZone.getBoundingClientRect();
+  const layout = getPlacementLayout();
   const directHitDistance = state.markerSize / 2 + 3;
 
   // Ein Tap praktisch direkt auf einen bestehenden Punkt ist immer ungültig.
@@ -108,23 +133,27 @@ function findPlacement(x, y) {
     return null;
   }
 
-  if (isValidPosition(requestedPosition, bounds)) {
+  if (isValidPosition(requestedPosition, layout)) {
     return requestedPosition;
   }
 
   // Ringweise Suche: Die erste gefundene Position benötigt die kleinste Verschiebung.
-  const maximumShift = state.markerSize * 0.82;
-  const radialStep = 5;
-  const angleStep = Math.PI / 18;
+  const maximumShift = state.markerSize * 1.15;
+  const radialStep = 4;
+  const angleCount = 48;
+  const angleStep = (Math.PI * 2) / angleCount;
 
   for (let radius = radialStep; radius <= maximumShift; radius += radialStep) {
-    for (let angle = 0; angle < Math.PI * 2; angle += angleStep) {
+    const ringOffset = Math.round(radius / radialStep) % 2 === 0 ? angleStep / 2 : 0;
+
+    for (let angleIndex = 0; angleIndex < angleCount; angleIndex += 1) {
+      const angle = angleIndex * angleStep + ringOffset;
       const candidate = {
         x: x + Math.cos(angle) * radius,
         y: y + Math.sin(angle) * radius,
       };
 
-      if (isValidPosition(candidate, bounds)) {
+      if (isValidPosition(candidate, layout)) {
         return candidate;
       }
     }

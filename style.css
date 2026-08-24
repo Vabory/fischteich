@@ -103,6 +103,40 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
+.viewport-debug {
+  position: fixed;
+  z-index: 1000;
+  top: max(6px, env(safe-area-inset-top));
+  left: max(6px, env(safe-area-inset-left));
+  width: min(381px, calc(100vw - 12px));
+  max-height: min(58vh, 494px);
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 55%);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 86%);
+  color: #fff;
+  font: 10px/1.28 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: left;
+  white-space: pre-wrap;
+  pointer-events: auto;
+  touch-action: pan-y;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-overflow-scrolling: touch;
+}
+
+.safe-area-probe {
+  position: fixed;
+  width: 0;
+  height: 0;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .menu-card,
 .choice-card,
 .roulette-content {

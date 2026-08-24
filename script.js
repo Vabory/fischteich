@@ -23,6 +23,8 @@ const drawButton = document.querySelector("#draw-teams");
 const leaveModal = document.querySelector("#leave-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
+const viewportDebug = document.querySelector("#viewport-debug");
+const safeAreaProbe = document.querySelector("#safe-area-probe");
 
 const state = {
   players: [],
@@ -33,6 +35,48 @@ const state = {
   rouletteRun: 0,
   rouletteTimer: null,
 };
+
+function formatDebugNumber(value) {
+  return typeof value === "number" ? value.toFixed(2) : String(value);
+}
+
+function formatDebugRect(selector) {
+  const element = document.querySelector(selector);
+  const rectangle = element.getBoundingClientRect();
+
+  return `${selector.padEnd(16)} top=${formatDebugNumber(rectangle.top)}  bottom=${formatDebugNumber(rectangle.bottom)}  height=${formatDebugNumber(rectangle.height)}`;
+}
+
+function updateViewportDebug() {
+  const visualViewport = window.visualViewport;
+  const safeAreaStyles = getComputedStyle(safeAreaProbe);
+  const standaloneMedia = window.matchMedia("(display-mode: standalone)").matches;
+
+  viewportDebug.textContent = [
+    "VIEWPORT DIAGNOSE",
+    `innerHeight                 ${formatDebugNumber(window.innerHeight)}`,
+    `outerHeight                 ${formatDebugNumber(window.outerHeight)}`,
+    `html.clientHeight            ${formatDebugNumber(document.documentElement.clientHeight)}`,
+    `body.clientHeight            ${formatDebugNumber(document.body.clientHeight)}`,
+    `body.scrollHeight            ${formatDebugNumber(document.body.scrollHeight)}`,
+    `visualViewport.height        ${formatDebugNumber(visualViewport?.height)}`,
+    `visualViewport.offsetTop     ${formatDebugNumber(visualViewport?.offsetTop)}`,
+    `visualViewport.offsetLeft    ${formatDebugNumber(visualViewport?.offsetLeft)}`,
+    `visualViewport.scale         ${formatDebugNumber(visualViewport?.scale)}`,
+    `safe-area top                ${safeAreaStyles.paddingTop}`,
+    `safe-area bottom             ${safeAreaStyles.paddingBottom}`,
+    `display-mode standalone      ${standaloneMedia}`,
+    `navigator.standalone         ${String(navigator.standalone)}`,
+    "",
+    "RECTS (CSS px)",
+    formatDebugRect("html"),
+    formatDebugRect("body"),
+    formatDebugRect("#app"),
+    formatDebugRect(".menu-screen"),
+    formatDebugRect(".menu-background"),
+    formatDebugRect(".menu-card"),
+  ].join("\n");
+}
 
 function showScreen(screen) {
   for (const item of screens) {
@@ -383,7 +427,13 @@ window.addEventListener("resize", () => {
     updateMarkerSize();
   }
 });
+window.addEventListener("resize", updateViewportDebug);
+window.addEventListener("orientationchange", updateViewportDebug);
+window.visualViewport?.addEventListener("resize", updateViewportDebug);
+window.visualViewport?.addEventListener("scroll", updateViewportDebug);
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 
 updateMarkerSize();
+updateViewportDebug();
+window.setInterval(updateViewportDebug, 500);

@@ -110,7 +110,11 @@ h2 {
 
 .menu-actions {
   display: grid;
-  gap: 4px;
+  gap: 0;
+}
+
+.menu-actions button + button {
+  margin-top: -14px;
 }
 
 .menu-card {

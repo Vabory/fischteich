@@ -517,6 +517,22 @@ h2 {
   gap: 10px;
 }
 
+.bottom-test {
+  position: fixed;
+  z-index: 999999;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  height: 120px;
+  place-items: center;
+  background: #eaff00;
+  color: #000;
+  font-size: 28px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
 @media (max-height: 700px) {
   .menu-card { width: min(56vw, 200px); }
 }

@@ -386,4 +386,26 @@ window.addEventListener("resize", () => {
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 
+document.addEventListener("DOMContentLoaded", () => {
+  const jsBottomTest = document.createElement("div");
+  jsBottomTest.textContent = "JS BOTTOM";
+  jsBottomTest.setAttribute("aria-hidden", "true");
+  Object.assign(jsBottomTest.style, {
+    position: "fixed",
+    zIndex: "1000000",
+    right: "0",
+    bottom: "0",
+    left: "0",
+    display: "grid",
+    height: "60px",
+    placeItems: "center",
+    background: "#ff0000",
+    color: "#ffffff",
+    fontSize: "24px",
+    fontWeight: "900",
+    pointerEvents: "none",
+  });
+  document.documentElement.append(jsBottomTest);
+}, { once: true });
+
 updateMarkerSize();

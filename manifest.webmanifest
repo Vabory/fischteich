@@ -1,0 +1,11 @@
+{
+  "name": "Fischteich Angel",
+  "short_name": "Fischteich Angel",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#080b18",
+  "background_color": "#080b18"
+}

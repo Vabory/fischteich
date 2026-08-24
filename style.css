@@ -96,11 +96,26 @@ button:focus-visible {
   height: 100dvh;
   object-fit: cover;
   object-position: center top;
-  transform: scale(1.06);
-  transform-origin: center top;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
+}
+
+/* Temporäre Diagnosefarben für den unteren iOS-Standalone-Bereich. */
+html {
+  background: #ff2b2b;
+}
+
+body {
+  background: #16c95f;
+}
+
+#app {
+  background: #ffe600;
+}
+
+.menu-screen {
+  background: #a629d3;
 }
 
 .menu-card,

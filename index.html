@@ -6,13 +6,73 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     >
-    <meta name="theme-color" content="#080808">
-    <title>Multi-Touch-Test</title>
+    <meta name="theme-color" content="#080b18">
+    <title>Fischteich Angel</title>
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
   </head>
   <body>
-    <header id="touch-counter" aria-live="polite">ACTIVE TOUCHES: 0</header>
-    <main id="touch-area" aria-label="Multi-Touch-Testfläche"></main>
+    <div id="app">
+      <section class="screen menu-screen is-active" id="menu-screen" aria-labelledby="app-title">
+        <div class="menu-card">
+          <p class="eyebrow">Willkommen am</p>
+          <h1 id="app-title">Fischteich<br>Angel</h1>
+          <div class="menu-actions">
+            <button class="primary-button" id="start-two-teams" type="button">Angel auswerfen</button>
+            <button class="secondary-button" id="start-roulette" type="button">Wer beißt zuerst?</button>
+            <button class="secondary-button" id="open-team-choice" type="button">Mehr Teams</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen choice-screen" id="team-choice-screen" aria-labelledby="team-choice-title" hidden>
+        <button class="close-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">×</button>
+        <div class="choice-card">
+          <p class="eyebrow">Fanggruppe festlegen</p>
+          <h2 id="team-choice-title">Wie viele Teams?</h2>
+          <div class="team-options" aria-label="Teamanzahl auswählen">
+            <button type="button" data-team-count="2">2</button>
+            <button type="button" data-team-count="3">3</button>
+            <button type="button" data-team-count="4">4</button>
+            <button type="button" data-team-count="5">5</button>
+            <button type="button" data-team-count="6">6</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen game-screen" id="game-screen" aria-labelledby="fish-counter" hidden>
+        <button class="close-button" id="leave-game" type="button" aria-label="Auslosung verlassen">×</button>
+        <h2 id="fish-counter" aria-live="polite">Fische im Teich: 0</h2>
+        <div id="play-zone" aria-label="Hier tippen, um Spieler zu registrieren"></div>
+        <div id="player-layer" aria-hidden="true"></div>
+        <div class="game-action-area">
+          <button class="fish-button" id="draw-teams" type="button" hidden>Angeln</button>
+        </div>
+      </section>
+
+      <section class="screen roulette-screen" id="roulette-screen" aria-labelledby="roulette-title" hidden>
+        <button class="close-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">×</button>
+        <div class="roulette-content">
+          <p class="eyebrow">Die erste Flosse gehört …</p>
+          <h2 id="roulette-title">Wer beißt zuerst?</h2>
+          <div class="roulette-window" aria-hidden="true">
+            <div class="roulette-marker"></div>
+            <div class="roulette-strip" id="roulette-strip"></div>
+          </div>
+          <p class="roulette-result" id="roulette-result" aria-live="polite"></p>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="leave-modal" role="dialog" aria-modal="true" aria-labelledby="leave-title" hidden>
+      <div class="modal-card">
+        <h2 id="leave-title">Zurück zum Menü?</h2>
+        <p>Die aktuelle Auslosung wird gelöscht.</p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-leave" type="button">Nein</button>
+          <button class="primary-button" id="confirm-leave" type="button">Ja</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

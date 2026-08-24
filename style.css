@@ -1,0 +1,69 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
+  background: #080808;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#touch-counter {
+  position: fixed;
+  z-index: 2;
+  top: 0;
+  left: 50%;
+  padding-top: max(16px, env(safe-area-inset-top));
+  font-size: clamp(1rem, 4.5vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+#touch-area {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+}
+
+.touch-marker {
+  position: fixed;
+  z-index: 1;
+  display: grid;
+  width: clamp(72px, 22vw, 96px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: #00a8ff;
+  box-shadow: 0 0 24px rgb(0 168 255 / 75%);
+  color: #fff;
+  font-size: clamp(1.75rem, 8vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}

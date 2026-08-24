@@ -87,11 +87,13 @@ button:focus-visible {
 }
 
 .menu-background {
-  position: absolute;
+  /* Der Hintergrund ist direkt an den Standalone-Viewport gebunden. */
+  position: fixed;
   z-index: 0;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   object-fit: cover;
   object-position: center top;
   pointer-events: none;

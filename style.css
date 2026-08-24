@@ -96,6 +96,8 @@ button:focus-visible {
   height: 100dvh;
   object-fit: cover;
   object-position: center top;
+  transform: scale(1.06);
+  transform-origin: center top;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;

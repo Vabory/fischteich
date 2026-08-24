@@ -76,11 +76,17 @@ button:focus-visible {
 
 .menu-screen {
   place-items: end center;
-  background-color: #050711;
-  background-image: url("assets/menu-background.png");
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
+  background: #050711 url("assets/menu-background.png") center center / cover no-repeat;
+}
+
+.menu-screen::before {
+  position: absolute;
+  inset: 0;
+  background: url("assets/menu-background.png") center 40px / cover no-repeat;
+  content: "";
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 38px, #000 52px);
+  mask-image: linear-gradient(to bottom, transparent 38px, #000 52px);
 }
 
 .menu-card,
@@ -119,6 +125,12 @@ h2 {
 
 .menu-card {
   width: min(82vw, 320px);
+  transform: translateY(
+    min(
+      25px,
+      max(14px, calc(max(28px, env(safe-area-inset-bottom)) - 14px))
+    )
+  );
 }
 
 .menu-actions .primary-button,

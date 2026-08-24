@@ -84,6 +84,8 @@ button:focus-visible {
 .menu-screen {
   place-items: end center;
   background: #050711;
+  /* Das Hintergrundbild darf den kleineren iOS-dvh-Bereich überragen. */
+  overflow: visible;
 }
 
 .menu-background {
@@ -93,29 +95,12 @@ button:focus-visible {
   inset: 0;
   width: 100vw;
   height: 100vh;
-  height: 100dvh;
+  height: 100lvh;
   object-fit: cover;
   object-position: center top;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
-}
-
-/* Temporäre Diagnosefarben für den unteren iOS-Standalone-Bereich. */
-html {
-  background: #ff2b2b;
-}
-
-body {
-  background: #16c95f;
-}
-
-#app {
-  background: #ffe600;
-}
-
-.menu-screen {
-  background: #a629d3;
 }
 
 .menu-card,

@@ -116,7 +116,13 @@ button:focus-visible {
 .menu-crest {
   position: absolute;
   z-index: 1;
-  top: max(calc(env(safe-area-inset-top) + 28px), clamp(70px, 9dvh, 82px));
+  top: max(
+    env(safe-area-inset-top),
+    calc(
+      max(calc(env(safe-area-inset-top) + 28px), clamp(70px, 9dvh, 82px))
+      - clamp(28px, 3.52dvh, 30px)
+    )
+  );
   left: 50%;
   width: clamp(116px, 31vw, 132px);
   height: auto;

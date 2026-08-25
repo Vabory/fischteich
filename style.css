@@ -358,6 +358,7 @@ h2 {
   bottom: max(14px, env(safe-area-inset-bottom));
   left: max(18px, env(safe-area-inset-left));
   height: 62px;
+  --side-control-inline-offset: -16px;
   pointer-events: none;
 }
 
@@ -365,7 +366,7 @@ h2 {
   position: absolute;
   right: 0;
   bottom: 0;
-  left: 72px;
+  left: 0;
   pointer-events: auto;
   animation: button-in 220ms ease-out;
 }
@@ -373,7 +374,8 @@ h2 {
 .settings-button {
   position: absolute;
   bottom: 2px;
-  left: 0;
+  left: var(--side-control-inline-offset);
+  z-index: 1;
   display: grid;
   width: 52px;
   min-height: 52px;

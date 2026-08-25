@@ -113,6 +113,19 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
+.menu-crest {
+  position: absolute;
+  z-index: 1;
+  top: max(calc(env(safe-area-inset-top) + 28px), clamp(70px, 9dvh, 82px));
+  left: 50%;
+  width: clamp(116px, 31vw, 132px);
+  height: auto;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .roulette-background {
   position: absolute;
   z-index: 0;

@@ -121,6 +121,7 @@ button:focus-visible {
   height: 100%;
   object-fit: cover;
   object-position: center;
+  filter: brightness(0.78);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;

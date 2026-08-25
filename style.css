@@ -126,6 +126,19 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
+.roulette-title-image {
+  position: absolute;
+  z-index: 1;
+  top: max(calc(env(safe-area-inset-top) + 20px), clamp(58px, 8dvh, 72px));
+  left: 50%;
+  width: min(96vw, 420px);
+  height: auto;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .menu-card,
 .choice-card,
 .roulette-content {

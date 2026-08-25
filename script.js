@@ -677,11 +677,15 @@ function startRoulette() {
   }
 
   const tileWidth = 78;
-  const tilePitch = 84;
+  const tilePitch = 81;
   const startIndex = 2;
   const startOffset = -(startIndex * tilePitch + tileWidth / 2);
-  const randomStopOffset = secureRandomInt(31) - 15;
-  const endOffset = -(targetIndex * tilePitch + tileWidth / 2 + randomStopOffset);
+  const stopSafetyRatio = 0.15;
+  const minimumStopPosition = Math.ceil(tileWidth * stopSafetyRatio);
+  const maximumStopPosition = tileWidth - minimumStopPosition;
+  const stopPositionWithinTile = minimumStopPosition
+    + secureRandomInt(maximumStopPosition - minimumStopPosition + 1);
+  const endOffset = -(targetIndex * tilePitch + stopPositionWithinTile);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const duration = reducedMotion ? 650 : 4700;
   const run = state.rouletteRun;

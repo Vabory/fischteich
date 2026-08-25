@@ -930,7 +930,7 @@ h2 {
   top: 18px;
   left: 50%;
   display: flex;
-  gap: 6px;
+  gap: 3px;
   will-change: transform;
 }
 

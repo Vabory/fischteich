@@ -797,8 +797,12 @@ function recordCompletedRouletteSpin(winnerIndex) {
   renderRouletteStats();
 }
 
+function setRouletteTileColor(tile, colorIndex) {
+  tile.style.backgroundColor = ROULETTE_WINNERS[colorIndex].color;
+  tile.dataset.colorIndex = colorIndex;
+}
+
 function createRouletteTiles(goldTileIndex = -1) {
-  const firstColorIndex = secureRandomInt(2);
   const tileCount = 52;
   const tiles = [];
 
@@ -807,11 +811,10 @@ function createRouletteTiles(goldTileIndex = -1) {
   for (let index = 0; index < tileCount; index += 1) {
     const colorIndex = index === goldTileIndex
       ? ROULETTE_GOLD_WINNER_INDEX
-      : (firstColorIndex + index) % 2;
+      : secureRandomInt(2);
     const tile = document.createElement("div");
     tile.className = "roulette-tile";
-    tile.style.backgroundColor = ROULETTE_WINNERS[colorIndex].color;
-    tile.dataset.colorIndex = colorIndex;
+    setRouletteTileColor(tile, colorIndex);
     rouletteStrip.append(tile);
     tiles.push(tile);
   }
@@ -1008,7 +1011,7 @@ function startRoulette() {
     winnerIndex !== ROULETTE_GOLD_WINNER_INDEX
     && Number(tiles[targetIndex].dataset.colorIndex) !== winnerIndex
   ) {
-    targetIndex += 1;
+    setRouletteTileColor(tiles[targetIndex], winnerIndex);
   }
 
   const tileWidth = 78;

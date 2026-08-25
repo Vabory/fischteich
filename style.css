@@ -1248,11 +1248,13 @@ h2 {
   min-height: 42px;
   padding-top: 6px;
   border-top: 1px solid rgb(255 255 255 / 12%);
+  gap: 7px;
 }
 
 .roulette-stat-row--total .roulette-stat-label {
   color: rgb(255 255 255 / 92%);
   font-size: 0.84rem;
+  letter-spacing: 0.04em;
 }
 
 .roulette-stat-value--total {

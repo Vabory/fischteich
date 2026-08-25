@@ -121,7 +121,7 @@ button:focus-visible {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  filter: brightness(0.78);
+  filter: brightness(0.70);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -994,6 +994,45 @@ h2 {
   cursor: default;
   filter: brightness(0.62);
   opacity: 0.5;
+  pointer-events: none;
+}
+
+.roulette-speed-button {
+  position: absolute;
+  z-index: 3;
+  top: calc(50% + 86px);
+  left: calc(50% + min(28vw, 110px) + 10px);
+  display: grid;
+  width: 50px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid rgb(74 213 255 / 72%);
+  border-radius: 14px;
+  background:
+    linear-gradient(145deg, rgb(15 19 38 / 96%), rgb(5 7 18 / 96%)) padding-box,
+    linear-gradient(135deg, #3dd9ff, #f15a9a) border-box;
+  box-shadow:
+    0 0 10px rgb(61 217 255 / 22%),
+    inset 0 0 10px rgb(241 90 154 / 10%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  place-items: center;
+  text-shadow: 0 1px 4px rgb(0 0 0 / 70%);
+  transition: filter 110ms ease-out, opacity 110ms ease-out, transform 110ms ease-out;
+}
+
+.roulette-speed-button:active {
+  filter: brightness(0.9);
+  transform: scale(0.96);
+}
+
+.roulette-speed-button:disabled {
+  cursor: default;
+  filter: brightness(0.58);
+  opacity: 0.55;
   pointer-events: none;
 }
 

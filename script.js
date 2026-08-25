@@ -51,6 +51,9 @@ const MAX_TEAM_COUNT = 10;
 const MIN_MANUAL_TEAM_COUNT = 2;
 const MAX_MANUAL_TEAM_COUNT = 10;
 const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
+const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
+const ROULETTE_BASE_DURATION = 4700;
+const ROULETTE_REDUCED_MOTION_DURATION = 650;
 const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
@@ -84,6 +87,7 @@ const leaveModal = document.querySelector("#leave-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
 const rouletteSpinButton = document.querySelector("#spin-roulette");
+const rouletteSpeedButton = document.querySelector("#roulette-speed");
 
 const state = {
   players: [],
@@ -100,6 +104,7 @@ const state = {
   rouletteTimer: null,
   rouletteSpinning: false,
   rouletteWinnerIndex: null,
+  rouletteSpeed: ROULETTE_SPEEDS[0],
 };
 
 function showScreen(screen) {
@@ -639,6 +644,35 @@ function setRouletteSpinButtonState(visible, enabled) {
   rouletteSpinButton.disabled = !enabled;
 }
 
+function updateRouletteSpeedButton(enabled) {
+  rouletteSpeedButton.textContent = `${state.rouletteSpeed}×`;
+  rouletteSpeedButton.setAttribute(
+    "aria-label",
+    `Roulette-Geschwindigkeit: ${state.rouletteSpeed}-fach`,
+  );
+  rouletteSpeedButton.disabled = !enabled;
+}
+
+function cycleRouletteSpeed() {
+  if (state.rouletteSpinning) {
+    return;
+  }
+
+  const currentIndex = ROULETTE_SPEEDS.indexOf(state.rouletteSpeed);
+  const nextIndex = (currentIndex + 1) % ROULETTE_SPEEDS.length;
+  state.rouletteSpeed = ROULETTE_SPEEDS[nextIndex];
+  updateRouletteSpeedButton(true);
+}
+
+function getRouletteDuration() {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const baseDuration = reducedMotion
+    ? ROULETTE_REDUCED_MOTION_DURATION
+    : ROULETTE_BASE_DURATION;
+
+  return Math.round(baseDuration / state.rouletteSpeed);
+}
+
 function createRouletteTiles() {
   const firstColorIndex = secureRandomInt(2);
   const tileCount = 52;
@@ -675,6 +709,7 @@ function stopRoulette() {
   state.rouletteSpinning = false;
   state.rouletteWinnerIndex = null;
   setRouletteSpinButtonState(false, false);
+  updateRouletteSpeedButton(false);
   rouletteStrip.style.transition = "none";
 }
 
@@ -704,6 +739,7 @@ function openRoulette() {
   rouletteStrip.style.transition = "none";
   rouletteStrip.style.transform = `translateX(${initialOffset}px)`;
   setRouletteSpinButtonState(true, true);
+  updateRouletteSpeedButton(true);
 }
 
 function finishRoulette(run, winnerIndex) {
@@ -717,6 +753,7 @@ function finishRoulette(run, winnerIndex) {
   rouletteResult.classList.add("is-visible");
   state.rouletteSpinning = false;
   setRouletteSpinButtonState(true, true);
+  updateRouletteSpeedButton(true);
 }
 
 function startRoulette() {
@@ -727,6 +764,7 @@ function startRoulette() {
   stopRoulette();
   state.rouletteSpinning = true;
   setRouletteSpinButtonState(true, false);
+  updateRouletteSpeedButton(false);
   showScreen(rouletteScreen);
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
@@ -747,8 +785,7 @@ function startRoulette() {
   const startOffset = -(startIndex * tilePitch + tileWidth / 2);
   const stopPositionWithinTile = getRandomRouletteStopPosition(tileWidth);
   const endOffset = -(targetIndex * tilePitch + stopPositionWithinTile);
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const duration = reducedMotion ? 650 : 4700;
+  const duration = getRouletteDuration();
   const run = state.rouletteRun;
 
   rouletteStrip.style.transition = "none";
@@ -773,6 +810,7 @@ function startRoulette() {
 document.querySelector("#start-two-teams").addEventListener("click", () => startGame(2));
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
+rouletteSpeedButton.addEventListener("click", cycleRouletteSpeed);
 document.querySelector("#open-team-choice").addEventListener("click", () => {
   showScreen(teamChoiceScreen);
 });

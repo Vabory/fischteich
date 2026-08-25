@@ -59,7 +59,7 @@ const ROULETTE_GOLD_WINNER_INDEX = 2;
 const ROULETTE_RANDOM_BUCKET_COUNT = 200;
 const ROULETTE_GOLD_BUCKET_COUNT = 2;
 const ROULETTE_GOLD_IMPACT_DURATION = 200;
-const ROULETTE_GOLD_EFFECT_DURATION = 1300;
+const ROULETTE_GOLD_EFFECT_DURATION = 2600;
 const ROULETTE_GOLD_REDUCED_IMPACT_DURATION = 60;
 const ROULETTE_GOLD_REDUCED_EFFECT_DURATION = 420;
 const ROULETTE_WINNERS = Object.freeze([
@@ -871,19 +871,30 @@ function createGoldCelebration(reducedMotion) {
   particles.className = "roulette-gold-effect roulette-gold-particles";
   particles.style.setProperty("--gold-origin-x", `${originX}px`);
   particles.style.setProperty("--gold-origin-y", `${originY}px`);
+  const minimumTravelDistance = Math.round(
+    Math.min(screenRect.width, screenRect.height) * 0.22,
+  );
+  const maximumTravelDistance = Math.ceil(
+    Math.hypot(screenRect.width, screenRect.height) * 0.9,
+  );
 
-  for (let index = 0; index < 48; index += 1) {
+  for (let index = 0; index < 80; index += 1) {
     const particle = document.createElement("span");
-    const size = 3 + secureRandomInt(7);
+    const size = 3 + secureRandomInt(8);
     const angle = secureRandomInt(3600) / 10 * (Math.PI / 180);
-    const travelDistance = 80 + secureRandomInt(181);
+    const travelDistance = minimumTravelDistance + secureRandomInt(
+      maximumTravelDistance - minimumTravelDistance + 1,
+    );
     const travelX = Math.round(Math.cos(angle) * travelDistance);
-    const travelY = Math.round(Math.sin(angle) * travelDistance * 0.85);
+    const travelY = Math.round(Math.sin(angle) * travelDistance * 0.92);
+    const emissionDelay = index < 32
+      ? secureRandomInt(221)
+      : 220 + secureRandomInt(781);
     particle.style.setProperty("--gold-particle-size", `${size}px`);
     particle.style.setProperty("--gold-particle-x", `${travelX}px`);
     particle.style.setProperty("--gold-particle-y", `${travelY}px`);
-    particle.style.setProperty("--gold-particle-delay", `${secureRandomInt(151)}ms`);
-    particle.style.setProperty("--gold-particle-duration", `${850 + secureRandomInt(301)}ms`);
+    particle.style.setProperty("--gold-particle-delay", `${emissionDelay}ms`);
+    particle.style.setProperty("--gold-particle-duration", `${1400 + secureRandomInt(201)}ms`);
     particle.style.setProperty("--gold-particle-rotation", `${secureRandomInt(541) - 270}deg`);
     particles.append(particle);
   }

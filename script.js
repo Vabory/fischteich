@@ -54,6 +54,7 @@ const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
 const ROULETTE_REDUCED_MOTION_DURATION = 650;
+const ROULETTE_STATS_STORAGE_KEY = "fischteich-roulette-stats";
 const ROULETTE_STAT_KEY_BY_WINNER_INDEX = Object.freeze({
   0: "turbolachs",
   1: "nitroforelle",
@@ -99,6 +100,60 @@ const rouletteStatElements = Object.freeze({
   gold: document.querySelector("#roulette-stat-gold"),
 });
 
+function createDefaultRouletteStats() {
+  return {
+    totalSpins: 0,
+    turbolachs: 0,
+    nitroforelle: 0,
+    gold: 0,
+  };
+}
+
+function normalizeRouletteStatValue(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function normalizeRouletteStats(value) {
+  const storedStats = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+  const turbolachs = normalizeRouletteStatValue(storedStats.turbolachs);
+  const nitroforelle = normalizeRouletteStatValue(storedStats.nitroforelle);
+  const gold = normalizeRouletteStatValue(storedStats.gold);
+
+  return {
+    totalSpins: turbolachs + nitroforelle + gold,
+    turbolachs,
+    nitroforelle,
+    gold,
+  };
+}
+
+function loadRouletteStats() {
+  try {
+    const storedValue = window.localStorage.getItem(ROULETTE_STATS_STORAGE_KEY);
+
+    if (storedValue === null) {
+      return createDefaultRouletteStats();
+    }
+
+    return normalizeRouletteStats(JSON.parse(storedValue));
+  } catch {
+    return createDefaultRouletteStats();
+  }
+}
+
+function saveRouletteStats() {
+  try {
+    window.localStorage.setItem(
+      ROULETTE_STATS_STORAGE_KEY,
+      JSON.stringify(state.rouletteStats),
+    );
+  } catch {
+    // Die Session-Statistik läuft weiter, wenn persistenter Speicher nicht verfügbar ist.
+  }
+}
+
 const state = {
   players: [],
   nextPlayerNumber: 1,
@@ -115,12 +170,7 @@ const state = {
   rouletteSpinning: false,
   rouletteWinnerIndex: null,
   rouletteSpeed: ROULETTE_SPEEDS[0],
-  rouletteStats: {
-    totalSpins: 0,
-    turbolachs: 0,
-    nitroforelle: 0,
-    gold: 0,
-  },
+  rouletteStats: loadRouletteStats(),
 };
 
 function showScreen(screen) {
@@ -704,6 +754,7 @@ function recordCompletedRouletteSpin(winnerIndex) {
 
   state.rouletteStats.totalSpins += 1;
   state.rouletteStats[winnerStatKey] += 1;
+  saveRouletteStats();
   renderRouletteStats();
 }
 
@@ -935,3 +986,4 @@ document.addEventListener("keydown", (event) => {
 });
 
 updateMarkerSize();
+renderRouletteStats();

@@ -968,9 +968,11 @@ h2 {
   border: 0;
   background: transparent;
   box-shadow: none;
+  filter: none;
   line-height: 0;
+  opacity: 1;
   transform: translateX(-50%);
-  transition: filter 110ms ease-out, transform 110ms ease-out;
+  transition: filter 110ms ease-out, opacity 110ms ease-out, transform 110ms ease-out;
 }
 
 .roulette-spin-button img {
@@ -988,6 +990,9 @@ h2 {
 }
 
 .roulette-spin-button:disabled {
+  cursor: default;
+  filter: brightness(0.62);
+  opacity: 0.5;
   pointer-events: none;
 }
 

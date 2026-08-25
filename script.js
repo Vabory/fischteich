@@ -50,6 +50,7 @@ const MIN_TEAM_COUNT = 2;
 const MAX_TEAM_COUNT = 10;
 const MIN_MANUAL_TEAM_COUNT = 2;
 const MAX_MANUAL_TEAM_COUNT = 10;
+const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
@@ -633,9 +634,38 @@ function closeLeaveConfirmation() {
   document.querySelector("#leave-game").focus();
 }
 
-function setRouletteSpinButtonAvailable(available) {
-  rouletteSpinButton.hidden = !available;
-  rouletteSpinButton.disabled = !available;
+function setRouletteSpinButtonState(visible, enabled) {
+  rouletteSpinButton.hidden = !visible;
+  rouletteSpinButton.disabled = !enabled;
+}
+
+function createRouletteTiles() {
+  const firstColorIndex = secureRandomInt(2);
+  const tileCount = 52;
+  const tiles = [];
+
+  rouletteStrip.replaceChildren();
+
+  for (let index = 0; index < tileCount; index += 1) {
+    const colorIndex = (firstColorIndex + index) % 2;
+    const tile = document.createElement("div");
+    tile.className = "roulette-tile";
+    tile.style.backgroundColor = TEAM_COLORS[colorIndex].color;
+    tile.dataset.colorIndex = colorIndex;
+    rouletteStrip.append(tile);
+    tiles.push(tile);
+  }
+
+  return tiles;
+}
+
+function getRandomRouletteStopPosition(tileWidth) {
+  const stopSafetyRatio = 0.15;
+  const minimumStopPosition = Math.ceil(tileWidth * stopSafetyRatio);
+  const maximumStopPosition = tileWidth - minimumStopPosition;
+
+  return minimumStopPosition
+    + secureRandomInt(maximumStopPosition - minimumStopPosition + 1);
 }
 
 function stopRoulette() {
@@ -644,8 +674,36 @@ function stopRoulette() {
   state.rouletteTimer = null;
   state.rouletteSpinning = false;
   state.rouletteWinnerIndex = null;
-  setRouletteSpinButtonAvailable(false);
+  setRouletteSpinButtonState(false, false);
   rouletteStrip.style.transition = "none";
+}
+
+function openRoulette() {
+  stopRoulette();
+  showScreen(rouletteScreen);
+  rouletteResult.textContent = "";
+  rouletteResult.classList.remove("is-visible");
+
+  const tiles = createRouletteTiles();
+  const initialFishTileIndexes = tiles
+    .map((tile, index) => ({ colorIndex: Number(tile.dataset.colorIndex), index }))
+    .filter(({ colorIndex, index }) => (
+      index >= 3
+      && index < tiles.length - 3
+      && ROULETTE_INITIAL_FISH_COLOR_INDEXES.includes(colorIndex)
+    ))
+    .map(({ index }) => index);
+  const initialTargetIndex = initialFishTileIndexes[
+    secureRandomInt(initialFishTileIndexes.length)
+  ];
+  const tileWidth = 78;
+  const tilePitch = 81;
+  const stopPositionWithinTile = getRandomRouletteStopPosition(tileWidth);
+  const initialOffset = -(initialTargetIndex * tilePitch + stopPositionWithinTile);
+
+  rouletteStrip.style.transition = "none";
+  rouletteStrip.style.transform = `translateX(${initialOffset}px)`;
+  setRouletteSpinButtonState(true, true);
 }
 
 function finishRoulette(run, winnerIndex) {
@@ -658,7 +716,7 @@ function finishRoulette(run, winnerIndex) {
   rouletteResult.style.color = winner.color;
   rouletteResult.classList.add("is-visible");
   state.rouletteSpinning = false;
-  setRouletteSpinButtonAvailable(true);
+  setRouletteSpinButtonState(true, true);
 }
 
 function startRoulette() {
@@ -668,26 +726,14 @@ function startRoulette() {
 
   stopRoulette();
   state.rouletteSpinning = true;
+  setRouletteSpinButtonState(true, false);
   showScreen(rouletteScreen);
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
-  rouletteStrip.replaceChildren();
 
   const winnerIndex = secureRandomInt(2);
   state.rouletteWinnerIndex = winnerIndex;
-  const firstColorIndex = secureRandomInt(2);
-  const tileCount = 52;
-  const tiles = [];
-
-  for (let index = 0; index < tileCount; index += 1) {
-    const colorIndex = (firstColorIndex + index) % 2;
-    const tile = document.createElement("div");
-    tile.className = "roulette-tile";
-    tile.style.backgroundColor = TEAM_COLORS[colorIndex].color;
-    tile.dataset.colorIndex = colorIndex;
-    rouletteStrip.append(tile);
-    tiles.push(tile);
-  }
+  const tiles = createRouletteTiles();
 
   let targetIndex = 43 + secureRandomInt(4);
 
@@ -699,11 +745,7 @@ function startRoulette() {
   const tilePitch = 81;
   const startIndex = 2;
   const startOffset = -(startIndex * tilePitch + tileWidth / 2);
-  const stopSafetyRatio = 0.15;
-  const minimumStopPosition = Math.ceil(tileWidth * stopSafetyRatio);
-  const maximumStopPosition = tileWidth - minimumStopPosition;
-  const stopPositionWithinTile = minimumStopPosition
-    + secureRandomInt(maximumStopPosition - minimumStopPosition + 1);
+  const stopPositionWithinTile = getRandomRouletteStopPosition(tileWidth);
   const endOffset = -(targetIndex * tilePitch + stopPositionWithinTile);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const duration = reducedMotion ? 650 : 4700;
@@ -729,7 +771,7 @@ function startRoulette() {
 }
 
 document.querySelector("#start-two-teams").addEventListener("click", () => startGame(2));
-document.querySelector("#start-roulette").addEventListener("click", startRoulette);
+document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
 document.querySelector("#open-team-choice").addEventListener("click", () => {
   showScreen(teamChoiceScreen);

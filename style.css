@@ -206,6 +206,7 @@ h2 {
 .secondary-button:active,
 .fish-button:active,
 .settings-button:active,
+.participant-button:active,
 .game-team-options button:active,
 .team-options button:active {
   transform: scale(0.97);
@@ -371,10 +372,10 @@ h2 {
   animation: button-in 220ms ease-out;
 }
 
-.settings-button {
+.settings-button,
+.participant-button {
   position: absolute;
   bottom: 2px;
-  left: var(--side-control-inline-offset);
   z-index: 1;
   display: grid;
   width: 52px;
@@ -392,7 +393,17 @@ h2 {
   -webkit-backdrop-filter: blur(7px);
 }
 
-.settings-button span {
+.settings-button {
+  left: var(--side-control-inline-offset);
+}
+
+.participant-button {
+  right: var(--side-control-inline-offset);
+  font-size: 1.25rem;
+}
+
+.settings-button span,
+.participant-button span {
   transform: translateY(-1px);
 }
 
@@ -462,6 +473,132 @@ h2 {
   border-color: var(--pink);
   background: rgb(241 90 154 / 18%);
   box-shadow: inset 0 0 0 1px var(--pink);
+}
+
+.participant-screen {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(33 35 122 / 34%), transparent 42%),
+    linear-gradient(180deg, #0b1022, #03010f 72%);
+}
+
+.participant-shell {
+  display: grid;
+  width: min(100%, 680px);
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  padding:
+    max(22px, env(safe-area-inset-top))
+    max(10px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.participant-shell > h2 {
+  margin: 0 0 18px;
+  padding-inline: 42px;
+  font-size: clamp(1.05rem, 5vw, 1.8rem);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.participant-columns {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.participant-column {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 9px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.participant-column-selected {
+  border-left: 1px solid rgb(255 255 255 / 13%);
+}
+
+.participant-column h3 {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: clamp(0.72rem, 3.4vw, 0.9rem);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.participant-list {
+  display: flex;
+  min-height: 0;
+  padding: 1px 1px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 7px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.participant-name-button {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid rgb(255 255 255 / 13%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 8%);
+  font-size: clamp(0.82rem, 3.6vw, 0.98rem);
+  font-weight: 750;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.participant-name-button.is-available {
+  color: #f8f9ff;
+}
+
+.participant-name-button.is-selected {
+  border-color: rgb(241 90 154 / 36%);
+  background: rgb(241 90 154 / 13%);
+}
+
+.participant-name-button:active,
+.participant-guest-button:active,
+.participant-continue-button:active {
+  transform: scale(0.97);
+}
+
+.participant-actions {
+  display: grid;
+  padding-top: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
+  gap: 10px;
+}
+
+.participant-guest-button,
+.participant-continue-button {
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  font-size: clamp(0.78rem, 3.5vw, 0.95rem);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.participant-guest-button {
+  border: 1px solid rgb(255 255 255 / 16%);
+  background: rgb(255 255 255 / 8%);
+}
+
+.participant-continue-button {
+  background: var(--pink);
+  box-shadow: 0 9px 24px rgb(241 90 154 / 24%);
 }
 
 .roulette-content {

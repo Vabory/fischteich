@@ -13,6 +13,31 @@ const TEAM_COLORS = [
   { name: "Braun", color: "#9B6545" },
 ];
 
+const FRIENDS = Object.freeze([
+  "Tobi",
+  "Luana",
+  "Marcel",
+  "Caro",
+  "Patrick",
+  "Michi M.",
+  "Julia",
+  "Patschi",
+  "Chris",
+  "Julian",
+  "Fabian",
+  "Kathi",
+  "Juli",
+  "Dani",
+  "Luki",
+  "Tiffany",
+  "Brazn",
+  "Michi S.",
+  "Hannah",
+  "Melvin",
+  "Clemens",
+  "Vivienne",
+]);
+
 const MIN_TEAM_COUNT = 2;
 const MAX_TEAM_COUNT = 10;
 const MARKER_GAP = 7;
@@ -20,6 +45,7 @@ const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
 const menuScreen = document.querySelector("#menu-screen");
 const gameScreen = document.querySelector("#game-screen");
+const participantScreen = document.querySelector("#participant-screen");
 const teamChoiceScreen = document.querySelector("#team-choice-screen");
 const rouletteScreen = document.querySelector("#roulette-screen");
 const playZone = document.querySelector("#play-zone");
@@ -28,7 +54,10 @@ const fishCounter = document.querySelector("#fish-counter");
 const drawButton = document.querySelector("#draw-teams");
 const gameActionArea = document.querySelector(".game-action-area");
 const teamSettingsButton = document.querySelector("#open-team-settings");
+const participantSelectionButton = document.querySelector("#open-participant-selection");
 const teamSettingsModal = document.querySelector("#team-settings-modal");
+const availableParticipants = document.querySelector("#available-participants");
+const selectedParticipants = document.querySelector("#selected-participants");
 const leaveModal = document.querySelector("#leave-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
@@ -39,6 +68,7 @@ const state = {
   teamCount: 2,
   frozen: false,
   markerSize: 76,
+  selectedParticipants: [],
   rouletteRun: 0,
   rouletteTimer: null,
 };
@@ -93,7 +123,55 @@ function updateGameUi() {
   fishCounter.textContent = `Fische im Teich: ${state.players.length}`;
   drawButton.hidden = state.frozen;
   teamSettingsButton.hidden = state.frozen;
+  participantSelectionButton.hidden = state.frozen;
   drawButton.disabled = state.players.length < 2 || state.frozen;
+}
+
+function createParticipantButton(name, isSelected) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `participant-name-button ${isSelected ? "is-selected" : "is-available"}`;
+  button.textContent = `${isSelected ? "−" : "+"} ${name}`;
+  button.setAttribute(
+    "aria-label",
+    isSelected ? `${name} aus Auswahl entfernen` : `${name} auswählen`,
+  );
+  button.addEventListener("click", () => {
+    if (isSelected) {
+      state.selectedParticipants = state.selectedParticipants.filter(
+        (selectedName) => selectedName !== name,
+      );
+    } else if (!state.selectedParticipants.includes(name)) {
+      state.selectedParticipants.push(name);
+    }
+
+    renderParticipantSelection();
+  });
+  return button;
+}
+
+function renderParticipantSelection() {
+  const sortedAvailableParticipants = FRIENDS
+    .filter((name) => !state.selectedParticipants.includes(name))
+    .sort((first, second) => first.localeCompare(second, "de", { sensitivity: "base" }));
+
+  availableParticipants.replaceChildren(
+    ...sortedAvailableParticipants.map((name) => createParticipantButton(name, false)),
+  );
+  selectedParticipants.replaceChildren(
+    ...state.selectedParticipants.map((name) => createParticipantButton(name, true)),
+  );
+}
+
+function openParticipantSelection() {
+  renderParticipantSelection();
+  showScreen(participantScreen);
+  document.querySelector("#close-participant-selection").focus();
+}
+
+function closeParticipantSelection() {
+  showScreen(gameScreen);
+  participantSelectionButton.focus();
 }
 
 function openTeamSettings() {
@@ -428,6 +506,11 @@ for (const button of document.querySelectorAll(".screen-back")) {
 playZone.addEventListener("pointerdown", handlePlayZonePointerDown, { passive: false });
 drawButton.addEventListener("click", drawTeams);
 teamSettingsButton.addEventListener("click", openTeamSettings);
+participantSelectionButton.addEventListener("click", openParticipantSelection);
+document.querySelector("#close-participant-selection").addEventListener(
+  "click",
+  closeParticipantSelection,
+);
 teamSettingsModal.addEventListener("click", (event) => {
   if (event.target === teamSettingsModal) {
     closeTeamSettings();
@@ -449,8 +532,12 @@ window.addEventListener("resize", () => {
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !teamSettingsModal.hidden) {
-    closeTeamSettings();
+  if (event.key === "Escape") {
+    if (!teamSettingsModal.hidden) {
+      closeTeamSettings();
+    } else if (!participantScreen.hidden) {
+      closeParticipantSelection();
+    }
   }
 });
 

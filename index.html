@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=17">
-    <script src="./script.js?v=6" defer></script>
+    <link rel="stylesheet" href="./style.css?v=19">
+    <script src="./script.js?v=7" defer></script>
   </head>
   <body>
     <div id="app">
@@ -68,6 +68,33 @@
             <span aria-hidden="true">⚙</span>
           </button>
           <button class="fish-button" id="draw-teams" type="button" disabled>Angeln</button>
+          <button class="participant-button" id="open-participant-selection" type="button" aria-label="Teilnehmer auswählen">
+            <span aria-hidden="true">👥</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="screen participant-screen" id="participant-screen" aria-labelledby="participant-title" hidden>
+        <button class="close-button" id="close-participant-selection" type="button" aria-label="Zurück zum Finger-Tippen-Screen">×</button>
+        <div class="participant-shell">
+          <h2 id="participant-title">Teilnehmer auswählen</h2>
+
+          <div class="participant-columns">
+            <section class="participant-column" aria-labelledby="available-participants-title">
+              <h3 id="available-participants-title">Verfügbar</h3>
+              <div class="participant-list" id="available-participants"></div>
+            </section>
+
+            <section class="participant-column participant-column-selected" aria-labelledby="selected-participants-title">
+              <h3 id="selected-participants-title">Ausgewählt</h3>
+              <div class="participant-list" id="selected-participants"></div>
+            </section>
+          </div>
+
+          <div class="participant-actions">
+            <button class="participant-guest-button" id="guest-fish-button" type="button">+ Gast Fisch hinzufügen</button>
+            <button class="participant-continue-button" id="participant-continue-button" type="button">Weiter</button>
+          </div>
         </div>
       </section>
 

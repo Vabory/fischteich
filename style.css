@@ -121,7 +121,6 @@ button:focus-visible {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  transform: translateY(clamp(48px, 6dvh, 56px));
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;

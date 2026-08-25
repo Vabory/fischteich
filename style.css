@@ -121,6 +121,7 @@ button:focus-visible {
   height: 100%;
   object-fit: cover;
   object-position: center;
+  transform: translateY(clamp(48px, 6dvh, 56px));
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -854,6 +855,7 @@ h2 {
 
 .roulette-content {
   width: min(100%, 560px);
+  transform: translateY(-1.6rem);
 }
 
 .roulette-window {
@@ -939,11 +941,7 @@ h2 {
 }
 
 .roulette-result {
-  min-height: 3.2rem;
-  margin: 0;
-  font-size: clamp(1.4rem, 7vw, 2.1rem);
-  font-weight: 900;
-  line-height: 1.15;
+  display: none;
 }
 
 .roulette-result.is-visible {

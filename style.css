@@ -953,6 +953,58 @@ h2 {
   background-image: url("./assets/nitroforelle-feld.png?v=1");
 }
 
+.roulette-tile[data-color-index="2"] {
+  background-image: url("./assets/gold-feld.png?v=1");
+}
+
+.roulette-tile.is-gold-hit {
+  position: relative;
+  z-index: 3;
+  animation: roulette-gold-tile-pulse 1050ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  filter: drop-shadow(0 0 12px rgb(255 204 74 / 90%));
+  transform-origin: center;
+}
+
+.roulette-screen.is-gold-impact .roulette-marker {
+  background: #fff8cf;
+  box-shadow:
+    0 0 16px #fff,
+    0 0 28px rgb(255 201 72 / 88%);
+}
+
+.roulette-gold-flash,
+.roulette-gold-particles {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.roulette-gold-flash {
+  background: radial-gradient(
+    circle at var(--gold-origin-x) var(--gold-origin-y),
+    rgb(255 224 112 / 58%) 0,
+    rgb(255 177 43 / 24%) 12%,
+    transparent 36%
+  );
+  animation: roulette-gold-flash 680ms ease-out both;
+  mix-blend-mode: screen;
+}
+
+.roulette-gold-particles span {
+  position: absolute;
+  top: var(--gold-origin-y);
+  left: var(--gold-origin-x);
+  width: var(--gold-particle-size);
+  height: calc(var(--gold-particle-size) * 1.7);
+  border-radius: 45%;
+  background: linear-gradient(180deg, #fff6b7, #ffc52f 56%, #d88700);
+  box-shadow: 0 0 8px rgb(255 205 70 / 82%);
+  opacity: 0;
+  animation: roulette-gold-particle var(--gold-particle-duration) ease-out var(--gold-particle-delay) both;
+}
+
 .roulette-result {
   display: none;
 }
@@ -1108,6 +1160,12 @@ h2 {
   font-weight: 650;
 }
 
+.roulette-last-gold-hit strong.is-gold-now {
+  color: #ffd66e;
+  text-shadow: 0 0 9px rgb(255 198 62 / 54%);
+  animation: roulette-gold-now-pulse 760ms ease-out both;
+}
+
 .roulette-stat-fish-group {
   display: grid;
   padding-block: 5px;
@@ -1178,6 +1236,14 @@ h2 {
   text-shadow: 0 0 12px rgb(255 193 66 / 32%);
 }
 
+.roulette-stat-gold.is-gold-updated .roulette-stat-icon--gold {
+  animation: roulette-gold-stat-icon 850ms cubic-bezier(0.18, 0.82, 0.22, 1) both;
+}
+
+.roulette-stat-gold.is-gold-updated .roulette-stat-value--gold {
+  animation: roulette-gold-stat-value 850ms cubic-bezier(0.18, 0.82, 0.22, 1) both;
+}
+
 .roulette-stat-row--total {
   min-height: 42px;
   padding-top: 6px;
@@ -1195,6 +1261,50 @@ h2 {
 
 .roulette-result.is-visible {
   animation: result-in 420ms cubic-bezier(0.2, 0.9, 0.25, 1.2);
+}
+
+@keyframes roulette-gold-tile-pulse {
+  0%, 100% { transform: scale(1); }
+  38% { transform: scale(1.055); }
+}
+
+@keyframes roulette-gold-flash {
+  0% { opacity: 0; transform: scale(0.72); }
+  24% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+@keyframes roulette-gold-particle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.45);
+  }
+  14% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform:
+      translate(
+        calc(-50% + var(--gold-particle-x)),
+        calc(-50% + var(--gold-particle-y))
+      )
+      rotate(var(--gold-particle-rotation))
+      scale(1);
+  }
+}
+
+@keyframes roulette-gold-stat-icon {
+  0%, 100% { filter: none; transform: scale(1); }
+  42% { filter: drop-shadow(0 0 14px rgb(255 204 74 / 82%)); transform: scale(1.11); }
+}
+
+@keyframes roulette-gold-stat-value {
+  0%, 100% { transform: scale(1); }
+  42% { color: #fff0a5; text-shadow: 0 0 20px rgb(255 196 45 / 72%); transform: scale(1.16); }
+}
+
+@keyframes roulette-gold-now-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  42% { opacity: 0.92; transform: scale(1.08); }
 }
 
 @keyframes result-in {
@@ -1252,6 +1362,16 @@ h2 {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .roulette-screen.is-gold-hit-reduced .roulette-window {
+    box-shadow:
+      inset 0 0 36px rgb(0 0 0 / 48%),
+      0 0 26px rgb(255 201 72 / 48%);
+  }
+
+  .roulette-screen.is-gold-hit-reduced .roulette-stat-gold {
+    filter: drop-shadow(0 0 8px rgb(255 201 72 / 34%));
+  }
+
   *, *::before, *::after {
     scroll-behavior: auto !important;
     animation-duration: 1ms !important;

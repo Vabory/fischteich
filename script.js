@@ -55,9 +55,22 @@ const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
 const ROULETTE_REDUCED_MOTION_DURATION = 650;
 const ROULETTE_STATS_STORAGE_KEY = "fischteich-roulette-stats";
+const ROULETTE_GOLD_WINNER_INDEX = 2;
+const ROULETTE_RANDOM_BUCKET_COUNT = 200;
+const ROULETTE_GOLD_BUCKET_COUNT = 2;
+const ROULETTE_GOLD_IMPACT_DURATION = 200;
+const ROULETTE_GOLD_EFFECT_DURATION = 1300;
+const ROULETTE_GOLD_REDUCED_IMPACT_DURATION = 60;
+const ROULETTE_GOLD_REDUCED_EFFECT_DURATION = 420;
+const ROULETTE_WINNERS = Object.freeze([
+  Object.freeze({ name: TEAM_COLORS[0].name, color: TEAM_COLORS[0].color }),
+  Object.freeze({ name: TEAM_COLORS[1].name, color: TEAM_COLORS[1].color }),
+  Object.freeze({ name: "Goldfisch", color: "#FFD66E" }),
+]);
 const ROULETTE_STAT_KEY_BY_WINNER_INDEX = Object.freeze({
   0: "turbolachs",
   1: "nitroforelle",
+  2: "gold",
 });
 const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
@@ -100,6 +113,7 @@ const rouletteStatElements = Object.freeze({
   gold: document.querySelector("#roulette-stat-gold"),
 });
 const rouletteLastGoldHitElement = document.querySelector("#roulette-stat-last-gold-hit");
+const rouletteGoldStatElement = document.querySelector(".roulette-stat-gold");
 
 function createDefaultRouletteStats() {
   return {
@@ -176,6 +190,7 @@ const state = {
   rouletteTimer: null,
   rouletteSpinning: false,
   rouletteWinnerIndex: null,
+  rouletteGoldTimer: null,
   rouletteSpeed: ROULETTE_SPEEDS[0],
   rouletteStats: loadRouletteStats(),
 };
@@ -746,6 +761,16 @@ function getRouletteDuration() {
   return Math.round(baseDuration / state.rouletteSpeed);
 }
 
+function selectRouletteWinner() {
+  const randomBucket = secureRandomInt(ROULETTE_RANDOM_BUCKET_COUNT);
+
+  if (randomBucket < ROULETTE_GOLD_BUCKET_COUNT) {
+    return ROULETTE_GOLD_WINNER_INDEX;
+  }
+
+  return randomBucket - ROULETTE_GOLD_BUCKET_COUNT < 99 ? 0 : 1;
+}
+
 function renderRouletteStats() {
   for (const [key, element] of Object.entries(rouletteStatElements)) {
     element.textContent = String(state.rouletteStats[key]);
@@ -772,7 +797,7 @@ function recordCompletedRouletteSpin(winnerIndex) {
   renderRouletteStats();
 }
 
-function createRouletteTiles() {
+function createRouletteTiles(goldTileIndex = -1) {
   const firstColorIndex = secureRandomInt(2);
   const tileCount = 52;
   const tiles = [];
@@ -780,10 +805,12 @@ function createRouletteTiles() {
   rouletteStrip.replaceChildren();
 
   for (let index = 0; index < tileCount; index += 1) {
-    const colorIndex = (firstColorIndex + index) % 2;
+    const colorIndex = index === goldTileIndex
+      ? ROULETTE_GOLD_WINNER_INDEX
+      : (firstColorIndex + index) % 2;
     const tile = document.createElement("div");
     tile.className = "roulette-tile";
-    tile.style.backgroundColor = TEAM_COLORS[colorIndex].color;
+    tile.style.backgroundColor = ROULETTE_WINNERS[colorIndex].color;
     tile.dataset.colorIndex = colorIndex;
     rouletteStrip.append(tile);
     tiles.push(tile);
@@ -801,10 +828,104 @@ function getRandomRouletteStopPosition(tileWidth) {
     + secureRandomInt(maximumStopPosition - minimumStopPosition + 1);
 }
 
+function clearGoldHitEffects() {
+  window.clearTimeout(state.rouletteGoldTimer);
+  state.rouletteGoldTimer = null;
+  rouletteScreen.classList.remove("is-gold-impact", "is-gold-hit-reduced");
+  rouletteGoldStatElement.classList.remove("is-gold-updated");
+  rouletteLastGoldHitElement.classList.remove("is-gold-now");
+
+  for (const tile of rouletteStrip.querySelectorAll(".roulette-tile.is-gold-hit")) {
+    tile.classList.remove("is-gold-hit");
+  }
+
+  for (const effect of rouletteScreen.querySelectorAll(".roulette-gold-effect")) {
+    effect.remove();
+  }
+}
+
+function createGoldCelebration(reducedMotion) {
+  if (reducedMotion) {
+    rouletteScreen.classList.add("is-gold-hit-reduced");
+    return;
+  }
+
+  const screenRect = rouletteScreen.getBoundingClientRect();
+  const markerRect = rouletteScreen.querySelector(".roulette-marker").getBoundingClientRect();
+  const originX = markerRect.left + markerRect.width / 2 - screenRect.left;
+  const originY = markerRect.top + markerRect.height / 2 - screenRect.top;
+  const flash = document.createElement("div");
+  flash.className = "roulette-gold-effect roulette-gold-flash";
+  flash.style.setProperty("--gold-origin-x", `${originX}px`);
+  flash.style.setProperty("--gold-origin-y", `${originY}px`);
+  rouletteScreen.append(flash);
+
+  const particles = document.createElement("div");
+  particles.className = "roulette-gold-effect roulette-gold-particles";
+  particles.style.setProperty("--gold-origin-x", `${originX}px`);
+  particles.style.setProperty("--gold-origin-y", `${originY}px`);
+
+  for (let index = 0; index < 24; index += 1) {
+    const particle = document.createElement("span");
+    const size = 4 + secureRandomInt(5);
+    particle.style.setProperty("--gold-particle-size", `${size}px`);
+    particle.style.setProperty("--gold-particle-x", `${secureRandomInt(321) - 160}px`);
+    particle.style.setProperty("--gold-particle-y", `${secureRandomInt(331) - 140}px`);
+    particle.style.setProperty("--gold-particle-delay", `${secureRandomInt(160)}ms`);
+    particle.style.setProperty("--gold-particle-duration", `${900 + secureRandomInt(351)}ms`);
+    particle.style.setProperty("--gold-particle-rotation", `${secureRandomInt(541) - 270}deg`);
+    particles.append(particle);
+  }
+
+  rouletteScreen.append(particles);
+}
+
+function handleGoldHit(run, targetIndex) {
+  const winnerTile = rouletteStrip.children[targetIndex];
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const impactDuration = reducedMotion
+    ? ROULETTE_GOLD_REDUCED_IMPACT_DURATION
+    : ROULETTE_GOLD_IMPACT_DURATION;
+  const effectDuration = reducedMotion
+    ? ROULETTE_GOLD_REDUCED_EFFECT_DURATION
+    : ROULETTE_GOLD_EFFECT_DURATION;
+
+  rouletteScreen.classList.add("is-gold-impact");
+  winnerTile?.classList.add("is-gold-hit");
+
+  state.rouletteGoldTimer = window.setTimeout(() => {
+    if (run !== state.rouletteRun || !state.rouletteSpinning) {
+      clearGoldHitEffects();
+      return;
+    }
+
+    state.rouletteStats.lastGoldHit = new Date().toISOString();
+    recordCompletedRouletteSpin(ROULETTE_GOLD_WINNER_INDEX);
+    rouletteLastGoldHitElement.textContent = "Jetzt";
+    rouletteLastGoldHitElement.classList.add("is-gold-now");
+    rouletteGoldStatElement.classList.add("is-gold-updated");
+    createGoldCelebration(reducedMotion);
+
+    state.rouletteGoldTimer = window.setTimeout(() => {
+      if (run !== state.rouletteRun || !state.rouletteSpinning) {
+        clearGoldHitEffects();
+        return;
+      }
+
+      clearGoldHitEffects();
+      renderRouletteStats();
+      state.rouletteSpinning = false;
+      setRouletteSpinButtonState(true, true);
+      updateRouletteSpeedButton(true);
+    }, effectDuration);
+  }, impactDuration);
+}
+
 function stopRoulette() {
   state.rouletteRun += 1;
   window.clearTimeout(state.rouletteTimer);
   state.rouletteTimer = null;
+  clearGoldHitEffects();
   state.rouletteSpinning = false;
   state.rouletteWinnerIndex = null;
   setRouletteSpinButtonState(false, false);
@@ -842,15 +963,22 @@ function openRoulette() {
   updateRouletteSpeedButton(true);
 }
 
-function finishRoulette(run, winnerIndex) {
+function finishRoulette(run, winnerIndex, targetIndex) {
   if (run !== state.rouletteRun || !state.rouletteSpinning) {
     return;
   }
 
-  const winner = TEAM_COLORS[winnerIndex];
+  state.rouletteTimer = null;
+  const winner = ROULETTE_WINNERS[winnerIndex];
   rouletteResult.textContent = `${winner.name} fängt an!`;
   rouletteResult.style.color = winner.color;
   rouletteResult.classList.add("is-visible");
+
+  if (winnerIndex === ROULETTE_GOLD_WINNER_INDEX) {
+    handleGoldHit(run, targetIndex);
+    return;
+  }
+
   state.rouletteSpinning = false;
   recordCompletedRouletteSpin(winnerIndex);
   setRouletteSpinButtonState(true, true);
@@ -870,13 +998,16 @@ function startRoulette() {
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
 
-  const winnerIndex = secureRandomInt(2);
+  const winnerIndex = selectRouletteWinner();
   state.rouletteWinnerIndex = winnerIndex;
-  const tiles = createRouletteTiles();
-
   let targetIndex = 43 + secureRandomInt(4);
+  const goldTileIndex = winnerIndex === ROULETTE_GOLD_WINNER_INDEX ? targetIndex : -1;
+  const tiles = createRouletteTiles(goldTileIndex);
 
-  if (Number(tiles[targetIndex].dataset.colorIndex) !== winnerIndex) {
+  if (
+    winnerIndex !== ROULETTE_GOLD_WINNER_INDEX
+    && Number(tiles[targetIndex].dataset.colorIndex) !== winnerIndex
+  ) {
     targetIndex += 1;
   }
 
@@ -903,7 +1034,7 @@ function startRoulette() {
   });
 
   state.rouletteTimer = window.setTimeout(
-    () => finishRoulette(run, winnerIndex),
+    () => finishRoulette(run, winnerIndex, targetIndex),
     duration + 80,
   );
 }

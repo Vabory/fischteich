@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=19">
-    <script src="./script.js?v=7" defer></script>
+    <link rel="stylesheet" href="./style.css?v=20">
+    <script src="./script.js?v=9" defer></script>
   </head>
   <body>
     <div id="app">
@@ -138,6 +138,31 @@
           <button type="button" data-game-team-count="10">10</button>
         </div>
       </div>
+    </div>
+
+    <div class="modal-backdrop guest-fish-backdrop" id="guest-fish-modal" role="dialog" aria-modal="true" aria-labelledby="guest-fish-title" hidden>
+      <form class="modal-card guest-fish-card" id="guest-fish-form" novalidate>
+        <h2 id="guest-fish-title">Gast Fisch hinzufügen</h2>
+        <label class="visually-hidden" for="guest-fish-name">Name des Gastfischs</label>
+        <input
+          class="guest-fish-input"
+          id="guest-fish-name"
+          name="guestFishName"
+          type="text"
+          maxlength="24"
+          autocomplete="off"
+          autocapitalize="words"
+          autocorrect="off"
+          enterkeyhint="done"
+          spellcheck="false"
+          aria-describedby="guest-fish-error"
+        >
+        <p class="guest-fish-error" id="guest-fish-error" aria-live="polite" hidden>Bitte einen Namen eingeben.</p>
+        <div class="modal-actions guest-fish-actions">
+          <button class="secondary-button" id="cancel-guest-fish" type="button">Abbrechen</button>
+          <button class="primary-button" id="confirm-guest-fish" type="submit">OK</button>
+        </div>
+      </form>
     </div>
 
   </body>

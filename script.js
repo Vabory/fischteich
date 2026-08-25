@@ -38,6 +38,14 @@ const FRIENDS = Object.freeze([
   "Vivienne",
 ]);
 
+const FRIEND_PARTICIPANTS = Object.freeze(
+  FRIENDS.map((name, index) => Object.freeze({
+    id: `friend-${index + 1}`,
+    name,
+    type: "friend",
+  })),
+);
+
 const MIN_TEAM_COUNT = 2;
 const MAX_TEAM_COUNT = 10;
 const MARKER_GAP = 7;
@@ -58,6 +66,11 @@ const participantSelectionButton = document.querySelector("#open-participant-sel
 const teamSettingsModal = document.querySelector("#team-settings-modal");
 const availableParticipants = document.querySelector("#available-participants");
 const selectedParticipants = document.querySelector("#selected-participants");
+const guestFishButton = document.querySelector("#guest-fish-button");
+const guestFishModal = document.querySelector("#guest-fish-modal");
+const guestFishForm = document.querySelector("#guest-fish-form");
+const guestFishInput = document.querySelector("#guest-fish-name");
+const guestFishError = document.querySelector("#guest-fish-error");
 const leaveModal = document.querySelector("#leave-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
@@ -69,6 +82,7 @@ const state = {
   frozen: false,
   markerSize: 76,
   selectedParticipants: [],
+  nextGuestId: 1,
   rouletteRun: 0,
   rouletteTimer: null,
 };
@@ -127,22 +141,30 @@ function updateGameUi() {
   drawButton.disabled = state.players.length < 2 || state.frozen;
 }
 
-function createParticipantButton(name, isSelected) {
+function createParticipantButton(participant, isSelected) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = `participant-name-button ${isSelected ? "is-selected" : "is-available"}`;
-  button.textContent = `${isSelected ? "−" : "+"} ${name}`;
+  button.textContent = `${isSelected ? "−" : "+"} ${participant.name}`;
+  button.dataset.participantId = participant.id;
+  button.dataset.participantType = participant.type;
   button.setAttribute(
     "aria-label",
-    isSelected ? `${name} aus Auswahl entfernen` : `${name} auswählen`,
+    isSelected
+      ? `${participant.name} aus Auswahl entfernen`
+      : `${participant.name} auswählen`,
   );
   button.addEventListener("click", () => {
     if (isSelected) {
       state.selectedParticipants = state.selectedParticipants.filter(
-        (selectedName) => selectedName !== name,
+        (selectedParticipant) => selectedParticipant.id !== participant.id,
       );
-    } else if (!state.selectedParticipants.includes(name)) {
-      state.selectedParticipants.push(name);
+    } else if (
+      !state.selectedParticipants.some(
+        (selectedParticipant) => selectedParticipant.id === participant.id,
+      )
+    ) {
+      state.selectedParticipants.push(participant);
     }
 
     renderParticipantSelection();
@@ -151,16 +173,77 @@ function createParticipantButton(name, isSelected) {
 }
 
 function renderParticipantSelection() {
-  const sortedAvailableParticipants = FRIENDS
-    .filter((name) => !state.selectedParticipants.includes(name))
-    .sort((first, second) => first.localeCompare(second, "de", { sensitivity: "base" }));
+  const selectedParticipantIds = new Set(
+    state.selectedParticipants.map((participant) => participant.id),
+  );
+  const sortedAvailableParticipants = FRIEND_PARTICIPANTS
+    .filter((participant) => !selectedParticipantIds.has(participant.id))
+    .sort((first, second) => (
+      first.name.localeCompare(second.name, "de", { sensitivity: "base" })
+    ));
 
   availableParticipants.replaceChildren(
-    ...sortedAvailableParticipants.map((name) => createParticipantButton(name, false)),
+    ...sortedAvailableParticipants.map(
+      (participant) => createParticipantButton(participant, false),
+    ),
   );
   selectedParticipants.replaceChildren(
-    ...state.selectedParticipants.map((name) => createParticipantButton(name, true)),
+    ...state.selectedParticipants.map(
+      (participant) => createParticipantButton(participant, true),
+    ),
   );
+}
+
+function getNextGuestName() {
+  const usedNames = new Set(
+    state.selectedParticipants.map((participant) => participant.name),
+  );
+  let guestNumber = 1;
+
+  while (usedNames.has(`Gast Fisch ${guestNumber}`)) {
+    guestNumber += 1;
+  }
+
+  return `Gast Fisch ${guestNumber}`;
+}
+
+function setGuestFishError(isVisible) {
+  guestFishError.hidden = !isVisible;
+  guestFishInput.setAttribute("aria-invalid", String(isVisible));
+}
+
+function openGuestFishModal() {
+  guestFishInput.value = getNextGuestName();
+  setGuestFishError(false);
+  guestFishModal.hidden = false;
+  guestFishInput.focus({ preventScroll: true });
+  guestFishInput.setSelectionRange(0, guestFishInput.value.length);
+}
+
+function closeGuestFishModal() {
+  guestFishModal.hidden = true;
+  guestFishButton.focus();
+}
+
+function addGuestFish() {
+  const name = guestFishInput.value.trim();
+
+  if (!name) {
+    setGuestFishError(true);
+    guestFishInput.focus({ preventScroll: true });
+    guestFishInput.setSelectionRange(0, guestFishInput.value.length);
+    return false;
+  }
+
+  state.selectedParticipants.push({
+    id: `guest-${state.nextGuestId}`,
+    name,
+    type: "guest",
+  });
+  state.nextGuestId += 1;
+  renderParticipantSelection();
+  closeGuestFishModal();
+  return true;
 }
 
 function openParticipantSelection() {
@@ -511,6 +594,24 @@ document.querySelector("#close-participant-selection").addEventListener(
   "click",
   closeParticipantSelection,
 );
+guestFishButton.addEventListener("click", openGuestFishModal);
+guestFishForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  addGuestFish();
+});
+document.querySelector("#cancel-guest-fish").addEventListener("click", closeGuestFishModal);
+guestFishInput.addEventListener("input", () => setGuestFishError(false));
+guestFishInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.isComposing) {
+    event.preventDefault();
+    addGuestFish();
+  }
+});
+guestFishModal.addEventListener("click", (event) => {
+  if (event.target === guestFishModal) {
+    closeGuestFishModal();
+  }
+});
 teamSettingsModal.addEventListener("click", (event) => {
   if (event.target === teamSettingsModal) {
     closeTeamSettings();
@@ -533,7 +634,9 @@ document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    if (!teamSettingsModal.hidden) {
+    if (!guestFishModal.hidden) {
+      closeGuestFishModal();
+    } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
     } else if (!participantScreen.hidden) {
       closeParticipantSelection();

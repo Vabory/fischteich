@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=15">
-    <script src="./script.js?v=5" defer></script>
+    <link rel="stylesheet" href="./style.css?v=16">
+    <script src="./script.js?v=6" defer></script>
   </head>
   <body>
     <div id="app">
@@ -64,6 +64,9 @@
         <div id="play-zone" aria-label="Hier tippen, um Spieler zu registrieren"></div>
         <div id="player-layer" aria-hidden="true"></div>
         <div class="game-action-area">
+          <button class="settings-button" id="open-team-settings" type="button" aria-label="Teamanzahl einstellen">
+            <span aria-hidden="true">⚙</span>
+          </button>
           <button class="fish-button" id="draw-teams" type="button" disabled>Angeln</button>
         </div>
       </section>
@@ -89,6 +92,23 @@
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-leave" type="button">Nein</button>
           <button class="primary-button" id="confirm-leave" type="button">Ja</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="team-settings-backdrop" id="team-settings-modal" role="dialog" aria-modal="true" aria-labelledby="team-settings-title" hidden>
+      <div class="team-settings-card">
+        <h2 id="team-settings-title">Wie viele Teams?</h2>
+        <div class="game-team-options" aria-label="Teamanzahl auswählen">
+          <button type="button" data-game-team-count="2">2</button>
+          <button type="button" data-game-team-count="3">3</button>
+          <button type="button" data-game-team-count="4">4</button>
+          <button type="button" data-game-team-count="5">5</button>
+          <button type="button" data-game-team-count="6">6</button>
+          <button type="button" data-game-team-count="7">7</button>
+          <button type="button" data-game-team-count="8">8</button>
+          <button type="button" data-game-team-count="9">9</button>
+          <button type="button" data-game-team-count="10">10</button>
         </div>
       </div>
     </div>

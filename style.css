@@ -180,7 +180,8 @@ h2 {
 
 .primary-button,
 .secondary-button,
-.fish-button {
+.fish-button,
+.settings-button {
   width: 100%;
   min-height: 56px;
   padding: 14px 20px;
@@ -204,6 +205,8 @@ h2 {
 .primary-button:active,
 .secondary-button:active,
 .fish-button:active,
+.settings-button:active,
+.game-team-options button:active,
 .team-options button:active {
   transform: scale(0.97);
 }
@@ -362,9 +365,33 @@ h2 {
   position: absolute;
   right: 0;
   bottom: 0;
-  left: 0;
+  left: 72px;
   pointer-events: auto;
   animation: button-in 220ms ease-out;
+}
+
+.settings-button {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  display: grid;
+  width: 52px;
+  min-height: 52px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 10%);
+  color: rgb(255 255 255 / 82%);
+  font-size: 1.45rem;
+  line-height: 1;
+  pointer-events: auto;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.settings-button span {
+  transform: translateY(-1px);
 }
 
 .fish-button:disabled {
@@ -381,6 +408,58 @@ h2 {
 
 @keyframes button-in {
   from { opacity: 0; transform: translateY(12px); }
+}
+
+.team-settings-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(22px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom))
+    max(22px, env(safe-area-inset-left));
+  place-items: center;
+  background: rgb(2 4 12 / 76%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.team-settings-card {
+  width: min(100%, 320px);
+  padding: 24px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: 0 22px 70px rgb(0 0 0 / 46%);
+  text-align: center;
+}
+
+.team-settings-card h2 {
+  margin-bottom: 20px;
+  font-size: clamp(1.55rem, 7vw, 2rem);
+}
+
+.game-team-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.game-team-options button {
+  min-height: 52px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 8%);
+  font-size: 1.25rem;
+  font-weight: 850;
+}
+
+.game-team-options button.is-selected {
+  border-color: var(--pink);
+  background: rgb(241 90 154 / 18%);
+  box-shadow: inset 0 0 0 1px var(--pink);
 }
 
 .roulette-content {

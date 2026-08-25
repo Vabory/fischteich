@@ -7,8 +7,14 @@ const TEAM_COLORS = [
   { name: "Gelb", color: "#F4D03F" },
   { name: "Grün", color: "#35B86B" },
   { name: "Orange", color: "#F28C28" },
+  { name: "Türkis", color: "#27C7C9" },
+  { name: "Violett", color: "#8E5BE8" },
+  { name: "Limette", color: "#9BCB3B" },
+  { name: "Braun", color: "#9B6545" },
 ];
 
+const MIN_TEAM_COUNT = 2;
+const MAX_TEAM_COUNT = 10;
 const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
@@ -20,6 +26,9 @@ const playZone = document.querySelector("#play-zone");
 const playerLayer = document.querySelector("#player-layer");
 const fishCounter = document.querySelector("#fish-counter");
 const drawButton = document.querySelector("#draw-teams");
+const gameActionArea = document.querySelector(".game-action-area");
+const teamSettingsButton = document.querySelector("#open-team-settings");
+const teamSettingsModal = document.querySelector("#team-settings-modal");
 const leaveModal = document.querySelector("#leave-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
@@ -61,8 +70,20 @@ function resetGame() {
   updateGameUi();
 }
 
-function startGame(teamCount) {
+function setTeamCount(teamCount) {
+  if (!Number.isInteger(teamCount) || teamCount < MIN_TEAM_COUNT || teamCount > MAX_TEAM_COUNT) {
+    return false;
+  }
+
   state.teamCount = teamCount;
+  return true;
+}
+
+function startGame(teamCount) {
+  if (!setTeamCount(teamCount)) {
+    return;
+  }
+
   resetGame();
   updateMarkerSize();
   showScreen(gameScreen);
@@ -71,7 +92,27 @@ function startGame(teamCount) {
 function updateGameUi() {
   fishCounter.textContent = `Fische im Teich: ${state.players.length}`;
   drawButton.hidden = state.frozen;
+  teamSettingsButton.hidden = state.frozen;
   drawButton.disabled = state.players.length < 2 || state.frozen;
+}
+
+function openTeamSettings() {
+  for (const button of document.querySelectorAll("[data-game-team-count]")) {
+    const isSelected = Number(button.dataset.gameTeamCount) === state.teamCount;
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  }
+
+  teamSettingsModal.hidden = false;
+  document.querySelector(`[data-game-team-count="${state.teamCount}"]`)?.focus();
+}
+
+function closeTeamSettings({ restoreFocus = true } = {}) {
+  teamSettingsModal.hidden = true;
+
+  if (restoreFocus) {
+    teamSettingsButton.focus();
+  }
 }
 
 function distanceBetween(first, second) {
@@ -87,11 +128,19 @@ function overlapsUiElement(position, rectangle) {
 }
 
 function getPlacementLayout() {
+  const actionAreaRectangle = gameActionArea.getBoundingClientRect();
+  const actionButtonRectangle = drawButton.getBoundingClientRect();
+
   return {
     bounds: playZone.getBoundingClientRect(),
     blockedUi: [
       document.querySelector("#leave-game").getBoundingClientRect(),
-      drawButton.getBoundingClientRect(),
+      {
+        top: actionButtonRectangle.top,
+        right: actionAreaRectangle.right,
+        bottom: actionButtonRectangle.bottom,
+        left: actionAreaRectangle.left,
+      },
     ],
   };
 }
@@ -364,12 +413,26 @@ for (const button of document.querySelectorAll("[data-team-count]")) {
   button.addEventListener("click", () => startGame(Number(button.dataset.teamCount)));
 }
 
+for (const button of document.querySelectorAll("[data-game-team-count]")) {
+  button.addEventListener("click", () => {
+    if (setTeamCount(Number(button.dataset.gameTeamCount))) {
+      closeTeamSettings();
+    }
+  });
+}
+
 for (const button of document.querySelectorAll(".screen-back")) {
   button.addEventListener("click", showMenu);
 }
 
 playZone.addEventListener("pointerdown", handlePlayZonePointerDown, { passive: false });
 drawButton.addEventListener("click", drawTeams);
+teamSettingsButton.addEventListener("click", openTeamSettings);
+teamSettingsModal.addEventListener("click", (event) => {
+  if (event.target === teamSettingsModal) {
+    closeTeamSettings();
+  }
+});
 document.querySelector("#leave-game").addEventListener("click", openLeaveConfirmation);
 document.querySelector("#cancel-leave").addEventListener("click", closeLeaveConfirmation);
 document.querySelector("#confirm-leave").addEventListener("click", () => {
@@ -385,5 +448,10 @@ window.addEventListener("resize", () => {
 });
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !teamSettingsModal.hidden) {
+    closeTeamSettings();
+  }
+});
 
 updateMarkerSize();

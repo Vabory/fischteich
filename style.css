@@ -130,9 +130,9 @@ button:focus-visible {
 .roulette-title-image {
   position: absolute;
   z-index: 1;
-  top: max(calc(env(safe-area-inset-top) + 20px), clamp(58px, 8dvh, 72px));
+  top: max(calc(env(safe-area-inset-top) + 6px), clamp(44px, 5.3dvh, 48px));
   left: 50%;
-  width: min(96vw, 420px);
+  width: min(72vw, 300px);
   height: auto;
   transform: translateX(-50%);
   pointer-events: none;
@@ -868,7 +868,7 @@ h2 {
 
 .roulette-content {
   width: min(100%, 560px);
-  transform: translateY(-1.6rem);
+  transform: translateY(-8rem);
 }
 
 .roulette-window {
@@ -960,7 +960,7 @@ h2 {
 .roulette-spin-button {
   position: absolute;
   z-index: 3;
-  top: calc(50% + 72px);
+  top: calc(50% - 28px);
   left: 50%;
   display: block;
   width: min(56vw, 220px);
@@ -1000,7 +1000,7 @@ h2 {
 .roulette-speed-button {
   position: absolute;
   z-index: 3;
-  top: calc(50% + 86px);
+  top: calc(50% - 14px);
   left: calc(50% + min(28vw, 110px) + 10px);
   display: grid;
   width: 50px;
@@ -1039,56 +1039,158 @@ h2 {
 .roulette-stats {
   position: absolute;
   z-index: 2;
-  top: calc(50% + 170px);
+  top: calc(50% + 56px);
   left: 50%;
-  display: grid;
-  width: min(72vw, 270px);
-  padding: 10px 12px;
-  border: 1px solid rgb(255 255 255 / 14%);
-  border-radius: 16px;
-  background: rgb(5 8 20 / 82%);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 28%);
-  gap: 4px;
+  display: flex;
+  width: min(calc(100% - 32px), 346px);
+  height: clamp(238px, 29dvh, 252px);
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 22px;
+  background: rgb(3 6 18 / 88%);
+  box-shadow:
+    -12px 0 30px rgb(31 162 255 / 9%),
+    12px 0 30px rgb(241 47 142 / 9%),
+    0 16px 36px rgb(0 0 0 / 36%);
+  flex-direction: column;
   pointer-events: none;
   transform: translateX(-50%);
 }
 
-.roulette-stat-row {
-  display: grid;
-  min-height: 24px;
-  align-items: center;
-  grid-template-columns: 24px minmax(0, 1fr) minmax(2ch, auto);
-  gap: 9px;
+.roulette-stats::before {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(36 158 255 / 8%), transparent 28%),
+    linear-gradient(-90deg, rgb(241 47 142 / 8%), transparent 28%);
+  content: "";
+  pointer-events: none;
 }
 
-.roulette-stat-row img {
+.roulette-stats > * {
+  position: relative;
+  z-index: 1;
+}
+
+.roulette-stat-gold {
+  display: grid;
+  min-height: 0;
+  padding-bottom: 7px;
+  flex: 1 1 auto;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+}
+
+.roulette-stat-gold-label {
+  color: rgb(255 220 125 / 88%);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.roulette-stat-gold-main {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 12px;
+}
+
+.roulette-last-gold-hit {
+  color: rgb(239 241 250 / 62%);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.roulette-last-gold-hit strong {
+  margin-left: 3px;
+  color: rgb(255 255 255 / 82%);
+  font-weight: 650;
+}
+
+.roulette-stat-fish-group {
+  display: grid;
+  padding-block: 5px;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  gap: 2px;
+}
+
+.roulette-stat-row {
+  display: grid;
+  min-height: 32px;
+  align-items: center;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(3ch, auto);
+  gap: 11px;
+}
+
+.roulette-stat-icon {
   display: block;
-  width: 24px;
-  height: 24px;
   object-fit: contain;
-  opacity: 0.9;
+  opacity: 0.94;
   user-select: none;
   -webkit-user-drag: none;
 }
 
+.roulette-stat-icon--gold {
+  width: clamp(48px, 13.5vw, 56px);
+  height: clamp(48px, 13.5vw, 56px);
+}
+
+.roulette-stat-icon--fish,
+.roulette-stat-icon--total {
+  width: 32px;
+  height: 32px;
+}
+
 .roulette-stat-label {
   overflow: hidden;
-  color: rgb(245 247 255 / 82%);
-  font-size: 0.73rem;
-  font-weight: 700;
-  letter-spacing: 0.055em;
+  color: rgb(245 247 255 / 88%);
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .roulette-stat-value {
-  min-width: 2ch;
+  min-width: 3ch;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 1.35rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: right;
+}
+
+.roulette-stat-row--turbolachs .roulette-stat-label {
+  color: #73ddff;
+}
+
+.roulette-stat-row--nitroforelle .roulette-stat-label {
+  color: #ff7db9;
+}
+
+.roulette-stat-value--gold {
+  min-width: auto;
+  color: #ffd66e;
+  font-size: clamp(34px, 9.7vw, 40px);
+  text-shadow: 0 0 12px rgb(255 193 66 / 32%);
+}
+
+.roulette-stat-row--total {
+  min-height: 42px;
+  padding-top: 6px;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.roulette-stat-row--total .roulette-stat-label {
+  color: rgb(255 255 255 / 92%);
+  font-size: 0.84rem;
+}
+
+.roulette-stat-value--total {
+  font-size: clamp(26px, 7vw, 29px);
 }
 
 .roulette-result.is-visible {

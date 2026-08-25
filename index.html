@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=32">
-    <script src="./script.js?v=17" defer></script>
+    <link rel="stylesheet" href="./style.css?v=33">
+    <script src="./script.js?v=18" defer></script>
   </head>
   <body>
     <div id="app">
@@ -162,25 +162,60 @@
           aria-label="Roulette-Geschwindigkeit: 1-fach"
         >1×</button>
         <div class="roulette-stats" aria-label="Roulette-Statistik" aria-live="polite">
-          <div class="roulette-stat-row">
-            <img src="./assets/total-spins-icon.png" alt="" width="1536" height="1024" draggable="false">
+          <div class="roulette-stat-gold">
+            <span class="roulette-stat-gold-label">GOLD</span>
+            <div class="roulette-stat-gold-main">
+              <img
+                class="roulette-stat-icon roulette-stat-icon--gold"
+                src="./assets/gold-icon.png"
+                alt=""
+                width="1379"
+                height="1141"
+                draggable="false"
+              >
+              <strong class="roulette-stat-value roulette-stat-value--gold" id="roulette-stat-gold">0</strong>
+            </div>
+            <span class="roulette-last-gold-hit">
+              Letzter Hit: <strong id="roulette-stat-last-gold-hit">—</strong>
+            </span>
+          </div>
+          <div class="roulette-stat-fish-group">
+            <div class="roulette-stat-row roulette-stat-row--turbolachs">
+              <img
+                class="roulette-stat-icon roulette-stat-icon--fish"
+                src="./assets/turbolachs-icon.png"
+                alt=""
+                width="1536"
+                height="1024"
+                draggable="false"
+              >
+              <span class="roulette-stat-label">TURBOLACHS</span>
+              <strong class="roulette-stat-value" id="roulette-stat-turbolachs">0</strong>
+            </div>
+            <div class="roulette-stat-row roulette-stat-row--nitroforelle">
+              <img
+                class="roulette-stat-icon roulette-stat-icon--fish"
+                src="./assets/nitroforelle-icon.png"
+                alt=""
+                width="1536"
+                height="1024"
+                draggable="false"
+              >
+              <span class="roulette-stat-label">NITROFORELLE</span>
+              <strong class="roulette-stat-value" id="roulette-stat-nitroforelle">0</strong>
+            </div>
+          </div>
+          <div class="roulette-stat-row roulette-stat-row--total">
+            <img
+              class="roulette-stat-icon roulette-stat-icon--total"
+              src="./assets/total-spins-icon.png"
+              alt=""
+              width="1536"
+              height="1024"
+              draggable="false"
+            >
             <span class="roulette-stat-label">TOTAL SPINS</span>
-            <strong class="roulette-stat-value" id="roulette-stat-total">0</strong>
-          </div>
-          <div class="roulette-stat-row">
-            <img src="./assets/turbolachs-icon.png" alt="" width="1536" height="1024" draggable="false">
-            <span class="roulette-stat-label">TURBOLACHS</span>
-            <strong class="roulette-stat-value" id="roulette-stat-turbolachs">0</strong>
-          </div>
-          <div class="roulette-stat-row">
-            <img src="./assets/nitroforelle-icon.png" alt="" width="1536" height="1024" draggable="false">
-            <span class="roulette-stat-label">NITROFORELLE</span>
-            <strong class="roulette-stat-value" id="roulette-stat-nitroforelle">0</strong>
-          </div>
-          <div class="roulette-stat-row">
-            <img src="./assets/gold-icon.png" alt="" width="1379" height="1141" draggable="false">
-            <span class="roulette-stat-label">GOLD</span>
-            <strong class="roulette-stat-value" id="roulette-stat-gold">0</strong>
+            <strong class="roulette-stat-value roulette-stat-value--total" id="roulette-stat-total">0</strong>
           </div>
         </div>
       </section>

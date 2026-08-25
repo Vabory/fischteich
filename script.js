@@ -99,6 +99,7 @@ const rouletteStatElements = Object.freeze({
   nitroforelle: document.querySelector("#roulette-stat-nitroforelle"),
   gold: document.querySelector("#roulette-stat-gold"),
 });
+const rouletteLastGoldHitElement = document.querySelector("#roulette-stat-last-gold-hit");
 
 function createDefaultRouletteStats() {
   return {
@@ -106,6 +107,7 @@ function createDefaultRouletteStats() {
     turbolachs: 0,
     nitroforelle: 0,
     gold: 0,
+    lastGoldHit: null,
   };
 }
 
@@ -120,12 +122,17 @@ function normalizeRouletteStats(value) {
   const turbolachs = normalizeRouletteStatValue(storedStats.turbolachs);
   const nitroforelle = normalizeRouletteStatValue(storedStats.nitroforelle);
   const gold = normalizeRouletteStatValue(storedStats.gold);
+  const lastGoldHit = typeof storedStats.lastGoldHit === "string"
+    && Number.isFinite(Date.parse(storedStats.lastGoldHit))
+    ? new Date(storedStats.lastGoldHit).toISOString()
+    : null;
 
   return {
     totalSpins: turbolachs + nitroforelle + gold,
     turbolachs,
     nitroforelle,
     gold,
+    lastGoldHit,
   };
 }
 
@@ -743,6 +750,13 @@ function renderRouletteStats() {
   for (const [key, element] of Object.entries(rouletteStatElements)) {
     element.textContent = String(state.rouletteStats[key]);
   }
+
+  rouletteLastGoldHitElement.textContent = state.rouletteStats.lastGoldHit
+    ? new Date(state.rouletteStats.lastGoldHit).toLocaleString("de-AT", {
+      dateStyle: "short",
+      timeStyle: "short",
+    })
+    : "—";
 }
 
 function recordCompletedRouletteSpin(winnerIndex) {

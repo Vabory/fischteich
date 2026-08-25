@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=22">
-    <script src="./script.js?v=9" defer></script>
+    <link rel="stylesheet" href="./style.css?v=24">
+    <script src="./script.js?v=10" defer></script>
   </head>
   <body>
     <div id="app">
@@ -93,7 +93,27 @@
 
           <div class="participant-actions">
             <button class="participant-guest-button" id="guest-fish-button" type="button">+ Gast Fisch hinzufügen</button>
-            <button class="participant-continue-button" id="participant-continue-button" type="button">Weiter</button>
+            <button class="participant-continue-button" id="participant-continue-button" type="button" disabled>Weiter</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen manual-team-screen" id="manual-team-screen" aria-labelledby="manual-team-title" hidden>
+        <button class="close-button manual-team-back-button" id="close-manual-team-screen" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
+        <div class="manual-team-shell">
+          <div class="manual-team-scroll">
+            <header class="manual-team-header">
+              <h2 id="manual-team-title">Fische im Teich:</h2>
+              <p id="manual-team-participant-names"></p>
+            </header>
+
+            <div class="manual-team-grid" id="manual-team-grid">
+              <button class="manual-add-team-button" id="add-manual-team" type="button" aria-label="Weiteres Team hinzufügen">+</button>
+            </div>
+          </div>
+
+          <div class="manual-team-actions">
+            <button class="manual-divide-button" id="divide-manual-teams" type="button">Teams aufteilen</button>
           </div>
         </div>
       </section>

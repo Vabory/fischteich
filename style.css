@@ -956,6 +956,41 @@ h2 {
   display: none;
 }
 
+.roulette-spin-button {
+  position: absolute;
+  z-index: 3;
+  top: calc(50% + 72px);
+  left: 50%;
+  display: block;
+  width: min(56vw, 220px);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  line-height: 0;
+  transform: translateX(-50%);
+  transition: filter 110ms ease-out, transform 110ms ease-out;
+}
+
+.roulette-spin-button img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.roulette-spin-button:active {
+  filter: brightness(0.92);
+  transform: translateX(-50%) scale(0.97);
+}
+
+.roulette-spin-button:disabled {
+  pointer-events: none;
+}
+
 .roulette-result.is-visible {
   animation: result-in 420ms cubic-bezier(0.2, 0.9, 0.25, 1.2);
 }

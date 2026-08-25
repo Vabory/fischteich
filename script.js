@@ -82,6 +82,7 @@ const guestFishError = document.querySelector("#guest-fish-error");
 const leaveModal = document.querySelector("#leave-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
+const rouletteSpinButton = document.querySelector("#spin-roulette");
 
 const state = {
   players: [],
@@ -96,6 +97,8 @@ const state = {
   manualTeamParticipantSignature: "",
   rouletteRun: 0,
   rouletteTimer: null,
+  rouletteSpinning: false,
+  rouletteWinnerIndex: null,
 };
 
 function showScreen(screen) {
@@ -630,10 +633,18 @@ function closeLeaveConfirmation() {
   document.querySelector("#leave-game").focus();
 }
 
+function setRouletteSpinButtonAvailable(available) {
+  rouletteSpinButton.hidden = !available;
+  rouletteSpinButton.disabled = !available;
+}
+
 function stopRoulette() {
   state.rouletteRun += 1;
   window.clearTimeout(state.rouletteTimer);
   state.rouletteTimer = null;
+  state.rouletteSpinning = false;
+  state.rouletteWinnerIndex = null;
+  setRouletteSpinButtonAvailable(false);
   rouletteStrip.style.transition = "none";
 }
 
@@ -646,16 +657,24 @@ function finishRoulette(run, winnerIndex) {
   rouletteResult.textContent = `${winner.name} fängt an!`;
   rouletteResult.style.color = winner.color;
   rouletteResult.classList.add("is-visible");
+  state.rouletteSpinning = false;
+  setRouletteSpinButtonAvailable(true);
 }
 
 function startRoulette() {
+  if (state.rouletteSpinning) {
+    return;
+  }
+
   stopRoulette();
+  state.rouletteSpinning = true;
   showScreen(rouletteScreen);
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
   rouletteStrip.replaceChildren();
 
   const winnerIndex = secureRandomInt(2);
+  state.rouletteWinnerIndex = winnerIndex;
   const firstColorIndex = secureRandomInt(2);
   const tileCount = 52;
   const tiles = [];
@@ -711,6 +730,7 @@ function startRoulette() {
 
 document.querySelector("#start-two-teams").addEventListener("click", () => startGame(2));
 document.querySelector("#start-roulette").addEventListener("click", startRoulette);
+rouletteSpinButton.addEventListener("click", startRoulette);
 document.querySelector("#open-team-choice").addEventListener("click", () => {
   showScreen(teamChoiceScreen);
 });

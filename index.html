@@ -13,7 +13,7 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=24">
+    <link rel="stylesheet" href="./style.css?v=25">
     <script src="./script.js?v=11" defer></script>
   </head>
   <body>
@@ -33,8 +33,8 @@
             <button id="start-two-teams" type="button" aria-label="Angel auswerfen">
               <img src="./assets/button-angel-auswerfen.png?v=2" alt="" width="2172" height="724" draggable="false">
             </button>
-            <button id="start-roulette" type="button" aria-label="Wer beißt zuerst?">
-              <img src="./assets/button-wer-beisst-zuerst.png?v=2" alt="" width="2172" height="724" draggable="false">
+            <button id="start-roulette" type="button" aria-label="Fisch Roulette">
+              <img src="./assets/button-fisch-roulette.png?v=1" alt="" width="2172" height="724" draggable="false">
             </button>
             <button id="open-team-choice" type="button" aria-label="Mehr Teams">
               <img src="./assets/button-mehr-teams.png?v=2" alt="" width="2172" height="724" draggable="false">
@@ -118,11 +118,18 @@
         </div>
       </section>
 
-      <section class="screen roulette-screen" id="roulette-screen" aria-labelledby="roulette-title" hidden>
+      <section class="screen roulette-screen" id="roulette-screen" aria-label="Fisch Roulette" hidden>
+        <img
+          class="roulette-background"
+          src="./assets/background-fisch-roulette.png?v=1"
+          alt=""
+          width="853"
+          height="1844"
+          draggable="false"
+          aria-hidden="true"
+        >
         <button class="close-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">×</button>
         <div class="roulette-content">
-          <p class="eyebrow">Die erste Flosse gehört …</p>
-          <h2 id="roulette-title">Wer beißt zuerst?</h2>
           <div class="roulette-window" aria-hidden="true">
             <div class="roulette-marker"></div>
             <div class="roulette-strip" id="roulette-strip"></div>

@@ -113,6 +113,19 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
+.roulette-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .menu-card,
 .choice-card,
 .roulette-content {
@@ -910,9 +923,19 @@ h2 {
 .roulette-tile {
   flex: 0 0 78px;
   height: 88px;
-  border: 2px solid rgb(255 255 255 / 28%);
-  border-radius: 12px;
-  box-shadow: 0 5px 16px rgb(0 0 0 / 30%);
+  border: 0;
+  background-color: transparent !important;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.roulette-tile[data-color-index="0"] {
+  background-image: url("./assets/turbolachs-feld.png?v=1");
+}
+
+.roulette-tile[data-color-index="1"] {
+  background-image: url("./assets/nitroforelle-feld.png?v=1");
 }
 
 .roulette-result {

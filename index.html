@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=31">
-    <script src="./script.js?v=15" defer></script>
+    <link rel="stylesheet" href="./style.css?v=32">
+    <script src="./script.js?v=16" defer></script>
   </head>
   <body>
     <div id="app">
@@ -161,6 +161,28 @@
           type="button"
           aria-label="Roulette-Geschwindigkeit: 1-fach"
         >1×</button>
+        <div class="roulette-stats" aria-label="Roulette-Statistik" aria-live="polite">
+          <div class="roulette-stat-row">
+            <img src="./assets/total-spins-icon.png" alt="" width="1536" height="1024" draggable="false">
+            <span class="roulette-stat-label">TOTAL SPINS</span>
+            <strong class="roulette-stat-value" id="roulette-stat-total">0</strong>
+          </div>
+          <div class="roulette-stat-row">
+            <img src="./assets/turbolachs-icon.png" alt="" width="1536" height="1024" draggable="false">
+            <span class="roulette-stat-label">TURBOLACHS</span>
+            <strong class="roulette-stat-value" id="roulette-stat-turbolachs">0</strong>
+          </div>
+          <div class="roulette-stat-row">
+            <img src="./assets/nitroforelle-icon.png" alt="" width="1536" height="1024" draggable="false">
+            <span class="roulette-stat-label">NITROFORELLE</span>
+            <strong class="roulette-stat-value" id="roulette-stat-nitroforelle">0</strong>
+          </div>
+          <div class="roulette-stat-row">
+            <img src="./assets/gold-icon.png" alt="" width="1379" height="1141" draggable="false">
+            <span class="roulette-stat-label">GOLD</span>
+            <strong class="roulette-stat-value" id="roulette-stat-gold">0</strong>
+          </div>
+        </div>
       </section>
     </div>
 

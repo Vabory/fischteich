@@ -54,6 +54,10 @@ const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
 const ROULETTE_REDUCED_MOTION_DURATION = 650;
+const ROULETTE_STAT_KEY_BY_WINNER_INDEX = Object.freeze({
+  0: "turbolachs",
+  1: "nitroforelle",
+});
 const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
@@ -88,6 +92,12 @@ const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
 const rouletteSpinButton = document.querySelector("#spin-roulette");
 const rouletteSpeedButton = document.querySelector("#roulette-speed");
+const rouletteStatElements = Object.freeze({
+  totalSpins: document.querySelector("#roulette-stat-total"),
+  turbolachs: document.querySelector("#roulette-stat-turbolachs"),
+  nitroforelle: document.querySelector("#roulette-stat-nitroforelle"),
+  gold: document.querySelector("#roulette-stat-gold"),
+});
 
 const state = {
   players: [],
@@ -105,6 +115,12 @@ const state = {
   rouletteSpinning: false,
   rouletteWinnerIndex: null,
   rouletteSpeed: ROULETTE_SPEEDS[0],
+  rouletteStats: {
+    totalSpins: 0,
+    turbolachs: 0,
+    nitroforelle: 0,
+    gold: 0,
+  },
 };
 
 function showScreen(screen) {
@@ -673,6 +689,24 @@ function getRouletteDuration() {
   return Math.round(baseDuration / state.rouletteSpeed);
 }
 
+function renderRouletteStats() {
+  for (const [key, element] of Object.entries(rouletteStatElements)) {
+    element.textContent = String(state.rouletteStats[key]);
+  }
+}
+
+function recordCompletedRouletteSpin(winnerIndex) {
+  const winnerStatKey = ROULETTE_STAT_KEY_BY_WINNER_INDEX[winnerIndex];
+
+  if (!winnerStatKey) {
+    return;
+  }
+
+  state.rouletteStats.totalSpins += 1;
+  state.rouletteStats[winnerStatKey] += 1;
+  renderRouletteStats();
+}
+
 function createRouletteTiles() {
   const firstColorIndex = secureRandomInt(2);
   const tileCount = 52;
@@ -718,6 +752,7 @@ function openRoulette() {
   showScreen(rouletteScreen);
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
+  renderRouletteStats();
 
   const tiles = createRouletteTiles();
   const initialFishTileIndexes = tiles
@@ -743,7 +778,7 @@ function openRoulette() {
 }
 
 function finishRoulette(run, winnerIndex) {
-  if (run !== state.rouletteRun) {
+  if (run !== state.rouletteRun || !state.rouletteSpinning) {
     return;
   }
 
@@ -752,6 +787,7 @@ function finishRoulette(run, winnerIndex) {
   rouletteResult.style.color = winner.color;
   rouletteResult.classList.add("is-visible");
   state.rouletteSpinning = false;
+  recordCompletedRouletteSpin(winnerIndex);
   setRouletteSpinButtonState(true, true);
   updateRouletteSpeedButton(true);
 }

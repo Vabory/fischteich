@@ -848,6 +848,10 @@ function clearGoldHitEffects() {
 }
 
 function createGoldCelebration(reducedMotion) {
+  const viewportFlash = document.createElement("div");
+  viewportFlash.className = "roulette-gold-effect roulette-gold-viewport-flash";
+  rouletteScreen.append(viewportFlash);
+
   if (reducedMotion) {
     rouletteScreen.classList.add("is-gold-hit-reduced");
     return;
@@ -868,14 +872,18 @@ function createGoldCelebration(reducedMotion) {
   particles.style.setProperty("--gold-origin-x", `${originX}px`);
   particles.style.setProperty("--gold-origin-y", `${originY}px`);
 
-  for (let index = 0; index < 24; index += 1) {
+  for (let index = 0; index < 48; index += 1) {
     const particle = document.createElement("span");
-    const size = 4 + secureRandomInt(5);
+    const size = 3 + secureRandomInt(7);
+    const angle = secureRandomInt(3600) / 10 * (Math.PI / 180);
+    const travelDistance = 80 + secureRandomInt(181);
+    const travelX = Math.round(Math.cos(angle) * travelDistance);
+    const travelY = Math.round(Math.sin(angle) * travelDistance * 0.85);
     particle.style.setProperty("--gold-particle-size", `${size}px`);
-    particle.style.setProperty("--gold-particle-x", `${secureRandomInt(321) - 160}px`);
-    particle.style.setProperty("--gold-particle-y", `${secureRandomInt(331) - 140}px`);
-    particle.style.setProperty("--gold-particle-delay", `${secureRandomInt(160)}ms`);
-    particle.style.setProperty("--gold-particle-duration", `${900 + secureRandomInt(351)}ms`);
+    particle.style.setProperty("--gold-particle-x", `${travelX}px`);
+    particle.style.setProperty("--gold-particle-y", `${travelY}px`);
+    particle.style.setProperty("--gold-particle-delay", `${secureRandomInt(151)}ms`);
+    particle.style.setProperty("--gold-particle-duration", `${850 + secureRandomInt(301)}ms`);
     particle.style.setProperty("--gold-particle-rotation", `${secureRandomInt(541) - 270}deg`);
     particles.append(particle);
   }

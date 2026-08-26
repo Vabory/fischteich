@@ -95,6 +95,8 @@ button:focus-visible {
 }
 
 .menu-screen {
+  --menu-bg-center-to-bottom-shift: max(0px, calc(108.0891vw - 50dvh));
+
   display: block;
   padding: 0;
   background: var(--ink);
@@ -206,7 +208,10 @@ h2 {
 .menu-card {
   position: absolute;
   z-index: 2;
-  top: clamp(342px, calc(51.5dvh + 22px), 506px);
+  top: calc(
+    clamp(342px, calc(51.5dvh + 22px), 506px)
+    - var(--menu-bg-center-to-bottom-shift)
+  );
   left: 50%;
   width: min(73vw, 286px);
   transform: translateX(-50%);
@@ -1507,7 +1512,10 @@ h2 {
 
 @media (max-height: 700px) {
   .menu-card {
-    top: clamp(300px, 52dvh, 364px);
+    top: calc(
+      clamp(300px, 52dvh, 364px)
+      - var(--menu-bg-center-to-bottom-shift)
+    );
     width: min(73vw, 36.5dvh, 286px);
   }
 

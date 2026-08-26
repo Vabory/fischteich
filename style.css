@@ -96,6 +96,7 @@ button:focus-visible {
 
 .menu-screen {
   --menu-bg-center-to-bottom-shift: max(0px, calc(108.0891vw - 50dvh));
+  --menu-main-stack-lift: clamp(12px, 2dvh, 18px);
 
   display: block;
   padding: 0;
@@ -211,6 +212,7 @@ h2 {
   top: calc(
     clamp(342px, calc(51.5dvh + 22px), 506px)
     - var(--menu-bg-center-to-bottom-shift)
+    - var(--menu-main-stack-lift)
   );
   left: 50%;
   width: min(73vw, 286px);
@@ -248,7 +250,7 @@ h2 {
 .active-tournament-card {
   width: 100%;
   min-height: 65px;
-  margin-top: clamp(-20px, -4.8vw, -16px);
+  margin-top: clamp(-16px, -3.7vw, -12px);
   margin-left: 50%;
   padding: 8px 12px;
   align-items: center;
@@ -324,10 +326,20 @@ h2 {
 }
 
 .menu-secondary-actions {
+  --menu-lower-base-bottom: max(env(safe-area-inset-bottom), 8px);
+  --menu-lower-target-shift: clamp(16px, 2.8dvh, 22px);
+  --menu-lower-effective-shift: min(
+    var(--menu-lower-target-shift),
+    var(--menu-lower-base-bottom)
+  );
+
   position: absolute;
   z-index: 2;
   right: max(20px, env(safe-area-inset-right));
-  bottom: max(env(safe-area-inset-bottom), 8px);
+  bottom: calc(
+    var(--menu-lower-base-bottom)
+    - var(--menu-lower-effective-shift)
+  );
   left: max(20px, env(safe-area-inset-left));
   display: flex;
   width: min(75vw, 304px);
@@ -1536,6 +1548,7 @@ h2 {
     top: calc(
       clamp(300px, 52dvh, 364px)
       - var(--menu-bg-center-to-bottom-shift)
+      - var(--menu-main-stack-lift)
     );
     width: min(73vw, 36.5dvh, 286px);
   }

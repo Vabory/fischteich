@@ -183,22 +183,32 @@ h2 {
 }
 
 .menu-actions {
+  --menu-visible-gap: clamp(6px, 0.8dvh, 10px);
+
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
 .menu-actions button + button {
-  /* Gleicht die transparenten PNG-Ränder aus; sichtbar bleiben ca. 8–14 px. */
-  margin-top: clamp(-44px, -10.5vw, -30px);
+  /* Die Prozentwerte gleichen nur die unterschiedlichen transparenten PNG-Ränder aus. */
+  margin-top: calc(var(--menu-visible-gap) - 17.3%);
+}
+
+.menu-actions button:nth-child(3) {
+  margin-top: calc(var(--menu-visible-gap) - 20.2%);
+}
+
+.menu-actions button:nth-child(4) {
+  margin-top: calc(var(--menu-visible-gap) - 16.1%);
 }
 
 .menu-card {
   position: absolute;
   z-index: 2;
-  top: clamp(320px, 52dvh, 484px);
+  top: clamp(320px, 51.5dvh, 484px);
   left: 50%;
-  width: min(78vw, 306px);
+  width: min(73vw, 286px);
   transform: translateX(-50%);
 }
 
@@ -231,10 +241,11 @@ h2 {
 }
 
 .active-tournament-card {
-  width: min(88vw, 360px);
-  margin-top: clamp(8px, 1.4dvh, 14px);
+  width: 100%;
+  min-height: 65px;
+  margin-top: clamp(-20px, -4.8vw, -16px);
   margin-left: 50%;
-  padding: 12px 14px;
+  padding: 8px 12px;
   align-items: center;
   justify-content: space-between;
   border: 1px solid rgb(255 255 255 / 20%);
@@ -263,18 +274,21 @@ h2 {
   font-size: 0.65rem;
   font-weight: 900;
   letter-spacing: 0.09em;
+  line-height: 1.1;
   text-transform: uppercase;
 }
 
 .active-tournament-name {
   margin-top: 2px !important;
   font-size: 0.9rem;
+  line-height: 1.15;
 }
 
 .active-tournament-phase {
   margin-top: 2px !important;
   color: var(--muted);
   font-size: 0.72rem;
+  line-height: 1.1;
 }
 
 .active-tournament-arrow {
@@ -287,7 +301,7 @@ h2 {
   position: absolute;
   z-index: 2;
   right: max(20px, env(safe-area-inset-right));
-  bottom: max(calc(env(safe-area-inset-bottom) + 4px), 12px);
+  bottom: max(env(safe-area-inset-bottom), 8px);
   left: max(20px, env(safe-area-inset-left));
   display: flex;
   width: min(58vw, 238px);
@@ -1494,7 +1508,7 @@ h2 {
 @media (max-height: 700px) {
   .menu-card {
     top: clamp(300px, 52dvh, 364px);
-    width: min(78vw, 39dvh, 306px);
+    width: min(73vw, 36.5dvh, 286px);
   }
 
   .menu-crest {

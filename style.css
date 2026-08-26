@@ -95,7 +95,8 @@ button:focus-visible {
 }
 
 .menu-screen {
-  place-items: end center;
+  display: block;
+  padding: 0;
   background: var(--ink);
 }
 
@@ -104,10 +105,9 @@ button:focus-visible {
   z-index: 0;
   inset: 0;
   width: 100%;
-  height: calc(100% + 60px);
+  height: 100%;
   object-fit: cover;
-  object-position: center top;
-  transform: translateY(-60px);
+  object-position: center center;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -116,15 +116,9 @@ button:focus-visible {
 .menu-crest {
   position: absolute;
   z-index: 1;
-  top: max(
-    env(safe-area-inset-top),
-    calc(
-      max(calc(env(safe-area-inset-top) + 28px), clamp(70px, 9dvh, 82px))
-      - clamp(28px, 3.52dvh, 30px)
-    )
-  );
+  top: max(calc(env(safe-area-inset-top) + 8px), clamp(40px, 5.8dvh, 58px));
   left: 50%;
-  width: clamp(116px, 31vw, 132px);
+  width: clamp(94px, 27vw, 122px);
   height: auto;
   transform: translateX(-50%);
   pointer-events: none;
@@ -190,21 +184,16 @@ h2 {
 
 .menu-actions {
   display: grid;
-  gap: 0;
-}
-
-.menu-actions button + button {
-  margin-top: -14px;
+  gap: clamp(2px, 0.45dvh, 5px);
 }
 
 .menu-card {
-  width: min(60vw, 220px);
-  transform: translateY(
-    min(
-      25px,
-      max(14px, calc(max(28px, env(safe-area-inset-bottom)) - 14px))
-    )
-  );
+  position: absolute;
+  z-index: 2;
+  top: clamp(320px, 51.5dvh, 470px);
+  left: 50%;
+  width: clamp(184px, 54.5vw, 234px);
+  transform: translateX(-50%);
 }
 
 .menu-actions button {
@@ -217,9 +206,7 @@ h2 {
   background: transparent;
   box-shadow: none;
   line-height: 0;
-  transition:
-    transform 110ms ease-out,
-    filter 110ms ease-out;
+  transition: transform 110ms ease-out;
 }
 
 .menu-actions img {
@@ -228,12 +215,104 @@ h2 {
   height: auto;
   object-fit: contain;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .menu-actions button:active {
-  filter: brightness(0.92);
   box-shadow: none;
-  transform: scale(0.97);
+  transform: scale(0.975);
+}
+
+.active-tournament-card {
+  width: min(88vw, 360px);
+  margin-top: clamp(8px, 1.4dvh, 14px);
+  margin-left: 50%;
+  padding: 12px 14px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 14px;
+  background: rgb(3 7 22 / 86%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+  text-align: left;
+  transform: translateX(-50%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.active-tournament-card:not([hidden]) {
+  display: flex;
+}
+
+.active-tournament-card p,
+.active-tournament-card strong,
+.active-tournament-card span {
+  display: block;
+  margin: 0;
+}
+
+.active-tournament-status {
+  color: #ff4c9c;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.active-tournament-name {
+  margin-top: 2px !important;
+  font-size: 0.9rem;
+}
+
+.active-tournament-phase {
+  margin-top: 2px !important;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.active-tournament-arrow {
+  color: #fff;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.menu-secondary-actions {
+  position: absolute;
+  z-index: 2;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(calc(env(safe-area-inset-bottom) + 4px), 12px);
+  left: max(20px, env(safe-area-inset-left));
+  display: flex;
+  width: min(58vw, 238px);
+  margin-inline: auto;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.menu-secondary-actions button {
+  width: clamp(58px, 17vw, 74px);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  line-height: 0;
+  transition: transform 110ms ease-out;
+}
+
+.menu-secondary-actions img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.menu-secondary-actions button:active {
+  transform: scale(0.96);
 }
 
 .primary-button,
@@ -1407,7 +1486,18 @@ h2 {
 }
 
 @media (max-height: 700px) {
-  .menu-card { width: min(56vw, 200px); }
+  .menu-card {
+    top: clamp(292px, 48.5dvh, 340px);
+    width: clamp(168px, 50vw, 202px);
+  }
+
+  .menu-crest {
+    width: clamp(82px, 23vw, 104px);
+  }
+
+  .menu-secondary-actions button {
+    width: clamp(50px, 14vw, 60px);
+  }
 }
 
 @media (max-height: 620px) {

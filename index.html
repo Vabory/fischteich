@@ -13,15 +13,15 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=39">
-    <script src="./script.js?v=22" defer></script>
+    <link rel="stylesheet" href="./style.css?v=40">
+    <script src="./script.js?v=23" defer></script>
   </head>
   <body>
     <div id="app">
       <section class="screen menu-screen is-active" id="menu-screen" aria-label="Hauptmenü">
         <img
           class="menu-background"
-          src="./assets/menu-background.png?v=3"
+          src="./assets/menu-background.png?v=4"
           alt=""
           width="853"
           height="1844"
@@ -30,26 +30,47 @@
         >
         <img
           class="menu-crest"
-          src="./assets/turbolachs-wappen.png?v=1"
+          src="./assets/turbolachs-wappen.png?v=2"
           alt=""
           width="1236"
           height="1273"
           draggable="false"
           aria-hidden="true"
         >
-        <div class="menu-card">
+        <main class="menu-card">
           <div class="menu-actions">
             <button id="start-two-teams" type="button" aria-label="Teams aufteilen">
-              <img src="./assets/button-teams-aufteilen.png?v=1" alt="" width="2172" height="724" draggable="false">
+              <img src="./assets/button-teams-aufteilen.png?v=2" alt="" width="2172" height="724" draggable="false">
             </button>
             <button id="start-roulette" type="button" aria-label="Fisch Roulette">
-              <img src="./assets/button-fisch-roulette.png?v=1" alt="" width="2172" height="724" draggable="false">
+              <img src="./assets/button-fisch-roulette.png?v=2" alt="" width="2032" height="774" draggable="false">
             </button>
-            <button id="open-team-choice" type="button" aria-label="Mehr Teams">
-              <img src="./assets/button-mehr-teams.png?v=2" alt="" width="2172" height="724" draggable="false">
+            <button id="create-tournament" type="button" aria-label="Turnier erstellen">
+              <img src="./assets/button-turnier-erstellen.png?v=1" alt="" width="2172" height="724" draggable="false">
+            </button>
+            <button id="open-dice-game" type="button" aria-label="3er Trottl – Würfelspiel">
+              <img src="./assets/button-würfelspiel.png?v=1" alt="" width="2172" height="724" draggable="false">
             </button>
           </div>
-        </div>
+
+          <aside class="active-tournament-card" id="active-tournament" aria-live="polite" hidden>
+            <div>
+              <p class="active-tournament-status"><span aria-hidden="true">●</span> Turnier läuft</p>
+              <strong class="active-tournament-name">Sommer Dart Turnier</strong>
+              <span class="active-tournament-phase">Gruppenphase</span>
+            </div>
+            <span class="active-tournament-arrow" aria-hidden="true">›</span>
+          </aside>
+        </main>
+
+        <nav class="menu-secondary-actions" aria-label="Weitere Bereiche">
+          <button id="open-settings" type="button" aria-label="Einstellungen">
+            <img src="./assets/button-einstellungen.png?v=1" alt="" width="1254" height="1254" draggable="false">
+          </button>
+          <button id="open-past-tournaments" type="button" aria-label="Vergangene Turniere">
+            <img src="./assets/button-vergangene-tuniere.png?v=1" alt="" width="1270" height="1239" draggable="false">
+          </button>
+        </nav>
       </section>
 
       <section class="screen choice-screen" id="team-choice-screen" aria-labelledby="team-choice-title" hidden>

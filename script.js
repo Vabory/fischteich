@@ -1065,9 +1065,6 @@ document.querySelector("#start-two-teams").addEventListener("click", () => start
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
 rouletteSpeedButton.addEventListener("click", cycleRouletteSpeed);
-document.querySelector("#open-team-choice").addEventListener("click", () => {
-  showScreen(teamChoiceScreen);
-});
 
 for (const button of document.querySelectorAll("[data-team-count]")) {
   button.addEventListener("click", () => startGame(Number(button.dataset.teamCount)));

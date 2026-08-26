@@ -206,7 +206,7 @@ h2 {
 .menu-card {
   position: absolute;
   z-index: 2;
-  top: clamp(320px, 51.5dvh, 484px);
+  top: clamp(342px, calc(51.5dvh + 22px), 506px);
   left: 50%;
   width: min(73vw, 286px);
   transform: translateX(-50%);
@@ -304,7 +304,7 @@ h2 {
   bottom: max(env(safe-area-inset-bottom), 8px);
   left: max(20px, env(safe-area-inset-left));
   display: flex;
-  width: min(58vw, 238px);
+  width: min(75vw, 304px);
   margin-inline: auto;
   align-items: center;
   justify-content: space-between;

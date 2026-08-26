@@ -114,6 +114,33 @@ const rouletteStatElements = Object.freeze({
 });
 const rouletteLastGoldHitElement = document.querySelector("#roulette-stat-last-gold-hit");
 const rouletteGoldStatElement = document.querySelector(".roulette-stat-gold");
+const activeTournamentCard = document.querySelector("#active-tournament");
+const activeTournamentName = document.querySelector("#active-tournament-name");
+const activeTournamentPhase = document.querySelector("#active-tournament-phase");
+
+function setActiveTournament(tournament = null) {
+  if (tournament === null) {
+    activeTournamentCard.hidden = true;
+    return;
+  }
+
+  const name = String(tournament.name ?? "").trim();
+  const phase = String(tournament.phase ?? "").trim();
+
+  if (name) {
+    activeTournamentName.textContent = name;
+  }
+
+  if (phase) {
+    activeTournamentPhase.textContent = phase;
+  }
+
+  activeTournamentCard.setAttribute(
+    "aria-label",
+    `Aktives Turnier öffnen: ${activeTournamentName.textContent}, ${activeTournamentPhase.textContent}`,
+  );
+  activeTournamentCard.hidden = false;
+}
 
 function createDefaultRouletteStats() {
   return {

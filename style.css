@@ -764,6 +764,7 @@ h2 {
 
 .participant-name-button:active,
 .participant-guest-button:active,
+.participant-reset-button:active,
 .participant-continue-button:active {
   transform: scale(0.97);
 }
@@ -771,23 +772,31 @@ h2 {
 .participant-actions {
   display: grid;
   padding-top: 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .participant-guest-button,
+.participant-reset-button,
 .participant-continue-button {
   min-height: 52px;
-  padding: 10px 12px;
+  padding: 10px 6px;
   border-radius: 15px;
   font-size: clamp(0.78rem, 3.5vw, 0.95rem);
   font-weight: 800;
   line-height: 1.15;
+  white-space: nowrap;
 }
 
-.participant-guest-button {
+.participant-guest-button,
+.participant-reset-button {
   border: 1px solid rgb(255 255 255 / 16%);
   background: rgb(255 255 255 / 8%);
+}
+
+.participant-reset-button {
+  border-color: rgb(255 102 120 / 34%);
+  color: #ff8997;
 }
 
 .participant-continue-button {

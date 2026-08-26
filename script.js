@@ -91,7 +91,9 @@ const participantSelectionButton = document.querySelector("#open-participant-sel
 const teamSettingsModal = document.querySelector("#team-settings-modal");
 const availableParticipants = document.querySelector("#available-participants");
 const selectedParticipants = document.querySelector("#selected-participants");
+const selectedParticipantsTitle = document.querySelector("#selected-participants-title");
 const participantContinueButton = document.querySelector("#participant-continue-button");
+const resetParticipantsButton = document.querySelector("#reset-participants");
 const manualTeamTitle = document.querySelector("#manual-team-title");
 const manualTeamParticipantNames = document.querySelector("#manual-team-participant-names");
 const manualTeamGrid = document.querySelector("#manual-team-grid");
@@ -334,7 +336,14 @@ function renderParticipantSelection() {
       (participant) => createParticipantButton(participant, true),
     ),
   );
+  selectedParticipantsTitle.textContent = `Ausgewählt (${state.selectedParticipants.length})`;
   participantContinueButton.disabled = state.selectedParticipants.length < 2;
+}
+
+function resetParticipantSelection() {
+  state.selectedParticipants = [];
+  state.nextGuestId = 1;
+  renderParticipantSelection();
 }
 
 function getNextGuestName() {
@@ -1228,6 +1237,7 @@ drawButton.addEventListener("click", drawTeams);
 teamSettingsButton.addEventListener("click", openTeamSettings);
 participantSelectionButton.addEventListener("click", openParticipantSelection);
 participantContinueButton.addEventListener("click", openManualTeamScreen);
+resetParticipantsButton.addEventListener("click", resetParticipantSelection);
 document.querySelector("#close-participant-selection").addEventListener(
   "click",
   closeParticipantSelection,

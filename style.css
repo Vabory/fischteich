@@ -253,10 +253,10 @@ h2 {
   padding: 8px 12px;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid rgb(255 255 255 / 20%);
+  border: 1px solid rgb(73 211 137 / 44%);
   border-radius: 14px;
-  background: rgb(3 7 22 / 86%);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+  background: rgb(2 9 18 / 88%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 24%);
   text-align: left;
   transform: translateX(-50%);
   backdrop-filter: blur(8px);
@@ -275,7 +275,10 @@ h2 {
 }
 
 .active-tournament-status {
-  color: #ff4c9c;
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  color: #52d98b;
   font-size: 0.65rem;
   font-weight: 900;
   letter-spacing: 0.09em;
@@ -283,23 +286,41 @@ h2 {
   text-transform: uppercase;
 }
 
+.active-tournament-status-point {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #52d98b;
+}
+
 .active-tournament-name {
   margin-top: 2px !important;
-  font-size: 0.9rem;
+  color: #fff;
+  font-size: 0.82rem;
   line-height: 1.15;
 }
 
 .active-tournament-phase {
   margin-top: 2px !important;
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: #9aa5b8;
+  font-size: 0.68rem;
   line-height: 1.1;
 }
 
 .active-tournament-arrow {
-  color: #fff;
-  font-size: 1.7rem;
+  color: #52d98b;
+  font-size: 1.35rem;
   line-height: 1;
+}
+
+.active-tournament-card:active {
+  transform: translateX(-50%) scale(0.985);
+}
+
+.active-tournament-card:focus-visible {
+  outline: 2px solid #75dfa0;
+  outline-offset: 2px;
 }
 
 .menu-secondary-actions {

@@ -13,7 +13,7 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=44">
+    <link rel="stylesheet" href="./style.css?v=45">
     <script src="./script.js?v=23" defer></script>
   </head>
   <body>
@@ -53,14 +53,22 @@
             </button>
           </div>
 
-          <aside class="active-tournament-card" id="active-tournament" aria-live="polite" hidden>
-            <div>
-              <p class="active-tournament-status"><span aria-hidden="true">●</span> Turnier läuft</p>
-              <strong class="active-tournament-name">Sommer Dart Turnier</strong>
-              <span class="active-tournament-phase">Gruppenphase</span>
+          <button
+            class="active-tournament-card"
+            id="active-tournament"
+            type="button"
+            aria-label="Aktives Turnier öffnen: Sommer Dart Turnier, Gruppenphase"
+          >
+            <div class="active-tournament-copy">
+              <p class="active-tournament-status">
+                <span class="active-tournament-status-point" aria-hidden="true"></span>
+                Turnier läuft
+              </p>
+              <strong class="active-tournament-name" id="active-tournament-name">Sommer Dart Turnier</strong>
+              <span class="active-tournament-phase" id="active-tournament-phase">Gruppenphase</span>
             </div>
             <span class="active-tournament-arrow" aria-hidden="true">›</span>
-          </aside>
+          </button>
         </main>
 
         <nav class="menu-secondary-actions" aria-label="Weitere Bereiche">

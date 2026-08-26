@@ -24,9 +24,19 @@
 
       .viewport-debug-frame,
       #viewport-debug-safe-area,
-      #viewport-debug-panel {
+      #viewport-debug-panel,
+      .ios-overflow-test {
         position: fixed;
         pointer-events: none;
+      }
+
+      .ios-overflow-test {
+        z-index: 2147483643;
+        right: 40px;
+        bottom: -80px;
+        left: 40px;
+        height: 160px;
+        background: #ffff00;
       }
 
       .viewport-debug-frame {
@@ -73,6 +83,7 @@
         ];
         const panel = document.createElement("pre");
         const safeArea = document.createElement("div");
+        const overflowTest = document.createElement("div");
         const frames = targets.map(([label, element, color]) => {
           const frame = document.createElement("div");
           frame.className = "viewport-debug-frame";
@@ -84,7 +95,8 @@
 
         panel.id = "viewport-debug-panel";
         safeArea.id = "viewport-debug-safe-area";
-        document.body.append(safeArea, panel);
+        overflowTest.className = "ios-overflow-test";
+        document.body.append(overflowTest, safeArea, panel);
 
         const formatRect = (rect) => (
           `${Math.round(rect.left)},${Math.round(rect.top)} `

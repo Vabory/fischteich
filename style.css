@@ -183,16 +183,22 @@ h2 {
 }
 
 .menu-actions {
-  display: grid;
-  gap: clamp(2px, 0.45dvh, 5px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.menu-actions button + button {
+  /* Gleicht die transparenten PNG-Ränder aus; sichtbar bleiben ca. 8–14 px. */
+  margin-top: clamp(-44px, -10.5vw, -30px);
 }
 
 .menu-card {
   position: absolute;
   z-index: 2;
-  top: clamp(320px, 51.5dvh, 470px);
+  top: clamp(320px, 52dvh, 484px);
   left: 50%;
-  width: clamp(184px, 54.5vw, 234px);
+  width: min(78vw, 306px);
   transform: translateX(-50%);
 }
 
@@ -1487,8 +1493,8 @@ h2 {
 
 @media (max-height: 700px) {
   .menu-card {
-    top: clamp(292px, 48.5dvh, 340px);
-    width: clamp(168px, 50vw, 202px);
+    top: clamp(300px, 52dvh, 364px);
+    width: min(78vw, 39dvh, 306px);
   }
 
   .menu-crest {

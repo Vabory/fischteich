@@ -92,10 +92,15 @@ const teamSettingsModal = document.querySelector("#team-settings-modal");
 const availableParticipants = document.querySelector("#available-participants");
 const selectedParticipants = document.querySelector("#selected-participants");
 const participantContinueButton = document.querySelector("#participant-continue-button");
+const manualTeamTitle = document.querySelector("#manual-team-title");
 const manualTeamParticipantNames = document.querySelector("#manual-team-participant-names");
 const manualTeamGrid = document.querySelector("#manual-team-grid");
 const addManualTeamButton = document.querySelector("#add-manual-team");
 const divideManualTeamsButton = document.querySelector("#divide-manual-teams");
+const manualTeamRenameModal = document.querySelector("#manual-team-rename-modal");
+const manualTeamRenameForm = document.querySelector("#manual-team-rename-form");
+const manualTeamRenameInput = document.querySelector("#manual-team-rename-input");
+const manualTeamRenameError = document.querySelector("#manual-team-rename-error");
 const guestFishButton = document.querySelector("#guest-fish-button");
 const guestFishModal = document.querySelector("#guest-fish-modal");
 const guestFishForm = document.querySelector("#guest-fish-form");
@@ -211,6 +216,8 @@ const state = {
   selectedParticipants: [],
   nextGuestId: 1,
   manualTeamCount: MIN_MANUAL_TEAM_COUNT,
+  manualTeamNames: [],
+  manualTeamRenameIndex: null,
   manualTeamAssignments: null,
   manualTeamParticipantSignature: "",
   rouletteRun: 0,
@@ -343,17 +350,30 @@ function getNextGuestName() {
   return `Gast Fisch ${guestNumber}`;
 }
 
+function setTextInputError(input, error, isVisible) {
+  error.hidden = !isVisible;
+  input.setAttribute("aria-invalid", String(isVisible));
+}
+
+function prepareTextInputModal(modal, input, error, value) {
+  input.value = value;
+  setTextInputError(input, error, false);
+  modal.hidden = false;
+  input.focus({ preventScroll: true });
+  input.setSelectionRange(0, input.value.length);
+}
+
 function setGuestFishError(isVisible) {
-  guestFishError.hidden = !isVisible;
-  guestFishInput.setAttribute("aria-invalid", String(isVisible));
+  setTextInputError(guestFishInput, guestFishError, isVisible);
 }
 
 function openGuestFishModal() {
-  guestFishInput.value = getNextGuestName();
-  setGuestFishError(false);
-  guestFishModal.hidden = false;
-  guestFishInput.focus({ preventScroll: true });
-  guestFishInput.setSelectionRange(0, guestFishInput.value.length);
+  prepareTextInputModal(
+    guestFishModal,
+    guestFishInput,
+    guestFishError,
+    getNextGuestName(),
+  );
 }
 
 function closeGuestFishModal() {
@@ -638,23 +658,113 @@ function createManualTeamAssignments(participants, teamCount) {
   return assignments;
 }
 
+function getDefaultManualTeamName(teamIndex) {
+  return `TEAM ${teamIndex + 1}`;
+}
+
+function ensureManualTeamNames() {
+  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+    state.manualTeamNames = [];
+    return;
+  }
+
+  state.manualTeamNames = Array.from(
+    { length: state.manualTeamCount },
+    (_, teamIndex) => state.manualTeamNames[teamIndex] || getDefaultManualTeamName(teamIndex),
+  );
+}
+
+function getManualTeamName(teamIndex) {
+  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+    return teamIndex === 0 ? "TURBOLACHS" : "NITROFORELLE";
+  }
+
+  return state.manualTeamNames[teamIndex] || getDefaultManualTeamName(teamIndex);
+}
+
+function setManualTeamRenameError(isVisible) {
+  setTextInputError(manualTeamRenameInput, manualTeamRenameError, isVisible);
+}
+
+function openManualTeamRename(teamIndex) {
+  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+    return;
+  }
+
+  state.manualTeamRenameIndex = teamIndex;
+  prepareTextInputModal(
+    manualTeamRenameModal,
+    manualTeamRenameInput,
+    manualTeamRenameError,
+    getManualTeamName(teamIndex),
+  );
+}
+
+function closeManualTeamRenameModal({ restoreFocus = true } = {}) {
+  const teamIndex = state.manualTeamRenameIndex;
+  manualTeamRenameModal.hidden = true;
+  state.manualTeamRenameIndex = null;
+
+  if (restoreFocus && Number.isInteger(teamIndex)) {
+    document.querySelector(`[data-manual-team-edit-index="${teamIndex}"]`)?.focus();
+  }
+}
+
+function renameManualTeam() {
+  const teamIndex = state.manualTeamRenameIndex;
+  const name = manualTeamRenameInput.value.trim();
+
+  if (!name) {
+    setManualTeamRenameError(true);
+    manualTeamRenameInput.focus({ preventScroll: true });
+    manualTeamRenameInput.setSelectionRange(0, manualTeamRenameInput.value.length);
+    return false;
+  }
+
+  if (!Number.isInteger(teamIndex) || state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+    closeManualTeamRenameModal({ restoreFocus: false });
+    return false;
+  }
+
+  ensureManualTeamNames();
+  state.manualTeamNames[teamIndex] = name;
+  renderManualTeamScreen();
+  closeManualTeamRenameModal();
+  return true;
+}
+
 function createManualTeamCard(teamIndex) {
   const card = document.createElement("article");
   const heading = document.createElement("h3");
   const memberList = document.createElement("ul");
   const teamNumber = teamIndex + 1;
+  const teamName = getManualTeamName(teamIndex);
 
   card.className = "manual-team-card";
   card.dataset.teamNumber = teamNumber;
-  heading.textContent = `Team ${teamNumber}`;
+  heading.textContent = teamName;
   memberList.className = "manual-team-member-list";
+
+  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+    card.classList.add(teamIndex === 0 ? "is-turbolachs" : "is-nitroforelle");
+  } else {
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "manual-team-edit-button";
+    editButton.textContent = "✎";
+    editButton.dataset.manualTeamEditIndex = teamIndex;
+    editButton.setAttribute("aria-label", `${teamName} umbenennen`);
+    editButton.addEventListener("click", () => openManualTeamRename(teamIndex));
+    card.classList.add("is-editable");
+    card.append(editButton);
+  }
 
   if (teamIndex >= MIN_MANUAL_TEAM_COUNT) {
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "manual-remove-team-button";
     removeButton.textContent = "×";
-    removeButton.setAttribute("aria-label", `Team ${teamNumber} entfernen`);
+    removeButton.setAttribute("aria-label", `${teamName} entfernen`);
     removeButton.addEventListener("click", removeManualTeam);
     card.classList.add("is-removable");
     card.append(removeButton);
@@ -674,6 +784,8 @@ function createManualTeamCard(teamIndex) {
 }
 
 function renderManualTeamScreen() {
+  ensureManualTeamNames();
+  manualTeamTitle.textContent = `${state.selectedParticipants.length} Fische im Teich:`;
   manualTeamParticipantNames.textContent = state.selectedParticipants
     .map((participant) => participant.name)
     .join(" · ");
@@ -722,6 +834,7 @@ function addManualTeam() {
   }
 
   state.manualTeamCount += 1;
+  ensureManualTeamNames();
   invalidateManualTeamResult();
   renderManualTeamScreen();
 }
@@ -732,6 +845,7 @@ function removeManualTeam() {
   }
 
   state.manualTeamCount -= 1;
+  ensureManualTeamNames();
   invalidateManualTeamResult();
   renderManualTeamScreen();
 }
@@ -1124,6 +1238,20 @@ document.querySelector("#close-manual-team-screen").addEventListener(
 );
 addManualTeamButton.addEventListener("click", addManualTeam);
 divideManualTeamsButton.addEventListener("click", divideManualTeams);
+manualTeamRenameForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  renameManualTeam();
+});
+document.querySelector("#cancel-manual-team-rename").addEventListener(
+  "click",
+  closeManualTeamRenameModal,
+);
+manualTeamRenameInput.addEventListener("input", () => setManualTeamRenameError(false));
+manualTeamRenameModal.addEventListener("click", (event) => {
+  if (event.target === manualTeamRenameModal) {
+    closeManualTeamRenameModal();
+  }
+});
 guestFishButton.addEventListener("click", openGuestFishModal);
 guestFishForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -1164,7 +1292,9 @@ document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    if (!guestFishModal.hidden) {
+    if (!manualTeamRenameModal.hidden) {
+      closeManualTeamRenameModal();
+    } else if (!guestFishModal.hidden) {
       closeGuestFishModal();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();

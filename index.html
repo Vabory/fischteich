@@ -17,7 +17,8 @@
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
-    <script src="./script.js?v=29" defer></script>
+    <script src="./local-identity.js?v=1" defer></script>
+    <script src="./script.js?v=31" defer></script>
   </head>
   <body>
     <div id="app">
@@ -296,6 +297,29 @@
           </div>
         </div>
       </section>
+    </div>
+
+    <div class="modal-backdrop guest-fish-backdrop" id="welcome-identity-modal" role="dialog" aria-modal="true" aria-labelledby="welcome-identity-title" hidden>
+      <form class="modal-card guest-fish-card welcome-identity-card" id="welcome-identity-form" novalidate>
+        <h2 id="welcome-identity-title">Willkommen im Fischteich!</h2>
+        <label class="welcome-identity-label" for="welcome-display-name">Name:</label>
+        <input
+          class="guest-fish-input"
+          id="welcome-display-name"
+          name="displayName"
+          type="text"
+          maxlength="24"
+          autocomplete="name"
+          autocapitalize="words"
+          enterkeyhint="done"
+          aria-describedby="welcome-identity-error"
+          required
+        >
+        <p class="guest-fish-error" id="welcome-identity-error" aria-live="polite" hidden>Bitte einen Namen mit maximal 24 Zeichen eingeben.</p>
+        <div class="modal-actions guest-fish-actions welcome-identity-actions">
+          <button class="primary-button" type="submit">Weiter</button>
+        </div>
+      </form>
     </div>
 
     <div class="modal-backdrop" id="leave-modal" role="dialog" aria-modal="true" aria-labelledby="leave-title" hidden>

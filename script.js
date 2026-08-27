@@ -114,6 +114,11 @@ const guestFishModal = document.querySelector("#guest-fish-modal");
 const guestFishForm = document.querySelector("#guest-fish-form");
 const guestFishInput = document.querySelector("#guest-fish-name");
 const guestFishError = document.querySelector("#guest-fish-error");
+const appElement = document.querySelector("#app");
+const welcomeIdentityModal = document.querySelector("#welcome-identity-modal");
+const welcomeIdentityForm = document.querySelector("#welcome-identity-form");
+const welcomeDisplayNameInput = document.querySelector("#welcome-display-name");
+const welcomeIdentityError = document.querySelector("#welcome-identity-error");
 const leaveModal = document.querySelector("#leave-modal");
 const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
 const redistributeModal = document.querySelector("#redistribute-modal");
@@ -407,6 +412,40 @@ function prepareTextInputModal(modal, input, error, value) {
 
 function setGuestFishError(isVisible) {
   setTextInputError(guestFishInput, guestFishError, isVisible);
+}
+
+function setWelcomeIdentityError(isVisible) {
+  setTextInputError(welcomeDisplayNameInput, welcomeIdentityError, isVisible);
+}
+
+function openWelcomeIdentityModal() {
+  appElement.inert = true;
+  welcomeDisplayNameInput.value = "";
+  setWelcomeIdentityError(false);
+  welcomeIdentityModal.hidden = false;
+  welcomeDisplayNameInput.focus({ preventScroll: true });
+}
+
+function completeLocalIdentitySetup() {
+  const identity = createLocalIdentity(welcomeDisplayNameInput.value);
+
+  if (!identity) {
+    setWelcomeIdentityError(true);
+    welcomeDisplayNameInput.focus({ preventScroll: true });
+    welcomeDisplayNameInput.setSelectionRange(0, welcomeDisplayNameInput.value.length);
+    return false;
+  }
+
+  welcomeIdentityModal.hidden = true;
+  appElement.inert = false;
+  document.querySelector("#start-two-teams").focus();
+  return true;
+}
+
+function initializeLocalIdentity() {
+  if (!hasLocalIdentity()) {
+    openWelcomeIdentityModal();
+  }
 }
 
 function openGuestFishModal() {
@@ -1669,6 +1708,11 @@ manualPlayerModal.addEventListener("click", (event) => {
   }
 });
 guestFishButton.addEventListener("click", openGuestFishModal);
+welcomeIdentityForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  completeLocalIdentitySetup();
+});
+welcomeDisplayNameInput.addEventListener("input", () => setWelcomeIdentityError(false));
 guestFishForm.addEventListener("submit", (event) => {
   event.preventDefault();
   addGuestFish();
@@ -1718,7 +1762,9 @@ document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    if (!manualPlayerModal.hidden) {
+    if (!welcomeIdentityModal.hidden) {
+      return;
+    } else if (!manualPlayerModal.hidden) {
       closeManualPlayerModal();
     } else if (!manualTeamRenameModal.hidden) {
       closeManualTeamRenameModal();
@@ -1742,3 +1788,4 @@ document.addEventListener("keydown", (event) => {
 
 updateMarkerSize();
 renderRouletteStats();
+initializeLocalIdentity();

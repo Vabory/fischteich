@@ -1218,6 +1218,24 @@ h2 {
   min-height: 50px;
 }
 
+.modal-card.welcome-identity-card {
+  text-align: left;
+}
+
+.welcome-identity-card h2 {
+  text-align: center;
+}
+
+.welcome-identity-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 750;
+}
+
+.modal-actions.welcome-identity-actions {
+  grid-template-columns: 1fr;
+}
+
 .manual-player-card {
   display: grid;
   max-height: min(78dvh, 620px);

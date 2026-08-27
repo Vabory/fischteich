@@ -86,6 +86,7 @@ const playZone = document.querySelector("#play-zone");
 const playerLayer = document.querySelector("#player-layer");
 const fishCounter = document.querySelector("#fish-counter");
 const drawButton = document.querySelector("#draw-teams");
+const fingerResetButton = document.querySelector("#reset-finger-game");
 const gameActionArea = document.querySelector(".game-action-area");
 const teamSettingsButton = document.querySelector("#open-team-settings");
 const participantBackButton = document.querySelector("#close-participant-selection");
@@ -114,7 +115,7 @@ const guestFishForm = document.querySelector("#guest-fish-form");
 const guestFishInput = document.querySelector("#guest-fish-name");
 const guestFishError = document.querySelector("#guest-fish-error");
 const leaveModal = document.querySelector("#leave-modal");
-const resetGameModal = document.querySelector("#reset-game-modal");
+const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
 const redistributeModal = document.querySelector("#redistribute-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
@@ -256,13 +257,13 @@ function showScreen(screen) {
 function showMenu() {
   stopRoulette();
   leaveModal.hidden = true;
-  resetGameModal.hidden = true;
+  fingerRedistributeModal.hidden = true;
   showScreen(menuScreen);
 }
 
 function showTeamsMenu({ focusSelector = null } = {}) {
   leaveModal.hidden = true;
-  resetGameModal.hidden = true;
+  fingerRedistributeModal.hidden = true;
   showScreen(teamsMenuScreen);
 
   if (focusSelector) {
@@ -313,7 +314,7 @@ function updateGameUi() {
 
   fishCounter.textContent = `Fische im Teich: ${state.players.length}`;
   teamSettingsButton.hidden = state.frozen;
-  drawButton.textContent = state.frozen ? "Reset" : "Aufteilen";
+  drawButton.textContent = state.frozen ? "Neu Aufteilen" : "Aufteilen";
   drawButton.disabled = !state.frozen && state.players.length < 2;
 }
 
@@ -658,8 +659,8 @@ function shuffle(items) {
   return result;
 }
 
-function drawTeams() {
-  if (state.frozen || state.players.length < 2) {
+function drawTeams({ allowRedistribution = false } = {}) {
+  if ((state.frozen && !allowRedistribution) || state.players.length < 2) {
     return;
   }
 
@@ -1222,23 +1223,23 @@ function handleLeaveGame() {
   openLeaveConfirmation();
 }
 
-function openResetGameConfirmation() {
-  if (!state.frozen || !resetGameModal.hidden) {
+function openFingerRedistributeConfirmation() {
+  if (!state.frozen || !fingerRedistributeModal.hidden) {
     return;
   }
 
-  resetGameModal.hidden = false;
-  document.querySelector("#cancel-reset-game").focus();
+  fingerRedistributeModal.hidden = false;
+  document.querySelector("#cancel-finger-redistribute").focus();
 }
 
-function closeResetGameConfirmation() {
-  resetGameModal.hidden = true;
+function closeFingerRedistributeConfirmation() {
+  fingerRedistributeModal.hidden = true;
   drawButton.focus();
 }
 
 function handleDrawButtonClick() {
   if (state.frozen) {
-    openResetGameConfirmation();
+    openFingerRedistributeConfirmation();
     return;
   }
 
@@ -1617,6 +1618,7 @@ for (const button of document.querySelectorAll(".screen-back")) {
 
 playZone.addEventListener("pointerdown", handlePlayZonePointerDown, { passive: false });
 drawButton.addEventListener("click", handleDrawButtonClick);
+fingerResetButton.addEventListener("click", resetGame);
 teamSettingsButton.addEventListener("click", openTeamSettings);
 participantContinueButton.addEventListener("click", handleParticipantContinue);
 resetParticipantsButton.addEventListener("click", resetParticipantSelection);
@@ -1692,17 +1694,17 @@ teamSettingsModal.addEventListener("click", (event) => {
 document.querySelector("#leave-game").addEventListener("click", handleLeaveGame);
 document.querySelector("#cancel-leave").addEventListener("click", closeLeaveConfirmation);
 document.querySelector("#confirm-leave").addEventListener("click", returnFromGame);
-document.querySelector("#cancel-reset-game").addEventListener(
+document.querySelector("#cancel-finger-redistribute").addEventListener(
   "click",
-  closeResetGameConfirmation,
+  closeFingerRedistributeConfirmation,
 );
-document.querySelector("#confirm-reset-game").addEventListener("click", () => {
-  if (resetGameModal.hidden) {
+document.querySelector("#confirm-finger-redistribute").addEventListener("click", () => {
+  if (fingerRedistributeModal.hidden) {
     return;
   }
 
-  resetGameModal.hidden = true;
-  resetGame();
+  fingerRedistributeModal.hidden = true;
+  drawTeams({ allowRedistribution: true });
   drawButton.focus();
 });
 
@@ -1724,8 +1726,8 @@ document.addEventListener("keydown", (event) => {
       closeGuestFishModal();
     } else if (!redistributeModal.hidden) {
       closeRedistributeConfirmation();
-    } else if (!resetGameModal.hidden) {
-      closeResetGameConfirmation();
+    } else if (!fingerRedistributeModal.hidden) {
+      closeFingerRedistributeConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
     } else if (!manualTeamScreen.hidden) {

@@ -125,13 +125,14 @@ button:focus-visible {
 .sidemenu-background {
   position: absolute;
   z-index: 0;
-  top: -59px;
+  top: -72px;
   right: 0;
   left: 0;
   width: 100%;
-  height: calc(100% + 59px);
+  height: calc(100% + 72px);
   object-fit: cover;
   object-position: center bottom;
+  filter: brightness(0.9);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -153,12 +154,12 @@ button:focus-visible {
 .teams-menu-actions {
   position: absolute;
   z-index: 2;
-  top: clamp(290px, 37dvh, 330px);
+  top: clamp(310px, 39.5dvh, 336px);
   left: 50%;
   display: flex;
   width: min(92vw, 360px);
   flex-direction: column;
-  gap: clamp(4px, 0.8dvh, 8px);
+  gap: 0;
   transform: translateX(-50%);
 }
 
@@ -185,6 +186,10 @@ button:focus-visible {
 
 .teams-menu-actions button:active {
   transform: scale(0.975);
+}
+
+.teams-menu-actions button + button {
+  margin-top: -18px;
 }
 
 .menu-crest {
@@ -462,7 +467,8 @@ h2 {
 .primary-button,
 .secondary-button,
 .fish-button,
-.settings-button {
+.settings-button,
+.finger-reset-button {
   width: 100%;
   min-height: 56px;
   padding: 14px 20px;
@@ -487,6 +493,7 @@ h2 {
 .secondary-button:active,
 .fish-button:active,
 .settings-button:active,
+.finger-reset-button:active,
 .game-team-options button:active,
 .team-options button:active {
   transform: scale(0.97);
@@ -660,7 +667,7 @@ h2 {
 
 .fish-button {
   position: absolute;
-  right: 0;
+  right: 48px;
   bottom: 0;
   left: 48px;
   width: auto;
@@ -690,6 +697,36 @@ h2 {
 
 .settings-button {
   left: var(--side-control-inline-offset);
+}
+
+.settings-button[hidden] + .fish-button {
+  left: 0;
+}
+
+.finger-reset-button {
+  position: absolute;
+  right: var(--side-control-inline-offset);
+  bottom: 2px;
+  z-index: 1;
+  display: grid;
+  width: 52px;
+  min-height: 52px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 10%);
+  color: #ff465c;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: auto;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.finger-reset-button span {
+  transform: translateY(-1px);
 }
 
 .settings-button span {
@@ -1761,7 +1798,7 @@ h2 {
   }
 
   .teams-menu-actions {
-    top: clamp(230px, 37dvh, 270px);
+    top: clamp(250px, 40dvh, 285px);
     width: min(92vw, 47dvh, 360px);
   }
 

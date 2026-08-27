@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=52">
-    <script src="./script.js?v=28" defer></script>
+    <link rel="stylesheet" href="./style.css?v=54">
+    <script src="./script.js?v=29" defer></script>
   </head>
   <body>
     <div id="app">
@@ -141,6 +141,9 @@
             <span aria-hidden="true">⚙</span>
           </button>
           <button class="fish-button" id="draw-teams" type="button" disabled>Aufteilen</button>
+          <button class="finger-reset-button" id="reset-finger-game" type="button" aria-label="Finger-System vollständig zurücksetzen">
+            <span aria-hidden="true">×</span>
+          </button>
         </div>
       </section>
 
@@ -303,12 +306,12 @@
       </div>
     </div>
 
-    <div class="modal-backdrop" id="reset-game-modal" role="dialog" aria-modal="true" aria-labelledby="reset-game-title" hidden>
+    <div class="modal-backdrop" id="finger-redistribute-modal" role="dialog" aria-modal="true" aria-labelledby="finger-redistribute-title" hidden>
       <div class="modal-card">
-        <h2 id="reset-game-title">Team Aufteilung löschen?</h2>
+        <h2 id="finger-redistribute-title">Teams neu Aufteilen?</h2>
         <div class="modal-actions">
-          <button class="secondary-button" id="cancel-reset-game" type="button">Nein</button>
-          <button class="primary-button" id="confirm-reset-game" type="button">Ja</button>
+          <button class="secondary-button" id="cancel-finger-redistribute" type="button">Nein</button>
+          <button class="primary-button" id="confirm-finger-redistribute" type="button">Ja</button>
         </div>
       </div>
     </div>

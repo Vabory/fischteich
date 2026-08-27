@@ -259,6 +259,8 @@ const state = {
   rouletteGoldTimer: null,
   rouletteSpeed: ROULETTE_SPEEDS[0],
   rouletteStats: loadRouletteStats(),
+  globalRouletteStats: null,
+  rouletteStatsRequestId: 0,
 };
 
 function showScreen(screen) {
@@ -1371,17 +1373,101 @@ function selectRouletteWinner() {
   return randomBucket - ROULETTE_GOLD_BUCKET_COUNT < 99 ? 0 : 1;
 }
 
-function renderRouletteStats() {
-  for (const [key, element] of Object.entries(rouletteStatElements)) {
-    element.textContent = String(state.rouletteStats[key]);
+function normalizeGlobalRouletteStatValue(value) {
+  const numericValue = typeof value === "string" && /^\d+$/.test(value)
+    ? Number(value)
+    : value;
+
+  return Number.isSafeInteger(numericValue) && numericValue >= 0
+    ? numericValue
+    : null;
+}
+
+function normalizeGlobalRouletteStats(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
   }
 
-  rouletteLastGoldHitElement.textContent = state.rouletteStats.lastGoldHit
-    ? new Date(state.rouletteStats.lastGoldHit).toLocaleString("de-AT", {
+  const totalSpins = normalizeGlobalRouletteStatValue(value.total_spins);
+  const turbolachs = normalizeGlobalRouletteStatValue(value.turbolachs_count);
+  const nitroforelle = normalizeGlobalRouletteStatValue(value.nitroforelle_count);
+  const gold = normalizeGlobalRouletteStatValue(value.goldfish_count);
+  const hasValidLastGoldHit = value.last_gold_hit_at === null
+    || (
+      typeof value.last_gold_hit_at === "string"
+      && Number.isFinite(Date.parse(value.last_gold_hit_at))
+    );
+
+  if (
+    totalSpins === null
+    || turbolachs === null
+    || nitroforelle === null
+    || gold === null
+    || !hasValidLastGoldHit
+  ) {
+    return null;
+  }
+
+  return {
+    totalSpins,
+    turbolachs,
+    nitroforelle,
+    gold,
+    lastGoldHit: value.last_gold_hit_at
+      ? new Date(value.last_gold_hit_at).toISOString()
+      : null,
+  };
+}
+
+function formatRouletteLastGoldHit(lastGoldHit) {
+  return lastGoldHit
+    ? new Date(lastGoldHit).toLocaleString("de-AT", {
       dateStyle: "short",
       timeStyle: "short",
     })
     : "—";
+}
+
+function renderRouletteStats(stats = state.globalRouletteStats ?? state.rouletteStats) {
+  for (const [key, element] of Object.entries(rouletteStatElements)) {
+    element.textContent = String(stats[key]);
+  }
+
+  if (!rouletteLastGoldHitElement.classList.contains("is-gold-now")) {
+    rouletteLastGoldHitElement.textContent = formatRouletteLastGoldHit(stats.lastGoldHit);
+  }
+}
+
+async function loadGlobalRouletteStats() {
+  const requestId = state.rouletteStatsRequestId + 1;
+  state.rouletteStatsRequestId = requestId;
+
+  try {
+    if (!window.rouletteService?.getGlobalRouletteStats) {
+      throw new Error("Roulette service is unavailable");
+    }
+
+    const response = await window.rouletteService.getGlobalRouletteStats();
+    const globalStats = normalizeGlobalRouletteStats(response);
+
+    if (!globalStats) {
+      throw new Error("Global roulette statistics response is invalid");
+    }
+
+    if (requestId !== state.rouletteStatsRequestId) {
+      return false;
+    }
+
+    state.globalRouletteStats = globalStats;
+    renderRouletteStats();
+    return true;
+  } catch (error) {
+    if (requestId === state.rouletteStatsRequestId) {
+      console.error("Globale Roulette-Statistik konnte nicht geladen werden.", error);
+    }
+
+    return false;
+  }
 }
 
 function persistCompletedRouletteSpin(resultType) {
@@ -1393,6 +1479,7 @@ function persistCompletedRouletteSpin(resultType) {
 
       return window.rouletteService.recordRouletteSpin(resultType);
     })
+    .then(() => loadGlobalRouletteStats())
     .catch((error) => {
       console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
     });
@@ -1409,6 +1496,8 @@ function recordCompletedRouletteSpin(winnerIndex) {
   state.rouletteStats.totalSpins += 1;
   state.rouletteStats[winnerStatKey] += 1;
   saveRouletteStats();
+  state.globalRouletteStats = null;
+  state.rouletteStatsRequestId += 1;
   renderRouletteStats();
   persistCompletedRouletteSpin(resultType);
 }
@@ -1576,7 +1665,9 @@ function openRoulette() {
   showScreen(rouletteScreen);
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
+  state.globalRouletteStats = null;
   renderRouletteStats();
+  void loadGlobalRouletteStats();
 
   const tiles = createRouletteTiles();
   const initialFishTileIndexes = tiles

@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=50">
-    <script src="./script.js?v=26" defer></script>
+    <link rel="stylesheet" href="./style.css?v=51">
+    <script src="./script.js?v=27" defer></script>
   </head>
   <body>
     <div id="app">
@@ -82,6 +82,40 @@
         </nav>
       </section>
 
+      <section class="screen teams-menu-screen" id="teams-menu-screen" aria-labelledby="teams-menu-title" hidden>
+        <h1 class="visually-hidden" id="teams-menu-title">Teams aufteilen</h1>
+        <img
+          class="sidemenu-background"
+          src="./assets/sidemenu-background.png"
+          alt=""
+          width="851"
+          height="1849"
+          draggable="false"
+          aria-hidden="true"
+        >
+        <button class="close-button" id="close-teams-menu" type="button" aria-label="Zurück zum Hauptmenü">×</button>
+        <img
+          class="teams-menu-logo"
+          src="./assets/teams-aufteilen-logo.png"
+          alt=""
+          width="1774"
+          height="887"
+          draggable="false"
+          aria-hidden="true"
+        >
+        <nav class="teams-menu-actions" aria-label="Methode zur Teamaufteilung auswählen">
+          <button id="start-finger-selection" type="button" aria-label="Finger Auswahl">
+            <img src="./assets/button-finger-auswahl.png" alt="" width="2179" height="722" draggable="false">
+          </button>
+          <button id="start-random-participants" type="button" aria-label="Mitspieler Zufall">
+            <img src="./assets/button-mitspieler-zufall.png" alt="" width="2172" height="724" draggable="false">
+          </button>
+          <button id="start-manual-participants" type="button" aria-label="Mitspieler Manuell">
+            <img src="./assets/button-mitspieler-manuell.png" alt="" width="1993" height="789" draggable="false">
+          </button>
+        </nav>
+      </section>
+
       <section class="screen choice-screen" id="team-choice-screen" aria-labelledby="team-choice-title" hidden>
         <button class="close-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">×</button>
         <div class="choice-card">
@@ -135,6 +169,15 @@
             <button class="participant-reset-button" id="reset-participants" type="button">Reset</button>
             <button class="participant-continue-button" id="participant-continue-button" type="button" disabled>Weiter</button>
           </div>
+        </div>
+      </section>
+
+      <section class="screen choice-screen manual-assignment-placeholder-screen" id="manual-assignment-placeholder-screen" aria-labelledby="manual-assignment-placeholder-title" hidden>
+        <button class="close-button" id="close-manual-assignment-placeholder" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
+        <div class="choice-card">
+          <p class="eyebrow">Mitspieler manuell</p>
+          <h2 id="manual-assignment-placeholder-title">Manuelle Teamaufteilung</h2>
+          <p>Dieser Bereich folgt im nächsten Schritt.</p>
         </div>
       </section>
 

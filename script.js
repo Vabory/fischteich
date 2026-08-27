@@ -76,8 +76,12 @@ const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
 const menuScreen = document.querySelector("#menu-screen");
+const teamsMenuScreen = document.querySelector("#teams-menu-screen");
 const gameScreen = document.querySelector("#game-screen");
 const participantScreen = document.querySelector("#participant-screen");
+const manualAssignmentPlaceholderScreen = document.querySelector(
+  "#manual-assignment-placeholder-screen",
+);
 const manualTeamScreen = document.querySelector("#manual-team-screen");
 const teamChoiceScreen = document.querySelector("#team-choice-screen");
 const rouletteScreen = document.querySelector("#roulette-screen");
@@ -88,6 +92,7 @@ const drawButton = document.querySelector("#draw-teams");
 const gameActionArea = document.querySelector(".game-action-area");
 const teamSettingsButton = document.querySelector("#open-team-settings");
 const participantSelectionButton = document.querySelector("#open-participant-selection");
+const participantBackButton = document.querySelector("#close-participant-selection");
 const teamSettingsModal = document.querySelector("#team-settings-modal");
 const availableParticipants = document.querySelector("#available-participants");
 const selectedParticipants = document.querySelector("#selected-participants");
@@ -216,6 +221,9 @@ const state = {
   teamCount: 2,
   frozen: false,
   markerSize: 76,
+  gameReturnTarget: "menu",
+  participantEntryPoint: "finger",
+  teamAssignmentMode: "random",
   selectedParticipants: [],
   nextGuestId: 1,
   manualTeamCount: MIN_MANUAL_TEAM_COUNT,
@@ -243,6 +251,15 @@ function showMenu() {
   stopRoulette();
   leaveModal.hidden = true;
   showScreen(menuScreen);
+}
+
+function showTeamsMenu({ focusSelector = null } = {}) {
+  leaveModal.hidden = true;
+  showScreen(teamsMenuScreen);
+
+  if (focusSelector) {
+    document.querySelector(focusSelector)?.focus();
+  }
 }
 
 function updateMarkerSize() {
@@ -419,15 +436,32 @@ function addGuestFish() {
   return true;
 }
 
-function openParticipantSelection() {
+function openParticipantSelection({ mode = "random", entryPoint = "finger" } = {}) {
+  state.teamAssignmentMode = mode;
+  state.participantEntryPoint = entryPoint;
+  participantScreen.dataset.teamAssignmentMode = mode;
+  participantBackButton.setAttribute(
+    "aria-label",
+    entryPoint === "finger"
+      ? "Zurück zum Finger-Tippen-Screen"
+      : "Zurück zu Teams aufteilen",
+  );
   renderParticipantSelection();
   showScreen(participantScreen);
-  document.querySelector("#close-participant-selection").focus();
+  participantBackButton.focus();
 }
 
 function closeParticipantSelection() {
-  showScreen(gameScreen);
-  participantSelectionButton.focus();
+  if (state.participantEntryPoint === "finger") {
+    showScreen(gameScreen);
+    participantSelectionButton.focus();
+    return;
+  }
+
+  const focusSelector = state.teamAssignmentMode === "manual"
+    ? "#start-manual-participants"
+    : "#start-random-participants";
+  showTeamsMenu({ focusSelector });
 }
 
 function openTeamSettings() {
@@ -845,6 +879,30 @@ function closeManualTeamScreen() {
   participantContinueButton.focus();
 }
 
+function openManualAssignmentScreen() {
+  if (state.selectedParticipants.length < 2) {
+    return;
+  }
+
+  // Navigations-Hook für den nächsten Schritt; noch keine manuelle Zuordnungslogik.
+  showScreen(manualAssignmentPlaceholderScreen);
+  document.querySelector("#close-manual-assignment-placeholder").focus();
+}
+
+function closeManualAssignmentScreen() {
+  showScreen(participantScreen);
+  participantContinueButton.focus();
+}
+
+function handleParticipantContinue() {
+  if (state.teamAssignmentMode === "manual") {
+    openManualAssignmentScreen();
+    return;
+  }
+
+  openManualTeamScreen();
+}
+
 function addManualTeam() {
   if (state.manualTeamCount >= MAX_MANUAL_TEAM_COUNT) {
     return;
@@ -1245,13 +1303,28 @@ function startRoulette() {
   );
 }
 
-document.querySelector("#start-two-teams").addEventListener("click", () => startGame(2));
+document.querySelector("#start-two-teams").addEventListener("click", () => showTeamsMenu());
+document.querySelector("#close-teams-menu").addEventListener("click", showMenu);
+document.querySelector("#start-finger-selection").addEventListener("click", () => {
+  state.gameReturnTarget = "teams-menu";
+  state.teamAssignmentMode = "random";
+  startGame(2);
+});
+document.querySelector("#start-random-participants").addEventListener("click", () => {
+  openParticipantSelection({ mode: "random", entryPoint: "random" });
+});
+document.querySelector("#start-manual-participants").addEventListener("click", () => {
+  openParticipantSelection({ mode: "manual", entryPoint: "manual" });
+});
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
 rouletteSpeedButton.addEventListener("click", cycleRouletteSpeed);
 
 for (const button of document.querySelectorAll("[data-team-count]")) {
-  button.addEventListener("click", () => startGame(Number(button.dataset.teamCount)));
+  button.addEventListener("click", () => {
+    state.gameReturnTarget = "menu";
+    startGame(Number(button.dataset.teamCount));
+  });
 }
 
 for (const button of document.querySelectorAll("[data-game-team-count]")) {
@@ -1269,12 +1342,18 @@ for (const button of document.querySelectorAll(".screen-back")) {
 playZone.addEventListener("pointerdown", handlePlayZonePointerDown, { passive: false });
 drawButton.addEventListener("click", drawTeams);
 teamSettingsButton.addEventListener("click", openTeamSettings);
-participantSelectionButton.addEventListener("click", openParticipantSelection);
-participantContinueButton.addEventListener("click", openManualTeamScreen);
+participantSelectionButton.addEventListener("click", () => {
+  openParticipantSelection({ mode: "random", entryPoint: "finger" });
+});
+participantContinueButton.addEventListener("click", handleParticipantContinue);
 resetParticipantsButton.addEventListener("click", resetParticipantSelection);
-document.querySelector("#close-participant-selection").addEventListener(
+participantBackButton.addEventListener(
   "click",
   closeParticipantSelection,
+);
+document.querySelector("#close-manual-assignment-placeholder").addEventListener(
+  "click",
+  closeManualAssignmentScreen,
 );
 document.querySelector("#close-manual-team-screen").addEventListener(
   "click",
@@ -1335,8 +1414,14 @@ teamSettingsModal.addEventListener("click", (event) => {
 document.querySelector("#leave-game").addEventListener("click", openLeaveConfirmation);
 document.querySelector("#cancel-leave").addEventListener("click", closeLeaveConfirmation);
 document.querySelector("#confirm-leave").addEventListener("click", () => {
+  const shouldReturnToTeamsMenu = state.gameReturnTarget === "teams-menu";
   resetGame();
-  showMenu();
+
+  if (shouldReturnToTeamsMenu) {
+    showTeamsMenu({ focusSelector: "#start-finger-selection" });
+  } else {
+    showMenu();
+  }
 });
 
 window.addEventListener("resize", () => {
@@ -1357,10 +1442,14 @@ document.addEventListener("keydown", (event) => {
       closeRedistributeConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
+    } else if (!manualAssignmentPlaceholderScreen.hidden) {
+      closeManualAssignmentScreen();
     } else if (!manualTeamScreen.hidden) {
       closeManualTeamScreen();
     } else if (!participantScreen.hidden) {
       closeParticipantSelection();
+    } else if (!teamsMenuScreen.hidden) {
+      showMenu();
     }
   }
 });

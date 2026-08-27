@@ -116,6 +116,77 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
+.teams-menu-screen {
+  display: block;
+  padding: 0;
+  background: var(--ink);
+}
+
+.sidemenu-background {
+  position: absolute;
+  z-index: 0;
+  top: -59px;
+  right: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100% + 59px);
+  object-fit: cover;
+  object-position: center bottom;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.teams-menu-logo {
+  position: absolute;
+  z-index: 1;
+  top: max(calc(env(safe-area-inset-top) + 38px), clamp(72px, 10dvh, 92px));
+  left: 50%;
+  width: min(90vw, 355px);
+  height: auto;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.teams-menu-actions {
+  position: absolute;
+  z-index: 2;
+  top: clamp(290px, 37dvh, 330px);
+  left: 50%;
+  display: flex;
+  width: min(92vw, 360px);
+  flex-direction: column;
+  gap: clamp(4px, 0.8dvh, 8px);
+  transform: translateX(-50%);
+}
+
+.teams-menu-actions button {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 0;
+  transition: transform 110ms ease-out;
+}
+
+.teams-menu-actions img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.teams-menu-actions button:active {
+  transform: scale(0.975);
+}
+
 .menu-crest {
   position: absolute;
   z-index: 1;
@@ -1600,6 +1671,16 @@ h2 {
 }
 
 @media (max-height: 700px) {
+  .teams-menu-logo {
+    top: max(calc(env(safe-area-inset-top) + 30px), 62px);
+    width: min(82vw, 48dvh, 320px);
+  }
+
+  .teams-menu-actions {
+    top: clamp(230px, 37dvh, 270px);
+    width: min(92vw, 47dvh, 360px);
+  }
+
   .menu-card {
     top: calc(
       clamp(300px, 52dvh, 364px)

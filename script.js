@@ -1379,6 +1379,20 @@ function renderRouletteStats() {
     : "—";
 }
 
+function persistCompletedRouletteSpin(isGoldfish) {
+  void Promise.resolve()
+    .then(() => {
+      if (!window.rouletteService?.recordRouletteSpin) {
+        throw new Error("Roulette service is unavailable");
+      }
+
+      return window.rouletteService.recordRouletteSpin(isGoldfish);
+    })
+    .catch((error) => {
+      console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
+    });
+}
+
 function recordCompletedRouletteSpin(winnerIndex) {
   const winnerStatKey = ROULETTE_STAT_KEY_BY_WINNER_INDEX[winnerIndex];
 
@@ -1390,6 +1404,7 @@ function recordCompletedRouletteSpin(winnerIndex) {
   state.rouletteStats[winnerStatKey] += 1;
   saveRouletteStats();
   renderRouletteStats();
+  persistCompletedRouletteSpin(winnerIndex === ROULETTE_GOLD_WINNER_INDEX);
 }
 
 function setRouletteTileColor(tile, colorIndex) {

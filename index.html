@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#03010f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Fischteich Angel">
+    <meta name="apple-mobile-web-app-title" content="Fischteich">
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
@@ -106,7 +106,7 @@
           <button class="settings-button" id="open-team-settings" type="button" aria-label="Teamanzahl einstellen">
             <span aria-hidden="true">⚙</span>
           </button>
-          <button class="fish-button" id="draw-teams" type="button" disabled>Angeln</button>
+          <button class="fish-button" id="draw-teams" type="button" disabled>Aufteilen</button>
           <button class="participant-button" id="open-participant-selection" type="button" aria-label="Teilnehmer auswählen">
             <span aria-hidden="true">👥</span>
           </button>
@@ -268,6 +268,16 @@
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-leave" type="button">Nein</button>
           <button class="primary-button" id="confirm-leave" type="button">Ja</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="redistribute-modal" role="dialog" aria-modal="true" aria-labelledby="redistribute-title" hidden>
+      <div class="modal-card">
+        <h2 id="redistribute-title">Neu aufteilen?</h2>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-redistribute" type="button">Nein</button>
+          <button class="primary-button" id="confirm-redistribute" type="button">Ja</button>
         </div>
       </div>
     </div>

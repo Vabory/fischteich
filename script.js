@@ -49,7 +49,7 @@ const FRIEND_PARTICIPANTS = Object.freeze(
 const MIN_TEAM_COUNT = 2;
 const MAX_TEAM_COUNT = 10;
 const MIN_MANUAL_TEAM_COUNT = 2;
-const MAX_MANUAL_TEAM_COUNT = 10;
+const MAX_MANUAL_TEAM_COUNT = 20;
 const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
@@ -109,6 +109,7 @@ const guestFishForm = document.querySelector("#guest-fish-form");
 const guestFishInput = document.querySelector("#guest-fish-name");
 const guestFishError = document.querySelector("#guest-fish-error");
 const leaveModal = document.querySelector("#leave-modal");
+const redistributeModal = document.querySelector("#redistribute-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
 const rouletteSpinButton = document.querySelector("#spin-roulette");
@@ -278,6 +279,13 @@ function startGame(teamCount) {
 }
 
 function updateGameUi() {
+  const lastPlayerIndex = state.players.length - 1;
+
+  state.players.forEach((player, index) => {
+    player.marker.classList.toggle("is-latest", index === lastPlayerIndex);
+    player.marker.classList.toggle("is-previous", index === lastPlayerIndex - 1);
+  });
+
   fishCounter.textContent = `Fische im Teich: ${state.players.length}`;
   drawButton.hidden = state.frozen;
   teamSettingsButton.hidden = state.frozen;
@@ -867,6 +875,32 @@ function divideManualTeams() {
   renderManualTeamScreen();
 }
 
+function openRedistributeConfirmation() {
+  if (!redistributeModal.hidden) {
+    return;
+  }
+
+  redistributeModal.hidden = false;
+  document.querySelector("#cancel-redistribute").focus();
+}
+
+function closeRedistributeConfirmation({ restoreFocus = true } = {}) {
+  redistributeModal.hidden = true;
+
+  if (restoreFocus) {
+    divideManualTeamsButton.focus();
+  }
+}
+
+function handleManualTeamDivision() {
+  if (state.manualTeamAssignments) {
+    openRedistributeConfirmation();
+    return;
+  }
+
+  divideManualTeams();
+}
+
 function openLeaveConfirmation() {
   leaveModal.hidden = false;
   document.querySelector("#cancel-leave").focus();
@@ -1247,7 +1281,20 @@ document.querySelector("#close-manual-team-screen").addEventListener(
   closeManualTeamScreen,
 );
 addManualTeamButton.addEventListener("click", addManualTeam);
-divideManualTeamsButton.addEventListener("click", divideManualTeams);
+divideManualTeamsButton.addEventListener("click", handleManualTeamDivision);
+document.querySelector("#cancel-redistribute").addEventListener(
+  "click",
+  closeRedistributeConfirmation,
+);
+document.querySelector("#confirm-redistribute").addEventListener("click", () => {
+  if (redistributeModal.hidden) {
+    return;
+  }
+
+  closeRedistributeConfirmation({ restoreFocus: false });
+  divideManualTeams();
+  divideManualTeamsButton.focus();
+});
 manualTeamRenameForm.addEventListener("submit", (event) => {
   event.preventDefault();
   renameManualTeam();
@@ -1306,6 +1353,8 @@ document.addEventListener("keydown", (event) => {
       closeManualTeamRenameModal();
     } else if (!guestFishModal.hidden) {
       closeGuestFishModal();
+    } else if (!redistributeModal.hidden) {
+      closeRedistributeConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
     } else if (!manualTeamScreen.hidden) {

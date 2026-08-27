@@ -498,10 +498,19 @@ h2 {
   font-size: clamp(1.45rem, 7vw, 2rem);
   font-weight: 900;
   line-height: 1;
+  opacity: 0.6;
   paint-order: stroke fill;
   -webkit-text-stroke: 1px rgb(255 255 255 / 38%);
   transform: translate(-50%, -50%);
-  transition: background-color 220ms ease, border-color 220ms ease;
+  transition: background-color 220ms ease, border-color 220ms ease, opacity 220ms ease;
+}
+
+.player-marker.is-previous {
+  opacity: 0.85;
+}
+
+.player-marker.is-latest {
+  opacity: 1;
 }
 
 .player-marker.is-new {

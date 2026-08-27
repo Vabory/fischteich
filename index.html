@@ -13,12 +13,12 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=55">
+    <link rel="stylesheet" href="./style.css?v=57">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=1" defer></script>
-    <script src="./script.js?v=31" defer></script>
+    <script src="./script.js?v=32" defer></script>
   </head>
   <body>
     <div id="app">
@@ -135,9 +135,9 @@
         </div>
       </section>
 
-      <section class="screen game-screen" id="game-screen" aria-labelledby="fish-counter" hidden>
+      <section class="screen game-screen" id="game-screen" aria-labelledby="game-status" hidden>
         <button class="close-button navigation-back-button" id="leave-game" type="button" aria-label="Auslosung verlassen">←</button>
-        <h2 id="fish-counter" aria-live="polite">Fische im Teich: 0</h2>
+        <h2 id="game-status" aria-live="polite">Auf 2 Teams aufteilen</h2>
         <div id="play-zone" aria-label="Hier tippen, um Spieler zu registrieren"></div>
         <div id="player-layer" aria-hidden="true"></div>
         <div class="game-action-area">
@@ -145,7 +145,7 @@
             <span aria-hidden="true">⚙</span>
           </button>
           <button class="fish-button" id="draw-teams" type="button" disabled>Aufteilen</button>
-          <button class="finger-reset-button" id="reset-finger-game" type="button" aria-label="Finger-System vollständig zurücksetzen">
+          <button class="finger-reset-button" id="reset-finger-game" type="button" aria-label="Finger-System vollständig zurücksetzen" hidden>
             <span aria-hidden="true">×</span>
           </button>
         </div>
@@ -426,7 +426,10 @@
         <p class="manual-player-team-name" id="manual-player-team-name"></p>
         <div class="manual-player-options" id="manual-player-options"></div>
         <p class="manual-player-empty" id="manual-player-empty" hidden>Alle Spieler sind bereits manuell zugeordnet.</p>
-        <button class="secondary-button manual-player-close" id="close-manual-player-modal" type="button">Schließen</button>
+        <div class="modal-actions manual-player-actions">
+          <button class="secondary-button" id="cancel-manual-player-selection" type="button">Abbrechen</button>
+          <button class="primary-button" id="confirm-manual-player-selection" type="button" disabled>OK</button>
+        </div>
       </div>
     </div>
 

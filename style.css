@@ -548,7 +548,7 @@ h2 {
   touch-action: none;
 }
 
-#fish-counter {
+#game-status {
   position: fixed;
   z-index: 4;
   top: max(16px, env(safe-area-inset-top));
@@ -667,7 +667,7 @@ h2 {
 
 .fish-button {
   position: absolute;
-  right: 48px;
+  right: 0;
   bottom: 0;
   left: 48px;
   width: auto;
@@ -699,13 +699,9 @@ h2 {
   left: var(--side-control-inline-offset);
 }
 
-.settings-button[hidden] + .fish-button {
-  left: 0;
-}
-
 .finger-reset-button {
   position: absolute;
-  right: var(--side-control-inline-offset);
+  left: var(--side-control-inline-offset);
   bottom: 2px;
   z-index: 1;
   display: grid;
@@ -1267,6 +1263,7 @@ h2 {
 }
 
 .manual-player-option {
+  display: flex;
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
@@ -1275,7 +1272,28 @@ h2 {
   background: rgb(255 255 255 / 8%);
   color: var(--text);
   font-weight: 750;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   text-align: left;
+}
+
+.manual-player-option.is-selected {
+  border-color: var(--pink);
+  background: rgb(241 90 154 / 18%);
+  box-shadow: inset 0 0 0 1px rgb(241 90 154 / 24%);
+}
+
+.manual-player-option.is-selected::after {
+  color: #ff9fc7;
+  content: "✓";
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.manual-player-option:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 82%);
+  outline-offset: -3px;
 }
 
 .manual-player-card .manual-player-empty {
@@ -1284,8 +1302,12 @@ h2 {
   font-size: 0.9rem;
 }
 
-.manual-player-close {
+.manual-player-actions {
   margin-top: 16px;
+}
+
+.manual-player-actions button {
+  min-height: 50px;
 }
 
 .roulette-content {

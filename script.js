@@ -72,6 +72,11 @@ const ROULETTE_STAT_KEY_BY_WINNER_INDEX = Object.freeze({
   1: "nitroforelle",
   2: "gold",
 });
+const ROULETTE_RESULT_TYPE_BY_WINNER_INDEX = Object.freeze({
+  0: "turbolachs",
+  1: "nitroforelle",
+  2: "goldfish",
+});
 const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
@@ -1379,14 +1384,14 @@ function renderRouletteStats() {
     : "—";
 }
 
-function persistCompletedRouletteSpin(isGoldfish) {
+function persistCompletedRouletteSpin(resultType) {
   void Promise.resolve()
     .then(() => {
       if (!window.rouletteService?.recordRouletteSpin) {
         throw new Error("Roulette service is unavailable");
       }
 
-      return window.rouletteService.recordRouletteSpin(isGoldfish);
+      return window.rouletteService.recordRouletteSpin(resultType);
     })
     .catch((error) => {
       console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
@@ -1395,8 +1400,9 @@ function persistCompletedRouletteSpin(isGoldfish) {
 
 function recordCompletedRouletteSpin(winnerIndex) {
   const winnerStatKey = ROULETTE_STAT_KEY_BY_WINNER_INDEX[winnerIndex];
+  const resultType = ROULETTE_RESULT_TYPE_BY_WINNER_INDEX[winnerIndex];
 
-  if (!winnerStatKey) {
+  if (!winnerStatKey || !resultType) {
     return;
   }
 
@@ -1404,7 +1410,7 @@ function recordCompletedRouletteSpin(winnerIndex) {
   state.rouletteStats[winnerStatKey] += 1;
   saveRouletteStats();
   renderRouletteStats();
-  persistCompletedRouletteSpin(winnerIndex === ROULETTE_GOLD_WINNER_INDEX);
+  persistCompletedRouletteSpin(resultType);
 }
 
 function setRouletteTileColor(tile, colorIndex) {

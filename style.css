@@ -125,11 +125,9 @@ button:focus-visible {
 .sidemenu-background {
   position: absolute;
   z-index: 0;
-  top: calc(-72px - clamp(14px, 2.2dvh, 20px));
-  right: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
-  height: calc(100% + 72px);
+  height: 100%;
   object-fit: cover;
   object-position: center bottom;
   filter: brightness(0.85);
@@ -190,6 +188,10 @@ button:focus-visible {
 
 .teams-menu-actions button + button {
   margin-top: -33px;
+}
+
+.teams-menu-actions #start-manual-participants {
+  margin-top: -41px;
 }
 
 .menu-crest {

@@ -93,7 +93,7 @@
           draggable="false"
           aria-hidden="true"
         >
-        <button class="close-button" id="close-teams-menu" type="button" aria-label="Zurück zum Hauptmenü">×</button>
+        <button class="close-button navigation-back-button" id="close-teams-menu" type="button" aria-label="Zurück zum Hauptmenü">←</button>
         <img
           class="teams-menu-logo"
           src="./assets/teams-aufteilen-logo.png"
@@ -117,7 +117,7 @@
       </section>
 
       <section class="screen choice-screen" id="team-choice-screen" aria-labelledby="team-choice-title" hidden>
-        <button class="close-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">×</button>
+        <button class="close-button navigation-back-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">←</button>
         <div class="choice-card">
           <p class="eyebrow">Fanggruppe festlegen</p>
           <h2 id="team-choice-title">Wie viele Teams?</h2>
@@ -132,7 +132,7 @@
       </section>
 
       <section class="screen game-screen" id="game-screen" aria-labelledby="fish-counter" hidden>
-        <button class="close-button" id="leave-game" type="button" aria-label="Auslosung verlassen">×</button>
+        <button class="close-button navigation-back-button" id="leave-game" type="button" aria-label="Auslosung verlassen">←</button>
         <h2 id="fish-counter" aria-live="polite">Fische im Teich: 0</h2>
         <div id="play-zone" aria-label="Hier tippen, um Spieler zu registrieren"></div>
         <div id="player-layer" aria-hidden="true"></div>
@@ -141,14 +141,11 @@
             <span aria-hidden="true">⚙</span>
           </button>
           <button class="fish-button" id="draw-teams" type="button" disabled>Aufteilen</button>
-          <button class="participant-button" id="open-participant-selection" type="button" aria-label="Teilnehmer auswählen">
-            <span aria-hidden="true">👥</span>
-          </button>
         </div>
       </section>
 
       <section class="screen participant-screen" id="participant-screen" aria-labelledby="participant-title" hidden>
-        <button class="close-button" id="close-participant-selection" type="button" aria-label="Zurück zum Finger-Tippen-Screen">×</button>
+        <button class="close-button navigation-back-button" id="close-participant-selection" type="button" aria-label="Zurück zu Teams aufteilen">←</button>
         <div class="participant-shell">
           <h2 id="participant-title">Teilnehmer auswählen</h2>
 
@@ -173,7 +170,7 @@
       </section>
 
       <section class="screen choice-screen manual-assignment-placeholder-screen" id="manual-assignment-placeholder-screen" aria-labelledby="manual-assignment-placeholder-title" hidden>
-        <button class="close-button" id="close-manual-assignment-placeholder" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
+        <button class="close-button navigation-back-button" id="close-manual-assignment-placeholder" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
         <div class="choice-card">
           <p class="eyebrow">Mitspieler manuell</p>
           <h2 id="manual-assignment-placeholder-title">Manuelle Teamaufteilung</h2>
@@ -182,7 +179,7 @@
       </section>
 
       <section class="screen manual-team-screen" id="manual-team-screen" aria-labelledby="manual-team-title" hidden>
-        <button class="close-button manual-team-back-button" id="close-manual-team-screen" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
+        <button class="close-button navigation-back-button manual-team-back-button" id="close-manual-team-screen" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
         <div class="manual-team-shell">
           <div class="manual-team-scroll">
             <header class="manual-team-header">
@@ -220,7 +217,7 @@
           draggable="false"
           aria-hidden="true"
         >
-        <button class="close-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">×</button>
+        <button class="close-button navigation-back-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">←</button>
         <div class="roulette-content">
           <div class="roulette-window" aria-hidden="true">
             <div class="roulette-marker"></div>
@@ -311,6 +308,16 @@
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-leave" type="button">Nein</button>
           <button class="primary-button" id="confirm-leave" type="button">Ja</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="reset-game-modal" role="dialog" aria-modal="true" aria-labelledby="reset-game-title" hidden>
+      <div class="modal-card">
+        <h2 id="reset-game-title">Team Aufteilung löschen?</h2>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-reset-game" type="button">Nein</button>
+          <button class="primary-button" id="confirm-reset-game" type="button">Ja</button>
         </div>
       </div>
     </div>

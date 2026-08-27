@@ -91,7 +91,6 @@ const fishCounter = document.querySelector("#fish-counter");
 const drawButton = document.querySelector("#draw-teams");
 const gameActionArea = document.querySelector(".game-action-area");
 const teamSettingsButton = document.querySelector("#open-team-settings");
-const participantSelectionButton = document.querySelector("#open-participant-selection");
 const participantBackButton = document.querySelector("#close-participant-selection");
 const teamSettingsModal = document.querySelector("#team-settings-modal");
 const availableParticipants = document.querySelector("#available-participants");
@@ -114,6 +113,7 @@ const guestFishForm = document.querySelector("#guest-fish-form");
 const guestFishInput = document.querySelector("#guest-fish-name");
 const guestFishError = document.querySelector("#guest-fish-error");
 const leaveModal = document.querySelector("#leave-modal");
+const resetGameModal = document.querySelector("#reset-game-modal");
 const redistributeModal = document.querySelector("#redistribute-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
@@ -222,7 +222,6 @@ const state = {
   frozen: false,
   markerSize: 76,
   gameReturnTarget: "menu",
-  participantEntryPoint: "finger",
   teamAssignmentMode: "random",
   selectedParticipants: [],
   nextGuestId: 1,
@@ -250,11 +249,13 @@ function showScreen(screen) {
 function showMenu() {
   stopRoulette();
   leaveModal.hidden = true;
+  resetGameModal.hidden = true;
   showScreen(menuScreen);
 }
 
 function showTeamsMenu({ focusSelector = null } = {}) {
   leaveModal.hidden = true;
+  resetGameModal.hidden = true;
   showScreen(teamsMenuScreen);
 
   if (focusSelector) {
@@ -304,10 +305,9 @@ function updateGameUi() {
   });
 
   fishCounter.textContent = `Fische im Teich: ${state.players.length}`;
-  drawButton.hidden = state.frozen;
   teamSettingsButton.hidden = state.frozen;
-  participantSelectionButton.hidden = state.frozen;
-  drawButton.disabled = state.players.length < 2 || state.frozen;
+  drawButton.textContent = state.frozen ? "Reset" : "Aufteilen";
+  drawButton.disabled = !state.frozen && state.players.length < 2;
 }
 
 function createParticipantButton(participant, isSelected) {
@@ -436,28 +436,15 @@ function addGuestFish() {
   return true;
 }
 
-function openParticipantSelection({ mode = "random", entryPoint = "finger" } = {}) {
+function openParticipantSelection({ mode = "random" } = {}) {
   state.teamAssignmentMode = mode;
-  state.participantEntryPoint = entryPoint;
   participantScreen.dataset.teamAssignmentMode = mode;
-  participantBackButton.setAttribute(
-    "aria-label",
-    entryPoint === "finger"
-      ? "Zurück zum Finger-Tippen-Screen"
-      : "Zurück zu Teams aufteilen",
-  );
   renderParticipantSelection();
   showScreen(participantScreen);
   participantBackButton.focus();
 }
 
 function closeParticipantSelection() {
-  if (state.participantEntryPoint === "finger") {
-    showScreen(gameScreen);
-    participantSelectionButton.focus();
-    return;
-  }
-
   const focusSelector = state.teamAssignmentMode === "manual"
     ? "#start-manual-participants"
     : "#start-random-participants";
@@ -969,6 +956,49 @@ function closeLeaveConfirmation() {
   document.querySelector("#leave-game").focus();
 }
 
+function returnFromGame() {
+  const shouldReturnToTeamsMenu = state.gameReturnTarget === "teams-menu";
+  resetGame();
+
+  if (shouldReturnToTeamsMenu) {
+    showTeamsMenu({ focusSelector: "#start-finger-selection" });
+  } else {
+    showMenu();
+  }
+}
+
+function handleLeaveGame() {
+  if (state.players.length === 0) {
+    returnFromGame();
+    return;
+  }
+
+  openLeaveConfirmation();
+}
+
+function openResetGameConfirmation() {
+  if (!state.frozen || !resetGameModal.hidden) {
+    return;
+  }
+
+  resetGameModal.hidden = false;
+  document.querySelector("#cancel-reset-game").focus();
+}
+
+function closeResetGameConfirmation() {
+  resetGameModal.hidden = true;
+  drawButton.focus();
+}
+
+function handleDrawButtonClick() {
+  if (state.frozen) {
+    openResetGameConfirmation();
+    return;
+  }
+
+  drawTeams();
+}
+
 function setRouletteSpinButtonState(visible, enabled) {
   rouletteSpinButton.hidden = !visible;
   rouletteSpinButton.disabled = !enabled;
@@ -1311,10 +1341,10 @@ document.querySelector("#start-finger-selection").addEventListener("click", () =
   startGame(2);
 });
 document.querySelector("#start-random-participants").addEventListener("click", () => {
-  openParticipantSelection({ mode: "random", entryPoint: "random" });
+  openParticipantSelection({ mode: "random" });
 });
 document.querySelector("#start-manual-participants").addEventListener("click", () => {
-  openParticipantSelection({ mode: "manual", entryPoint: "manual" });
+  openParticipantSelection({ mode: "manual" });
 });
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
@@ -1340,11 +1370,8 @@ for (const button of document.querySelectorAll(".screen-back")) {
 }
 
 playZone.addEventListener("pointerdown", handlePlayZonePointerDown, { passive: false });
-drawButton.addEventListener("click", drawTeams);
+drawButton.addEventListener("click", handleDrawButtonClick);
 teamSettingsButton.addEventListener("click", openTeamSettings);
-participantSelectionButton.addEventListener("click", () => {
-  openParticipantSelection({ mode: "random", entryPoint: "finger" });
-});
 participantContinueButton.addEventListener("click", handleParticipantContinue);
 resetParticipantsButton.addEventListener("click", resetParticipantSelection);
 participantBackButton.addEventListener(
@@ -1411,17 +1438,21 @@ teamSettingsModal.addEventListener("click", (event) => {
     closeTeamSettings();
   }
 });
-document.querySelector("#leave-game").addEventListener("click", openLeaveConfirmation);
+document.querySelector("#leave-game").addEventListener("click", handleLeaveGame);
 document.querySelector("#cancel-leave").addEventListener("click", closeLeaveConfirmation);
-document.querySelector("#confirm-leave").addEventListener("click", () => {
-  const shouldReturnToTeamsMenu = state.gameReturnTarget === "teams-menu";
-  resetGame();
-
-  if (shouldReturnToTeamsMenu) {
-    showTeamsMenu({ focusSelector: "#start-finger-selection" });
-  } else {
-    showMenu();
+document.querySelector("#confirm-leave").addEventListener("click", returnFromGame);
+document.querySelector("#cancel-reset-game").addEventListener(
+  "click",
+  closeResetGameConfirmation,
+);
+document.querySelector("#confirm-reset-game").addEventListener("click", () => {
+  if (resetGameModal.hidden) {
+    return;
   }
+
+  resetGameModal.hidden = true;
+  resetGame();
+  drawButton.focus();
 });
 
 window.addEventListener("resize", () => {
@@ -1440,6 +1471,8 @@ document.addEventListener("keydown", (event) => {
       closeGuestFishModal();
     } else if (!redistributeModal.hidden) {
       closeRedistributeConfirmation();
+    } else if (!resetGameModal.hidden) {
+      closeResetGameConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
     } else if (!manualAssignmentPlaceholderScreen.hidden) {

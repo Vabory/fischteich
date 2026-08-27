@@ -231,6 +231,22 @@ h2 {
   transition: transform 110ms ease-out;
 }
 
+.menu-actions button:nth-child(-n + 3) {
+  position: relative;
+}
+
+.menu-actions button:nth-child(1) {
+  top: -8px;
+}
+
+.menu-actions button:nth-child(2) {
+  top: -5px;
+}
+
+.menu-actions button:nth-child(3) {
+  top: 2px;
+}
+
 .menu-actions img {
   display: block;
   width: 100%;

@@ -79,9 +79,6 @@ const menuScreen = document.querySelector("#menu-screen");
 const teamsMenuScreen = document.querySelector("#teams-menu-screen");
 const gameScreen = document.querySelector("#game-screen");
 const participantScreen = document.querySelector("#participant-screen");
-const manualAssignmentPlaceholderScreen = document.querySelector(
-  "#manual-assignment-placeholder-screen",
-);
 const manualTeamScreen = document.querySelector("#manual-team-screen");
 const teamChoiceScreen = document.querySelector("#team-choice-screen");
 const rouletteScreen = document.querySelector("#roulette-screen");
@@ -107,6 +104,10 @@ const manualTeamRenameModal = document.querySelector("#manual-team-rename-modal"
 const manualTeamRenameForm = document.querySelector("#manual-team-rename-form");
 const manualTeamRenameInput = document.querySelector("#manual-team-rename-input");
 const manualTeamRenameError = document.querySelector("#manual-team-rename-error");
+const manualPlayerModal = document.querySelector("#manual-player-modal");
+const manualPlayerTeamName = document.querySelector("#manual-player-team-name");
+const manualPlayerOptions = document.querySelector("#manual-player-options");
+const manualPlayerEmpty = document.querySelector("#manual-player-empty");
 const guestFishButton = document.querySelector("#guest-fish-button");
 const guestFishModal = document.querySelector("#guest-fish-modal");
 const guestFishForm = document.querySelector("#guest-fish-form");
@@ -230,6 +231,12 @@ const state = {
   manualTeamRenameIndex: null,
   manualTeamAssignments: null,
   manualTeamParticipantSignature: "",
+  manualModeTeamCount: MIN_MANUAL_TEAM_COUNT,
+  manualModeTeamNames: [],
+  manualAssignments: Array.from({ length: MIN_MANUAL_TEAM_COUNT }, () => []),
+  automaticAssignments: null,
+  manualModeParticipantSignature: "",
+  manualPlayerTeamIndex: null,
   rouletteRun: 0,
   rouletteTimer: null,
   rouletteSpinning: false,
@@ -700,24 +707,53 @@ function getDefaultManualTeamName(teamIndex) {
   return `TEAM ${teamIndex + 1}`;
 }
 
+function isManualAssignmentMode() {
+  return state.teamAssignmentMode === "manual";
+}
+
+function getCurrentTeamCount() {
+  return isManualAssignmentMode()
+    ? state.manualModeTeamCount
+    : state.manualTeamCount;
+}
+
+function getCurrentTeamNames() {
+  return isManualAssignmentMode()
+    ? state.manualModeTeamNames
+    : state.manualTeamNames;
+}
+
+function setCurrentTeamNames(names) {
+  if (isManualAssignmentMode()) {
+    state.manualModeTeamNames = names;
+  } else {
+    state.manualTeamNames = names;
+  }
+}
+
 function ensureManualTeamNames() {
-  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
-    state.manualTeamNames = [];
+  const teamCount = getCurrentTeamCount();
+
+  if (teamCount === MIN_MANUAL_TEAM_COUNT) {
+    setCurrentTeamNames([]);
     return;
   }
 
-  state.manualTeamNames = Array.from(
-    { length: state.manualTeamCount },
-    (_, teamIndex) => state.manualTeamNames[teamIndex] || getDefaultManualTeamName(teamIndex),
+  const currentNames = getCurrentTeamNames();
+  setCurrentTeamNames(
+    Array.from(
+      { length: teamCount },
+      (_, teamIndex) => currentNames[teamIndex] || getDefaultManualTeamName(teamIndex),
+    ),
   );
 }
 
 function getManualTeamName(teamIndex) {
-  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+  if (getCurrentTeamCount() === MIN_MANUAL_TEAM_COUNT) {
     return teamIndex === 0 ? "TURBOLACHS" : "NITROFORELLE";
   }
 
-  return state.manualTeamNames[teamIndex] || getDefaultManualTeamName(teamIndex);
+  return getCurrentTeamNames()[teamIndex] || getDefaultManualTeamName(teamIndex);
 }
 
 function setManualTeamRenameError(isVisible) {
@@ -725,7 +761,7 @@ function setManualTeamRenameError(isVisible) {
 }
 
 function openManualTeamRename(teamIndex) {
-  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+  if (getCurrentTeamCount() === MIN_MANUAL_TEAM_COUNT) {
     return;
   }
 
@@ -759,16 +795,124 @@ function renameManualTeam() {
     return false;
   }
 
-  if (!Number.isInteger(teamIndex) || state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+  if (!Number.isInteger(teamIndex) || getCurrentTeamCount() === MIN_MANUAL_TEAM_COUNT) {
     closeManualTeamRenameModal({ restoreFocus: false });
     return false;
   }
 
   ensureManualTeamNames();
-  state.manualTeamNames[teamIndex] = name;
+  const teamNames = getCurrentTeamNames();
+  teamNames[teamIndex] = name;
+  setCurrentTeamNames(teamNames);
   renderManualTeamScreen();
   closeManualTeamRenameModal();
   return true;
+}
+
+function ensureManualAssignmentTeams() {
+  state.manualAssignments = Array.from(
+    { length: state.manualModeTeamCount },
+    (_, teamIndex) => state.manualAssignments[teamIndex] ?? [],
+  );
+}
+
+function getManuallyAssignedParticipantIds() {
+  return new Set(
+    state.manualAssignments.flatMap(
+      (teamMembers) => teamMembers.map((participant) => participant.id),
+    ),
+  );
+}
+
+function getAvailableManualParticipants() {
+  const manuallyAssignedIds = getManuallyAssignedParticipantIds();
+  return state.selectedParticipants.filter(
+    (participant) => !manuallyAssignedIds.has(participant.id),
+  );
+}
+
+function closeManualPlayerModal({ restoreFocus = true } = {}) {
+  const teamIndex = state.manualPlayerTeamIndex;
+  manualPlayerModal.hidden = true;
+  state.manualPlayerTeamIndex = null;
+
+  if (restoreFocus && Number.isInteger(teamIndex)) {
+    document.querySelector(`[data-manual-player-team-index="${teamIndex}"]`)?.focus();
+  }
+}
+
+function addManualParticipantToTeam(participantId) {
+  const teamIndex = state.manualPlayerTeamIndex;
+  const participant = state.selectedParticipants.find(
+    (item) => item.id === participantId,
+  );
+
+  if (
+    !Number.isInteger(teamIndex)
+    || teamIndex < 0
+    || teamIndex >= state.manualModeTeamCount
+    || !participant
+    || getManuallyAssignedParticipantIds().has(participant.id)
+  ) {
+    return false;
+  }
+
+  ensureManualAssignmentTeams();
+  state.manualAssignments[teamIndex].push(participant);
+  state.automaticAssignments = null;
+  closeManualPlayerModal({ restoreFocus: false });
+  renderManualTeamScreen();
+  document.querySelector(`[data-manual-player-team-index="${teamIndex}"]`)?.focus();
+  return true;
+}
+
+function openManualPlayerModal(teamIndex) {
+  if (
+    !isManualAssignmentMode()
+    || !Number.isInteger(teamIndex)
+    || teamIndex < 0
+    || teamIndex >= state.manualModeTeamCount
+    || !manualPlayerModal.hidden
+  ) {
+    return;
+  }
+
+  state.manualPlayerTeamIndex = teamIndex;
+  manualPlayerTeamName.textContent = getManualTeamName(teamIndex);
+  const availableParticipants = getAvailableManualParticipants();
+  const buttons = availableParticipants.map((participant) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "manual-player-option";
+    button.textContent = participant.name;
+    button.dataset.participantId = participant.id;
+    button.addEventListener(
+      "click",
+      () => addManualParticipantToTeam(participant.id),
+    );
+    return button;
+  });
+
+  manualPlayerOptions.replaceChildren(...buttons);
+  manualPlayerOptions.hidden = buttons.length === 0;
+  manualPlayerEmpty.hidden = buttons.length !== 0;
+  manualPlayerModal.hidden = false;
+  (buttons[0] ?? document.querySelector("#close-manual-player-modal")).focus();
+}
+
+function removeManualParticipantFromTeam(teamIndex, participantId) {
+  const teamMembers = state.manualAssignments[teamIndex];
+
+  if (!teamMembers) {
+    return;
+  }
+
+  state.manualAssignments[teamIndex] = teamMembers.filter(
+    (participant) => participant.id !== participantId,
+  );
+  state.automaticAssignments = null;
+  renderManualTeamScreen();
+  document.querySelector(`[data-manual-player-team-index="${teamIndex}"]`)?.focus();
 }
 
 function createManualTeamCard(teamIndex) {
@@ -777,13 +921,15 @@ function createManualTeamCard(teamIndex) {
   const memberList = document.createElement("ul");
   const teamNumber = teamIndex + 1;
   const teamName = getManualTeamName(teamIndex);
+  const teamCount = getCurrentTeamCount();
+  const usesManualAssignments = isManualAssignmentMode();
 
   card.className = "manual-team-card";
   card.dataset.teamNumber = teamNumber;
   heading.textContent = teamName;
   memberList.className = "manual-team-member-list";
 
-  if (state.manualTeamCount === MIN_MANUAL_TEAM_COUNT) {
+  if (teamCount === MIN_MANUAL_TEAM_COUNT) {
     card.classList.add(teamIndex === 0 ? "is-turbolachs" : "is-nitroforelle");
   } else {
     const editButton = document.createElement("button");
@@ -808,9 +954,35 @@ function createManualTeamCard(teamIndex) {
     card.append(removeButton);
   }
 
-  const teamMembers = state.manualTeamAssignments?.[teamIndex] ?? [];
+  const manuallyAssignedMembers = usesManualAssignments
+    ? state.manualAssignments[teamIndex] ?? []
+    : [];
+  const automaticallyAssignedMembers = usesManualAssignments
+    ? state.automaticAssignments?.[teamIndex] ?? []
+    : state.manualTeamAssignments?.[teamIndex] ?? [];
 
-  for (const participant of teamMembers) {
+  for (const participant of manuallyAssignedMembers) {
+    const member = document.createElement("li");
+    const removeMemberButton = document.createElement("button");
+
+    member.className = "is-manually-assigned";
+    member.dataset.participantId = participant.id;
+    removeMemberButton.type = "button";
+    removeMemberButton.className = "manual-fixed-member-button";
+    removeMemberButton.textContent = `− ${participant.name}`;
+    removeMemberButton.setAttribute(
+      "aria-label",
+      `${participant.name} aus ${teamName} entfernen`,
+    );
+    removeMemberButton.addEventListener(
+      "click",
+      () => removeManualParticipantFromTeam(teamIndex, participant.id),
+    );
+    member.append(removeMemberButton);
+    memberList.append(member);
+  }
+
+  for (const participant of automaticallyAssignedMembers) {
     const member = document.createElement("li");
     member.textContent = participant.name;
     member.dataset.participantId = participant.id;
@@ -818,6 +990,21 @@ function createManualTeamCard(teamIndex) {
   }
 
   card.append(heading, memberList);
+
+  if (usesManualAssignments) {
+    const addMemberButton = document.createElement("button");
+    addMemberButton.type = "button";
+    addMemberButton.className = "manual-team-member-add-button";
+    addMemberButton.textContent = "+";
+    addMemberButton.dataset.manualPlayerTeamIndex = teamIndex;
+    addMemberButton.setAttribute(
+      "aria-label",
+      `Spieler manuell zu ${teamName} hinzufügen`,
+    );
+    addMemberButton.addEventListener("click", () => openManualPlayerModal(teamIndex));
+    card.append(addMemberButton);
+  }
+
   return card;
 }
 
@@ -833,14 +1020,16 @@ function renderManualTeamScreen() {
   }
 
   const cards = Array.from(
-    { length: state.manualTeamCount },
+    { length: getCurrentTeamCount() },
     (_, teamIndex) => createManualTeamCard(teamIndex),
   );
   manualTeamGrid.prepend(...cards);
-  addManualTeamButton.hidden = state.manualTeamCount >= MAX_MANUAL_TEAM_COUNT;
-  divideManualTeamsButton.textContent = state.manualTeamAssignments
-    ? "Neu aufteilen"
-    : "Teams aufteilen";
+  addManualTeamButton.hidden = getCurrentTeamCount() >= MAX_MANUAL_TEAM_COUNT;
+  divideManualTeamsButton.textContent = isManualAssignmentMode()
+    ? "Aufteilen"
+    : state.manualTeamAssignments
+      ? "Neu aufteilen"
+      : "Teams aufteilen";
 }
 
 function openManualTeamScreen() {
@@ -871,14 +1060,23 @@ function openManualAssignmentScreen() {
     return;
   }
 
-  // Navigations-Hook für den nächsten Schritt; noch keine manuelle Zuordnungslogik.
-  showScreen(manualAssignmentPlaceholderScreen);
-  document.querySelector("#close-manual-assignment-placeholder").focus();
-}
+  const participantSignature = getManualTeamParticipantSignature();
 
-function closeManualAssignmentScreen() {
-  showScreen(participantScreen);
-  participantContinueButton.focus();
+  if (participantSignature !== state.manualModeParticipantSignature) {
+    state.manualModeTeamCount = MIN_MANUAL_TEAM_COUNT;
+    state.manualModeTeamNames = [];
+    state.manualAssignments = Array.from(
+      { length: MIN_MANUAL_TEAM_COUNT },
+      () => [],
+    );
+    state.automaticAssignments = null;
+    state.manualModeParticipantSignature = participantSignature;
+  }
+
+  ensureManualAssignmentTeams();
+  renderManualTeamScreen();
+  showScreen(manualTeamScreen);
+  document.querySelector("#close-manual-team-screen").focus();
 }
 
 function handleParticipantContinue() {
@@ -891,24 +1089,38 @@ function handleParticipantContinue() {
 }
 
 function addManualTeam() {
-  if (state.manualTeamCount >= MAX_MANUAL_TEAM_COUNT) {
+  if (getCurrentTeamCount() >= MAX_MANUAL_TEAM_COUNT) {
     return;
   }
 
-  state.manualTeamCount += 1;
+  if (isManualAssignmentMode()) {
+    state.manualModeTeamCount += 1;
+    state.manualAssignments.push([]);
+    state.automaticAssignments = null;
+  } else {
+    state.manualTeamCount += 1;
+    invalidateManualTeamResult();
+  }
+
   ensureManualTeamNames();
-  invalidateManualTeamResult();
   renderManualTeamScreen();
 }
 
 function removeManualTeam() {
-  if (state.manualTeamCount <= MIN_MANUAL_TEAM_COUNT) {
+  if (getCurrentTeamCount() <= MIN_MANUAL_TEAM_COUNT) {
     return;
   }
 
-  state.manualTeamCount -= 1;
+  if (isManualAssignmentMode()) {
+    state.manualModeTeamCount -= 1;
+    state.manualAssignments.pop();
+    state.automaticAssignments = null;
+  } else {
+    state.manualTeamCount -= 1;
+    invalidateManualTeamResult();
+  }
+
   ensureManualTeamNames();
-  invalidateManualTeamResult();
   renderManualTeamScreen();
 }
 
@@ -917,6 +1129,35 @@ function divideManualTeams() {
     state.selectedParticipants,
     state.manualTeamCount,
   );
+  renderManualTeamScreen();
+}
+
+function divideRemainingManualParticipants() {
+  ensureManualAssignmentTeams();
+  const manuallyAssignedIds = getManuallyAssignedParticipantIds();
+  const remainingParticipants = shuffle(
+    state.selectedParticipants.filter(
+      (participant) => !manuallyAssignedIds.has(participant.id),
+    ),
+  );
+  const teamSizes = state.manualAssignments.map((teamMembers) => teamMembers.length);
+  const automaticAssignments = Array.from(
+    { length: state.manualModeTeamCount },
+    () => [],
+  );
+
+  for (const participant of remainingParticipants) {
+    const smallestTeamSize = Math.min(...teamSizes);
+    const smallestTeamIndexes = teamSizes
+      .map((teamSize, teamIndex) => ({ teamSize, teamIndex }))
+      .filter(({ teamSize }) => teamSize === smallestTeamSize)
+      .map(({ teamIndex }) => teamIndex);
+    const teamIndex = smallestTeamIndexes[secureRandomInt(smallestTeamIndexes.length)];
+    automaticAssignments[teamIndex].push(participant);
+    teamSizes[teamIndex] += 1;
+  }
+
+  state.automaticAssignments = automaticAssignments;
   renderManualTeamScreen();
 }
 
@@ -938,6 +1179,11 @@ function closeRedistributeConfirmation({ restoreFocus = true } = {}) {
 }
 
 function handleManualTeamDivision() {
+  if (isManualAssignmentMode()) {
+    divideRemainingManualParticipants();
+    return;
+  }
+
   if (state.manualTeamAssignments) {
     openRedistributeConfirmation();
     return;
@@ -1378,10 +1624,6 @@ participantBackButton.addEventListener(
   "click",
   closeParticipantSelection,
 );
-document.querySelector("#close-manual-assignment-placeholder").addEventListener(
-  "click",
-  closeManualAssignmentScreen,
-);
 document.querySelector("#close-manual-team-screen").addEventListener(
   "click",
   closeManualTeamScreen,
@@ -1413,6 +1655,15 @@ manualTeamRenameInput.addEventListener("input", () => setManualTeamRenameError(f
 manualTeamRenameModal.addEventListener("click", (event) => {
   if (event.target === manualTeamRenameModal) {
     closeManualTeamRenameModal();
+  }
+});
+document.querySelector("#close-manual-player-modal").addEventListener(
+  "click",
+  closeManualPlayerModal,
+);
+manualPlayerModal.addEventListener("click", (event) => {
+  if (event.target === manualPlayerModal) {
+    closeManualPlayerModal();
   }
 });
 guestFishButton.addEventListener("click", openGuestFishModal);
@@ -1465,7 +1716,9 @@ document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    if (!manualTeamRenameModal.hidden) {
+    if (!manualPlayerModal.hidden) {
+      closeManualPlayerModal();
+    } else if (!manualTeamRenameModal.hidden) {
       closeManualTeamRenameModal();
     } else if (!guestFishModal.hidden) {
       closeGuestFishModal();
@@ -1475,8 +1728,6 @@ document.addEventListener("keydown", (event) => {
       closeResetGameConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
-    } else if (!manualAssignmentPlaceholderScreen.hidden) {
-      closeManualAssignmentScreen();
     } else if (!manualTeamScreen.hidden) {
       closeManualTeamScreen();
     } else if (!participantScreen.hidden) {

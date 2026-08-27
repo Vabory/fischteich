@@ -1058,6 +1058,39 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.manual-team-member-list li.is-manually-assigned {
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 9%);
+  background: rgb(255 255 255 / 8%);
+}
+
+.manual-fixed-member-button {
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+
+.manual-team-member-add-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  margin: 10px auto 0;
+  padding: 0 0 3px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 9%);
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
 .manual-add-team-button {
   display: grid;
   width: 52px;
@@ -1089,6 +1122,8 @@ h2 {
 
 .manual-divide-button:active,
 .manual-add-team-button:active,
+.manual-team-member-add-button:active,
+.manual-fixed-member-button:active,
 .manual-team-edit-button:active,
 .manual-remove-team-button:active {
   transform: scale(0.97);
@@ -1144,6 +1179,58 @@ h2 {
 
 .guest-fish-actions button {
   min-height: 50px;
+}
+
+.manual-player-card {
+  display: grid;
+  max-height: min(78dvh, 620px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.manual-player-card h2 {
+  margin-bottom: 6px;
+}
+
+.manual-player-card .manual-player-team-name {
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 750;
+}
+
+.manual-player-options {
+  display: grid;
+  min-height: 0;
+  padding: 1px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  gap: 7px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.manual-player-option {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgb(255 255 255 / 13%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 8%);
+  color: var(--text);
+  font-weight: 750;
+  text-align: left;
+}
+
+.manual-player-card .manual-player-empty {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.manual-player-close {
+  margin-top: 16px;
 }
 
 .roulette-content {

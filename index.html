@@ -13,8 +13,8 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=51">
-    <script src="./script.js?v=27" defer></script>
+    <link rel="stylesheet" href="./style.css?v=52">
+    <script src="./script.js?v=28" defer></script>
   </head>
   <body>
     <div id="app">
@@ -166,15 +166,6 @@
             <button class="participant-reset-button" id="reset-participants" type="button">Reset</button>
             <button class="participant-continue-button" id="participant-continue-button" type="button" disabled>Weiter</button>
           </div>
-        </div>
-      </section>
-
-      <section class="screen choice-screen manual-assignment-placeholder-screen" id="manual-assignment-placeholder-screen" aria-labelledby="manual-assignment-placeholder-title" hidden>
-        <button class="close-button navigation-back-button" id="close-manual-assignment-placeholder" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
-        <div class="choice-card">
-          <p class="eyebrow">Mitspieler manuell</p>
-          <h2 id="manual-assignment-placeholder-title">Manuelle Teamaufteilung</h2>
-          <p>Dieser Bereich folgt im nächsten Schritt.</p>
         </div>
       </section>
 
@@ -397,6 +388,16 @@
           <button class="primary-button" type="submit">OK</button>
         </div>
       </form>
+    </div>
+
+    <div class="modal-backdrop guest-fish-backdrop" id="manual-player-modal" role="dialog" aria-modal="true" aria-labelledby="manual-player-title" hidden>
+      <div class="modal-card manual-player-card">
+        <h2 id="manual-player-title">Spieler hinzufügen</h2>
+        <p class="manual-player-team-name" id="manual-player-team-name"></p>
+        <div class="manual-player-options" id="manual-player-options"></div>
+        <p class="manual-player-empty" id="manual-player-empty" hidden>Alle Spieler sind bereits manuell zugeordnet.</p>
+        <button class="secondary-button manual-player-close" id="close-manual-player-modal" type="button">Schließen</button>
+      </div>
     </div>
 
   </body>

@@ -1164,6 +1164,187 @@ h2 {
   transform: scale(0.97);
 }
 
+.rage-cage-screen {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(33 35 122 / 34%), transparent 42%),
+    linear-gradient(180deg, #0b1022, #03010f 72%);
+}
+
+.rage-cage-back-button {
+  padding: 0;
+  font-size: 1.2rem;
+}
+
+.rage-cage-shell {
+  display: grid;
+  width: min(100%, 680px);
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  padding:
+    max(22px, env(safe-area-inset-top))
+    max(10px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.rage-cage-header {
+  min-height: 72px;
+  padding-inline: 42px;
+  text-align: center;
+}
+
+.rage-cage-header h2 {
+  margin: 0 0 7px;
+  font-size: clamp(1.25rem, 5.8vw, 1.85rem);
+}
+
+.rage-cage-header p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: clamp(0.78rem, 3.4vw, 0.96rem);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rage-cage-stage {
+  position: relative;
+  width: min(100%, 470px);
+  height: 100%;
+  min-height: 240px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.rage-cage-table {
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  left: 33%;
+  display: grid;
+  width: 34%;
+  place-items: center;
+  border: 2px solid rgb(255 255 255 / 30%);
+  border-radius: 42px;
+  background:
+    linear-gradient(90deg, transparent 49.5%, rgb(255 255 255 / 9%) 49.5% 50.5%, transparent 50.5%),
+    linear-gradient(160deg, #202869, #11183f 48%, #181d4d);
+  box-shadow:
+    inset 0 0 0 4px rgb(3 6 18 / 42%),
+    inset 0 0 28px rgb(0 0 0 / 35%),
+    0 18px 40px rgb(0 0 0 / 34%);
+}
+
+.rage-cage-table span {
+  color: rgb(255 255 255 / 16%);
+  font-size: clamp(0.72rem, 3.2vw, 1rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.rage-cage-seats {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rage-cage-seat {
+  position: absolute;
+  top: var(--seat-y);
+  left: var(--seat-x);
+  width: 0;
+  height: 0;
+}
+
+.rage-cage-dot {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgb(3 6 18 / 78%);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px rgb(255 255 255 / 68%);
+  transform: translate(-50%, -50%);
+  transition: background-color 70ms ease-out, box-shadow 70ms ease-out, transform 70ms ease-out;
+}
+
+.rage-cage-seat.is-start-position .rage-cage-dot {
+  background: #ff3d4f;
+  box-shadow:
+    0 0 7px #ff3d4f,
+    0 0 14px rgb(255 61 79 / 72%);
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+.rage-cage-player-name {
+  position: absolute;
+  z-index: 1;
+  top: var(--label-y);
+  left: var(--label-x);
+  width: clamp(72px, 24vw, 112px);
+  color: #f8f9ff;
+  font-size: clamp(0.68rem, 3vw, 0.86rem);
+  font-weight: 750;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 5px rgb(0 0 0 / 85%);
+  transform: translate(-50%, -50%);
+}
+
+.rage-cage-seat.has-compact-label .rage-cage-player-name {
+  font-size: clamp(0.62rem, 2.7vw, 0.76rem);
+}
+
+.rage-cage-actions {
+  display: grid;
+  padding-top: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.rage-cage-reshuffle-button,
+.rage-cage-start-button {
+  min-height: 54px;
+  padding: 12px 10px;
+  border-radius: 17px;
+  font-size: clamp(0.84rem, 3.7vw, 1rem);
+  font-weight: 800;
+}
+
+.rage-cage-reshuffle-button {
+  border: 1px solid rgb(255 255 255 / 16%);
+  background: rgb(255 255 255 / 9%);
+}
+
+.rage-cage-start-button {
+  background: var(--pink);
+  box-shadow: 0 9px 24px rgb(241 90 154 / 24%);
+}
+
+.rage-cage-reshuffle-button:active,
+.rage-cage-start-button:active {
+  transform: scale(0.97);
+}
+
+.rage-cage-reshuffle-button:disabled,
+.rage-cage-start-button:disabled {
+  cursor: default;
+  filter: saturate(0.55);
+  opacity: 0.58;
+  pointer-events: none;
+}
+
 .guest-fish-backdrop {
   z-index: 30;
 }
@@ -1863,6 +2044,24 @@ h2 {
 
 @media (max-height: 620px) {
   .primary-button, .secondary-button, .fish-button { min-height: 50px; padding-block: 11px; }
+
+  .rage-cage-header {
+    min-height: 58px;
+  }
+
+  .rage-cage-header p {
+    -webkit-line-clamp: 1;
+  }
+
+  .rage-cage-table {
+    top: 9%;
+    bottom: 9%;
+  }
+
+  .rage-cage-reshuffle-button,
+  .rage-cage-start-button {
+    min-height: 48px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

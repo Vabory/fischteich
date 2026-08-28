@@ -50,6 +50,7 @@ const MIN_TEAM_COUNT = 2;
 const MAX_TEAM_COUNT = 10;
 const MIN_MANUAL_TEAM_COUNT = 2;
 const MAX_MANUAL_TEAM_COUNT = 20;
+const RAGE_CAGE_MIN_ANIMATION_STEPS = 12;
 const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
@@ -85,6 +86,7 @@ const teamsMenuScreen = document.querySelector("#teams-menu-screen");
 const gameScreen = document.querySelector("#game-screen");
 const participantScreen = document.querySelector("#participant-screen");
 const manualTeamScreen = document.querySelector("#manual-team-screen");
+const rageCageScreen = document.querySelector("#rage-cage-screen");
 const teamChoiceScreen = document.querySelector("#team-choice-screen");
 const rouletteScreen = document.querySelector("#roulette-screen");
 const playZone = document.querySelector("#play-zone");
@@ -106,6 +108,12 @@ const manualTeamParticipantNames = document.querySelector("#manual-team-particip
 const manualTeamGrid = document.querySelector("#manual-team-grid");
 const addManualTeamButton = document.querySelector("#add-manual-team");
 const divideManualTeamsButton = document.querySelector("#divide-manual-teams");
+const rageCageParticipantNames = document.querySelector("#rage-cage-participant-names");
+const rageCageStage = document.querySelector("#rage-cage-stage");
+const rageCageTable = document.querySelector("#rage-cage-table");
+const rageCageSeats = document.querySelector("#rage-cage-seats");
+const rageCageReshuffleButton = document.querySelector("#rage-cage-reshuffle");
+const rageCageStartButton = document.querySelector("#rage-cage-start-position");
 const manualTeamRenameModal = document.querySelector("#manual-team-rename-modal");
 const manualTeamRenameForm = document.querySelector("#manual-team-rename-form");
 const manualTeamRenameInput = document.querySelector("#manual-team-rename-input");
@@ -129,7 +137,7 @@ const welcomeDisplayNameInput = document.querySelector("#welcome-display-name");
 const welcomeIdentityError = document.querySelector("#welcome-identity-error");
 const leaveModal = document.querySelector("#leave-modal");
 const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
-const redistributeModal = document.querySelector("#redistribute-modal");
+const rageCageReshuffleModal = document.querySelector("#rage-cage-reshuffle-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
 const rouletteSpinButton = document.querySelector("#spin-roulette");
@@ -237,21 +245,20 @@ const state = {
   frozen: false,
   markerSize: 76,
   gameReturnTarget: "menu",
-  teamAssignmentMode: "random",
+  teamAssignmentMode: "teams",
   selectedParticipants: [],
   nextGuestId: 1,
   manualTeamCount: MIN_MANUAL_TEAM_COUNT,
   manualTeamNames: [],
   manualTeamRenameIndex: null,
-  manualTeamAssignments: null,
-  manualTeamParticipantSignature: "",
-  manualModeTeamCount: MIN_MANUAL_TEAM_COUNT,
-  manualModeTeamNames: [],
   manualAssignments: Array.from({ length: MIN_MANUAL_TEAM_COUNT }, () => []),
   automaticAssignments: null,
-  manualModeParticipantSignature: "",
+  manualTeamParticipantSignature: "",
   manualPlayerTeamIndex: null,
   manualPlayerSelectionIds: new Set(),
+  rageCageSeats: [],
+  rageCageAnimationRun: 0,
+  rageCageAnimationTimer: null,
   rouletteRun: 0,
   rouletteTimer: null,
   rouletteSpinning: false,
@@ -500,7 +507,7 @@ function addGuestFish() {
   return true;
 }
 
-function openParticipantSelection({ mode = "random" } = {}) {
+function openParticipantSelection({ mode = "teams" } = {}) {
   state.teamAssignmentMode = mode;
   participantScreen.dataset.teamAssignmentMode = mode;
   renderParticipantSelection();
@@ -509,7 +516,7 @@ function openParticipantSelection({ mode = "random" } = {}) {
 }
 
 function closeParticipantSelection() {
-  const focusSelector = state.teamAssignmentMode === "manual"
+  const focusSelector = state.teamAssignmentMode === "rage-cage"
     ? "#start-manual-participants"
     : "#start-random-participants";
   showTeamsMenu({ focusSelector });
@@ -741,51 +748,20 @@ function getManualTeamParticipantSignature() {
   return state.selectedParticipants.map((participant) => participant.id).join("|");
 }
 
-function invalidateManualTeamResult() {
-  state.manualTeamAssignments = null;
-}
-
-function createManualTeamAssignments(participants, teamCount) {
-  const randomizedParticipants = shuffle(participants);
-  const randomizedTeams = shuffle(
-    Array.from({ length: teamCount }, (_, index) => index),
-  );
-  const assignments = Array.from({ length: teamCount }, () => []);
-
-  randomizedParticipants.forEach((participant, index) => {
-    const teamIndex = randomizedTeams[index % teamCount];
-    assignments[teamIndex].push(participant);
-  });
-
-  return assignments;
-}
-
 function getDefaultManualTeamName(teamIndex) {
   return `TEAM ${teamIndex + 1}`;
 }
 
-function isManualAssignmentMode() {
-  return state.teamAssignmentMode === "manual";
-}
-
 function getCurrentTeamCount() {
-  return isManualAssignmentMode()
-    ? state.manualModeTeamCount
-    : state.manualTeamCount;
+  return state.manualTeamCount;
 }
 
 function getCurrentTeamNames() {
-  return isManualAssignmentMode()
-    ? state.manualModeTeamNames
-    : state.manualTeamNames;
+  return state.manualTeamNames;
 }
 
 function setCurrentTeamNames(names) {
-  if (isManualAssignmentMode()) {
-    state.manualModeTeamNames = names;
-  } else {
-    state.manualTeamNames = names;
-  }
+  state.manualTeamNames = names;
 }
 
 function ensureManualTeamNames() {
@@ -868,7 +844,7 @@ function renameManualTeam() {
 
 function ensureManualAssignmentTeams() {
   state.manualAssignments = Array.from(
-    { length: state.manualModeTeamCount },
+    { length: state.manualTeamCount },
     (_, teamIndex) => state.manualAssignments[teamIndex] ?? [],
   );
 }
@@ -932,7 +908,7 @@ function confirmManualPlayerSelection() {
   if (
     !Number.isInteger(teamIndex)
     || teamIndex < 0
-    || teamIndex >= state.manualModeTeamCount
+    || teamIndex >= state.manualTeamCount
     || participants.length === 0
   ) {
     return false;
@@ -949,10 +925,9 @@ function confirmManualPlayerSelection() {
 
 function openManualPlayerModal(teamIndex) {
   if (
-    !isManualAssignmentMode()
-    || !Number.isInteger(teamIndex)
+    !Number.isInteger(teamIndex)
     || teamIndex < 0
-    || teamIndex >= state.manualModeTeamCount
+    || teamIndex >= state.manualTeamCount
     || !manualPlayerModal.hidden
   ) {
     return;
@@ -1006,7 +981,6 @@ function createManualTeamCard(teamIndex) {
   const teamNumber = teamIndex + 1;
   const teamName = getManualTeamName(teamIndex);
   const teamCount = getCurrentTeamCount();
-  const usesManualAssignments = isManualAssignmentMode();
 
   card.className = "manual-team-card";
   card.dataset.teamNumber = teamNumber;
@@ -1038,12 +1012,8 @@ function createManualTeamCard(teamIndex) {
     card.append(removeButton);
   }
 
-  const manuallyAssignedMembers = usesManualAssignments
-    ? state.manualAssignments[teamIndex] ?? []
-    : [];
-  const automaticallyAssignedMembers = usesManualAssignments
-    ? state.automaticAssignments?.[teamIndex] ?? []
-    : state.manualTeamAssignments?.[teamIndex] ?? [];
+  const manuallyAssignedMembers = state.manualAssignments[teamIndex] ?? [];
+  const automaticallyAssignedMembers = state.automaticAssignments?.[teamIndex] ?? [];
 
   for (const participant of manuallyAssignedMembers) {
     const member = document.createElement("li");
@@ -1075,19 +1045,17 @@ function createManualTeamCard(teamIndex) {
 
   card.append(heading, memberList);
 
-  if (usesManualAssignments) {
-    const addMemberButton = document.createElement("button");
-    addMemberButton.type = "button";
-    addMemberButton.className = "manual-team-member-add-button";
-    addMemberButton.textContent = "+";
-    addMemberButton.dataset.manualPlayerTeamIndex = teamIndex;
-    addMemberButton.setAttribute(
-      "aria-label",
-      `Spieler manuell zu ${teamName} hinzufügen`,
-    );
-    addMemberButton.addEventListener("click", () => openManualPlayerModal(teamIndex));
-    card.append(addMemberButton);
-  }
+  const addMemberButton = document.createElement("button");
+  addMemberButton.type = "button";
+  addMemberButton.className = "manual-team-member-add-button";
+  addMemberButton.textContent = "+";
+  addMemberButton.dataset.manualPlayerTeamIndex = teamIndex;
+  addMemberButton.setAttribute(
+    "aria-label",
+    `Spieler manuell zu ${teamName} hinzufügen`,
+  );
+  addMemberButton.addEventListener("click", () => openManualPlayerModal(teamIndex));
+  card.append(addMemberButton);
 
   return card;
 }
@@ -1109,11 +1077,7 @@ function renderManualTeamScreen() {
   );
   manualTeamGrid.prepend(...cards);
   addManualTeamButton.hidden = getCurrentTeamCount() >= MAX_MANUAL_TEAM_COUNT;
-  divideManualTeamsButton.textContent = isManualAssignmentMode()
-    ? "Aufteilen"
-    : state.manualTeamAssignments
-      ? "Neu aufteilen"
-      : "Teams aufteilen";
+  divideManualTeamsButton.textContent = "Aufteilen";
 }
 
 function openManualTeamScreen() {
@@ -1124,10 +1088,17 @@ function openManualTeamScreen() {
   const participantSignature = getManualTeamParticipantSignature();
 
   if (participantSignature !== state.manualTeamParticipantSignature) {
-    invalidateManualTeamResult();
+    state.manualTeamCount = MIN_MANUAL_TEAM_COUNT;
+    state.manualTeamNames = [];
+    state.manualAssignments = Array.from(
+      { length: MIN_MANUAL_TEAM_COUNT },
+      () => [],
+    );
+    state.automaticAssignments = null;
     state.manualTeamParticipantSignature = participantSignature;
   }
 
+  ensureManualAssignmentTeams();
   renderManualTeamScreen();
   showScreen(manualTeamScreen);
   document.querySelector("#close-manual-team-screen").focus();
@@ -1139,33 +1110,9 @@ function closeManualTeamScreen() {
   participantContinueButton.focus();
 }
 
-function openManualAssignmentScreen() {
-  if (state.selectedParticipants.length < 2) {
-    return;
-  }
-
-  const participantSignature = getManualTeamParticipantSignature();
-
-  if (participantSignature !== state.manualModeParticipantSignature) {
-    state.manualModeTeamCount = MIN_MANUAL_TEAM_COUNT;
-    state.manualModeTeamNames = [];
-    state.manualAssignments = Array.from(
-      { length: MIN_MANUAL_TEAM_COUNT },
-      () => [],
-    );
-    state.automaticAssignments = null;
-    state.manualModeParticipantSignature = participantSignature;
-  }
-
-  ensureManualAssignmentTeams();
-  renderManualTeamScreen();
-  showScreen(manualTeamScreen);
-  document.querySelector("#close-manual-team-screen").focus();
-}
-
 function handleParticipantContinue() {
-  if (state.teamAssignmentMode === "manual") {
-    openManualAssignmentScreen();
+  if (state.teamAssignmentMode === "rage-cage") {
+    openRageCageTable();
     return;
   }
 
@@ -1177,14 +1124,9 @@ function addManualTeam() {
     return;
   }
 
-  if (isManualAssignmentMode()) {
-    state.manualModeTeamCount += 1;
-    state.manualAssignments.push([]);
-    state.automaticAssignments = null;
-  } else {
-    state.manualTeamCount += 1;
-    invalidateManualTeamResult();
-  }
+  state.manualTeamCount += 1;
+  state.manualAssignments.push([]);
+  state.automaticAssignments = null;
 
   ensureManualTeamNames();
   renderManualTeamScreen();
@@ -1195,24 +1137,11 @@ function removeManualTeam() {
     return;
   }
 
-  if (isManualAssignmentMode()) {
-    state.manualModeTeamCount -= 1;
-    state.manualAssignments.pop();
-    state.automaticAssignments = null;
-  } else {
-    state.manualTeamCount -= 1;
-    invalidateManualTeamResult();
-  }
+  state.manualTeamCount -= 1;
+  state.manualAssignments.pop();
+  state.automaticAssignments = null;
 
   ensureManualTeamNames();
-  renderManualTeamScreen();
-}
-
-function divideManualTeams() {
-  state.manualTeamAssignments = createManualTeamAssignments(
-    state.selectedParticipants,
-    state.manualTeamCount,
-  );
   renderManualTeamScreen();
 }
 
@@ -1226,7 +1155,7 @@ function divideRemainingManualParticipants() {
   );
   const teamSizes = state.manualAssignments.map((teamMembers) => teamMembers.length);
   const automaticAssignments = Array.from(
-    { length: state.manualModeTeamCount },
+    { length: state.manualTeamCount },
     () => [],
   );
 
@@ -1245,35 +1174,275 @@ function divideRemainingManualParticipants() {
   renderManualTeamScreen();
 }
 
-function openRedistributeConfirmation() {
-  if (!redistributeModal.hidden) {
+function handleManualTeamDivision() {
+  divideRemainingManualParticipants();
+}
+
+function stopRageCageStartAnimation() {
+  state.rageCageAnimationRun += 1;
+  window.clearTimeout(state.rageCageAnimationTimer);
+  state.rageCageAnimationTimer = null;
+  rageCageReshuffleButton.disabled = false;
+  rageCageStartButton.disabled = false;
+}
+
+function setRageCageStartPositions(startA = null, startB = null) {
+  for (const seat of state.rageCageSeats) {
+    seat.isStartPosition = seat.seatIndex === startA || seat.seatIndex === startB;
+  }
+}
+
+function createRageCageSeats() {
+  stopRageCageStartAnimation();
+  state.rageCageSeats = shuffle(state.selectedParticipants).map((player, seatIndex) => ({
+    player,
+    seatIndex,
+    dotPosition: null,
+    labelPosition: null,
+    isStartPosition: false,
+  }));
+}
+
+function getRageCagePathPoint(distance, tableBounds, cornerRadius) {
+  const straightWidth = tableBounds.width - cornerRadius * 2;
+  const straightHeight = tableBounds.height - cornerRadius * 2;
+  const arcLength = Math.PI * cornerRadius / 2;
+  const perimeter = 2 * straightWidth + 2 * straightHeight + 4 * arcLength;
+  let remaining = ((distance % perimeter) + perimeter) % perimeter;
+
+  const straightPoint = (length, createPoint) => {
+    if (remaining > length) {
+      remaining -= length;
+      return null;
+    }
+
+    return createPoint(length === 0 ? 0 : remaining / length);
+  };
+  const arcPoint = (startAngle, centerX, centerY) => straightPoint(
+    arcLength,
+    (progress) => {
+      const angle = startAngle + progress * Math.PI / 2;
+      return {
+        x: centerX + Math.cos(angle) * cornerRadius,
+        y: centerY + Math.sin(angle) * cornerRadius,
+        normalX: Math.cos(angle),
+        normalY: Math.sin(angle),
+      };
+    },
+  );
+
+  return straightPoint(straightWidth, (progress) => ({
+    x: tableBounds.left + cornerRadius + straightWidth * progress,
+    y: tableBounds.top,
+    normalX: 0,
+    normalY: -1,
+  })) ?? arcPoint(-Math.PI / 2, tableBounds.right - cornerRadius, tableBounds.top + cornerRadius)
+    ?? straightPoint(straightHeight, (progress) => ({
+      x: tableBounds.right,
+      y: tableBounds.top + cornerRadius + straightHeight * progress,
+      normalX: 1,
+      normalY: 0,
+    }))
+    ?? arcPoint(0, tableBounds.right - cornerRadius, tableBounds.bottom - cornerRadius)
+    ?? straightPoint(straightWidth, (progress) => ({
+      x: tableBounds.right - cornerRadius - straightWidth * progress,
+      y: tableBounds.bottom,
+      normalX: 0,
+      normalY: 1,
+    }))
+    ?? arcPoint(Math.PI / 2, tableBounds.left + cornerRadius, tableBounds.bottom - cornerRadius)
+    ?? straightPoint(straightHeight, (progress) => ({
+      x: tableBounds.left,
+      y: tableBounds.bottom - cornerRadius - straightHeight * progress,
+      normalX: -1,
+      normalY: 0,
+    }))
+    ?? arcPoint(Math.PI, tableBounds.left + cornerRadius, tableBounds.top + cornerRadius);
+}
+
+function renderRageCageSeats() {
+  if (rageCageScreen.hidden || state.rageCageSeats.length === 0) {
+    return false;
+  }
+
+  const stageBounds = rageCageStage.getBoundingClientRect();
+  const tableClientBounds = rageCageTable.getBoundingClientRect();
+
+  if (stageBounds.width === 0 || tableClientBounds.width === 0) {
+    return false;
+  }
+
+  const tableBounds = {
+    left: tableClientBounds.left - stageBounds.left,
+    top: tableClientBounds.top - stageBounds.top,
+    right: tableClientBounds.right - stageBounds.left,
+    bottom: tableClientBounds.bottom - stageBounds.top,
+    width: tableClientBounds.width,
+    height: tableClientBounds.height,
+  };
+  const cornerRadius = Math.min(42, tableBounds.width / 2, tableBounds.height / 2);
+  const straightWidth = tableBounds.width - cornerRadius * 2;
+  const straightHeight = tableBounds.height - cornerRadius * 2;
+  const perimeter = 2 * straightWidth + 2 * straightHeight + 2 * Math.PI * cornerRadius;
+  const compactLabels = state.rageCageSeats.length >= 16;
+  const seatElements = state.rageCageSeats.map((seat) => {
+    const point = getRageCagePathPoint(
+      perimeter * seat.seatIndex / state.rageCageSeats.length,
+      tableBounds,
+      cornerRadius,
+    );
+    const horizontalLabel = Math.abs(point.normalX) > 0.6;
+    const labelDistanceX = horizontalLabel ? 58 : 38;
+    const labelDistanceY = horizontalLabel ? 30 : 28;
+    const labelX = point.x + point.normalX * labelDistanceX;
+    const labelY = point.y + point.normalY * labelDistanceY;
+    const seatElement = document.createElement("div");
+    const dotElement = document.createElement("span");
+    const labelElement = document.createElement("span");
+
+    seat.dotPosition = { x: point.x, y: point.y };
+    seat.labelPosition = { x: labelX, y: labelY };
+    seatElement.className = "rage-cage-seat";
+    seatElement.classList.toggle("is-start-position", seat.isStartPosition);
+    seatElement.classList.toggle("has-compact-label", compactLabels);
+    seatElement.style.setProperty("--seat-x", `${point.x}px`);
+    seatElement.style.setProperty("--seat-y", `${point.y}px`);
+    seatElement.style.setProperty("--label-x", `${labelX - point.x}px`);
+    seatElement.style.setProperty("--label-y", `${labelY - point.y}px`);
+    seatElement.dataset.seatIndex = String(seat.seatIndex);
+    seatElement.setAttribute(
+      "aria-label",
+      `${seat.player.name}${seat.isStartPosition ? ", Startposition" : ""}`,
+    );
+    dotElement.className = "rage-cage-dot";
+    dotElement.setAttribute("aria-hidden", "true");
+    labelElement.className = "rage-cage-player-name";
+    labelElement.textContent = seat.player.name;
+    labelElement.style.textAlign = point.normalX > 0.35
+      ? "left"
+      : point.normalX < -0.35
+        ? "right"
+        : "center";
+    seatElement.append(dotElement, labelElement);
+    return seatElement;
+  });
+
+  rageCageSeats.replaceChildren(...seatElements);
+  return true;
+}
+
+function renderRageCageTable() {
+  rageCageParticipantNames.textContent = state.selectedParticipants
+    .map((participant) => participant.name)
+    .join(" · ");
+  renderRageCageSeats();
+}
+
+function openRageCageTable() {
+  if (state.selectedParticipants.length < 2) {
     return;
   }
 
-  redistributeModal.hidden = false;
-  document.querySelector("#cancel-redistribute").focus();
+  createRageCageSeats();
+  showScreen(rageCageScreen);
+  renderRageCageTable();
+  requestAnimationFrame(renderRageCageSeats);
+  document.querySelector("#close-rage-cage-screen").focus();
 }
 
-function closeRedistributeConfirmation({ restoreFocus = true } = {}) {
-  redistributeModal.hidden = true;
+function closeRageCageTable() {
+  stopRageCageStartAnimation();
+  rageCageReshuffleModal.hidden = true;
+  renderParticipantSelection();
+  showScreen(participantScreen);
+  participantContinueButton.focus();
+}
+
+function openRageCageReshuffleConfirmation() {
+  if (!rageCageReshuffleModal.hidden || state.rageCageAnimationTimer !== null) {
+    return;
+  }
+
+  rageCageReshuffleModal.hidden = false;
+  document.querySelector("#cancel-rage-cage-reshuffle").focus();
+}
+
+function closeRageCageReshuffleConfirmation({ restoreFocus = true } = {}) {
+  rageCageReshuffleModal.hidden = true;
 
   if (restoreFocus) {
-    divideManualTeamsButton.focus();
+    rageCageReshuffleButton.focus();
   }
 }
 
-function handleManualTeamDivision() {
-  if (isManualAssignmentMode()) {
-    divideRemainingManualParticipants();
+function reshuffleRageCagePlayers() {
+  createRageCageSeats();
+  renderRageCageSeats();
+}
+
+function pickRageCageStartPositions() {
+  const seatCount = state.rageCageSeats.length;
+
+  if (seatCount < 2) {
+    return null;
+  }
+
+  const startA = secureRandomInt(seatCount);
+  const oppositeOffset = seatCount % 2 === 0
+    ? seatCount / 2
+    : Math.floor(seatCount / 2) + secureRandomInt(2);
+
+  return {
+    startA,
+    startB: (startA + oppositeOffset) % seatCount,
+    oppositeOffset,
+  };
+}
+
+function animateRageCageStartPositions() {
+  const finalPositions = pickRageCageStartPositions();
+
+  if (!finalPositions || state.rageCageAnimationTimer !== null) {
     return;
   }
 
-  if (state.manualTeamAssignments) {
-    openRedistributeConfirmation();
-    return;
-  }
+  stopRageCageStartAnimation();
+  const run = state.rageCageAnimationRun;
+  const seatCount = state.rageCageSeats.length;
+  const initialStartA = secureRandomInt(seatCount);
+  const finalOffset = (finalPositions.startA - initialStartA + seatCount) % seatCount;
+  const fullCycleSteps = Math.ceil(RAGE_CAGE_MIN_ANIMATION_STEPS / seatCount) * seatCount;
+  const totalSteps = fullCycleSteps + finalOffset;
+  let step = 0;
 
-  divideManualTeams();
+  rageCageReshuffleButton.disabled = true;
+  rageCageStartButton.disabled = true;
+
+  const advance = () => {
+    if (run !== state.rageCageAnimationRun) {
+      return;
+    }
+
+    const startA = (initialStartA + step) % seatCount;
+    const startB = (startA + finalPositions.oppositeOffset) % seatCount;
+    setRageCageStartPositions(startA, startB);
+    renderRageCageSeats();
+
+    if (step >= totalSteps) {
+      state.rageCageAnimationTimer = null;
+      rageCageReshuffleButton.disabled = false;
+      rageCageStartButton.disabled = false;
+      rageCageStartButton.focus();
+      return;
+    }
+
+    step += 1;
+    const progress = step / totalSteps;
+    const delay = 28 + Math.round(112 * progress ** 2.25);
+    state.rageCageAnimationTimer = window.setTimeout(advance, delay);
+  };
+
+  advance();
 }
 
 function openLeaveConfirmation() {
@@ -1774,14 +1943,14 @@ document.querySelector("#start-two-teams").addEventListener("click", () => showT
 document.querySelector("#close-teams-menu").addEventListener("click", showMenu);
 document.querySelector("#start-finger-selection").addEventListener("click", () => {
   state.gameReturnTarget = "teams-menu";
-  state.teamAssignmentMode = "random";
+  state.teamAssignmentMode = "teams";
   startGame(2);
 });
 document.querySelector("#start-random-participants").addEventListener("click", () => {
-  openParticipantSelection({ mode: "random" });
+  openParticipantSelection({ mode: "teams" });
 });
 document.querySelector("#start-manual-participants").addEventListener("click", () => {
-  openParticipantSelection({ mode: "manual" });
+  openParticipantSelection({ mode: "rage-cage" });
 });
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
@@ -1820,20 +1989,26 @@ document.querySelector("#close-manual-team-screen").addEventListener(
   "click",
   closeManualTeamScreen,
 );
+document.querySelector("#close-rage-cage-screen").addEventListener(
+  "click",
+  closeRageCageTable,
+);
 addManualTeamButton.addEventListener("click", addManualTeam);
 divideManualTeamsButton.addEventListener("click", handleManualTeamDivision);
-document.querySelector("#cancel-redistribute").addEventListener(
+rageCageReshuffleButton.addEventListener("click", openRageCageReshuffleConfirmation);
+rageCageStartButton.addEventListener("click", animateRageCageStartPositions);
+document.querySelector("#cancel-rage-cage-reshuffle").addEventListener(
   "click",
-  closeRedistributeConfirmation,
+  closeRageCageReshuffleConfirmation,
 );
-document.querySelector("#confirm-redistribute").addEventListener("click", () => {
-  if (redistributeModal.hidden) {
+document.querySelector("#confirm-rage-cage-reshuffle").addEventListener("click", () => {
+  if (rageCageReshuffleModal.hidden) {
     return;
   }
 
-  closeRedistributeConfirmation({ restoreFocus: false });
-  divideManualTeams();
-  divideManualTeamsButton.focus();
+  closeRageCageReshuffleConfirmation({ restoreFocus: false });
+  reshuffleRageCagePlayers();
+  rageCageReshuffleButton.focus();
 });
 manualTeamRenameForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -1912,6 +2087,10 @@ window.addEventListener("resize", () => {
   if (state.players.length === 0) {
     updateMarkerSize();
   }
+
+  if (!rageCageScreen.hidden) {
+    renderRageCageSeats();
+  }
 });
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -1925,12 +2104,14 @@ document.addEventListener("keydown", (event) => {
       closeManualTeamRenameModal();
     } else if (!guestFishModal.hidden) {
       closeGuestFishModal();
-    } else if (!redistributeModal.hidden) {
-      closeRedistributeConfirmation();
+    } else if (!rageCageReshuffleModal.hidden) {
+      closeRageCageReshuffleConfirmation();
     } else if (!fingerRedistributeModal.hidden) {
       closeFingerRedistributeConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
+    } else if (!rageCageScreen.hidden) {
+      closeRageCageTable();
     } else if (!manualTeamScreen.hidden) {
       closeManualTeamScreen();
     } else if (!participantScreen.hidden) {

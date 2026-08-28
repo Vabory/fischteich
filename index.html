@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=59">
+    <link rel="stylesheet" href="./style.css?v=60">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=1" defer></script>
     <script src="./roulette-service.js?v=2" defer></script>
-    <script src="./script.js?v=35" defer></script>
+    <script src="./script.js?v=36" defer></script>
   </head>
   <body>
     <div id="app">
@@ -197,6 +197,28 @@
         </div>
       </section>
 
+      <section class="screen rage-cage-screen" id="rage-cage-screen" aria-labelledby="rage-cage-title" hidden>
+        <button class="close-button navigation-back-button rage-cage-back-button" id="close-rage-cage-screen" type="button" aria-label="Zurück zur Teilnehmerauswahl">←</button>
+        <div class="rage-cage-shell">
+          <header class="rage-cage-header">
+            <h2 id="rage-cage-title">Fische im Cage:</h2>
+            <p id="rage-cage-participant-names"></p>
+          </header>
+
+          <div class="rage-cage-stage" id="rage-cage-stage" aria-label="Rage-Cage-Sitzordnung">
+            <div class="rage-cage-table" id="rage-cage-table" aria-hidden="true">
+              <span>RAGE<br>CAGE</span>
+            </div>
+            <div class="rage-cage-seats" id="rage-cage-seats"></div>
+          </div>
+
+          <div class="rage-cage-actions">
+            <button class="rage-cage-reshuffle-button" id="rage-cage-reshuffle" type="button">Neu aufteilen</button>
+            <button class="rage-cage-start-button" id="rage-cage-start-position" type="button">Startposition</button>
+          </div>
+        </div>
+      </section>
+
       <section class="screen roulette-screen" id="roulette-screen" aria-label="Fisch Roulette" hidden>
         <img
           class="roulette-background"
@@ -344,12 +366,12 @@
       </div>
     </div>
 
-    <div class="modal-backdrop" id="redistribute-modal" role="dialog" aria-modal="true" aria-labelledby="redistribute-title" hidden>
+    <div class="modal-backdrop" id="rage-cage-reshuffle-modal" role="dialog" aria-modal="true" aria-labelledby="rage-cage-reshuffle-title" hidden>
       <div class="modal-card">
-        <h2 id="redistribute-title">Neu aufteilen?</h2>
+        <h2 id="rage-cage-reshuffle-title">Neu aufteilen?</h2>
         <div class="modal-actions">
-          <button class="secondary-button" id="cancel-redistribute" type="button">Nein</button>
-          <button class="primary-button" id="confirm-redistribute" type="button">Ja</button>
+          <button class="secondary-button" id="cancel-rage-cage-reshuffle" type="button">Nein</button>
+          <button class="primary-button" id="confirm-rage-cage-reshuffle" type="button">Ja</button>
         </div>
       </div>
     </div>

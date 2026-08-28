@@ -171,6 +171,7 @@ button:focus-visible {
   --teams-menu-visual-button-width: min(83vw, 326px);
   --teams-menu-button-row-height: clamp(74px, 9.8dvh, 78px);
   --teams-menu-button-gap: 0px;
+  --teams-menu-lower-buttons-offset: calc(var(--teams-menu-visual-button-width) * 0.02114);
 
   position: absolute;
   z-index: 2;
@@ -210,6 +211,11 @@ button:focus-visible {
 
 .teams-menu-actions #start-random-participants img {
   transform: translateY(calc(var(--teams-menu-visual-button-width) * -0.01135));
+}
+
+.teams-menu-actions #start-random-participants,
+.teams-menu-actions #start-manual-participants {
+  translate: 0 var(--teams-menu-lower-buttons-offset);
 }
 
 .teams-menu-actions button:active {
@@ -2925,10 +2931,6 @@ h2 {
 }
 
 .roulette-personal-metric.is-gold strong {
-  color: #ffd66e;
-}
-
-.roulette-personal-metric.is-gold span {
   color: #ffd66e;
 }
 

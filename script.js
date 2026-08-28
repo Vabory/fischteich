@@ -145,6 +145,14 @@ const welcomeIdentityModal = document.querySelector("#welcome-identity-modal");
 const welcomeIdentityForm = document.querySelector("#welcome-identity-form");
 const welcomeDisplayNameInput = document.querySelector("#welcome-display-name");
 const welcomeIdentityError = document.querySelector("#welcome-identity-error");
+const openSettingsButton = document.querySelector("#open-settings");
+const settingsModal = document.querySelector("#settings-modal");
+const settingsCurrentName = document.querySelector("#settings-current-name");
+const openDisplayNameRenameButton = document.querySelector("#open-display-name-rename");
+const displayNameRenameModal = document.querySelector("#display-name-rename-modal");
+const displayNameRenameForm = document.querySelector("#display-name-rename-form");
+const displayNameRenameInput = document.querySelector("#display-name-rename-input");
+const displayNameRenameError = document.querySelector("#display-name-rename-error");
 const leaveModal = document.querySelector("#leave-modal");
 const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
 const rageCageReshuffleModal = document.querySelector("#rage-cage-reshuffle-modal");
@@ -550,6 +558,10 @@ function setWelcomeIdentityError(isVisible) {
   setTextInputError(welcomeDisplayNameInput, welcomeIdentityError, isVisible);
 }
 
+function setDisplayNameRenameError(isVisible) {
+  setTextInputError(displayNameRenameInput, displayNameRenameError, isVisible);
+}
+
 function openWelcomeIdentityModal() {
   appElement.inert = true;
   welcomeDisplayNameInput.value = "";
@@ -578,6 +590,59 @@ function initializeLocalIdentity() {
   if (!hasLocalIdentity()) {
     openWelcomeIdentityModal();
   }
+}
+
+function renderSettingsIdentity() {
+  settingsCurrentName.textContent = getDisplayName() || "—";
+}
+
+function openSettingsModal() {
+  renderSettingsIdentity();
+  appElement.inert = true;
+  settingsModal.hidden = false;
+  document.querySelector("#close-settings").focus({ preventScroll: true });
+}
+
+function closeSettingsModal() {
+  settingsModal.hidden = true;
+  appElement.inert = false;
+  openSettingsButton.focus({ preventScroll: true });
+}
+
+function openDisplayNameRenameModal() {
+  displayNameRenameInput.value = getDisplayName() || "";
+  setDisplayNameRenameError(false);
+  settingsModal.inert = true;
+  displayNameRenameModal.hidden = false;
+  displayNameRenameInput.focus({ preventScroll: true });
+  displayNameRenameInput.setSelectionRange(0, displayNameRenameInput.value.length);
+}
+
+function closeDisplayNameRenameModal() {
+  displayNameRenameModal.hidden = true;
+  settingsModal.inert = false;
+  setDisplayNameRenameError(false);
+  openDisplayNameRenameButton.focus({ preventScroll: true });
+}
+
+function saveDisplayName() {
+  const identity = updateDisplayName(displayNameRenameInput.value);
+
+  if (!identity) {
+    setDisplayNameRenameError(true);
+    displayNameRenameInput.focus({ preventScroll: true });
+    displayNameRenameInput.setSelectionRange(0, displayNameRenameInput.value.length);
+    return false;
+  }
+
+  state.personalRouletteStatsRequestId += 1;
+  state.personalRouletteStats = null;
+  state.personalRouletteStatsLoading = false;
+  state.personalRouletteStatsError = false;
+  state.personalRouletteStatsRefreshQueued = false;
+  renderSettingsIdentity();
+  closeDisplayNameRenameModal();
+  return true;
 }
 
 function openGuestFishModal() {
@@ -2896,6 +2961,28 @@ document.querySelector("#start-random-participants").addEventListener("click", (
 document.querySelector("#start-manual-participants").addEventListener("click", () => {
   openParticipantSelection({ mode: "rage-cage" });
 });
+openSettingsButton.addEventListener("click", openSettingsModal);
+document.querySelector("#close-settings").addEventListener("click", closeSettingsModal);
+openDisplayNameRenameButton.addEventListener("click", openDisplayNameRenameModal);
+displayNameRenameForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveDisplayName();
+});
+document.querySelector("#cancel-display-name-rename").addEventListener(
+  "click",
+  closeDisplayNameRenameModal,
+);
+displayNameRenameInput.addEventListener("input", () => setDisplayNameRenameError(false));
+displayNameRenameModal.addEventListener("click", (event) => {
+  if (event.target === displayNameRenameModal) {
+    closeDisplayNameRenameModal();
+  }
+});
+settingsModal.addEventListener("click", (event) => {
+  if (event.target === settingsModal) {
+    closeSettingsModal();
+  }
+});
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
 for (const button of rouletteSpeedButtons) {
@@ -3101,6 +3188,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     if (!welcomeIdentityModal.hidden) {
       return;
+    } else if (!displayNameRenameModal.hidden) {
+      closeDisplayNameRenameModal();
+    } else if (!settingsModal.hidden) {
+      closeSettingsModal();
     } else if (!manualPlayerModal.hidden) {
       closeManualPlayerModal();
     } else if (!manualTeamRenameModal.hidden) {

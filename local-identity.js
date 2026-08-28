@@ -75,3 +75,20 @@ function createLocalIdentity(name) {
 
   return Object.freeze({ deviceId, displayName });
 }
+
+function updateDisplayName(name) {
+  const displayName = normalizeDisplayName(name);
+  const deviceId = getDeviceId();
+
+  if (!deviceId || !displayName) {
+    return null;
+  }
+
+  try {
+    window.localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, displayName);
+  } catch {
+    return null;
+  }
+
+  return Object.freeze({ deviceId, displayName });
+}

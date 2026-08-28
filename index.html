@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=69">
+    <link rel="stylesheet" href="./style.css?v=70">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
-    <script src="./local-identity.js?v=1" defer></script>
+    <script src="./local-identity.js?v=2" defer></script>
     <script src="./roulette-service.js?v=4" defer></script>
-    <script src="./script.js?v=43" defer></script>
+    <script src="./script.js?v=44" defer></script>
   </head>
   <body>
     <div id="app">
@@ -376,6 +376,43 @@
         <p class="guest-fish-error" id="welcome-identity-error" aria-live="polite" hidden>Bitte einen Namen mit maximal 24 Zeichen eingeben.</p>
         <div class="modal-actions guest-fish-actions welcome-identity-actions">
           <button class="primary-button" type="submit">Weiter</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="modal-backdrop settings-modal-backdrop" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+      <section class="modal-card settings-card">
+        <button class="settings-close-button" id="close-settings" type="button" aria-label="Einstellungen schließen">×</button>
+        <h2 id="settings-title">Einstellungen</h2>
+        <div class="settings-name-section">
+          <span class="settings-name-label">Name</span>
+          <strong class="settings-current-name" id="settings-current-name"></strong>
+          <button class="primary-button settings-rename-button" id="open-display-name-rename" type="button">Name ändern</button>
+          <p class="settings-name-hint">Der Name wird für zukünftige Roulette-Stats verwendet.</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop guest-fish-backdrop" id="display-name-rename-modal" role="dialog" aria-modal="true" aria-labelledby="display-name-rename-title" hidden>
+      <form class="modal-card guest-fish-card display-name-rename-card" id="display-name-rename-form" novalidate>
+        <h2 id="display-name-rename-title">Name ändern</h2>
+        <label class="welcome-identity-label" for="display-name-rename-input">Name</label>
+        <input
+          class="guest-fish-input"
+          id="display-name-rename-input"
+          name="displayName"
+          type="text"
+          maxlength="24"
+          autocomplete="name"
+          autocapitalize="words"
+          enterkeyhint="done"
+          aria-describedby="display-name-rename-error"
+          required
+        >
+        <p class="guest-fish-error" id="display-name-rename-error" aria-live="polite" hidden>Bitte einen Namen mit maximal 24 Zeichen eingeben.</p>
+        <div class="modal-actions guest-fish-actions">
+          <button class="secondary-button" id="cancel-display-name-rename" type="button">Abbrechen</button>
+          <button class="primary-button" type="submit">Speichern</button>
         </div>
       </form>
     </div>

@@ -13,7 +13,7 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=82">
+    <link rel="stylesheet" href="./style.css?v=83">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -21,6 +21,7 @@
     <script src="./auth.js?v=1" defer></script>
     <script src="./roulette-service.js?v=5" defer></script>
     <script src="./script.js?v=53" defer></script>
+    <script src="./tournament-create.js?v=1" defer></script>
   </head>
   <body>
     <div id="app">
@@ -255,6 +256,24 @@
             <button class="rage-cage-reshuffle-button" id="rage-cage-reshuffle" type="button">Neu aufteilen</button>
             <button class="rage-cage-start-button" id="rage-cage-start-position" type="button">Startposition</button>
           </div>
+        </div>
+      </section>
+
+      <section class="screen tournament-create-screen" id="tournament-create-screen" aria-labelledby="tournament-create-title" hidden>
+        <button class="close-button navigation-back-button tournament-create-close" id="close-tournament-create" type="button" aria-label="Turniererstellung verlassen">←</button>
+        <div class="tournament-wizard-shell">
+          <header class="tournament-wizard-header">
+            <p class="tournament-wizard-kicker" id="tournament-step-label">Schritt 1 von 4</p>
+            <h1 id="tournament-create-title">Turnier erstellen</h1>
+            <div class="tournament-progress" id="tournament-progress" aria-label="Fortschritt: Schritt 1 von 4">
+              <span class="is-active"></span><span></span><span></span><span></span>
+            </div>
+          </header>
+          <main class="tournament-wizard-content" id="tournament-wizard-content" aria-live="polite"></main>
+          <footer class="tournament-wizard-actions" id="tournament-wizard-actions">
+            <button class="secondary-button" id="tournament-step-back" type="button">Zurück</button>
+            <button class="primary-button" id="tournament-step-next" type="button">Weiter</button>
+          </footer>
         </div>
       </section>
 
@@ -530,6 +549,30 @@
           <button class="primary-button" id="confirm-guest-fish" type="submit">OK</button>
         </div>
       </form>
+    </div>
+
+    <div class="modal-backdrop guest-fish-backdrop" id="tournament-guest-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-guest-title" hidden>
+      <form class="modal-card guest-fish-card" id="tournament-guest-form" novalidate>
+        <h2 id="tournament-guest-title">Gast Fisch hinzufügen</h2>
+        <label class="visually-hidden" for="tournament-guest-name">Name des Gastfischs</label>
+        <input class="guest-fish-input" id="tournament-guest-name" name="tournamentGuestName" type="text" maxlength="80" autocomplete="off" autocapitalize="words" autocorrect="off" enterkeyhint="done" spellcheck="false" aria-describedby="tournament-guest-error">
+        <p class="guest-fish-error" id="tournament-guest-error" aria-live="polite" hidden>Bitte einen Namen mit maximal 80 Zeichen eingeben.</p>
+        <div class="modal-actions guest-fish-actions">
+          <button class="secondary-button" id="cancel-tournament-guest" type="button">Abbrechen</button>
+          <button class="primary-button" type="submit">Hinzufügen</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="modal-backdrop" id="tournament-abort-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-abort-title" hidden>
+      <div class="modal-card">
+        <h2 id="tournament-abort-title">Turnier erstellen abbrechen?</h2>
+        <p>Deine bisherigen Eingaben werden verworfen.</p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-tournament-abort" type="button">Abbrechen</button>
+          <button class="primary-button tournament-discard-button" id="confirm-tournament-abort" type="button">Verwerfen</button>
+        </div>
+      </div>
     </div>
 
     <div class="modal-backdrop guest-fish-backdrop" id="manual-team-rename-modal" role="dialog" aria-modal="true" aria-labelledby="manual-team-rename-title" hidden>

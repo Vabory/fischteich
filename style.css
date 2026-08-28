@@ -1810,7 +1810,7 @@ h2 {
 .roulette-spin-button {
   position: absolute;
   z-index: 3;
-  top: calc(50% - 38px);
+  top: calc(50% - 8px);
   left: 50%;
   display: block;
   width: min(56vw, 220px);
@@ -1850,14 +1850,14 @@ h2 {
 .roulette-speed-selector {
   position: absolute;
   z-index: 3;
-  top: calc(50% + 22px);
+  top: calc(50% - 39px);
   left: 50%;
   display: flex;
   width: min(45vw, 170px);
-  height: 38px;
-  padding: 3px;
+  height: 28px;
+  padding: 2px;
   border: 1px solid rgb(74 213 255 / 72%);
-  border-radius: 13px;
+  border-radius: 10px;
   background:
     linear-gradient(145deg, rgb(15 19 38 / 96%), rgb(5 7 18 / 96%)) padding-box,
     linear-gradient(135deg, #3dd9ff, #f15a9a) border-box;
@@ -1873,12 +1873,12 @@ h2 {
   min-height: 0;
   padding: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: 7px;
   background: transparent;
   box-shadow: none;
   color: rgb(255 255 255 / 58%);
   flex: 1 1 0;
-  font-size: 0.78rem;
+  font-size: 0.69rem;
   font-weight: 850;
   line-height: 1;
   text-shadow: 0 1px 4px rgb(0 0 0 / 70%);
@@ -1953,15 +1953,15 @@ h2 {
   top: max(calc(env(safe-area-inset-top) + 18px), 28px);
   right: max(calc(env(safe-area-inset-right) + 14px), 18px);
   display: flex;
-  width: auto;
-  min-height: 42px;
-  padding: 8px 11px;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
   border: 1px solid rgb(91 218 255 / 42%);
   border-radius: 13px;
   background: rgb(3 8 23 / 76%);
   box-shadow: 0 8px 22px rgb(0 0 0 / 25%);
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   color: rgb(241 247 255 / 92%);
   font-size: 0.68rem;
   font-weight: 800;
@@ -1973,7 +1973,7 @@ h2 {
 
 .roulette-personal-stats-button span:first-child {
   color: #6de0ff;
-  font-size: 1rem;
+  font-size: 1.08rem;
 }
 
 .roulette-stats {
@@ -2521,6 +2521,14 @@ h2 {
   color: #ffd66e;
 }
 
+.roulette-personal-metric.is-turbolachs span {
+  color: #73ddff;
+}
+
+.roulette-personal-metric.is-nitroforelle span {
+  color: #ff7db9;
+}
+
 .roulette-personal-metric.is-total strong {
   color: #6de0ff;
 }
@@ -2534,11 +2542,12 @@ h2 {
   font-size: 0.94rem;
 }
 
-@media (max-width: 360px) {
-  .roulette-personal-stats-button span:last-child {
-    display: none;
-  }
+.roulette-personal-metric.is-gold-quote strong {
+  color: #ffd66e;
+  font-size: 1.18rem;
+}
 
+@media (max-width: 360px) {
   .roulette-personal-stats-button {
     width: 42px;
     padding-inline: 0;
@@ -2615,11 +2624,11 @@ h2 {
   .primary-button, .secondary-button, .fish-button { min-height: 50px; padding-block: 11px; }
 
   .roulette-spin-button {
-    top: calc(50% - 42px);
+    top: calc(50% - 20px);
   }
 
   .roulette-speed-selector {
-    top: calc(50% + 15px);
+    top: calc(50% - 52px);
   }
 
   .roulette-stats {

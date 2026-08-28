@@ -47,6 +47,31 @@ async function getRouletteLeaderboard() {
   return data;
 }
 
+async function getPersonalRouletteStats(displayName) {
+  const normalizedName = normalizeDisplayName(displayName);
+
+  if (!normalizedName) {
+    throw new TypeError("A valid display name is required to load personal roulette stats");
+  }
+
+  const escapedName = normalizedName.replace(/[\\%_]/g, "\\$&");
+  const { data, error } = await supabaseClient
+    .from("roulette_stats")
+    .select(
+      "display_name,total_spins,turbolachs_count,nitroforelle_count,"
+      + "goldfish_count,last_gold_hit_at",
+    )
+    .ilike("display_name", escapedName)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 async function getGlobalRouletteStats() {
   const { data, error } = await supabaseClient
     .rpc("get_global_roulette_stats", undefined, { get: true })
@@ -111,6 +136,7 @@ async function getGoldHitEvents(afterEventId) {
 window.rouletteService = Object.freeze({
   recordRouletteSpin,
   getRouletteLeaderboard,
+  getPersonalRouletteStats,
   getGlobalRouletteStats,
   recordGoldHitEvent,
   getGoldHitEventCursor,

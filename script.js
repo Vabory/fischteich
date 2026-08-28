@@ -297,6 +297,11 @@ const state = {
   rouletteLeaderboardError: false,
   rouletteLeaderboardRequestId: 0,
   rouletteLeaderboardRefreshQueued: false,
+  personalRouletteStats: null,
+  personalRouletteStatsLoading: false,
+  personalRouletteStatsError: false,
+  personalRouletteStatsRequestId: 0,
+  personalRouletteStatsRefreshQueued: false,
   rouletteGoldEventSessionRun: 0,
   rouletteGoldEventPollTimer: null,
   rouletteGoldEventPollInFlight: false,
@@ -2243,40 +2248,181 @@ function formatRouletteQuote(count, total) {
   return total > 0 ? `${(count / total * 100).toFixed(1).replace(".", ",")} %` : "0,0 %";
 }
 
-function renderPersonalRouletteStatsPanel() {
-  const displayName = getDisplayName() || "—";
-  personalRouletteName.textContent = displayName;
-  personalRouletteGrid.replaceChildren();
-  personalRouletteStatus.hidden = false;
+function formatPersonalRouletteLastGoldHit(lastGoldHit) {
+  const timestamp = typeof lastGoldHit === "string" ? Date.parse(lastGoldHit) : NaN;
 
-  if (state.rouletteLeaderboardLoading && state.rouletteLeaderboard === null) {
-    personalRouletteStatus.textContent = "Wird geladen …";
-    return;
+  if (!Number.isFinite(timestamp)) {
+    return "—";
   }
 
-  if (state.rouletteLeaderboardError && state.rouletteLeaderboard === null) {
-    personalRouletteStatus.textContent = "Deine Statistik ist gerade nicht erreichbar.";
-    return;
-  }
+  return new Date(timestamp).toLocaleString("de-AT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
 
-  const player = state.rouletteLeaderboard?.find((item) => item.displayName === displayName) ?? {
+function createDefaultPersonalRouletteStats(displayName) {
+  return {
+    displayName,
     totalSpins: 0,
     turbolachs: 0,
     nitroforelle: 0,
     gold: 0,
     lastGoldHit: null,
   };
-  personalRouletteStatus.hidden = true;
+}
+
+function normalizePersonalRouletteStats(value, fallbackDisplayName) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const displayName = typeof value.display_name === "string"
+    ? value.display_name.trim()
+    : fallbackDisplayName;
+  const totalSpins = normalizeGlobalRouletteStatValue(value.total_spins);
+  const turbolachs = normalizeGlobalRouletteStatValue(value.turbolachs_count);
+  const nitroforelle = normalizeGlobalRouletteStatValue(value.nitroforelle_count);
+  const gold = normalizeGlobalRouletteStatValue(value.goldfish_count);
+  const hasValidLastGoldHit = value.last_gold_hit_at === null
+    || (
+      typeof value.last_gold_hit_at === "string"
+      && Number.isFinite(Date.parse(value.last_gold_hit_at))
+    );
+
+  if (
+    !displayName
+    || [totalSpins, turbolachs, nitroforelle, gold].includes(null)
+    || !hasValidLastGoldHit
+  ) {
+    return null;
+  }
+
+  return {
+    displayName,
+    totalSpins,
+    turbolachs,
+    nitroforelle,
+    gold,
+    lastGoldHit: value.last_gold_hit_at
+      ? new Date(value.last_gold_hit_at).toISOString()
+      : null,
+  };
+}
+
+function renderPersonalRouletteStatsPanel() {
+  const displayName = getDisplayName() || "—";
+  personalRouletteName.textContent = displayName;
+  personalRouletteGrid.replaceChildren();
+  const cachedStatsMatchDisplayName = state.personalRouletteStats
+    && state.personalRouletteStats.displayName.localeCompare(
+      displayName,
+      "de-AT",
+      { sensitivity: "base" },
+    ) === 0;
+  const hasCachedStats = Boolean(cachedStatsMatchDisplayName);
+  const player = cachedStatsMatchDisplayName
+    ? state.personalRouletteStats
+    : createDefaultPersonalRouletteStats(displayName);
+
+  if (state.personalRouletteStatsLoading && !hasCachedStats) {
+    personalRouletteStatus.hidden = false;
+    personalRouletteStatus.textContent = "Wird geladen …";
+  } else if (state.personalRouletteStatsError && !hasCachedStats) {
+    personalRouletteStatus.hidden = false;
+    personalRouletteStatus.textContent = "Deine Statistik ist gerade nicht erreichbar.";
+  } else {
+    personalRouletteStatus.hidden = true;
+  }
+
   personalRouletteGrid.append(
-    createRouletteMetric("Turbolachse", String(player.turbolachs)),
-    createRouletteMetric("Nitroforellen", String(player.nitroforelle)),
+    createRouletteMetric("Turbolachse", String(player.turbolachs), "is-turbolachs"),
+    createRouletteMetric("Nitroforellen", String(player.nitroforelle), "is-nitroforelle"),
     createRouletteMetric("Goldfische", String(player.gold), "is-gold"),
     createRouletteMetric("Fische gesamt", String(player.totalSpins), "is-total"),
-    createRouletteMetric("Letzter Goldfisch", formatRouletteLastGoldHit(player.lastGoldHit), "is-wide"),
-    createRouletteMetric("Gold-Hit-Quote", formatRouletteQuote(player.gold, player.totalSpins)),
-    createRouletteMetric("Turbolachs-Quote", formatRouletteQuote(player.turbolachs, player.totalSpins)),
+    createRouletteMetric(
+      "Letzter Goldfisch",
+      formatPersonalRouletteLastGoldHit(player.lastGoldHit),
+      "is-wide",
+    ),
     createRouletteMetric("Nitroforellen-Quote", formatRouletteQuote(player.nitroforelle, player.totalSpins)),
+    createRouletteMetric("Turbolachs-Quote", formatRouletteQuote(player.turbolachs, player.totalSpins)),
+    createRouletteMetric(
+      "Gold-Hit-Quote",
+      formatRouletteQuote(player.gold, player.totalSpins),
+      "is-wide is-gold-quote",
+    ),
   );
+}
+
+async function loadPersonalRouletteStats({ force = false } = {}) {
+  if (state.personalRouletteStatsLoading) {
+    if (force) {
+      state.personalRouletteStatsRefreshQueued = true;
+    }
+    return state.personalRouletteStats !== null;
+  }
+
+  if (!force && state.personalRouletteStats !== null) {
+    return true;
+  }
+
+  const displayName = getDisplayName();
+
+  if (!displayName) {
+    state.personalRouletteStats = createDefaultPersonalRouletteStats("—");
+    state.personalRouletteStatsError = false;
+    renderPersonalRouletteStatsPanel();
+    return true;
+  }
+
+  const requestId = state.personalRouletteStatsRequestId + 1;
+  state.personalRouletteStatsRequestId = requestId;
+  state.personalRouletteStatsLoading = true;
+  state.personalRouletteStatsError = false;
+  renderPersonalRouletteStatsPanel();
+
+  try {
+    if (!window.rouletteService?.getPersonalRouletteStats) {
+      throw new Error("Roulette service is unavailable");
+    }
+
+    const response = await window.rouletteService.getPersonalRouletteStats(displayName);
+    const personalStats = response === null
+      ? createDefaultPersonalRouletteStats(displayName)
+      : normalizePersonalRouletteStats(response, displayName);
+
+    if (!personalStats) {
+      throw new Error("Personal roulette statistics response is invalid");
+    }
+
+    if (requestId !== state.personalRouletteStatsRequestId) {
+      return false;
+    }
+
+    state.personalRouletteStats = personalStats;
+    return true;
+  } catch (error) {
+    if (requestId === state.personalRouletteStatsRequestId) {
+      state.personalRouletteStatsError = true;
+      console.error("Persönliche Roulette-Statistik konnte nicht geladen werden.", error);
+    }
+    return false;
+  } finally {
+    if (requestId === state.personalRouletteStatsRequestId) {
+      state.personalRouletteStatsLoading = false;
+      renderPersonalRouletteStatsPanel();
+
+      if (state.personalRouletteStatsRefreshQueued) {
+        state.personalRouletteStatsRefreshQueued = false;
+        void loadPersonalRouletteStats({ force: true });
+      }
+    }
+  }
 }
 
 async function loadRouletteLeaderboard({ force = false } = {}) {
@@ -2296,7 +2442,6 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
   state.rouletteLeaderboardLoading = true;
   state.rouletteLeaderboardError = false;
   renderRouletteLeaderboardPanel();
-  renderPersonalRouletteStatsPanel();
 
   try {
     if (!window.rouletteService?.getRouletteLeaderboard) {
@@ -2326,7 +2471,6 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
     if (requestId === state.rouletteLeaderboardRequestId) {
       state.rouletteLeaderboardLoading = false;
       renderRouletteLeaderboardPanel();
-      renderPersonalRouletteStatsPanel();
 
       if (state.rouletteLeaderboardRefreshQueued) {
         state.rouletteLeaderboardRefreshQueued = false;
@@ -2339,7 +2483,6 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
 function openRouletteStatsModal(modal) {
   modal.hidden = false;
   modal.querySelector("button")?.focus();
-  void loadRouletteLeaderboard();
 }
 
 function closeRouletteStatsModal(modal, returnFocusElement) {
@@ -2371,10 +2514,18 @@ function persistCompletedRouletteSpin(resultType) {
         console.error("Live-Goldfisch-Ereignis konnte nicht gespeichert werden.", error);
       }
     })
-    .then(() => Promise.all([
-      loadGlobalRouletteStats(),
-      loadRouletteLeaderboard({ force: true }),
-    ]))
+    .then(() => {
+      const refreshes = [
+        loadGlobalRouletteStats(),
+        loadRouletteLeaderboard({ force: true }),
+      ];
+
+      if (!personalRouletteStatsModal.hidden) {
+        refreshes.push(loadPersonalRouletteStats({ force: true }));
+      }
+
+      return Promise.all(refreshes);
+    })
     .catch((error) => {
       console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
     });
@@ -2711,10 +2862,12 @@ const openPersonalRouletteStatsButton = document.querySelector("#open-personal-r
 openRouletteLeaderboardButton.addEventListener("click", () => {
   renderRouletteLeaderboardPanel();
   openRouletteStatsModal(rouletteLeaderboardModal);
+  void loadRouletteLeaderboard();
 });
 openPersonalRouletteStatsButton.addEventListener("click", () => {
   renderPersonalRouletteStatsPanel();
   openRouletteStatsModal(personalRouletteStatsModal);
+  void loadPersonalRouletteStats({ force: true });
 });
 document.querySelector("#close-roulette-leaderboard").addEventListener("click", () => {
   closeRouletteStatsModal(rouletteLeaderboardModal, openRouletteLeaderboardButton);

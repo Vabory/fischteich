@@ -168,22 +168,25 @@ button:focus-visible {
 }
 
 .teams-menu-actions {
-  --teams-menu-visual-button-width: min(73vw, 286px);
+  --teams-menu-visual-button-width: min(83vw, 326px);
+  --teams-menu-button-row-height: clamp(74px, 9.8dvh, 78px);
+  --teams-menu-button-gap: 0px;
 
   position: absolute;
   z-index: 2;
-  top: clamp(330px, 42.7dvh, 350px);
+  top: clamp(318px, 41.6dvh, 334px);
   left: 50%;
-  display: flex;
-  width: min(92vw, 360px);
-  flex-direction: column;
-  gap: 0;
+  display: grid;
+  width: var(--teams-menu-visual-button-width);
+  grid-auto-rows: var(--teams-menu-button-row-height);
+  gap: var(--teams-menu-button-gap);
   transform: translateX(-50%);
 }
 
 .teams-menu-actions button {
   display: grid;
   width: 100%;
+  height: 100%;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -191,7 +194,6 @@ button:focus-visible {
   line-height: 0;
   place-items: center;
   transition: transform 110ms ease-out;
-  aspect-ratio: 2179 / 722;
 }
 
 .teams-menu-actions img {
@@ -206,12 +208,12 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
-.teams-menu-actions button:active {
-  transform: scale(0.975);
+.teams-menu-actions #start-random-participants img {
+  transform: translateY(calc(var(--teams-menu-visual-button-width) * -0.01135));
 }
 
-.teams-menu-actions button + button {
-  margin-top: -41px;
+.teams-menu-actions button:active {
+  transform: scale(0.975);
 }
 
 .menu-crest {
@@ -2732,8 +2734,8 @@ h2 {
   padding: 8px 12px;
   align-items: center;
   border-bottom: 1px solid rgb(255 255 255 / 8%);
-  grid-template-columns: 38px minmax(0, 1fr) 52px 54px;
-  gap: 6px;
+  grid-template-columns: 32px minmax(0, 1fr) 72px 64px;
+  gap: 4px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2763,10 +2765,10 @@ h2 {
 
 .roulette-leaderboard-gold,
 .roulette-leaderboard-total {
-  text-align: right;
+  text-align: center;
 }
 
-.roulette-leaderboard-gold {
+.roulette-leaderboard-row .roulette-leaderboard-gold {
   color: #ffd66e;
 }
 
@@ -2788,6 +2790,14 @@ h2 {
   text-shadow: 0 0 8px rgb(255 205 92 / 22%);
 }
 
+.roulette-leaderboard-row.is-rank-1 .roulette-leaderboard-gold {
+  color: #ffe28a;
+  font-size: 1.42rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 10px rgb(255 197 58 / 46%);
+}
+
 .roulette-leaderboard-row.is-rank-2 {
   min-height: 60px;
   background: linear-gradient(90deg, rgb(213 225 241 / 5%), transparent 60%);
@@ -2806,6 +2816,14 @@ h2 {
   text-shadow: 0 0 6px rgb(220 231 244 / 12%);
 }
 
+.roulette-leaderboard-row.is-rank-2 .roulette-leaderboard-gold {
+  color: #d9e2ed;
+  font-size: 1.12rem;
+  font-weight: 880;
+  line-height: 1;
+  text-shadow: 0 0 8px rgb(202 220 240 / 30%);
+}
+
 .roulette-leaderboard-row.is-rank-3 {
   min-height: 54px;
   background: linear-gradient(90deg, rgb(201 125 75 / 5%), transparent 58%);
@@ -2821,6 +2839,14 @@ h2 {
 .roulette-leaderboard-row.is-rank-3 .roulette-leaderboard-name {
   font-size: 0.84rem;
   font-weight: 820;
+}
+
+.roulette-leaderboard-row.is-rank-3 .roulette-leaderboard-gold {
+  color: #d79a70;
+  font-size: 0.98rem;
+  font-weight: 850;
+  line-height: 1;
+  text-shadow: 0 0 7px rgb(210 119 64 / 27%);
 }
 
 .roulette-leaderboard-heading {
@@ -2842,6 +2868,10 @@ h2 {
 .roulette-leaderboard-heading .roulette-leaderboard-name {
   font-weight: 750;
   text-align: left;
+}
+
+.roulette-leaderboard-heading .roulette-leaderboard-gold {
+  color: rgb(255 214 110 / 74%);
 }
 
 .roulette-personal-modal-card {
@@ -2898,6 +2928,10 @@ h2 {
   color: #ffd66e;
 }
 
+.roulette-personal-metric.is-gold span {
+  color: #ffd66e;
+}
+
 .roulette-personal-metric.is-turbolachs span {
   color: #73ddff;
 }
@@ -2942,8 +2976,12 @@ h2 {
 
   .roulette-leaderboard-row {
     padding-inline: 9px;
-    grid-template-columns: 32px minmax(0, 1fr) 44px 46px;
-    gap: 4px;
+    grid-template-columns: 26px minmax(0, 1fr) 66px 58px;
+    gap: 3px;
+  }
+
+  .roulette-leaderboard-heading span {
+    font-size: 0.56rem;
   }
 }
 
@@ -2977,10 +3015,10 @@ h2 {
   }
 
   .teams-menu-actions {
-    --teams-menu-visual-button-width: min(73vw, 36.5dvh, 286px);
+    --teams-menu-visual-button-width: min(83vw, 43dvh, 301px);
+    --teams-menu-button-row-height: clamp(67px, 10.5dvh, 74px);
 
     top: clamp(266px, 42dvh, 300px);
-    width: min(92vw, 47dvh, 360px);
   }
 
   .menu-card {

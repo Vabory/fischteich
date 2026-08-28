@@ -2676,8 +2676,8 @@ function renderRouletteLeaderboardPanel() {
   for (const [className, label] of [
     ["roulette-leaderboard-rank", ""],
     ["roulette-leaderboard-name", "Name"],
-    ["roulette-leaderboard-gold", "Gold"],
-    ["roulette-leaderboard-total", "Fische"],
+    ["roulette-leaderboard-gold", "Goldfische"],
+    ["roulette-leaderboard-total", "Geangelt"],
   ]) {
     const cell = document.createElement("span");
     cell.className = className;
@@ -2701,7 +2701,7 @@ function renderRouletteLeaderboardPanel() {
     rankCell.textContent = `${rank}.`;
     name.textContent = player.displayName;
     gold.textContent = String(player.gold);
-    total.textContent = String(player.totalSpins);
+    total.textContent = player.totalSpins.toLocaleString("de-AT");
     row.append(rankCell, name, gold, total);
     rouletteLeaderboardList.append(row);
   });

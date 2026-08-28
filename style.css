@@ -2558,6 +2558,95 @@ h2 {
   color: var(--muted);
 }
 
+.settings-card {
+  position: relative;
+  padding: 26px 26px 28px;
+  border-color: rgb(86 202 255 / 24%);
+  background: linear-gradient(145deg, rgb(15 22 45 / 98%), rgb(6 9 25 / 98%));
+  box-shadow:
+    -8px 0 28px rgb(31 162 255 / 8%),
+    8px 0 28px rgb(241 47 142 / 7%),
+    0 22px 70px rgb(0 0 0 / 50%);
+}
+
+.settings-card h2 {
+  margin: 0 50px 28px;
+  font-size: 1.55rem;
+  line-height: 1.15;
+}
+
+.settings-close-button {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: grid;
+  width: 44px;
+  min-height: 44px;
+  padding: 0 0 2px;
+  border: 1px solid rgb(148 211 239 / 32%);
+  border-radius: 50%;
+  background: rgb(4 11 27 / 78%);
+  box-shadow:
+    0 0 10px rgb(61 217 255 / 10%),
+    0 7px 18px rgb(0 0 0 / 28%),
+    inset 0 0 8px rgb(255 255 255 / 4%);
+  place-items: center;
+  color: rgb(246 249 255 / 94%);
+  font-size: 1.35rem;
+  font-weight: 450;
+  line-height: 1;
+  transition: background 110ms ease-out, border-color 110ms ease-out, transform 110ms ease-out;
+}
+
+.settings-close-button:active {
+  border-color: rgb(148 211 239 / 46%);
+  background: rgb(9 22 43 / 88%);
+  transform: scale(0.95);
+}
+
+.settings-name-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.settings-name-label {
+  color: rgb(199 208 225 / 74%);
+  font-size: 0.82rem;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.settings-current-name {
+  position: relative;
+  margin-top: 5px;
+  padding-bottom: 9px;
+  color: #f8faff;
+  font-size: clamp(1.55rem, 7vw, 1.85rem);
+  font-weight: 850;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.settings-current-name::after {
+  position: absolute;
+  right: 18%;
+  bottom: 0;
+  left: 18%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(61 217 255 / 70%), rgb(241 90 154 / 62%));
+  box-shadow: 0 0 7px rgb(61 217 255 / 14%);
+  content: "";
+}
+
+.settings-rename-button {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 24px;
+}
+
 .modal-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

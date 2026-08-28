@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=66">
+    <link rel="stylesheet" href="./style.css?v=67">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=1" defer></script>
-    <script src="./roulette-service.js?v=2" defer></script>
-    <script src="./script.js?v=40" defer></script>
+    <script src="./roulette-service.js?v=3" defer></script>
+    <script src="./script.js?v=41" defer></script>
   </head>
   <body>
     <div id="app">
@@ -269,6 +269,11 @@
           <button type="button" data-roulette-speed="1" aria-pressed="true">1x</button>
           <button type="button" data-roulette-speed="2" aria-pressed="false">2x</button>
           <button type="button" data-roulette-speed="3" aria-pressed="false">3x</button>
+        </div>
+        <div class="roulette-live-gold-toast" id="roulette-live-gold-toast" role="status" aria-live="polite" hidden>
+          <span class="roulette-live-gold-spark" aria-hidden="true">✦</span>
+          <strong id="roulette-live-gold-message"></strong>
+          <span class="roulette-live-gold-spark" aria-hidden="true">✦</span>
         </div>
         <div class="roulette-stats" aria-label="Roulette-Statistik" aria-live="polite">
           <div class="roulette-stats-top">

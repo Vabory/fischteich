@@ -66,6 +66,9 @@ const ROULETTE_GOLD_IMPACT_DURATION = 200;
 const ROULETTE_GOLD_EFFECT_DURATION = 2600;
 const ROULETTE_GOLD_REDUCED_IMPACT_DURATION = 60;
 const ROULETTE_GOLD_REDUCED_EFFECT_DURATION = 420;
+const ROULETTE_GOLD_EVENT_POLL_INTERVAL = 3000;
+const ROULETTE_GOLD_EVENT_TOAST_DURATION = 2200;
+const ROULETTE_GOLD_EVENT_SEEN_LIMIT = 100;
 const ROULETTE_WINNERS = Object.freeze([
   Object.freeze({ name: TEAM_COLORS[0].name, color: TEAM_COLORS[0].color }),
   Object.freeze({ name: TEAM_COLORS[1].name, color: TEAM_COLORS[1].color }),
@@ -157,6 +160,8 @@ const rouletteStatElements = Object.freeze({
 const rouletteLastGoldHitElement = document.querySelector("#roulette-stat-last-gold-hit");
 const rouletteLastAnglerNameElement = document.querySelector("#roulette-last-angler-name");
 const rouletteGoldStatElement = document.querySelector(".roulette-stat-gold");
+const rouletteLiveGoldToast = document.querySelector("#roulette-live-gold-toast");
+const rouletteLiveGoldMessage = document.querySelector("#roulette-live-gold-message");
 const rouletteLeaderboardModal = document.querySelector("#roulette-leaderboard-modal");
 const rouletteLeaderboardStatus = document.querySelector("#roulette-leaderboard-status");
 const rouletteLeaderboardList = document.querySelector("#roulette-leaderboard-list");
@@ -292,6 +297,14 @@ const state = {
   rouletteLeaderboardError: false,
   rouletteLeaderboardRequestId: 0,
   rouletteLeaderboardRefreshQueued: false,
+  rouletteGoldEventSessionRun: 0,
+  rouletteGoldEventPollTimer: null,
+  rouletteGoldEventPollInFlight: false,
+  rouletteGoldEventCursor: null,
+  rouletteGoldEventQueue: [],
+  rouletteGoldEventActive: false,
+  rouletteGoldEventToastTimer: null,
+  rouletteGoldEventSeenIds: new Set(),
 };
 
 function showScreen(screen) {
@@ -303,6 +316,7 @@ function showScreen(screen) {
 
 function showMenu() {
   stopRoulette();
+  stopRouletteGoldEventUpdates();
   leaveModal.hidden = true;
   fingerRedistributeModal.hidden = true;
   showScreen(menuScreen);
@@ -1836,16 +1850,15 @@ function renderRouletteLastAngler(stats = state.globalRouletteStats ?? state.rou
 }
 
 function renderRouletteStats(stats = state.globalRouletteStats ?? state.rouletteStats) {
-  for (const [key, element] of Object.entries(rouletteStatElements)) {
-    element.textContent = String(stats[key]);
-  }
-
+  renderRouletteStatCounts(stats);
   renderRouletteLastAngler(stats);
 }
 
-function startRouletteLastAnglerTimer() {
+function startRouletteLastAnglerTimer({ renderImmediately = true } = {}) {
   window.clearInterval(state.rouletteLastAnglerTimer);
-  renderRouletteLastAngler();
+  if (renderImmediately) {
+    renderRouletteLastAngler();
+  }
   state.rouletteLastAnglerTimer = window.setInterval(renderRouletteLastAngler, 60000);
 }
 
@@ -1854,7 +1867,228 @@ function stopRouletteLastAnglerTimer() {
   state.rouletteLastAnglerTimer = null;
 }
 
-async function loadGlobalRouletteStats() {
+function normalizeRouletteGoldEventCursor(value) {
+  const numericValue = typeof value === "string" && /^\d+$/.test(value)
+    ? Number(value)
+    : value;
+
+  return Number.isSafeInteger(numericValue) && numericValue >= 0
+    ? numericValue
+    : null;
+}
+
+function normalizeRouletteGoldEvents(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const events = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+
+    const eventId = normalizeRouletteGoldEventCursor(item.event_id);
+    const displayName = typeof item.display_name === "string"
+      ? item.display_name.trim()
+      : "";
+    const occurredAt = typeof item.occurred_at === "string"
+      && Number.isFinite(Date.parse(item.occurred_at))
+      ? new Date(item.occurred_at).toISOString()
+      : null;
+
+    if (
+      eventId === null
+      || !displayName
+      || !occurredAt
+      || typeof item.is_own_device !== "boolean"
+    ) {
+      continue;
+    }
+
+    events.push({
+      eventId,
+      displayName,
+      occurredAt,
+      isOwnDevice: item.is_own_device,
+    });
+  }
+
+  return events.sort((first, second) => first.eventId - second.eventId);
+}
+
+function rememberRouletteGoldEvent(eventId) {
+  state.rouletteGoldEventSeenIds.add(eventId);
+
+  while (state.rouletteGoldEventSeenIds.size > ROULETTE_GOLD_EVENT_SEEN_LIMIT) {
+    const oldestEventId = state.rouletteGoldEventSeenIds.values().next().value;
+    state.rouletteGoldEventSeenIds.delete(oldestEventId);
+  }
+}
+
+function renderRouletteStatCounts(stats = state.globalRouletteStats ?? state.rouletteStats) {
+  for (const [key, element] of Object.entries(rouletteStatElements)) {
+    element.textContent = String(stats[key]);
+  }
+}
+
+function showNextRouletteGoldEvent() {
+  if (
+    state.rouletteGoldEventActive
+    || state.rouletteGoldEventQueue.length === 0
+    || state.rouletteSpinning
+    || rouletteScreen.hidden
+  ) {
+    return;
+  }
+
+  const event = state.rouletteGoldEventQueue.shift();
+  state.rouletteGoldEventActive = true;
+  stopRouletteLastAnglerTimer();
+  rouletteLiveGoldMessage.textContent = `${event.displayName} hat Goldfische geangelt!`;
+  rouletteLiveGoldToast.hidden = false;
+  rouletteLiveGoldToast.classList.remove("is-visible");
+  void rouletteLiveGoldToast.offsetWidth;
+  rouletteLiveGoldToast.classList.add("is-visible");
+
+  state.rouletteGoldEventToastTimer = window.setTimeout(() => {
+    rouletteLiveGoldToast.classList.remove("is-visible");
+    rouletteLiveGoldToast.hidden = true;
+    rouletteLiveGoldMessage.textContent = "";
+    state.rouletteGoldEventToastTimer = null;
+    state.rouletteGoldEventActive = false;
+
+    renderRouletteLastAngler({
+      lastGoldHit: event.occurredAt,
+      lastGoldHitDisplayName: event.displayName,
+    });
+
+    void loadGlobalRouletteStats({ render: false }).then((loaded) => {
+      if (loaded && !rouletteScreen.hidden) {
+        renderRouletteStatCounts();
+      }
+    });
+
+    if (state.rouletteGoldEventQueue.length > 0) {
+      showNextRouletteGoldEvent();
+    } else {
+      startRouletteLastAnglerTimer({ renderImmediately: false });
+    }
+  }, ROULETTE_GOLD_EVENT_TOAST_DURATION);
+}
+
+function enqueueRouletteGoldEvent(event) {
+  if (state.rouletteGoldEventSeenIds.has(event.eventId)) {
+    return;
+  }
+
+  rememberRouletteGoldEvent(event.eventId);
+
+  if (event.isOwnDevice) {
+    return;
+  }
+
+  state.rouletteGoldEventQueue.push(event);
+  showNextRouletteGoldEvent();
+}
+
+async function pollRouletteGoldEvents(run) {
+  if (
+    run !== state.rouletteGoldEventSessionRun
+    || state.rouletteGoldEventPollInFlight
+    || state.rouletteGoldEventCursor === null
+  ) {
+    return;
+  }
+
+  state.rouletteGoldEventPollInFlight = true;
+
+  try {
+    if (!window.rouletteService?.getGoldHitEvents) {
+      throw new Error("Roulette gold event service is unavailable");
+    }
+
+    const response = await window.rouletteService.getGoldHitEvents(
+      state.rouletteGoldEventCursor,
+    );
+    const events = normalizeRouletteGoldEvents(response);
+
+    if (events === null) {
+      throw new Error("Roulette gold event response is invalid");
+    }
+
+    if (run !== state.rouletteGoldEventSessionRun) {
+      return;
+    }
+
+    for (const event of events) {
+      state.rouletteGoldEventCursor = Math.max(
+        state.rouletteGoldEventCursor,
+        event.eventId,
+      );
+      enqueueRouletteGoldEvent(event);
+    }
+  } catch (error) {
+    if (run === state.rouletteGoldEventSessionRun) {
+      console.error("Live-Goldfisch-Ereignisse konnten nicht geladen werden.", error);
+    }
+  } finally {
+    if (run === state.rouletteGoldEventSessionRun) {
+      state.rouletteGoldEventPollInFlight = false;
+    }
+  }
+}
+
+function stopRouletteGoldEventUpdates() {
+  state.rouletteGoldEventSessionRun += 1;
+  window.clearInterval(state.rouletteGoldEventPollTimer);
+  window.clearTimeout(state.rouletteGoldEventToastTimer);
+  state.rouletteGoldEventPollTimer = null;
+  state.rouletteGoldEventToastTimer = null;
+  state.rouletteGoldEventPollInFlight = false;
+  state.rouletteGoldEventCursor = null;
+  state.rouletteGoldEventQueue = [];
+  state.rouletteGoldEventActive = false;
+  state.rouletteGoldEventSeenIds.clear();
+  rouletteLiveGoldToast.classList.remove("is-visible");
+  rouletteLiveGoldToast.hidden = true;
+  rouletteLiveGoldMessage.textContent = "";
+}
+
+async function startRouletteGoldEventUpdates() {
+  stopRouletteGoldEventUpdates();
+  const run = state.rouletteGoldEventSessionRun;
+
+  try {
+    if (!window.rouletteService?.getGoldHitEventCursor) {
+      throw new Error("Roulette gold event service is unavailable");
+    }
+
+    const response = await window.rouletteService.getGoldHitEventCursor();
+    const cursor = normalizeRouletteGoldEventCursor(response);
+
+    if (cursor === null) {
+      throw new Error("Roulette gold event cursor is invalid");
+    }
+
+    if (run !== state.rouletteGoldEventSessionRun || rouletteScreen.hidden) {
+      return;
+    }
+
+    state.rouletteGoldEventCursor = cursor;
+    state.rouletteGoldEventPollTimer = window.setInterval(
+      () => void pollRouletteGoldEvents(run),
+      ROULETTE_GOLD_EVENT_POLL_INTERVAL,
+    );
+  } catch (error) {
+    if (run === state.rouletteGoldEventSessionRun) {
+      console.error("Live-Goldfisch-Updates konnten nicht gestartet werden.", error);
+    }
+  }
+}
+
+async function loadGlobalRouletteStats({ render = true } = {}) {
   const requestId = state.rouletteStatsRequestId + 1;
   state.rouletteStatsRequestId = requestId;
 
@@ -1875,7 +2109,13 @@ async function loadGlobalRouletteStats() {
     }
 
     state.globalRouletteStats = globalStats;
-    renderRouletteStats();
+    if (render) {
+      if (state.rouletteGoldEventActive || state.rouletteGoldEventQueue.length > 0) {
+        renderRouletteStatCounts();
+      } else {
+        renderRouletteStats();
+      }
+    }
     return true;
   } catch (error) {
     if (requestId === state.rouletteStatsRequestId) {
@@ -2116,6 +2356,21 @@ function persistCompletedRouletteSpin(resultType) {
 
       return window.rouletteService.recordRouletteSpin(resultType);
     })
+    .then(async () => {
+      if (resultType !== "goldfish") {
+        return;
+      }
+
+      try {
+        if (!window.rouletteService?.recordGoldHitEvent) {
+          throw new Error("Roulette gold event service is unavailable");
+        }
+
+        await window.rouletteService.recordGoldHitEvent();
+      } catch (error) {
+        console.error("Live-Goldfisch-Ereignis konnte nicht gespeichert werden.", error);
+      }
+    })
     .then(() => Promise.all([
       loadGlobalRouletteStats(),
       loadRouletteLeaderboard({ force: true }),
@@ -2200,6 +2455,11 @@ function createGoldCelebration(reducedMotion) {
   viewportFlash.className = "roulette-gold-effect roulette-gold-viewport-flash";
   rouletteScreen.append(viewportFlash);
 
+  const title = document.createElement("div");
+  title.className = "roulette-gold-effect roulette-gold-title";
+  title.textContent = "GOLDFISCH!";
+  rouletteScreen.append(title);
+
   if (reducedMotion) {
     rouletteScreen.classList.add("is-gold-hit-reduced");
     return;
@@ -2214,6 +2474,12 @@ function createGoldCelebration(reducedMotion) {
   flash.style.setProperty("--gold-origin-x", `${originX}px`);
   flash.style.setProperty("--gold-origin-y", `${originY}px`);
   rouletteScreen.append(flash);
+
+  const rays = document.createElement("div");
+  rays.className = "roulette-gold-effect roulette-gold-rays";
+  rays.style.setProperty("--gold-origin-x", `${originX}px`);
+  rays.style.setProperty("--gold-origin-y", `${originY}px`);
+  rouletteScreen.append(rays);
 
   const particles = document.createElement("div");
   particles.className = "roulette-gold-effect roulette-gold-particles";
@@ -2289,6 +2555,7 @@ function handleGoldHit(run, targetIndex) {
       state.rouletteSpinning = false;
       setRouletteSpinButtonState(true, true);
       updateRouletteSpeedButton(true);
+      showNextRouletteGoldEvent();
     }, effectDuration);
   }, impactDuration);
 }
@@ -2313,6 +2580,7 @@ function openRoulette() {
   rouletteResult.classList.remove("is-visible");
   renderRouletteStats();
   startRouletteLastAnglerTimer();
+  void startRouletteGoldEventUpdates();
   void loadGlobalRouletteStats();
   void loadRouletteLeaderboard();
 
@@ -2359,6 +2627,7 @@ function finishRoulette(run, winnerIndex, targetIndex) {
   recordCompletedRouletteSpin(winnerIndex);
   setRouletteSpinButtonState(true, true);
   updateRouletteSpeedButton(true);
+  showNextRouletteGoldEvent();
 }
 
 function startRoulette() {
@@ -2371,7 +2640,9 @@ function startRoulette() {
   setRouletteSpinButtonState(true, false);
   updateRouletteSpeedButton(false);
   showScreen(rouletteScreen);
-  startRouletteLastAnglerTimer();
+  if (!state.rouletteGoldEventActive && state.rouletteGoldEventQueue.length === 0) {
+    startRouletteLastAnglerTimer();
+  }
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
 

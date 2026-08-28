@@ -59,8 +59,60 @@ async function getGlobalRouletteStats() {
   return data;
 }
 
+async function recordGoldHitEvent() {
+  const identity = getLocalIdentity();
+
+  if (!identity) {
+    throw new Error("A local identity is required to record a gold hit event");
+  }
+
+  const { data, error } = await supabaseClient.rpc("record_roulette_gold_event", {
+    p_device_id: identity.deviceId,
+    p_display_name: identity.displayName,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function getGoldHitEventCursor() {
+  const { data, error } = await supabaseClient.rpc("get_roulette_gold_event_cursor");
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function getGoldHitEvents(afterEventId) {
+  const deviceId = getDeviceId();
+
+  if (!deviceId) {
+    throw new Error("A local device ID is required to load gold hit events");
+  }
+
+  const { data, error } = await supabaseClient.rpc("get_roulette_gold_events", {
+    p_after_id: afterEventId,
+    p_device_id: deviceId,
+    p_limit: 20,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 window.rouletteService = Object.freeze({
   recordRouletteSpin,
   getRouletteLeaderboard,
   getGlobalRouletteStats,
+  recordGoldHitEvent,
+  getGoldHitEventCursor,
+  getGoldHitEvents,
 });

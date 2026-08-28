@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=70">
+    <link rel="stylesheet" href="./style.css?v=71">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
     <script src="./roulette-service.js?v=4" defer></script>
-    <script src="./script.js?v=44" defer></script>
+    <script src="./script.js?v=45" defer></script>
   </head>
   <body>
     <div id="app">
@@ -265,9 +265,16 @@
           <span aria-hidden="true">▥</span>
         </button>
         <div class="roulette-content">
-          <div class="roulette-window" aria-hidden="true">
-            <div class="roulette-marker"></div>
-            <div class="roulette-strip" id="roulette-strip"></div>
+          <div class="roulette-window">
+            <div class="roulette-marker" aria-hidden="true"></div>
+            <div class="roulette-strip" id="roulette-strip" aria-hidden="true"></div>
+            <div class="roulette-load-status" id="roulette-loading-status" role="status" hidden>
+              <p>Roulette wird geladen …</p>
+            </div>
+            <div class="roulette-load-status" id="roulette-load-error" role="alert" hidden>
+              <p>Roulette konnte nicht vollständig geladen werden.</p>
+              <button id="retry-roulette-load" type="button">Erneut versuchen</button>
+            </div>
           </div>
           <p class="roulette-result" id="roulette-result" aria-live="polite"></p>
         </div>

@@ -1777,22 +1777,59 @@ h2 {
   flex: 0 0 78px;
   height: 88px;
   border: 0;
-  background-color: transparent !important;
+  background-color: #27334f;
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
 }
 
 .roulette-tile[data-color-index="0"] {
-  background-image: url("./assets/turbolachs-feld.png?v=1");
+  background-image: var(--roulette-tile-image-0);
 }
 
 .roulette-tile[data-color-index="1"] {
-  background-image: url("./assets/nitroforelle-feld.png?v=1");
+  background-image: var(--roulette-tile-image-1);
 }
 
 .roulette-tile[data-color-index="2"] {
-  background-image: url("./assets/gold-feld.png?v=1");
+  background-image: var(--roulette-tile-image-2);
+}
+
+.roulette-screen.is-roulette-loading .roulette-strip {
+  visibility: hidden;
+}
+
+.roulette-load-status {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  width: min(82%, 360px);
+  padding: 10px 14px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 12px;
+  background: rgb(4 8 24 / 82%);
+  color: rgb(255 255 255 / 84%);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(8px);
+}
+
+.roulette-load-status p {
+  margin: 0;
+}
+
+.roulette-load-status button {
+  margin-top: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgb(255 214 110 / 48%);
+  border-radius: 999px;
+  background: rgb(255 214 110 / 12%);
+  color: #ffe5a0;
+  font: inherit;
+  font-weight: 700;
 }
 
 .roulette-tile.is-gold-hit {

@@ -69,6 +69,12 @@ const ROULETTE_GOLD_REDUCED_EFFECT_DURATION = 420;
 const ROULETTE_GOLD_EVENT_POLL_INTERVAL = 3000;
 const ROULETTE_GOLD_EVENT_TOAST_DURATION = 2200;
 const ROULETTE_GOLD_EVENT_SEEN_LIMIT = 100;
+const ROULETTE_TILE_COUNT = 52;
+const ROULETTE_TILE_ASSETS = Object.freeze([
+  Object.freeze({ colorIndex: 0, url: "./assets/turbolachs-feld.png?v=1" }),
+  Object.freeze({ colorIndex: 1, url: "./assets/nitroforelle-feld.png?v=1" }),
+  Object.freeze({ colorIndex: 2, url: "./assets/gold-feld.png?v=1" }),
+]);
 const ROULETTE_WINNERS = Object.freeze([
   Object.freeze({ name: TEAM_COLORS[0].name, color: TEAM_COLORS[0].color }),
   Object.freeze({ name: TEAM_COLORS[1].name, color: TEAM_COLORS[1].color }),
@@ -158,8 +164,12 @@ const fingerRedistributeModal = document.querySelector("#finger-redistribute-mod
 const rageCageReshuffleModal = document.querySelector("#rage-cage-reshuffle-modal");
 const manualTeamReshuffleModal = document.querySelector("#manual-team-reshuffle-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
+const rouletteWindow = document.querySelector(".roulette-window");
 const rouletteResult = document.querySelector("#roulette-result");
 const rouletteSpinButton = document.querySelector("#spin-roulette");
+const rouletteLoadingStatus = document.querySelector("#roulette-loading-status");
+const rouletteLoadError = document.querySelector("#roulette-load-error");
+const rouletteRetryButton = document.querySelector("#retry-roulette-load");
 const rouletteSpeedButtons = Object.freeze([
   ...document.querySelectorAll("[data-roulette-speed]"),
 ]);
@@ -297,6 +307,9 @@ const state = {
   rouletteRun: 0,
   rouletteTimer: null,
   rouletteSpinning: false,
+  rouletteReady: false,
+  rouletteInitializing: false,
+  rouletteInitializationRun: 0,
   rouletteWinnerIndex: null,
   rouletteGoldTimer: null,
   rouletteSpeed: ROULETTE_SPEEDS[0],
@@ -324,6 +337,16 @@ const state = {
   rouletteGoldEventSeenIds: new Set(),
 };
 
+let rouletteAssetPreloadPromise = null;
+let rouletteAssetsReady = false;
+
+for (const asset of ROULETTE_TILE_ASSETS) {
+  document.documentElement.style.setProperty(
+    `--roulette-tile-image-${asset.colorIndex}`,
+    `url("${asset.url}")`,
+  );
+}
+
 function showScreen(screen) {
   for (const item of screens) {
     item.hidden = item !== screen;
@@ -333,6 +356,9 @@ function showScreen(screen) {
 
 function showMenu() {
   stopRoulette();
+  state.rouletteInitializationRun += 1;
+  state.rouletteReady = false;
+  state.rouletteInitializing = false;
   stopRouletteGoldEventUpdates();
   leaveModal.hidden = true;
   fingerRedistributeModal.hidden = true;
@@ -1820,6 +1846,84 @@ function setRouletteSpinButtonState(visible, enabled) {
   rouletteSpinButton.disabled = !enabled;
 }
 
+function loadRouletteTileAsset(asset) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+
+    const rejectAsset = (cause) => {
+      reject(new Error(`Roulette asset could not be loaded: ${asset.url}`, { cause }));
+    };
+
+    image.addEventListener("error", rejectAsset, { once: true });
+    image.addEventListener("load", async () => {
+      if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+        rejectAsset();
+        return;
+      }
+
+      try {
+        if (typeof image.decode === "function") {
+          await image.decode();
+        }
+
+        if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+          rejectAsset();
+          return;
+        }
+
+        resolve(image);
+      } catch (error) {
+        rejectAsset(error);
+      }
+    }, { once: true });
+
+    image.src = asset.url;
+  });
+}
+
+function preloadRouletteTileAssets() {
+  if (rouletteAssetsReady) {
+    return Promise.resolve();
+  }
+
+  if (rouletteAssetPreloadPromise) {
+    return rouletteAssetPreloadPromise;
+  }
+
+  const preloadAttempt = Promise.all(
+    ROULETTE_TILE_ASSETS.map(loadRouletteTileAsset),
+  ).then((images) => {
+    const allAssetsUsable = images.length === ROULETTE_TILE_ASSETS.length
+      && images.every((image) => (
+        image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+      ));
+
+    if (!allAssetsUsable) {
+      throw new Error("Roulette assets did not pass validation");
+    }
+
+    rouletteAssetsReady = true;
+  }).catch((error) => {
+    if (rouletteAssetPreloadPromise === preloadAttempt) {
+      rouletteAssetPreloadPromise = null;
+    }
+    throw error;
+  });
+
+  rouletteAssetPreloadPromise = preloadAttempt;
+  return preloadAttempt;
+}
+
+function renderRouletteInitializationState(status) {
+  const isLoading = status === "loading";
+  const hasError = status === "error";
+
+  rouletteScreen.classList.toggle("is-roulette-loading", isLoading || hasError);
+  rouletteWindow.setAttribute("aria-busy", String(isLoading));
+  rouletteLoadingStatus.hidden = !isLoading;
+  rouletteLoadError.hidden = !hasError;
+}
+
 function updateRouletteSpeedButton(enabled) {
   for (const button of rouletteSpeedButtons) {
     const speed = Number(button.dataset.rouletteSpeed);
@@ -2667,23 +2771,89 @@ function setRouletteTileColor(tile, colorIndex) {
 }
 
 function createRouletteTiles(goldTileIndex = -1) {
-  const tileCount = 52;
   const tiles = [];
+  const fragment = document.createDocumentFragment();
 
-  rouletteStrip.replaceChildren();
-
-  for (let index = 0; index < tileCount; index += 1) {
+  for (let index = 0; index < ROULETTE_TILE_COUNT; index += 1) {
     const colorIndex = index === goldTileIndex
       ? ROULETTE_GOLD_WINNER_INDEX
       : secureRandomInt(2);
     const tile = document.createElement("div");
     tile.className = "roulette-tile";
     setRouletteTileColor(tile, colorIndex);
-    rouletteStrip.append(tile);
+    fragment.append(tile);
     tiles.push(tile);
   }
 
+  rouletteStrip.replaceChildren(fragment);
   return tiles;
+}
+
+function positionInitialRouletteStrip(tiles) {
+  const initialFishTileIndexes = tiles
+    .map((tile, index) => ({ colorIndex: Number(tile.dataset.colorIndex), index }))
+    .filter(({ colorIndex, index }) => (
+      index >= 3
+      && index < tiles.length - 3
+      && ROULETTE_INITIAL_FISH_COLOR_INDEXES.includes(colorIndex)
+    ))
+    .map(({ index }) => index);
+
+  if (tiles.length !== ROULETTE_TILE_COUNT || initialFishTileIndexes.length === 0) {
+    throw new Error("Roulette strip initialization is incomplete");
+  }
+
+  const initialTargetIndex = initialFishTileIndexes[
+    secureRandomInt(initialFishTileIndexes.length)
+  ];
+  const tileWidth = 78;
+  const tilePitch = 81;
+  const stopPositionWithinTile = getRandomRouletteStopPosition(tileWidth);
+  const initialOffset = -(initialTargetIndex * tilePitch + stopPositionWithinTile);
+
+  rouletteStrip.style.transition = "none";
+  rouletteStrip.style.transform = `translateX(${initialOffset}px)`;
+}
+
+async function initializeRoulette() {
+  const initializationRun = state.rouletteInitializationRun + 1;
+  state.rouletteInitializationRun = initializationRun;
+  state.rouletteReady = false;
+  state.rouletteInitializing = true;
+  rouletteStrip.replaceChildren();
+  setRouletteSpinButtonState(true, false);
+  updateRouletteSpeedButton(false);
+  renderRouletteInitializationState("loading");
+
+  try {
+    await preloadRouletteTileAssets();
+
+    if (initializationRun !== state.rouletteInitializationRun || rouletteScreen.hidden) {
+      return false;
+    }
+
+    const tiles = createRouletteTiles();
+    positionInitialRouletteStrip(tiles);
+    state.rouletteReady = true;
+    state.rouletteInitializing = false;
+    renderRouletteInitializationState("ready");
+    setRouletteSpinButtonState(true, true);
+    updateRouletteSpeedButton(true);
+    return true;
+  } catch (error) {
+    if (initializationRun !== state.rouletteInitializationRun || rouletteScreen.hidden) {
+      return false;
+    }
+
+    state.rouletteReady = false;
+    state.rouletteInitializing = false;
+    rouletteStrip.replaceChildren();
+    renderRouletteInitializationState("error");
+    setRouletteSpinButtonState(true, false);
+    updateRouletteSpeedButton(false);
+    console.error("Roulette konnte nicht vollständig geladen werden.", error);
+    return false;
+  }
 }
 
 function getRandomRouletteStopPosition(tileWidth) {
@@ -2844,28 +3014,7 @@ function openRoulette() {
   void startRouletteGoldEventUpdates();
   void loadGlobalRouletteStats();
   void loadRouletteLeaderboard();
-
-  const tiles = createRouletteTiles();
-  const initialFishTileIndexes = tiles
-    .map((tile, index) => ({ colorIndex: Number(tile.dataset.colorIndex), index }))
-    .filter(({ colorIndex, index }) => (
-      index >= 3
-      && index < tiles.length - 3
-      && ROULETTE_INITIAL_FISH_COLOR_INDEXES.includes(colorIndex)
-    ))
-    .map(({ index }) => index);
-  const initialTargetIndex = initialFishTileIndexes[
-    secureRandomInt(initialFishTileIndexes.length)
-  ];
-  const tileWidth = 78;
-  const tilePitch = 81;
-  const stopPositionWithinTile = getRandomRouletteStopPosition(tileWidth);
-  const initialOffset = -(initialTargetIndex * tilePitch + stopPositionWithinTile);
-
-  rouletteStrip.style.transition = "none";
-  rouletteStrip.style.transform = `translateX(${initialOffset}px)`;
-  setRouletteSpinButtonState(true, true);
-  updateRouletteSpeedButton(true);
+  void initializeRoulette();
 }
 
 function finishRoulette(run, winnerIndex, targetIndex) {
@@ -2892,7 +3041,7 @@ function finishRoulette(run, winnerIndex, targetIndex) {
 }
 
 function startRoulette() {
-  if (state.rouletteSpinning) {
+  if (state.rouletteSpinning || !state.rouletteReady) {
     return;
   }
 
@@ -2985,6 +3134,9 @@ settingsModal.addEventListener("click", (event) => {
 });
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
+rouletteRetryButton.addEventListener("click", () => {
+  void initializeRoulette();
+});
 for (const button of rouletteSpeedButtons) {
   button.addEventListener("click", () => setRouletteSpeed(Number(button.dataset.rouletteSpeed)));
 }

@@ -60,7 +60,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select pg_catalog.coalesce(pg_catalog.max(event.id), 0)::bigint
+  select coalesce(pg_catalog.max(event.id), 0::bigint)
   from public.roulette_gold_events as event;
 $$;
 

@@ -53,6 +53,7 @@ const MAX_MANUAL_TEAM_COUNT = 20;
 const RAGE_CAGE_MIN_ANIMATION_STEPS = 12;
 const RESHUFFLE_FADE_OUT_DURATION = 190;
 const RESHUFFLE_FADE_IN_DURATION = 300;
+const RESET_EXIT_DURATION = 220;
 const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
@@ -144,7 +145,9 @@ const manualTeamReshuffleModal = document.querySelector("#manual-team-reshuffle-
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
 const rouletteSpinButton = document.querySelector("#spin-roulette");
-const rouletteSpeedButton = document.querySelector("#roulette-speed");
+const rouletteSpeedButtons = Object.freeze([
+  ...document.querySelectorAll("[data-roulette-speed]"),
+]);
 const rouletteStatElements = Object.freeze({
   totalSpins: document.querySelector("#roulette-stat-total"),
   turbolachs: document.querySelector("#roulette-stat-turbolachs"),
@@ -152,7 +155,15 @@ const rouletteStatElements = Object.freeze({
   gold: document.querySelector("#roulette-stat-gold"),
 });
 const rouletteLastGoldHitElement = document.querySelector("#roulette-stat-last-gold-hit");
+const rouletteLastAnglerNameElement = document.querySelector("#roulette-last-angler-name");
 const rouletteGoldStatElement = document.querySelector(".roulette-stat-gold");
+const rouletteLeaderboardModal = document.querySelector("#roulette-leaderboard-modal");
+const rouletteLeaderboardStatus = document.querySelector("#roulette-leaderboard-status");
+const rouletteLeaderboardList = document.querySelector("#roulette-leaderboard-list");
+const personalRouletteStatsModal = document.querySelector("#personal-roulette-stats-modal");
+const personalRouletteName = document.querySelector("#personal-roulette-name");
+const personalRouletteStatus = document.querySelector("#personal-roulette-status");
+const personalRouletteGrid = document.querySelector("#personal-roulette-grid");
 const activeTournamentCard = document.querySelector("#active-tournament");
 const activeTournamentName = document.querySelector("#active-tournament-name");
 const activeTournamentPhase = document.querySelector("#active-tournament-phase");
@@ -246,10 +257,12 @@ const state = {
   nextPlayerNumber: 1,
   teamCount: 2,
   frozen: false,
+  fingerResetting: false,
   markerSize: 76,
   gameReturnTarget: "menu",
   teamAssignmentMode: "teams",
   selectedParticipants: [],
+  participantSelectionResetting: false,
   nextGuestId: 1,
   manualTeamCount: MIN_MANUAL_TEAM_COUNT,
   manualTeamNames: [],
@@ -273,6 +286,12 @@ const state = {
   rouletteStats: loadRouletteStats(),
   globalRouletteStats: null,
   rouletteStatsRequestId: 0,
+  rouletteLastAnglerTimer: null,
+  rouletteLeaderboard: null,
+  rouletteLeaderboardLoading: false,
+  rouletteLeaderboardError: false,
+  rouletteLeaderboardRequestId: 0,
+  rouletteLeaderboardRefreshQueued: false,
 };
 
 function showScreen(screen) {
@@ -311,6 +330,33 @@ function resetGame() {
   state.frozen = false;
   playerLayer.replaceChildren();
   updateGameUi();
+}
+
+async function animateFingerReset() {
+  if (state.fingerResetting) {
+    return;
+  }
+
+  if (state.players.length === 0) {
+    resetGame();
+    return;
+  }
+
+  const duration = getResetExitDuration();
+  state.fingerResetting = true;
+  fingerResetButton.disabled = true;
+  playerLayer.style.setProperty("--reset-exit-duration", `${duration}ms`);
+  playerLayer.classList.add("is-resetting");
+
+  try {
+    await waitForReshufflePhase(duration);
+    resetGame();
+  } finally {
+    playerLayer.classList.remove("is-resetting");
+    playerLayer.style.removeProperty("--reset-exit-duration");
+    state.fingerResetting = false;
+    fingerResetButton.disabled = false;
+  }
 }
 
 function setTeamCount(teamCount) {
@@ -411,6 +457,40 @@ function resetParticipantSelection() {
   state.selectedParticipants = [];
   state.nextGuestId = 1;
   renderParticipantSelection();
+}
+
+function getResetExitDuration() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? 1
+    : RESET_EXIT_DURATION;
+}
+
+async function animateParticipantSelectionReset() {
+  if (state.participantSelectionResetting) {
+    return;
+  }
+
+  if (state.selectedParticipants.length === 0) {
+    resetParticipantSelection();
+    return;
+  }
+
+  const duration = getResetExitDuration();
+  state.participantSelectionResetting = true;
+  resetParticipantsButton.disabled = true;
+  selectedParticipants.style.setProperty("--reset-exit-duration", `${duration}ms`);
+  selectedParticipants.classList.add("is-resetting");
+
+  try {
+    await waitForReshufflePhase(duration);
+    resetParticipantSelection();
+  } finally {
+    selectedParticipants.classList.remove("is-resetting");
+    selectedParticipants.style.removeProperty("--reset-exit-duration");
+    state.participantSelectionResetting = false;
+    resetParticipantsButton.disabled = false;
+    resetParticipantsButton.focus();
+  }
 }
 
 function getNextGuestName() {
@@ -1612,22 +1692,21 @@ function setRouletteSpinButtonState(visible, enabled) {
 }
 
 function updateRouletteSpeedButton(enabled) {
-  rouletteSpeedButton.textContent = `${state.rouletteSpeed}×`;
-  rouletteSpeedButton.setAttribute(
-    "aria-label",
-    `Roulette-Geschwindigkeit: ${state.rouletteSpeed}-fach`,
-  );
-  rouletteSpeedButton.disabled = !enabled;
+  for (const button of rouletteSpeedButtons) {
+    const speed = Number(button.dataset.rouletteSpeed);
+    const isActive = speed === state.rouletteSpeed;
+    button.disabled = !enabled;
+    button.setAttribute("aria-pressed", String(isActive));
+    button.classList.toggle("is-active", isActive);
+  }
 }
 
-function cycleRouletteSpeed() {
-  if (state.rouletteSpinning) {
+function setRouletteSpeed(speed) {
+  if (state.rouletteSpinning || !ROULETTE_SPEEDS.includes(speed)) {
     return;
   }
 
-  const currentIndex = ROULETTE_SPEEDS.indexOf(state.rouletteSpeed);
-  const nextIndex = (currentIndex + 1) % ROULETTE_SPEEDS.length;
-  state.rouletteSpeed = ROULETTE_SPEEDS[nextIndex];
+  state.rouletteSpeed = speed;
   updateRouletteSpeedButton(true);
 }
 
@@ -1674,6 +1753,8 @@ function normalizeGlobalRouletteStats(value) {
       typeof value.last_gold_hit_at === "string"
       && Number.isFinite(Date.parse(value.last_gold_hit_at))
     );
+  const hasValidLastGoldName = value.last_gold_hit_display_name === null
+    || typeof value.last_gold_hit_display_name === "string";
 
   if (
     totalSpins === null
@@ -1681,6 +1762,7 @@ function normalizeGlobalRouletteStats(value) {
     || nitroforelle === null
     || gold === null
     || !hasValidLastGoldHit
+    || !hasValidLastGoldName
   ) {
     return null;
   }
@@ -1693,16 +1775,64 @@ function normalizeGlobalRouletteStats(value) {
     lastGoldHit: value.last_gold_hit_at
       ? new Date(value.last_gold_hit_at).toISOString()
       : null,
+    lastGoldHitDisplayName: typeof value.last_gold_hit_display_name === "string"
+      ? value.last_gold_hit_display_name.trim() || null
+      : null,
   };
 }
 
-function formatRouletteLastGoldHit(lastGoldHit) {
-  return lastGoldHit
-    ? new Date(lastGoldHit).toLocaleString("de-AT", {
-      dateStyle: "short",
-      timeStyle: "short",
-    })
-    : "—";
+function formatRouletteLastGoldHit(lastGoldHit, now = Date.now()) {
+  const timestamp = typeof lastGoldHit === "string" ? Date.parse(lastGoldHit) : NaN;
+
+  if (!Number.isFinite(timestamp)) {
+    return "—";
+  }
+
+  const elapsedMinutes = Math.floor(Math.max(0, now - timestamp) / 60000);
+
+  if (elapsedMinutes < 1) {
+    return "JETZT";
+  }
+
+  if (elapsedMinutes < 60) {
+    return `vor ${elapsedMinutes}min.`;
+  }
+
+  if (elapsedMinutes < 120) {
+    return "vor 1 Stunde";
+  }
+
+  if (elapsedMinutes < 180) {
+    return "vor 2 Stunden";
+  }
+
+  return new Date(timestamp).toLocaleString("de-AT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function getRouletteLastAnglerName(stats) {
+  if (!stats.lastGoldHit) {
+    return "—";
+  }
+
+  if (typeof stats.lastGoldHitDisplayName === "string") {
+    return stats.lastGoldHitDisplayName || "—";
+  }
+
+  return getDisplayName() || "—";
+}
+
+function renderRouletteLastAngler(stats = state.globalRouletteStats ?? state.rouletteStats) {
+  const formattedTime = formatRouletteLastGoldHit(stats.lastGoldHit);
+  rouletteLastAnglerNameElement.textContent = getRouletteLastAnglerName(stats);
+  rouletteLastGoldHitElement.textContent = formattedTime;
+  rouletteLastGoldHitElement.classList.toggle("is-gold-now", formattedTime === "JETZT");
 }
 
 function renderRouletteStats(stats = state.globalRouletteStats ?? state.rouletteStats) {
@@ -1710,9 +1840,18 @@ function renderRouletteStats(stats = state.globalRouletteStats ?? state.roulette
     element.textContent = String(stats[key]);
   }
 
-  if (!rouletteLastGoldHitElement.classList.contains("is-gold-now")) {
-    rouletteLastGoldHitElement.textContent = formatRouletteLastGoldHit(stats.lastGoldHit);
-  }
+  renderRouletteLastAngler(stats);
+}
+
+function startRouletteLastAnglerTimer() {
+  window.clearInterval(state.rouletteLastAnglerTimer);
+  renderRouletteLastAngler();
+  state.rouletteLastAnglerTimer = window.setInterval(renderRouletteLastAngler, 60000);
+}
+
+function stopRouletteLastAnglerTimer() {
+  window.clearInterval(state.rouletteLastAnglerTimer);
+  state.rouletteLastAnglerTimer = null;
 }
 
 async function loadGlobalRouletteStats() {
@@ -1747,6 +1886,227 @@ async function loadGlobalRouletteStats() {
   }
 }
 
+function normalizeRouletteLeaderboard(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const playersByName = new Map();
+
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+
+    const displayName = typeof item.display_name === "string"
+      ? item.display_name.trim()
+      : "";
+    const totalSpins = normalizeGlobalRouletteStatValue(item.total_spins);
+    const turbolachs = normalizeGlobalRouletteStatValue(item.turbolachs_count);
+    const nitroforelle = normalizeGlobalRouletteStatValue(item.nitroforelle_count);
+    const gold = normalizeGlobalRouletteStatValue(item.goldfish_count);
+    const lastGoldHit = typeof item.last_gold_hit_at === "string"
+      && Number.isFinite(Date.parse(item.last_gold_hit_at))
+      ? new Date(item.last_gold_hit_at).toISOString()
+      : null;
+
+    if (!displayName || [totalSpins, turbolachs, nitroforelle, gold].includes(null)) {
+      continue;
+    }
+
+    const previous = playersByName.get(displayName);
+
+    if (!previous) {
+      playersByName.set(displayName, {
+        displayName,
+        totalSpins,
+        turbolachs,
+        nitroforelle,
+        gold,
+        lastGoldHit,
+      });
+      continue;
+    }
+
+    previous.totalSpins += totalSpins;
+    previous.turbolachs += turbolachs;
+    previous.nitroforelle += nitroforelle;
+    previous.gold += gold;
+
+    if (lastGoldHit && (!previous.lastGoldHit || lastGoldHit > previous.lastGoldHit)) {
+      previous.lastGoldHit = lastGoldHit;
+    }
+  }
+
+  return [...playersByName.values()].sort((first, second) => (
+    second.gold - first.gold
+    || second.totalSpins - first.totalSpins
+    || first.displayName.localeCompare(second.displayName, "de-AT", { sensitivity: "base" })
+  ));
+}
+
+function createRouletteMetric(label, value, modifier = "") {
+  const metric = document.createElement("div");
+  metric.className = `roulette-personal-metric${modifier ? ` ${modifier}` : ""}`;
+  const metricLabel = document.createElement("span");
+  const metricValue = document.createElement("strong");
+  metricLabel.textContent = label;
+  metricValue.textContent = value;
+  metric.append(metricLabel, metricValue);
+  return metric;
+}
+
+function renderRouletteLeaderboardPanel() {
+  rouletteLeaderboardList.replaceChildren();
+  rouletteLeaderboardStatus.hidden = false;
+
+  if (state.rouletteLeaderboardLoading && state.rouletteLeaderboard === null) {
+    rouletteLeaderboardStatus.textContent = "Wird geladen …";
+    return;
+  }
+
+  if (state.rouletteLeaderboardError && state.rouletteLeaderboard === null) {
+    rouletteLeaderboardStatus.textContent = "Die Rangliste ist gerade nicht erreichbar.";
+    return;
+  }
+
+  if (!state.rouletteLeaderboard?.length) {
+    rouletteLeaderboardStatus.textContent = "Noch keine Roulette-Ergebnisse vorhanden.";
+    return;
+  }
+
+  rouletteLeaderboardStatus.hidden = true;
+  const heading = document.createElement("div");
+  heading.className = "roulette-leaderboard-row roulette-leaderboard-heading";
+  for (const label of ["# / Name", "Gold", "Fische"]) {
+    const cell = document.createElement("span");
+    cell.textContent = label;
+    heading.append(cell);
+  }
+  rouletteLeaderboardList.append(heading);
+
+  state.rouletteLeaderboard.forEach((player, index) => {
+    const row = document.createElement("div");
+    row.className = "roulette-leaderboard-row";
+    const name = document.createElement("strong");
+    const gold = document.createElement("span");
+    const total = document.createElement("span");
+    name.textContent = `${index + 1}. ${player.displayName}`;
+    gold.textContent = String(player.gold);
+    total.textContent = String(player.totalSpins);
+    row.append(name, gold, total);
+    rouletteLeaderboardList.append(row);
+  });
+}
+
+function formatRouletteQuote(count, total) {
+  return total > 0 ? `${(count / total * 100).toFixed(1).replace(".", ",")} %` : "0,0 %";
+}
+
+function renderPersonalRouletteStatsPanel() {
+  const displayName = getDisplayName() || "—";
+  personalRouletteName.textContent = displayName;
+  personalRouletteGrid.replaceChildren();
+  personalRouletteStatus.hidden = false;
+
+  if (state.rouletteLeaderboardLoading && state.rouletteLeaderboard === null) {
+    personalRouletteStatus.textContent = "Wird geladen …";
+    return;
+  }
+
+  if (state.rouletteLeaderboardError && state.rouletteLeaderboard === null) {
+    personalRouletteStatus.textContent = "Deine Statistik ist gerade nicht erreichbar.";
+    return;
+  }
+
+  const player = state.rouletteLeaderboard?.find((item) => item.displayName === displayName) ?? {
+    totalSpins: 0,
+    turbolachs: 0,
+    nitroforelle: 0,
+    gold: 0,
+    lastGoldHit: null,
+  };
+  personalRouletteStatus.hidden = true;
+  personalRouletteGrid.append(
+    createRouletteMetric("Turbolachse", String(player.turbolachs)),
+    createRouletteMetric("Nitroforellen", String(player.nitroforelle)),
+    createRouletteMetric("Goldfische", String(player.gold), "is-gold"),
+    createRouletteMetric("Fische gesamt", String(player.totalSpins), "is-total"),
+    createRouletteMetric("Letzter Goldfisch", formatRouletteLastGoldHit(player.lastGoldHit), "is-wide"),
+    createRouletteMetric("Gold-Hit-Quote", formatRouletteQuote(player.gold, player.totalSpins)),
+    createRouletteMetric("Turbolachs-Quote", formatRouletteQuote(player.turbolachs, player.totalSpins)),
+    createRouletteMetric("Nitroforellen-Quote", formatRouletteQuote(player.nitroforelle, player.totalSpins)),
+  );
+}
+
+async function loadRouletteLeaderboard({ force = false } = {}) {
+  if (state.rouletteLeaderboardLoading) {
+    if (force) {
+      state.rouletteLeaderboardRefreshQueued = true;
+    }
+    return state.rouletteLeaderboard !== null;
+  }
+
+  if (!force && state.rouletteLeaderboard !== null) {
+    return state.rouletteLeaderboard !== null;
+  }
+
+  const requestId = state.rouletteLeaderboardRequestId + 1;
+  state.rouletteLeaderboardRequestId = requestId;
+  state.rouletteLeaderboardLoading = true;
+  state.rouletteLeaderboardError = false;
+  renderRouletteLeaderboardPanel();
+  renderPersonalRouletteStatsPanel();
+
+  try {
+    if (!window.rouletteService?.getRouletteLeaderboard) {
+      throw new Error("Roulette service is unavailable");
+    }
+
+    const response = await window.rouletteService.getRouletteLeaderboard();
+    const leaderboard = normalizeRouletteLeaderboard(response);
+
+    if (leaderboard === null) {
+      throw new Error("Roulette leaderboard response is invalid");
+    }
+
+    if (requestId !== state.rouletteLeaderboardRequestId) {
+      return false;
+    }
+
+    state.rouletteLeaderboard = leaderboard;
+    return true;
+  } catch (error) {
+    if (requestId === state.rouletteLeaderboardRequestId) {
+      state.rouletteLeaderboardError = true;
+      console.error("Roulette-Rangliste konnte nicht geladen werden.", error);
+    }
+    return false;
+  } finally {
+    if (requestId === state.rouletteLeaderboardRequestId) {
+      state.rouletteLeaderboardLoading = false;
+      renderRouletteLeaderboardPanel();
+      renderPersonalRouletteStatsPanel();
+
+      if (state.rouletteLeaderboardRefreshQueued) {
+        state.rouletteLeaderboardRefreshQueued = false;
+        void loadRouletteLeaderboard({ force: true });
+      }
+    }
+  }
+}
+
+function openRouletteStatsModal(modal) {
+  modal.hidden = false;
+  modal.querySelector("button")?.focus();
+  void loadRouletteLeaderboard();
+}
+
+function closeRouletteStatsModal(modal, returnFocusElement) {
+  modal.hidden = true;
+  returnFocusElement.focus();
+}
+
 function persistCompletedRouletteSpin(resultType) {
   void Promise.resolve()
     .then(() => {
@@ -1756,7 +2116,10 @@ function persistCompletedRouletteSpin(resultType) {
 
       return window.rouletteService.recordRouletteSpin(resultType);
     })
-    .then(() => loadGlobalRouletteStats())
+    .then(() => Promise.all([
+      loadGlobalRouletteStats(),
+      loadRouletteLeaderboard({ force: true }),
+    ]))
     .catch((error) => {
       console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
     });
@@ -1908,8 +2271,10 @@ function handleGoldHit(run, targetIndex) {
 
     state.rouletteStats.lastGoldHit = new Date().toISOString();
     recordCompletedRouletteSpin(ROULETTE_GOLD_WINNER_INDEX);
-    rouletteLastGoldHitElement.textContent = "Jetzt";
-    rouletteLastGoldHitElement.classList.add("is-gold-now");
+    renderRouletteLastAngler({
+      ...state.rouletteStats,
+      lastGoldHitDisplayName: getDisplayName(),
+    });
     rouletteGoldStatElement.classList.add("is-gold-updated");
     createGoldCelebration(reducedMotion);
 
@@ -1938,6 +2303,7 @@ function stopRoulette() {
   setRouletteSpinButtonState(false, false);
   updateRouletteSpeedButton(false);
   rouletteStrip.style.transition = "none";
+  stopRouletteLastAnglerTimer();
 }
 
 function openRoulette() {
@@ -1946,7 +2312,9 @@ function openRoulette() {
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
   renderRouletteStats();
+  startRouletteLastAnglerTimer();
   void loadGlobalRouletteStats();
+  void loadRouletteLeaderboard();
 
   const tiles = createRouletteTiles();
   const initialFishTileIndexes = tiles
@@ -2003,6 +2371,7 @@ function startRoulette() {
   setRouletteSpinButtonState(true, false);
   updateRouletteSpeedButton(false);
   showScreen(rouletteScreen);
+  startRouletteLastAnglerTimer();
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
 
@@ -2062,7 +2431,39 @@ document.querySelector("#start-manual-participants").addEventListener("click", (
 });
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
 rouletteSpinButton.addEventListener("click", startRoulette);
-rouletteSpeedButton.addEventListener("click", cycleRouletteSpeed);
+for (const button of rouletteSpeedButtons) {
+  button.addEventListener("click", () => setRouletteSpeed(Number(button.dataset.rouletteSpeed)));
+}
+
+const openRouletteLeaderboardButton = document.querySelector("#open-roulette-leaderboard");
+const openPersonalRouletteStatsButton = document.querySelector("#open-personal-roulette-stats");
+openRouletteLeaderboardButton.addEventListener("click", () => {
+  renderRouletteLeaderboardPanel();
+  openRouletteStatsModal(rouletteLeaderboardModal);
+});
+openPersonalRouletteStatsButton.addEventListener("click", () => {
+  renderPersonalRouletteStatsPanel();
+  openRouletteStatsModal(personalRouletteStatsModal);
+});
+document.querySelector("#close-roulette-leaderboard").addEventListener("click", () => {
+  closeRouletteStatsModal(rouletteLeaderboardModal, openRouletteLeaderboardButton);
+});
+document.querySelector("#close-personal-roulette-stats").addEventListener("click", () => {
+  closeRouletteStatsModal(personalRouletteStatsModal, openPersonalRouletteStatsButton);
+});
+
+for (const modal of [rouletteLeaderboardModal, personalRouletteStatsModal]) {
+  modal.addEventListener("click", (event) => {
+    if (event.target !== modal) {
+      return;
+    }
+
+    const returnFocusElement = modal === rouletteLeaderboardModal
+      ? openRouletteLeaderboardButton
+      : openPersonalRouletteStatsButton;
+    closeRouletteStatsModal(modal, returnFocusElement);
+  });
+}
 
 for (const button of document.querySelectorAll("[data-team-count]")) {
   button.addEventListener("click", () => {
@@ -2085,10 +2486,13 @@ for (const button of document.querySelectorAll(".screen-back")) {
 
 playZone.addEventListener("pointerdown", handlePlayZonePointerDown, { passive: false });
 drawButton.addEventListener("click", handleDrawButtonClick);
-fingerResetButton.addEventListener("click", resetGame);
+fingerResetButton.addEventListener("click", () => void animateFingerReset());
 teamSettingsButton.addEventListener("click", openTeamSettings);
 participantContinueButton.addEventListener("click", handleParticipantContinue);
-resetParticipantsButton.addEventListener("click", resetParticipantSelection);
+resetParticipantsButton.addEventListener(
+  "click",
+  () => void animateParticipantSelectionReset(),
+);
 participantBackButton.addEventListener(
   "click",
   closeParticipantSelection,

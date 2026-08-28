@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=61">
+    <link rel="stylesheet" href="./style.css?v=66">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=1" defer></script>
     <script src="./roulette-service.js?v=2" defer></script>
-    <script src="./script.js?v=37" defer></script>
+    <script src="./script.js?v=40" defer></script>
   </head>
   <body>
     <div id="app">
@@ -239,6 +239,15 @@
           aria-hidden="true"
         >
         <button class="close-button navigation-back-button screen-back" type="button" aria-label="Zurück zum Hauptmenü">←</button>
+        <button
+          class="roulette-personal-stats-button"
+          id="open-personal-roulette-stats"
+          type="button"
+          aria-label="Meine Roulette-Statistik öffnen"
+        >
+          <span aria-hidden="true">▥</span>
+          <span>Meine Stats</span>
+        </button>
         <div class="roulette-content">
           <div class="roulette-window" aria-hidden="true">
             <div class="roulette-marker"></div>
@@ -256,29 +265,34 @@
         >
           <img src="./assets/button-drehen.png?v=1" alt="" width="2172" height="724" draggable="false">
         </button>
-        <button
-          class="roulette-speed-button"
-          id="roulette-speed"
-          type="button"
-          aria-label="Roulette-Geschwindigkeit: 1-fach"
-        >1×</button>
+        <div class="roulette-speed-selector" id="roulette-speed-selector" role="group" aria-label="Roulette-Geschwindigkeit">
+          <button type="button" data-roulette-speed="1" aria-pressed="true">1x</button>
+          <button type="button" data-roulette-speed="2" aria-pressed="false">2x</button>
+          <button type="button" data-roulette-speed="3" aria-pressed="false">3x</button>
+        </div>
         <div class="roulette-stats" aria-label="Roulette-Statistik" aria-live="polite">
-          <div class="roulette-stat-gold">
-            <span class="roulette-stat-gold-label">GOLDFISCHE</span>
-            <div class="roulette-stat-gold-main">
-              <img
-                class="roulette-stat-icon roulette-stat-icon--gold"
-                src="./assets/gold-icon.png"
-                alt=""
-                width="1379"
-                height="1141"
-                draggable="false"
-              >
-              <strong class="roulette-stat-value roulette-stat-value--gold" id="roulette-stat-gold">0</strong>
+          <div class="roulette-stats-top">
+            <div class="roulette-stat-gold">
+              <span class="roulette-stat-gold-label">GOLDFISCHE</span>
+              <div class="roulette-stat-gold-main">
+                <img
+                  class="roulette-stat-icon roulette-stat-icon--gold"
+                  src="./assets/gold-icon.png"
+                  alt=""
+                  width="1379"
+                  height="1141"
+                  draggable="false"
+                >
+                <strong class="roulette-stat-value roulette-stat-value--gold" id="roulette-stat-gold">0</strong>
+              </div>
             </div>
-            <span class="roulette-last-gold-hit">
-              Letzter Hit: <strong id="roulette-stat-last-gold-hit">—</strong>
-            </span>
+            <div class="roulette-stats-divider" aria-hidden="true"></div>
+            <div class="roulette-last-angler">
+              <span class="roulette-last-angler-label">LETZTER ANGLER</span>
+              <strong class="roulette-last-angler-name" id="roulette-last-angler-name">—</strong>
+              <span class="roulette-last-gold-hit" id="roulette-stat-last-gold-hit">—</span>
+              <button class="roulette-leaderboard-button" id="open-roulette-leaderboard" type="button">Rangliste</button>
+            </div>
           </div>
           <div class="roulette-stat-fish-group">
             <div class="roulette-stat-row roulette-stat-row--turbolachs">
@@ -463,6 +477,27 @@
           <button class="secondary-button" id="cancel-manual-player-selection" type="button">Abbrechen</button>
           <button class="primary-button" id="confirm-manual-player-selection" type="button" disabled>OK</button>
         </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop roulette-stats-backdrop" id="roulette-leaderboard-modal" role="dialog" aria-modal="true" aria-labelledby="roulette-leaderboard-title" hidden>
+      <div class="modal-card roulette-stats-modal-card">
+        <button class="roulette-modal-close" id="close-roulette-leaderboard" type="button" aria-label="Rangliste schließen">×</button>
+        <p class="roulette-modal-kicker">FISCH ROULETTE</p>
+        <h2 id="roulette-leaderboard-title">Rangliste</h2>
+        <p class="roulette-panel-status" id="roulette-leaderboard-status" aria-live="polite">Wird geladen …</p>
+        <div class="roulette-leaderboard-list" id="roulette-leaderboard-list"></div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop roulette-stats-backdrop" id="personal-roulette-stats-modal" role="dialog" aria-modal="true" aria-labelledby="personal-roulette-stats-title" hidden>
+      <div class="modal-card roulette-stats-modal-card roulette-personal-modal-card">
+        <button class="roulette-modal-close" id="close-personal-roulette-stats" type="button" aria-label="Meine Statistik schließen">×</button>
+        <p class="roulette-modal-kicker">MEIN FISCH ROULETTE</p>
+        <h2 id="personal-roulette-stats-title">Meine Statistik</h2>
+        <strong class="roulette-personal-name" id="personal-roulette-name">—</strong>
+        <p class="roulette-panel-status" id="personal-roulette-status" aria-live="polite">Wird geladen …</p>
+        <div class="roulette-personal-grid" id="personal-roulette-grid"></div>
       </div>
     </div>
 

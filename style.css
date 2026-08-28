@@ -623,6 +623,18 @@ h2 {
   animation: team-pop 330ms cubic-bezier(0.2, 0.85, 0.3, 1.15);
 }
 
+#player-layer.is-resetting .player-marker {
+  pointer-events: none;
+  animation: finger-marker-reset-out var(--reset-exit-duration, 220ms) ease-in both;
+}
+
+@keyframes finger-marker-reset-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.87);
+  }
+}
+
 @keyframes register-pop {
   0% {
     filter: brightness(1.35);
@@ -890,6 +902,18 @@ h2 {
 .participant-name-button.is-selected {
   border-color: rgb(241 90 154 / 36%);
   background: rgb(241 90 154 / 13%);
+}
+
+#selected-participants.is-resetting .participant-name-button.is-selected {
+  pointer-events: none;
+  animation: participant-reset-out var(--reset-exit-duration, 220ms) ease-in-out both;
+}
+
+@keyframes participant-reset-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
 }
 
 .participant-name-button:active,
@@ -1715,7 +1739,7 @@ h2 {
 .roulette-spin-button {
   position: absolute;
   z-index: 3;
-  top: calc(50% - 28px);
+  top: calc(50% - 38px);
   left: 50%;
   display: block;
   width: min(56vw, 220px);
@@ -1752,53 +1776,97 @@ h2 {
   pointer-events: none;
 }
 
-.roulette-speed-button {
+.roulette-speed-selector {
   position: absolute;
   z-index: 3;
-  top: calc(50% - 14px);
-  left: calc(50% + min(28vw, 110px) + 10px);
-  display: grid;
-  width: 50px;
-  height: 44px;
-  min-height: 0;
-  padding: 0;
+  top: calc(50% + 22px);
+  left: 50%;
+  display: flex;
+  width: min(45vw, 170px);
+  height: 38px;
+  padding: 3px;
   border: 1px solid rgb(74 213 255 / 72%);
-  border-radius: 14px;
+  border-radius: 13px;
   background:
     linear-gradient(145deg, rgb(15 19 38 / 96%), rgb(5 7 18 / 96%)) padding-box,
     linear-gradient(135deg, #3dd9ff, #f15a9a) border-box;
   box-shadow:
     0 0 10px rgb(61 217 255 / 22%),
     inset 0 0 10px rgb(241 90 154 / 10%);
-  color: #fff;
-  font-size: 1rem;
-  font-weight: 800;
+  gap: 2px;
+  transform: translateX(-50%);
+}
+
+.roulette-speed-selector button {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  box-shadow: none;
+  color: rgb(255 255 255 / 58%);
+  flex: 1 1 0;
+  font-size: 0.78rem;
+  font-weight: 850;
   line-height: 1;
-  place-items: center;
   text-shadow: 0 1px 4px rgb(0 0 0 / 70%);
-  transition: filter 110ms ease-out, opacity 110ms ease-out, transform 110ms ease-out;
+  transition: background 120ms ease-out, color 120ms ease-out, opacity 120ms ease-out;
 }
 
-.roulette-speed-button:active {
-  filter: brightness(0.9);
-  transform: scale(0.96);
+.roulette-speed-selector button.is-active {
+  background: linear-gradient(135deg, rgb(47 189 240 / 78%), rgb(217 66 145 / 72%));
+  box-shadow: 0 0 10px rgb(61 217 255 / 22%);
+  color: #fff;
 }
 
-.roulette-speed-button:disabled {
+.roulette-speed-selector button:disabled {
   cursor: default;
-  filter: brightness(0.58);
-  opacity: 0.55;
+  opacity: 0.42;
   pointer-events: none;
+}
+
+.roulette-speed-selector button.is-active:disabled {
+  opacity: 0.7;
+}
+
+.roulette-personal-stats-button {
+  position: absolute;
+  z-index: 5;
+  top: max(calc(env(safe-area-inset-top) + 18px), 28px);
+  right: max(calc(env(safe-area-inset-right) + 14px), 18px);
+  display: flex;
+  width: auto;
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid rgb(91 218 255 / 42%);
+  border-radius: 13px;
+  background: rgb(3 8 23 / 76%);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 25%);
+  align-items: center;
+  gap: 6px;
+  color: rgb(241 247 255 / 92%);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.roulette-personal-stats-button span:first-child {
+  color: #6de0ff;
+  font-size: 1rem;
 }
 
 .roulette-stats {
   position: absolute;
   z-index: 2;
-  top: calc(50% + 80px);
+  top: calc(50% + 78px);
   left: 50%;
   display: flex;
   width: min(calc(100% - 32px), 346px);
-  height: clamp(276px, 34dvh, 294px);
+  height: clamp(282px, 35dvh, 302px);
   padding: 12px 14px;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 18%);
@@ -1809,7 +1877,6 @@ h2 {
     12px 0 30px rgb(241 47 142 / 9%),
     0 16px 36px rgb(0 0 0 / 36%);
   flex-direction: column;
-  pointer-events: none;
   transform: translateX(-50%);
 }
 
@@ -1828,13 +1895,27 @@ h2 {
   z-index: 1;
 }
 
+.roulette-stats-top {
+  display: grid;
+  min-height: 128px;
+  padding: 2px 0 10px;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1.12fr) 1px minmax(0, 0.88fr);
+  gap: 12px;
+}
+
 .roulette-stat-gold {
   display: grid;
-  min-height: 0;
-  padding: 2px 0 14px;
-  flex: 1 1 auto;
+  min-width: 0;
   grid-template-rows: auto 1fr auto;
   justify-items: center;
+}
+
+.roulette-stats-divider {
+  width: 1px;
+  height: 78%;
+  align-self: center;
+  background: linear-gradient(transparent, rgb(255 255 255 / 20%) 18% 82%, transparent);
 }
 
 .roulette-stat-gold-label {
@@ -1851,22 +1932,68 @@ h2 {
   gap: 14px;
 }
 
-.roulette-last-gold-hit {
-  color: rgb(239 241 250 / 62%);
-  font-size: 0.72rem;
-  line-height: 1;
+.roulette-last-angler {
+  display: flex;
+  min-width: 0;
+  padding: 1px 0 0;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
 }
 
-.roulette-last-gold-hit strong {
-  margin-left: 3px;
-  color: rgb(255 255 255 / 82%);
-  font-weight: 650;
+.roulette-last-angler-label {
+  color: rgb(239 241 250 / 58%);
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
-.roulette-last-gold-hit strong.is-gold-now {
+.roulette-last-angler-name {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  overflow: hidden;
   color: #ffd66e;
+  font-size: clamp(1rem, 4.5vw, 1.18rem);
+  font-weight: 850;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 9px rgb(255 198 62 / 25%);
+  white-space: nowrap;
+}
+
+.roulette-last-gold-hit {
+  min-height: 1em;
+  margin-top: 5px;
+  color: rgb(239 241 250 / 68%);
+  font-size: 0.67rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.roulette-last-gold-hit.is-gold-now {
+  color: #ffd66e;
+  font-weight: 850;
   text-shadow: 0 0 9px rgb(255 198 62 / 54%);
   animation: roulette-gold-now-pulse 760ms ease-out both;
+}
+
+.roulette-leaderboard-button {
+  width: auto;
+  min-height: 34px;
+  margin-top: 10px;
+  padding: 7px 11px;
+  border: 1px solid rgb(255 215 108 / 35%);
+  border-radius: 10px;
+  background: rgb(255 201 72 / 8%);
+  box-shadow: none;
+  color: rgb(255 234 175 / 88%);
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .roulette-stat-fish-group {
@@ -1893,8 +2020,8 @@ h2 {
 }
 
 .roulette-stat-icon--gold {
-  width: clamp(64px, 18.3vw, 74px);
-  height: clamp(64px, 18.3vw, 74px);
+  width: clamp(70px, 20vw, 82px);
+  height: clamp(70px, 20vw, 82px);
 }
 
 .roulette-stat-icon--fish,
@@ -1935,7 +2062,7 @@ h2 {
 .roulette-stat-value--gold {
   min-width: auto;
   color: #ffd66e;
-  font-size: clamp(43px, 11.7vw, 48px);
+  font-size: clamp(46px, 12.4vw, 52px);
   text-shadow: 0 0 12px rgb(255 193 66 / 32%);
 }
 
@@ -2068,7 +2195,242 @@ h2 {
   gap: 10px;
 }
 
+.roulette-stats-backdrop {
+  z-index: 30;
+}
+
+.roulette-stats-modal-card {
+  position: relative;
+  width: min(100%, 380px);
+  max-height: min(78dvh, 650px);
+  padding: 24px 18px 18px;
+  overflow: hidden;
+  border-color: rgb(76 207 255 / 24%);
+  background:
+    linear-gradient(145deg, rgb(12 18 39 / 98%), rgb(4 7 20 / 98%));
+  box-shadow:
+    -10px 0 32px rgb(31 162 255 / 10%),
+    10px 0 32px rgb(241 47 142 / 10%),
+    0 22px 70px rgb(0 0 0 / 56%);
+}
+
+.roulette-modal-close {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 13%);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 6%);
+  box-shadow: none;
+  color: rgb(255 255 255 / 78%);
+  font-size: 1.45rem;
+  font-weight: 500;
+  line-height: 1;
+  place-items: center;
+}
+
+.roulette-stats-modal-card .roulette-modal-kicker {
+  margin: 0 48px 5px;
+  color: #67dcff;
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+
+.roulette-stats-modal-card h2 {
+  margin: 0 40px 15px;
+  color: #fff;
+  font-size: 1.45rem;
+}
+
+.roulette-stats-modal-card .roulette-panel-status {
+  margin: 24px 0 12px;
+  color: rgb(239 243 255 / 68%);
+  font-size: 0.84rem;
+}
+
+.roulette-leaderboard-list {
+  max-height: min(57dvh, 450px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 15px;
+  background: rgb(0 0 0 / 16%);
+  scrollbar-width: thin;
+}
+
+.roulette-leaderboard-row {
+  display: grid;
+  min-height: 46px;
+  padding: 8px 12px;
+  align-items: center;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  grid-template-columns: minmax(0, 1fr) 54px 54px;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.roulette-leaderboard-row:last-child {
+  border-bottom: 0;
+}
+
+.roulette-leaderboard-row strong {
+  overflow: hidden;
+  color: rgb(248 250 255 / 94%);
+  font-size: 0.8rem;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roulette-leaderboard-row span {
+  color: rgb(241 244 255 / 78%);
+  font-size: 0.79rem;
+  font-weight: 750;
+  text-align: right;
+}
+
+.roulette-leaderboard-row span:nth-child(2) {
+  color: #ffd66e;
+}
+
+.roulette-leaderboard-heading {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  min-height: 35px;
+  background: rgb(9 14 32 / 97%);
+}
+
+.roulette-leaderboard-heading span {
+  color: rgb(230 237 255 / 53%);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.roulette-personal-modal-card {
+  overflow-y: auto;
+}
+
+.roulette-personal-name {
+  display: block;
+  margin: -7px 0 14px;
+  overflow: hidden;
+  color: #ffd66e;
+  font-size: 1.05rem;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 10px rgb(255 198 62 / 28%);
+  white-space: nowrap;
+}
+
+.roulette-personal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.roulette-personal-metric {
+  display: flex;
+  min-width: 0;
+  min-height: 74px;
+  padding: 11px 10px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 4%);
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+}
+
+.roulette-personal-metric span {
+  color: rgb(232 237 250 / 62%);
+  font-size: 0.64rem;
+  font-weight: 750;
+  letter-spacing: 0.025em;
+  line-height: 1.2;
+}
+
+.roulette-personal-metric strong {
+  color: #fff;
+  font-size: 1.18rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.roulette-personal-metric.is-gold strong {
+  color: #ffd66e;
+}
+
+.roulette-personal-metric.is-total strong {
+  color: #6de0ff;
+}
+
+.roulette-personal-metric.is-wide {
+  min-height: 65px;
+  grid-column: 1 / -1;
+}
+
+.roulette-personal-metric.is-wide strong {
+  font-size: 0.94rem;
+}
+
+@media (max-width: 360px) {
+  .roulette-personal-stats-button span:last-child {
+    display: none;
+  }
+
+  .roulette-personal-stats-button {
+    width: 42px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .roulette-stats {
+    width: calc(100% - 24px);
+    padding-inline: 11px;
+  }
+
+  .roulette-stats-top {
+    gap: 8px;
+  }
+
+  .roulette-leaderboard-row {
+    padding-inline: 9px;
+    grid-template-columns: minmax(0, 1fr) 48px 48px;
+  }
+}
+
 @media (max-height: 700px) {
+  .roulette-stats {
+    top: calc(50% + 64px);
+    height: 260px;
+    padding-block: 10px;
+  }
+
+  .roulette-stats-top {
+    min-height: 116px;
+  }
+
+  .roulette-stat-icon--gold {
+    width: 66px;
+    height: 66px;
+  }
+
+  .roulette-stat-value--gold {
+    font-size: 43px;
+  }
+
+  .roulette-leaderboard-button {
+    margin-top: 7px;
+  }
+
   .teams-menu-logo {
     top: max(calc(env(safe-area-inset-top) + 30px), 62px);
     width: min(82vw, 48dvh, 320px);
@@ -2099,6 +2461,52 @@ h2 {
 @media (max-height: 620px) {
   .primary-button, .secondary-button, .fish-button { min-height: 50px; padding-block: 11px; }
 
+  .roulette-spin-button {
+    top: calc(50% - 42px);
+  }
+
+  .roulette-speed-selector {
+    top: calc(50% + 15px);
+  }
+
+  .roulette-stats {
+    top: calc(50% + 56px);
+    height: 238px;
+    padding-block: 8px;
+  }
+
+  .roulette-stats-top {
+    min-height: 103px;
+    padding-bottom: 6px;
+  }
+
+  .roulette-stat-icon--gold {
+    width: 58px;
+    height: 58px;
+  }
+
+  .roulette-stat-value--gold {
+    font-size: 38px;
+  }
+
+  .roulette-last-angler-name {
+    margin-top: 5px;
+  }
+
+  .roulette-leaderboard-button {
+    min-height: 30px;
+    margin-top: 5px;
+    padding-block: 5px;
+  }
+
+  .roulette-stat-row {
+    min-height: 29px;
+  }
+
+  .roulette-stat-row--total {
+    min-height: 37px;
+  }
+
   .rage-cage-header {
     min-height: 58px;
   }
@@ -2115,6 +2523,56 @@ h2 {
   .rage-cage-reshuffle-button,
   .rage-cage-start-button {
     min-height: 48px;
+  }
+}
+
+@media (max-height: 580px) {
+  .roulette-stats {
+    top: calc(50% + 55px);
+    height: 220px;
+    padding-block: 6px;
+  }
+
+  .roulette-stats-top {
+    min-height: 88px;
+    gap: 8px;
+  }
+
+  .roulette-stat-icon--gold {
+    width: 50px;
+    height: 50px;
+  }
+
+  .roulette-stat-value--gold {
+    font-size: 34px;
+  }
+
+  .roulette-stat-gold-label,
+  .roulette-last-angler-label {
+    font-size: 0.56rem;
+  }
+
+  .roulette-last-angler-name {
+    font-size: 0.9rem;
+  }
+
+  .roulette-last-gold-hit {
+    margin-top: 3px;
+    font-size: 0.6rem;
+  }
+
+  .roulette-leaderboard-button {
+    min-height: 27px;
+    margin-top: 3px;
+    padding: 4px 8px;
+  }
+
+  .roulette-stat-row {
+    min-height: 27px;
+  }
+
+  .roulette-stat-row--total {
+    min-height: 34px;
   }
 }
 

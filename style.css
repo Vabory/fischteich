@@ -137,20 +137,14 @@ button:focus-visible {
 }
 
 .sidemenu-fish-asset {
-  --sidemenu-fish-lift: clamp(25px, 3.8dvh, 35px);
-
   position: absolute;
   z-index: 1;
   top: max(
-    0px,
-    calc(
-      100dvh
-      - max(195.9vw, 90.83dvh)
-      - var(--sidemenu-fish-lift)
-    )
+    calc(env(safe-area-inset-top) + 8px),
+    clamp(36px, 5.6dvh, 50px)
   );
   left: 50%;
-  width: max(103.98vw, 48.21dvh);
+  width: 100vw;
   max-width: none;
   height: auto;
   filter: brightness(0.85);
@@ -167,7 +161,7 @@ button:focus-visible {
   left: 50%;
   width: min(90vw, 355px);
   height: auto;
-  transform: translate(-50%, 35px);
+  transform: translate(-50%, 43px);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -178,7 +172,7 @@ button:focus-visible {
 
   position: absolute;
   z-index: 2;
-  top: clamp(310px, 39.5dvh, 336px);
+  top: clamp(330px, 42.7dvh, 350px);
   left: 50%;
   display: flex;
   width: min(92vw, 360px);
@@ -197,6 +191,7 @@ button:focus-visible {
   line-height: 0;
   place-items: center;
   transition: transform 110ms ease-out;
+  aspect-ratio: 2179 / 722;
 }
 
 .teams-menu-actions img {
@@ -204,22 +199,11 @@ button:focus-visible {
   width: var(--teams-menu-visual-button-width);
   max-width: 100%;
   height: auto;
-  object-fit: contain;
+  aspect-ratio: 2179 / 722;
+  object-fit: fill;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
-}
-
-.teams-menu-actions #start-finger-selection {
-  aspect-ratio: 2179 / 722;
-}
-
-.teams-menu-actions #start-random-participants {
-  aspect-ratio: 2172 / 724;
-}
-
-.teams-menu-actions #start-manual-participants {
-  aspect-ratio: 1993 / 789;
 }
 
 .teams-menu-actions button:active {
@@ -227,10 +211,6 @@ button:focus-visible {
 }
 
 .teams-menu-actions button + button {
-  margin-top: -33px;
-}
-
-.teams-menu-actions #start-manual-participants {
   margin-top: -41px;
 }
 
@@ -2999,7 +2979,7 @@ h2 {
   .teams-menu-actions {
     --teams-menu-visual-button-width: min(73vw, 36.5dvh, 286px);
 
-    top: clamp(250px, 40dvh, 285px);
+    top: clamp(266px, 42dvh, 300px);
     width: min(92vw, 47dvh, 360px);
   }
 

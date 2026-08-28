@@ -8,6 +8,13 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Ex5JLH1PpN-N1gGZPDcNtQ_RbO9y7P-
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  },
 );
 
 console.info("Supabase client initialized");

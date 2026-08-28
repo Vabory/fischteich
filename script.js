@@ -642,6 +642,7 @@ function completeLocalIdentitySetup() {
 
   welcomeIdentityModal.hidden = true;
   appElement.inert = false;
+  void syncCurrentAuthProfileDisplayName(identity.displayName);
   document.querySelector("#start-two-teams").focus();
   return true;
 }
@@ -700,6 +701,7 @@ function saveDisplayName() {
   state.personalRouletteStatsLoading = false;
   state.personalRouletteStatsError = false;
   state.personalRouletteStatsRefreshQueued = false;
+  void syncCurrentAuthProfileDisplayName(identity.displayName);
   renderSettingsIdentity();
   closeDisplayNameRenameModal();
   return true;
@@ -3796,3 +3798,4 @@ document.addEventListener("keydown", (event) => {
 updateMarkerSize();
 renderRouletteStats();
 initializeLocalIdentity();
+void initializeAppAuth();

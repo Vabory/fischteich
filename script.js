@@ -1496,9 +1496,12 @@ function recordCompletedRouletteSpin(winnerIndex) {
   state.rouletteStats.totalSpins += 1;
   state.rouletteStats[winnerStatKey] += 1;
   saveRouletteStats();
-  state.globalRouletteStats = null;
   state.rouletteStatsRequestId += 1;
-  renderRouletteStats();
+
+  if (state.globalRouletteStats === null) {
+    renderRouletteStats();
+  }
+
   persistCompletedRouletteSpin(resultType);
 }
 
@@ -1665,7 +1668,6 @@ function openRoulette() {
   showScreen(rouletteScreen);
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
-  state.globalRouletteStats = null;
   renderRouletteStats();
   void loadGlobalRouletteStats();
 

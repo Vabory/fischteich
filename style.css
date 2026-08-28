@@ -136,9 +136,33 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
-.teams-menu-logo {
+.sidemenu-fish-asset {
+  --sidemenu-fish-lift: clamp(25px, 3.8dvh, 35px);
+
   position: absolute;
   z-index: 1;
+  top: max(
+    0px,
+    calc(
+      100dvh
+      - max(195.9vw, 90.83dvh)
+      - var(--sidemenu-fish-lift)
+    )
+  );
+  left: 50%;
+  width: max(103.98vw, 48.21dvh);
+  max-width: none;
+  height: auto;
+  filter: brightness(0.85);
+  pointer-events: none;
+  transform: translateX(-50%);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.teams-menu-logo {
+  position: absolute;
+  z-index: 2;
   top: max(calc(env(safe-area-inset-top) + 38px), clamp(72px, 10dvh, 92px));
   left: 50%;
   width: min(90vw, 355px);

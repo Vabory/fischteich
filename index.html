@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=81">
+    <link rel="stylesheet" href="./style.css?v=82">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
     <script src="./roulette-service.js?v=5" defer></script>
-    <script src="./script.js?v=51" defer></script>
+    <script src="./script.js?v=52" defer></script>
   </head>
   <body>
     <div id="app">
@@ -192,7 +192,19 @@
           <div class="manual-team-scroll">
             <header class="manual-team-header">
               <h2 id="manual-team-title">0 Fische im Teich:</h2>
-              <p id="manual-team-participant-names"></p>
+              <button
+                class="participant-list-toggle manual-team-participant-toggle"
+                id="manual-team-participant-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="manual-team-participant-panel"
+              >
+                <span class="participant-list-names" id="manual-team-participant-names"></span>
+                <span class="participant-list-chevron" aria-hidden="true">⌄</span>
+              </button>
+              <div class="participant-list-panel manual-team-participant-panel" id="manual-team-participant-panel" hidden>
+                <p id="manual-team-participant-names-full"></p>
+              </div>
             </header>
 
             <div class="manual-team-grid" id="manual-team-grid">
@@ -212,16 +224,16 @@
           <header class="rage-cage-header">
             <h2 id="rage-cage-title">Fische im Cage:</h2>
             <button
-              class="rage-cage-participant-toggle"
+              class="participant-list-toggle rage-cage-participant-toggle"
               id="rage-cage-participant-toggle"
               type="button"
               aria-expanded="false"
               aria-controls="rage-cage-participant-panel"
             >
-              <span id="rage-cage-participant-names"></span>
-              <span class="rage-cage-participant-chevron" aria-hidden="true">⌄</span>
+              <span class="participant-list-names" id="rage-cage-participant-names"></span>
+              <span class="participant-list-chevron" aria-hidden="true">⌄</span>
             </button>
-            <div class="rage-cage-participant-panel" id="rage-cage-participant-panel" hidden>
+            <div class="participant-list-panel rage-cage-participant-panel" id="rage-cage-participant-panel" hidden>
               <p id="rage-cage-participant-names-full"></p>
             </div>
           </header>

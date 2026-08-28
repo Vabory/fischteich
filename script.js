@@ -116,6 +116,9 @@ const participantContinueButton = document.querySelector("#participant-continue-
 const resetParticipantsButton = document.querySelector("#reset-participants");
 const manualTeamTitle = document.querySelector("#manual-team-title");
 const manualTeamParticipantNames = document.querySelector("#manual-team-participant-names");
+const manualTeamParticipantNamesFull = document.querySelector("#manual-team-participant-names-full");
+const manualTeamParticipantToggle = document.querySelector("#manual-team-participant-toggle");
+const manualTeamParticipantPanel = document.querySelector("#manual-team-participant-panel");
 const manualTeamGrid = document.querySelector("#manual-team-grid");
 const addManualTeamButton = document.querySelector("#add-manual-team");
 const divideManualTeamsButton = document.querySelector("#divide-manual-teams");
@@ -129,6 +132,26 @@ const rageCageTable = document.querySelector("#rage-cage-table");
 const rageCageSeats = document.querySelector("#rage-cage-seats");
 const rageCageReshuffleButton = document.querySelector("#rage-cage-reshuffle");
 const rageCageStartButton = document.querySelector("#rage-cage-start-position");
+const manualTeamParticipantList = {
+  screen: manualTeamScreen,
+  names: manualTeamParticipantNames,
+  fullNames: manualTeamParticipantNamesFull,
+  toggle: manualTeamParticipantToggle,
+  panel: manualTeamParticipantPanel,
+  locationLabel: "Fische im Teich",
+  participantNames: [],
+};
+const rageCageParticipantList = {
+  screen: rageCageScreen,
+  names: rageCageParticipantNames,
+  fullNames: rageCageParticipantNamesFull,
+  toggle: rageCageParticipantToggle,
+  panel: rageCageParticipantPanel,
+  locationLabel: "Fische im Cage",
+  participantNames: [],
+};
+const participantListControls = [manualTeamParticipantList, rageCageParticipantList];
+const PARTICIPANT_LIST_SEPARATOR = " · ";
 const manualTeamRenameModal = document.querySelector("#manual-team-rename-modal");
 const manualTeamRenameForm = document.querySelector("#manual-team-rename-form");
 const manualTeamRenameInput = document.querySelector("#manual-team-rename-input");
@@ -1299,9 +1322,10 @@ function createManualTeamCard(teamIndex) {
 function renderManualTeamScreen() {
   ensureManualTeamNames();
   manualTeamTitle.textContent = `${state.selectedParticipants.length} Fische im Teich:`;
-  manualTeamParticipantNames.textContent = state.selectedParticipants
-    .map((participant) => participant.name)
-    .join(" · ");
+  renderParticipantList(
+    manualTeamParticipantList,
+    state.selectedParticipants.map((participant) => participant.name),
+  );
 
   for (const card of manualTeamGrid.querySelectorAll(".manual-team-card")) {
     card.remove();
@@ -1343,6 +1367,7 @@ function openManualTeamScreen() {
 }
 
 function closeManualTeamScreen() {
+  closeParticipantListPanel(manualTeamParticipantList);
   renderParticipantSelection();
   showScreen(participantScreen);
   participantContinueButton.focus();
@@ -1576,7 +1601,9 @@ function renderRageCageSeats() {
       cornerRadius,
     );
     const horizontalLabel = Math.abs(point.normalX) > 0.6;
-    const labelDistanceX = horizontalLabel ? 52 : 38;
+    const labelDistanceX = horizontalLabel
+      ? Math.min(72, Math.max(60, stageBounds.width * 0.17))
+      : 38;
     const labelDistanceY = horizontalLabel ? 30 : 20;
     const labelX = point.x + point.normalX * labelDistanceX;
     const labelY = point.y + point.normalY * labelDistanceY;
@@ -1617,50 +1644,96 @@ function renderRageCageSeats() {
   return true;
 }
 
-function closeRageCageParticipantPanel() {
-  rageCageParticipantPanel.hidden = true;
-  rageCageParticipantToggle.classList.remove("is-open");
-  rageCageParticipantToggle.setAttribute("aria-expanded", "false");
+function participantListTextOverflows(namesElement) {
+  return namesElement.scrollHeight > namesElement.clientHeight + 1
+    || namesElement.scrollWidth > namesElement.clientWidth + 1;
 }
 
-function toggleRageCageParticipantPanel() {
-  const shouldOpen = rageCageParticipantPanel.hidden;
+function closeParticipantListPanel(control, { restoreFocus = false } = {}) {
+  control.panel.hidden = true;
+  control.toggle.classList.remove("is-open");
+  control.toggle.setAttribute("aria-expanded", "false");
+
+  if (restoreFocus) {
+    control.toggle.focus();
+  }
+}
+
+function toggleParticipantListPanel(control) {
+  if (!control.toggle.classList.contains("has-truncated-names")) {
+    return;
+  }
+
+  const shouldOpen = control.panel.hidden;
 
   if (!shouldOpen) {
-    closeRageCageParticipantPanel();
+    closeParticipantListPanel(control);
     return;
   }
 
-  rageCageParticipantPanel.hidden = false;
-  rageCageParticipantToggle.classList.add("is-open");
-  rageCageParticipantToggle.setAttribute("aria-expanded", "true");
+  control.panel.hidden = false;
+  control.toggle.classList.add("is-open");
+  control.toggle.setAttribute("aria-expanded", "true");
 }
 
-function updateRageCageParticipantTruncation() {
-  if (rageCageScreen.hidden) {
+function updateParticipantListTruncation(control) {
+  if (control.screen.hidden) {
     return;
   }
 
-  const isTruncated = rageCageParticipantNames.scrollHeight
-      > rageCageParticipantNames.clientHeight + 1
-    || rageCageParticipantNames.scrollWidth
-      > rageCageParticipantNames.clientWidth + 1;
-  rageCageParticipantToggle.classList.toggle("has-truncated-names", isTruncated);
+  const { names, participantNames, toggle } = control;
+  const fullText = participantNames.join(PARTICIPANT_LIST_SEPARATOR);
+
+  names.textContent = fullText;
+  toggle.classList.remove("has-truncated-names");
+  toggle.disabled = true;
+  toggle.removeAttribute("aria-label");
+
+  if (!participantListTextOverflows(names)) {
+    closeParticipantListPanel(control);
+    return;
+  }
+
+  let low = 1;
+  let high = Math.max(1, participantNames.length - 1);
+  let bestVisibleCount = 1;
+
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    names.textContent = `${participantNames.slice(0, middle).join(PARTICIPANT_LIST_SEPARATOR)}, ...`;
+
+    if (participantListTextOverflows(names)) {
+      high = middle - 1;
+    } else {
+      bestVisibleCount = middle;
+      low = middle + 1;
+    }
+  }
+
+  names.textContent = `${participantNames.slice(0, bestVisibleCount).join(PARTICIPANT_LIST_SEPARATOR)}, ...`;
+  toggle.classList.add("has-truncated-names");
+  toggle.disabled = false;
+  toggle.setAttribute(
+    "aria-label",
+    `Alle ${participantNames.length} ${control.locationLabel} anzeigen`,
+  );
+}
+
+function renderParticipantList(control, participantNames) {
+  control.participantNames = participantNames;
+  const fullText = participantNames.join(PARTICIPANT_LIST_SEPARATOR);
+
+  control.names.textContent = fullText;
+  control.fullNames.textContent = fullText;
+  closeParticipantListPanel(control);
+  requestAnimationFrame(() => updateParticipantListTruncation(control));
 }
 
 function renderRageCageTable() {
-  const participantNames = state.selectedParticipants
-    .map((participant) => participant.name)
-    .join(" · ");
+  const participantNames = state.selectedParticipants.map((participant) => participant.name);
   rageCageTitle.textContent = `${state.selectedParticipants.length} Fische im Cage:`;
-  rageCageParticipantNames.textContent = participantNames;
-  rageCageParticipantNamesFull.textContent = participantNames;
-  rageCageParticipantToggle.setAttribute(
-    "aria-label",
-    `Alle ${state.selectedParticipants.length} Fische im Cage anzeigen`,
-  );
+  renderParticipantList(rageCageParticipantList, participantNames);
   renderRageCageSeats();
-  requestAnimationFrame(updateRageCageParticipantTruncation);
 }
 
 function openRageCageTable() {
@@ -1669,7 +1742,7 @@ function openRageCageTable() {
   }
 
   createRageCageSeats();
-  closeRageCageParticipantPanel();
+  closeParticipantListPanel(rageCageParticipantList);
   showScreen(rageCageScreen);
   renderRageCageTable();
   requestAnimationFrame(renderRageCageSeats);
@@ -1678,7 +1751,7 @@ function openRageCageTable() {
 
 function closeRageCageTable() {
   stopRageCageStartAnimation();
-  closeRageCageParticipantPanel();
+  closeParticipantListPanel(rageCageParticipantList);
   rageCageReshuffleModal.hidden = true;
   renderParticipantSelection();
   showScreen(participantScreen);
@@ -3563,14 +3636,22 @@ document.querySelector("#confirm-manual-team-reshuffle").addEventListener("click
 });
 rageCageReshuffleButton.addEventListener("click", openRageCageReshuffleConfirmation);
 rageCageStartButton.addEventListener("click", animateRageCageStartPositions);
-rageCageParticipantToggle.addEventListener("click", toggleRageCageParticipantPanel);
+participantListControls.forEach((control) => {
+  control.toggle.addEventListener("click", () => toggleParticipantListPanel(control));
+});
 document.addEventListener("click", (event) => {
-  if (
-    !rageCageParticipantPanel.hidden
-    && event.target instanceof Element
-    && !event.target.closest(".rage-cage-header")
-  ) {
-    closeRageCageParticipantPanel();
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  for (const control of participantListControls) {
+    if (
+      !control.panel.hidden
+      && !control.toggle.contains(event.target)
+      && !control.panel.contains(event.target)
+    ) {
+      closeParticipantListPanel(control);
+    }
   }
 });
 document.querySelector("#cancel-rage-cage-reshuffle").addEventListener(
@@ -3665,7 +3746,12 @@ window.addEventListener("resize", () => {
 
   if (!rageCageScreen.hidden) {
     renderRageCageSeats();
-    updateRageCageParticipantTruncation();
+  }
+
+  for (const control of participantListControls) {
+    if (!control.screen.hidden) {
+      updateParticipantListTruncation(control);
+    }
   }
 });
 document.addEventListener("gesturestart", (event) => event.preventDefault());
@@ -3692,9 +3778,9 @@ document.addEventListener("keydown", (event) => {
       closeFingerRedistributeConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
-    } else if (!rageCageParticipantPanel.hidden) {
-      closeRageCageParticipantPanel();
-      rageCageParticipantToggle.focus();
+    } else if (participantListControls.some((control) => !control.panel.hidden)) {
+      const openParticipantList = participantListControls.find((control) => !control.panel.hidden);
+      closeParticipantListPanel(openParticipantList, { restoreFocus: true });
     } else if (!rageCageScreen.hidden) {
       closeRageCageTable();
     } else if (!manualTeamScreen.hidden) {

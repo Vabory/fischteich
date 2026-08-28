@@ -1793,7 +1793,7 @@ h2 {
   flex: 0 0 78px;
   height: 88px;
   border: 0;
-  background-color: #27334f;
+  background-color: transparent;
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
@@ -2042,14 +2042,14 @@ h2 {
   width: min(45vw, 170px);
   height: 28px;
   padding: 2px;
-  border: 1px solid rgb(74 213 255 / 72%);
+  border: 1px solid transparent;
   border-radius: 10px;
   background:
-    linear-gradient(145deg, rgb(15 19 38 / 96%), rgb(5 7 18 / 96%)) padding-box,
-    linear-gradient(135deg, #3dd9ff, #f15a9a) border-box;
+    linear-gradient(145deg, rgb(4 9 22 / 96%), rgb(1 4 13 / 97%)) padding-box,
+    linear-gradient(135deg, rgb(61 217 255 / 58%), rgb(241 90 154 / 38%)) border-box;
   box-shadow:
-    0 0 10px rgb(61 217 255 / 22%),
-    inset 0 0 10px rgb(241 90 154 / 10%);
+    0 0 8px rgb(61 217 255 / 13%),
+    inset 0 0 9px rgb(61 217 255 / 5%);
   gap: 2px;
   transform: translateX(-50%);
 }
@@ -2058,22 +2058,30 @@ h2 {
   min-width: 0;
   min-height: 0;
   padding: 0;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
   box-shadow: none;
-  color: rgb(255 255 255 / 58%);
+  color: rgb(220 233 246 / 62%);
   flex: 1 1 0;
   font-size: 0.69rem;
   font-weight: 850;
   line-height: 1;
   text-shadow: 0 1px 4px rgb(0 0 0 / 70%);
-  transition: background 120ms ease-out, color 120ms ease-out, opacity 120ms ease-out;
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out,
+    box-shadow 120ms ease-out,
+    color 120ms ease-out,
+    opacity 120ms ease-out;
 }
 
 .roulette-speed-selector button.is-active {
-  background: linear-gradient(135deg, rgb(47 189 240 / 78%), rgb(217 66 145 / 72%));
-  box-shadow: 0 0 10px rgb(61 217 255 / 22%);
+  border-color: rgb(88 213 255 / 48%);
+  background: linear-gradient(135deg, rgb(10 34 51 / 96%), rgb(33 12 37 / 96%));
+  box-shadow:
+    0 0 7px rgb(61 217 255 / 14%),
+    inset 0 0 8px rgb(241 90 154 / 10%);
   color: #fff;
 }
 
@@ -2142,24 +2150,46 @@ h2 {
   width: 44px;
   min-height: 44px;
   padding: 0;
-  border: 1px solid rgb(91 218 255 / 42%);
-  border-radius: 13px;
-  background: rgb(3 8 23 / 76%);
-  box-shadow: 0 8px 22px rgb(0 0 0 / 25%);
+  border: 1px solid rgb(91 218 255 / 48%);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgb(5 16 32 / 88%), rgb(2 5 16 / 92%));
+  box-shadow:
+    0 0 9px rgb(61 217 255 / 12%),
+    0 8px 22px rgb(0 0 0 / 28%),
+    inset 0 0 9px rgb(241 90 154 / 6%);
   align-items: center;
   justify-content: center;
-  color: rgb(241 247 255 / 92%);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
   line-height: 1;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
-.roulette-personal-stats-button span:first-child {
-  color: #6de0ff;
-  font-size: 1.08rem;
+.roulette-stats-icon {
+  display: flex;
+  width: 21px;
+  height: 19px;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.roulette-stats-icon span {
+  width: 4px;
+  border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(180deg, #a9efff, #43c8f2);
+  box-shadow: 0 0 5px rgb(61 217 255 / 28%);
+}
+
+.roulette-stats-icon span:nth-child(1) {
+  height: 8px;
+}
+
+.roulette-stats-icon span:nth-child(2) {
+  height: 13px;
+}
+
+.roulette-stats-icon span:nth-child(3) {
+  height: 18px;
 }
 
 .roulette-stats {

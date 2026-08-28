@@ -2987,7 +2987,6 @@ function recordCompletedRouletteSpin(winnerIndex) {
 }
 
 function setRouletteTileColor(tile, colorIndex) {
-  tile.style.backgroundColor = ROULETTE_WINNERS[colorIndex].color;
   tile.dataset.colorIndex = colorIndex;
 }
 

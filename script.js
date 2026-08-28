@@ -114,7 +114,11 @@ const manualTeamParticipantNames = document.querySelector("#manual-team-particip
 const manualTeamGrid = document.querySelector("#manual-team-grid");
 const addManualTeamButton = document.querySelector("#add-manual-team");
 const divideManualTeamsButton = document.querySelector("#divide-manual-teams");
+const rageCageTitle = document.querySelector("#rage-cage-title");
 const rageCageParticipantNames = document.querySelector("#rage-cage-participant-names");
+const rageCageParticipantNamesFull = document.querySelector("#rage-cage-participant-names-full");
+const rageCageParticipantToggle = document.querySelector("#rage-cage-participant-toggle");
+const rageCageParticipantPanel = document.querySelector("#rage-cage-participant-panel");
 const rageCageStage = document.querySelector("#rage-cage-stage");
 const rageCageTable = document.querySelector("#rage-cage-table");
 const rageCageSeats = document.querySelector("#rage-cage-seats");
@@ -1470,8 +1474,8 @@ function renderRageCageSeats() {
       cornerRadius,
     );
     const horizontalLabel = Math.abs(point.normalX) > 0.6;
-    const labelDistanceX = horizontalLabel ? 58 : 38;
-    const labelDistanceY = horizontalLabel ? 30 : 28;
+    const labelDistanceX = horizontalLabel ? 52 : 38;
+    const labelDistanceY = horizontalLabel ? 30 : 20;
     const labelX = point.x + point.normalX * labelDistanceX;
     const labelY = point.y + point.normalY * labelDistanceY;
     const seatElement = document.createElement("div");
@@ -1511,11 +1515,50 @@ function renderRageCageSeats() {
   return true;
 }
 
+function closeRageCageParticipantPanel() {
+  rageCageParticipantPanel.hidden = true;
+  rageCageParticipantToggle.classList.remove("is-open");
+  rageCageParticipantToggle.setAttribute("aria-expanded", "false");
+}
+
+function toggleRageCageParticipantPanel() {
+  const shouldOpen = rageCageParticipantPanel.hidden;
+
+  if (!shouldOpen) {
+    closeRageCageParticipantPanel();
+    return;
+  }
+
+  rageCageParticipantPanel.hidden = false;
+  rageCageParticipantToggle.classList.add("is-open");
+  rageCageParticipantToggle.setAttribute("aria-expanded", "true");
+}
+
+function updateRageCageParticipantTruncation() {
+  if (rageCageScreen.hidden) {
+    return;
+  }
+
+  const isTruncated = rageCageParticipantNames.scrollHeight
+      > rageCageParticipantNames.clientHeight + 1
+    || rageCageParticipantNames.scrollWidth
+      > rageCageParticipantNames.clientWidth + 1;
+  rageCageParticipantToggle.classList.toggle("has-truncated-names", isTruncated);
+}
+
 function renderRageCageTable() {
-  rageCageParticipantNames.textContent = state.selectedParticipants
+  const participantNames = state.selectedParticipants
     .map((participant) => participant.name)
     .join(" · ");
+  rageCageTitle.textContent = `${state.selectedParticipants.length} Fische im Cage:`;
+  rageCageParticipantNames.textContent = participantNames;
+  rageCageParticipantNamesFull.textContent = participantNames;
+  rageCageParticipantToggle.setAttribute(
+    "aria-label",
+    `Alle ${state.selectedParticipants.length} Fische im Cage anzeigen`,
+  );
   renderRageCageSeats();
+  requestAnimationFrame(updateRageCageParticipantTruncation);
 }
 
 function openRageCageTable() {
@@ -1524,6 +1567,7 @@ function openRageCageTable() {
   }
 
   createRageCageSeats();
+  closeRageCageParticipantPanel();
   showScreen(rageCageScreen);
   renderRageCageTable();
   requestAnimationFrame(renderRageCageSeats);
@@ -1532,6 +1576,7 @@ function openRageCageTable() {
 
 function closeRageCageTable() {
   stopRageCageStartAnimation();
+  closeRageCageParticipantPanel();
   rageCageReshuffleModal.hidden = true;
   renderParticipantSelection();
   showScreen(participantScreen);
@@ -2945,6 +2990,16 @@ document.querySelector("#confirm-manual-team-reshuffle").addEventListener("click
 });
 rageCageReshuffleButton.addEventListener("click", openRageCageReshuffleConfirmation);
 rageCageStartButton.addEventListener("click", animateRageCageStartPositions);
+rageCageParticipantToggle.addEventListener("click", toggleRageCageParticipantPanel);
+document.addEventListener("click", (event) => {
+  if (
+    !rageCageParticipantPanel.hidden
+    && event.target instanceof Element
+    && !event.target.closest(".rage-cage-header")
+  ) {
+    closeRageCageParticipantPanel();
+  }
+});
 document.querySelector("#cancel-rage-cage-reshuffle").addEventListener(
   "click",
   closeRageCageReshuffleConfirmation,
@@ -3037,6 +3092,7 @@ window.addEventListener("resize", () => {
 
   if (!rageCageScreen.hidden) {
     renderRageCageSeats();
+    updateRageCageParticipantTruncation();
   }
 });
 document.addEventListener("gesturestart", (event) => event.preventDefault());
@@ -3059,6 +3115,9 @@ document.addEventListener("keydown", (event) => {
       closeFingerRedistributeConfirmation();
     } else if (!teamSettingsModal.hidden) {
       closeTeamSettings();
+    } else if (!rageCageParticipantPanel.hidden) {
+      closeRageCageParticipantPanel();
+      rageCageParticipantToggle.focus();
     } else if (!rageCageScreen.hidden) {
       closeRageCageTable();
     } else if (!manualTeamScreen.hidden) {

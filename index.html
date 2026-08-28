@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=68">
+    <link rel="stylesheet" href="./style.css?v=69">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=1" defer></script>
     <script src="./roulette-service.js?v=4" defer></script>
-    <script src="./script.js?v=42" defer></script>
+    <script src="./script.js?v=43" defer></script>
   </head>
   <body>
     <div id="app">
@@ -202,12 +202,29 @@
         <div class="rage-cage-shell">
           <header class="rage-cage-header">
             <h2 id="rage-cage-title">Fische im Cage:</h2>
-            <p id="rage-cage-participant-names"></p>
+            <button
+              class="rage-cage-participant-toggle"
+              id="rage-cage-participant-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="rage-cage-participant-panel"
+            >
+              <span id="rage-cage-participant-names"></span>
+              <span class="rage-cage-participant-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="rage-cage-participant-panel" id="rage-cage-participant-panel" hidden>
+              <p id="rage-cage-participant-names-full"></p>
+            </div>
           </header>
 
           <div class="rage-cage-stage" id="rage-cage-stage" aria-label="Rage-Cage-Sitzordnung">
             <div class="rage-cage-table" id="rage-cage-table" aria-hidden="true">
-              <span>RAGE<br>CAGE</span>
+              <span class="rage-cage-table-mark rage-cage-table-mark--top">RAGE<br>CAGE</span>
+              <div class="rage-cage-cups">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <span class="rage-cage-table-mark rage-cage-table-mark--bottom">RAGE<br>CAGE</span>
             </div>
             <div class="rage-cage-seats" id="rage-cage-seats"></div>
           </div>

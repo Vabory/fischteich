@@ -11,16 +11,25 @@ async function recordRouletteSpin(resultType) {
     throw new TypeError("resultType must be turbolachs, nitroforelle, or goldfish");
   }
 
-  const displayName = getDisplayName();
+  const identity = getLocalIdentity();
 
-  if (!displayName) {
-    throw new Error("A local display name is required to record a roulette spin");
+  if (!identity) {
+    throw new Error("A local identity is required to record a roulette spin");
   }
 
-  const { data, error } = await supabaseClient.rpc("record_roulette_spin", {
-    p_display_name: displayName,
-    p_result_type: resultType,
-  });
+  const rpcName = resultType === "goldfish"
+    ? "record_roulette_gold_spin"
+    : "record_roulette_spin";
+  const parameters = resultType === "goldfish"
+    ? {
+      p_device_id: identity.deviceId,
+      p_display_name: identity.displayName,
+    }
+    : {
+      p_display_name: identity.displayName,
+      p_result_type: resultType,
+    };
+  const { data, error } = await supabaseClient.rpc(rpcName, parameters);
 
   if (error) {
     throw error;
@@ -84,25 +93,6 @@ async function getGlobalRouletteStats() {
   return data;
 }
 
-async function recordGoldHitEvent() {
-  const identity = getLocalIdentity();
-
-  if (!identity) {
-    throw new Error("A local identity is required to record a gold hit event");
-  }
-
-  const { data, error } = await supabaseClient.rpc("record_roulette_gold_event", {
-    p_device_id: identity.deviceId,
-    p_display_name: identity.displayName,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
-}
-
 async function getGoldHitEventCursor() {
   const { data, error } = await supabaseClient.rpc("get_roulette_gold_event_cursor");
 
@@ -138,7 +128,6 @@ window.rouletteService = Object.freeze({
   getRouletteLeaderboard,
   getPersonalRouletteStats,
   getGlobalRouletteStats,
-  recordGoldHitEvent,
   getGoldHitEventCursor,
   getGoldHitEvents,
 });

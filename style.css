@@ -1345,6 +1345,60 @@ h2 {
   pointer-events: none;
 }
 
+.manual-team-member-list li,
+.rage-cage-player-name {
+  transition:
+    opacity var(--reshuffle-fade-out-duration, 190ms) ease-in,
+    transform var(--reshuffle-fade-out-duration, 190ms) ease-in;
+}
+
+.manual-team-grid.is-reshuffle-fading-out .manual-team-member-list li {
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+}
+
+.manual-team-grid.is-reshuffle-fading-in .manual-team-member-list li {
+  animation: manual-team-member-reshuffle-in var(--reshuffle-fade-in-duration, 300ms) ease-out both;
+}
+
+.rage-cage-seats.is-reshuffle-fading-out .rage-cage-player-name {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+.rage-cage-seats.is-reshuffle-fading-in .rage-cage-player-name {
+  animation: rage-cage-name-reshuffle-in var(--reshuffle-fade-in-duration, 300ms) ease-out both;
+}
+
+@keyframes manual-team-member-reshuffle-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rage-cage-name-reshuffle-in {
+  from {
+    opacity: 0;
+    transform:
+      translate(
+        calc(-50% + var(--label-entry-x)),
+        calc(-50% + var(--label-entry-y))
+      )
+      scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
 .guest-fish-backdrop {
   z-index: 30;
 }

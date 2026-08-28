@@ -51,6 +51,8 @@ const MAX_TEAM_COUNT = 10;
 const MIN_MANUAL_TEAM_COUNT = 2;
 const MAX_MANUAL_TEAM_COUNT = 20;
 const RAGE_CAGE_MIN_ANIMATION_STEPS = 12;
+const RESHUFFLE_FADE_OUT_DURATION = 190;
+const RESHUFFLE_FADE_IN_DURATION = 300;
 const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
@@ -138,6 +140,7 @@ const welcomeIdentityError = document.querySelector("#welcome-identity-error");
 const leaveModal = document.querySelector("#leave-modal");
 const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
 const rageCageReshuffleModal = document.querySelector("#rage-cage-reshuffle-modal");
+const manualTeamReshuffleModal = document.querySelector("#manual-team-reshuffle-modal");
 const rouletteStrip = document.querySelector("#roulette-strip");
 const rouletteResult = document.querySelector("#roulette-result");
 const rouletteSpinButton = document.querySelector("#spin-roulette");
@@ -256,7 +259,9 @@ const state = {
   manualTeamParticipantSignature: "",
   manualPlayerTeamIndex: null,
   manualPlayerSelectionIds: new Set(),
+  manualTeamsReshuffling: false,
   rageCageSeats: [],
+  rageCageReshuffling: false,
   rageCageAnimationRun: 0,
   rageCageAnimationTimer: null,
   rouletteRun: 0,
@@ -722,6 +727,32 @@ function shuffle(items) {
   return result;
 }
 
+function waitForReshufflePhase(duration) {
+  return new Promise((resolve) => window.setTimeout(resolve, duration));
+}
+
+async function animateReshuffle(container, reshuffleCallback) {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fadeOutDuration = reducedMotion ? 1 : RESHUFFLE_FADE_OUT_DURATION;
+  const fadeInDuration = reducedMotion ? 1 : RESHUFFLE_FADE_IN_DURATION;
+
+  container.style.setProperty("--reshuffle-fade-out-duration", `${fadeOutDuration}ms`);
+  container.style.setProperty("--reshuffle-fade-in-duration", `${fadeInDuration}ms`);
+  container.classList.add("is-reshuffle-fading-out");
+
+  try {
+    await waitForReshufflePhase(fadeOutDuration);
+    reshuffleCallback();
+    container.classList.remove("is-reshuffle-fading-out");
+    container.classList.add("is-reshuffle-fading-in");
+    await waitForReshufflePhase(fadeInDuration);
+  } finally {
+    container.classList.remove("is-reshuffle-fading-out", "is-reshuffle-fading-in");
+    container.style.removeProperty("--reshuffle-fade-out-duration");
+    container.style.removeProperty("--reshuffle-fade-in-duration");
+  }
+}
+
 function drawTeams({ allowRedistribution = false } = {}) {
   if ((state.frozen && !allowRedistribution) || !canDrawTeams()) {
     return;
@@ -1077,7 +1108,9 @@ function renderManualTeamScreen() {
   );
   manualTeamGrid.prepend(...cards);
   addManualTeamButton.hidden = getCurrentTeamCount() >= MAX_MANUAL_TEAM_COUNT;
-  divideManualTeamsButton.textContent = "Aufteilen";
+  divideManualTeamsButton.textContent = state.automaticAssignments
+    ? "Neu aufteilen"
+    : "Aufteilen";
 }
 
 function openManualTeamScreen() {
@@ -1175,15 +1208,61 @@ function divideRemainingManualParticipants() {
 }
 
 function handleManualTeamDivision() {
+  if (state.manualTeamsReshuffling) {
+    return;
+  }
+
+  if (state.automaticAssignments) {
+    openManualTeamReshuffleConfirmation();
+    return;
+  }
+
   divideRemainingManualParticipants();
+}
+
+function openManualTeamReshuffleConfirmation() {
+  if (!manualTeamReshuffleModal.hidden || state.manualTeamsReshuffling) {
+    return;
+  }
+
+  manualTeamReshuffleModal.hidden = false;
+  document.querySelector("#cancel-manual-team-reshuffle").focus();
+}
+
+function closeManualTeamReshuffleConfirmation({ restoreFocus = true } = {}) {
+  manualTeamReshuffleModal.hidden = true;
+
+  if (restoreFocus) {
+    divideManualTeamsButton.focus();
+  }
+}
+
+async function animateManualTeamReshuffle() {
+  if (state.manualTeamsReshuffling) {
+    return;
+  }
+
+  state.manualTeamsReshuffling = true;
+  divideManualTeamsButton.disabled = true;
+
+  try {
+    await animateReshuffle(manualTeamGrid, divideRemainingManualParticipants);
+  } finally {
+    state.manualTeamsReshuffling = false;
+    divideManualTeamsButton.disabled = false;
+    divideManualTeamsButton.focus();
+  }
 }
 
 function stopRageCageStartAnimation() {
   state.rageCageAnimationRun += 1;
   window.clearTimeout(state.rageCageAnimationTimer);
   state.rageCageAnimationTimer = null;
-  rageCageReshuffleButton.disabled = false;
-  rageCageStartButton.disabled = false;
+
+  if (!state.rageCageReshuffling) {
+    rageCageReshuffleButton.disabled = false;
+    rageCageStartButton.disabled = false;
+  }
 }
 
 function setRageCageStartPositions(startA = null, startB = null) {
@@ -1309,6 +1388,8 @@ function renderRageCageSeats() {
     seatElement.style.setProperty("--seat-y", `${point.y}px`);
     seatElement.style.setProperty("--label-x", `${labelX - point.x}px`);
     seatElement.style.setProperty("--label-y", `${labelY - point.y}px`);
+    seatElement.style.setProperty("--label-entry-x", `${point.normalX * -8}px`);
+    seatElement.style.setProperty("--label-entry-y", `${point.normalY * -8}px`);
     seatElement.dataset.seatIndex = String(seat.seatIndex);
     seatElement.setAttribute(
       "aria-label",
@@ -1359,7 +1440,11 @@ function closeRageCageTable() {
 }
 
 function openRageCageReshuffleConfirmation() {
-  if (!rageCageReshuffleModal.hidden || state.rageCageAnimationTimer !== null) {
+  if (
+    !rageCageReshuffleModal.hidden
+    || state.rageCageAnimationTimer !== null
+    || state.rageCageReshuffling
+  ) {
     return;
   }
 
@@ -1378,6 +1463,25 @@ function closeRageCageReshuffleConfirmation({ restoreFocus = true } = {}) {
 function reshuffleRageCagePlayers() {
   createRageCageSeats();
   renderRageCageSeats();
+}
+
+async function animateRageCageReshuffle() {
+  if (state.rageCageReshuffling) {
+    return;
+  }
+
+  state.rageCageReshuffling = true;
+  rageCageReshuffleButton.disabled = true;
+  rageCageStartButton.disabled = true;
+
+  try {
+    await animateReshuffle(rageCageSeats, reshuffleRageCagePlayers);
+  } finally {
+    state.rageCageReshuffling = false;
+    rageCageReshuffleButton.disabled = false;
+    rageCageStartButton.disabled = false;
+    rageCageReshuffleButton.focus();
+  }
 }
 
 function pickRageCageStartPositions() {
@@ -1402,7 +1506,11 @@ function pickRageCageStartPositions() {
 function animateRageCageStartPositions() {
   const finalPositions = pickRageCageStartPositions();
 
-  if (!finalPositions || state.rageCageAnimationTimer !== null) {
+  if (
+    !finalPositions
+    || state.rageCageAnimationTimer !== null
+    || state.rageCageReshuffling
+  ) {
     return;
   }
 
@@ -1995,6 +2103,18 @@ document.querySelector("#close-rage-cage-screen").addEventListener(
 );
 addManualTeamButton.addEventListener("click", addManualTeam);
 divideManualTeamsButton.addEventListener("click", handleManualTeamDivision);
+document.querySelector("#cancel-manual-team-reshuffle").addEventListener(
+  "click",
+  closeManualTeamReshuffleConfirmation,
+);
+document.querySelector("#confirm-manual-team-reshuffle").addEventListener("click", () => {
+  if (manualTeamReshuffleModal.hidden) {
+    return;
+  }
+
+  closeManualTeamReshuffleConfirmation({ restoreFocus: false });
+  void animateManualTeamReshuffle();
+});
 rageCageReshuffleButton.addEventListener("click", openRageCageReshuffleConfirmation);
 rageCageStartButton.addEventListener("click", animateRageCageStartPositions);
 document.querySelector("#cancel-rage-cage-reshuffle").addEventListener(
@@ -2007,8 +2127,7 @@ document.querySelector("#confirm-rage-cage-reshuffle").addEventListener("click",
   }
 
   closeRageCageReshuffleConfirmation({ restoreFocus: false });
-  reshuffleRageCagePlayers();
-  rageCageReshuffleButton.focus();
+  void animateRageCageReshuffle();
 });
 manualTeamRenameForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -2104,6 +2223,8 @@ document.addEventListener("keydown", (event) => {
       closeManualTeamRenameModal();
     } else if (!guestFishModal.hidden) {
       closeGuestFishModal();
+    } else if (!manualTeamReshuffleModal.hidden) {
+      closeManualTeamReshuffleConfirmation();
     } else if (!rageCageReshuffleModal.hidden) {
       closeRageCageReshuffleConfirmation();
     } else if (!fingerRedistributeModal.hidden) {

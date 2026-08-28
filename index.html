@@ -13,13 +13,13 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=60">
+    <link rel="stylesheet" href="./style.css?v=61">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=1" defer></script>
     <script src="./local-identity.js?v=1" defer></script>
     <script src="./roulette-service.js?v=2" defer></script>
-    <script src="./script.js?v=36" defer></script>
+    <script src="./script.js?v=37" defer></script>
   </head>
   <body>
     <div id="app">
@@ -372,6 +372,16 @@
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-rage-cage-reshuffle" type="button">Nein</button>
           <button class="primary-button" id="confirm-rage-cage-reshuffle" type="button">Ja</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="manual-team-reshuffle-modal" role="dialog" aria-modal="true" aria-labelledby="manual-team-reshuffle-title" hidden>
+      <div class="modal-card">
+        <h2 id="manual-team-reshuffle-title">Neu aufteilen?</h2>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-manual-team-reshuffle" type="button">Nein</button>
+          <button class="primary-button" id="confirm-manual-team-reshuffle" type="button">Ja</button>
         </div>
       </div>
     </div>

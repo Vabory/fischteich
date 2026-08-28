@@ -328,6 +328,7 @@ const state = {
   rouletteLeaderboardError: false,
   rouletteLeaderboardRequestId: 0,
   rouletteLeaderboardRefreshQueued: false,
+  rouletteLeaderboardRealtimeChanges: [],
   personalRouletteStats: null,
   personalRouletteStatsLoading: false,
   personalRouletteStatsError: false,
@@ -2488,7 +2489,7 @@ function handleRouletteStatsRealtimeChange(payload) {
   void loadGlobalRouletteStats();
 
   if (!rouletteLeaderboardModal.hidden) {
-    void loadRouletteLeaderboard({ force: true });
+    updateOpenRouletteLeaderboard(payload);
   }
 
   if (personalRouletteStatsModal.hidden) {
@@ -2633,11 +2634,87 @@ function normalizeRouletteLeaderboard(value) {
     }
   }
 
-  return [...playersByName.values()].sort((first, second) => (
+  return sortRouletteLeaderboard([...playersByName.values()]);
+}
+
+function sortRouletteLeaderboard(players) {
+  return [...players].sort((first, second) => (
     second.gold - first.gold
     || second.totalSpins - first.totalSpins
     || first.displayName.localeCompare(second.displayName, "de-AT", { sensitivity: "base" })
   ));
+}
+
+function applyRouletteLeaderboardChange(payload, { render = true } = {}) {
+  if (!Array.isArray(state.rouletteLeaderboard)) {
+    return false;
+  }
+
+  const eventType = typeof payload?.eventType === "string"
+    ? payload.eventType.toUpperCase()
+    : "UPDATE";
+  const oldDisplayName = normalizeRouletteRealtimeDisplayName(payload?.old?.display_name);
+  const normalizedRows = eventType === "DELETE"
+    ? []
+    : normalizeRouletteLeaderboard([payload?.new]);
+
+  if (normalizedRows === null || (eventType !== "DELETE" && normalizedRows.length !== 1)) {
+    return false;
+  }
+
+  const nextPlayer = normalizedRows[0] ?? null;
+  const nextDisplayName = normalizeRouletteRealtimeDisplayName(nextPlayer?.displayName);
+  const nextLeaderboard = state.rouletteLeaderboard.filter((player) => {
+    const playerDisplayName = normalizeRouletteRealtimeDisplayName(player.displayName);
+    return playerDisplayName !== oldDisplayName && playerDisplayName !== nextDisplayName;
+  });
+
+  if (nextPlayer) {
+    nextLeaderboard.push(nextPlayer);
+  }
+
+  state.rouletteLeaderboard = sortRouletteLeaderboard(nextLeaderboard);
+  state.rouletteLeaderboardError = false;
+
+  if (render && !rouletteLeaderboardModal.hidden) {
+    renderRouletteLeaderboardPanel();
+  }
+
+  return true;
+}
+
+function updateOpenRouletteLeaderboard(payload) {
+  if (rouletteLeaderboardModal.hidden) {
+    return;
+  }
+
+  if (state.rouletteLeaderboardLoading || state.rouletteLeaderboard === null) {
+    state.rouletteLeaderboardRealtimeChanges.push(payload);
+    return;
+  }
+
+  if (!applyRouletteLeaderboardChange(payload)) {
+    void loadRouletteLeaderboard({ force: true });
+  }
+}
+
+function updateOpenRouletteLeaderboardFromServerRow(value) {
+  if (rouletteLeaderboardModal.hidden) {
+    return true;
+  }
+
+  const rows = Array.isArray(value) ? value : [value];
+
+  if (rows.length !== 1 || !rows[0] || typeof rows[0] !== "object") {
+    return false;
+  }
+
+  updateOpenRouletteLeaderboard({
+    eventType: "UPDATE",
+    old: {},
+    new: rows[0],
+  });
+  return true;
 }
 
 function createRouletteMetric(label, value, modifier = "") {
@@ -2904,7 +2981,11 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
   state.rouletteLeaderboardRequestId = requestId;
   state.rouletteLeaderboardLoading = true;
   state.rouletteLeaderboardError = false;
-  renderRouletteLeaderboardPanel();
+  state.rouletteLeaderboardRealtimeChanges = [];
+
+  if (!rouletteLeaderboardModal.hidden) {
+    renderRouletteLeaderboardPanel();
+  }
 
   try {
     if (!window.rouletteService?.getRouletteLeaderboard) {
@@ -2923,6 +3004,14 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
     }
 
     state.rouletteLeaderboard = leaderboard;
+
+    const realtimeChanges = state.rouletteLeaderboardRealtimeChanges.splice(0);
+    for (const change of realtimeChanges) {
+      if (!applyRouletteLeaderboardChange(change, { render: false })) {
+        state.rouletteLeaderboardRefreshQueued = true;
+        break;
+      }
+    }
     return true;
   } catch (error) {
     if (requestId === state.rouletteLeaderboardRequestId) {
@@ -2933,10 +3022,14 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
   } finally {
     if (requestId === state.rouletteLeaderboardRequestId) {
       state.rouletteLeaderboardLoading = false;
-      renderRouletteLeaderboardPanel();
+      if (!rouletteLeaderboardModal.hidden) {
+        renderRouletteLeaderboardPanel();
+      }
 
-      if (state.rouletteLeaderboardRefreshQueued) {
-        state.rouletteLeaderboardRefreshQueued = false;
+      const refreshQueued = state.rouletteLeaderboardRefreshQueued;
+      state.rouletteLeaderboardRefreshQueued = false;
+
+      if (refreshQueued && !rouletteLeaderboardModal.hidden) {
         void loadRouletteLeaderboard({ force: true });
       }
     }
@@ -2962,11 +3055,15 @@ function persistCompletedRouletteSpin(resultType) {
 
       return window.rouletteService.recordRouletteSpin(resultType);
     })
-    .then(() => {
-      const refreshes = [
-        loadGlobalRouletteStats(),
-        loadRouletteLeaderboard({ force: true }),
-      ];
+    .then((recordedStats) => {
+      const refreshes = [loadGlobalRouletteStats()];
+
+      if (
+        !rouletteLeaderboardModal.hidden
+        && !updateOpenRouletteLeaderboardFromServerRow(recordedStats)
+      ) {
+        refreshes.push(loadRouletteLeaderboard({ force: true }));
+      }
 
       if (!personalRouletteStatsModal.hidden) {
         refreshes.push(loadPersonalRouletteStats({ force: true }));
@@ -3247,7 +3344,6 @@ function openRoulette() {
   void startRouletteStatsRealtime();
   void startRouletteGoldEventUpdates();
   void loadGlobalRouletteStats();
-  void loadRouletteLeaderboard();
   void initializeRoulette();
 }
 
@@ -3380,7 +3476,7 @@ const openPersonalRouletteStatsButton = document.querySelector("#open-personal-r
 openRouletteLeaderboardButton.addEventListener("click", () => {
   renderRouletteLeaderboardPanel();
   openRouletteStatsModal(rouletteLeaderboardModal);
-  void loadRouletteLeaderboard();
+  void loadRouletteLeaderboard({ force: true });
 });
 openPersonalRouletteStatsButton.addEventListener("click", () => {
   renderPersonalRouletteStatsPanel();
@@ -3388,6 +3484,7 @@ openPersonalRouletteStatsButton.addEventListener("click", () => {
   void loadPersonalRouletteStats({ force: true });
 });
 document.querySelector("#close-roulette-leaderboard").addEventListener("click", () => {
+  state.rouletteLeaderboardRealtimeChanges = [];
   closeRouletteStatsModal(rouletteLeaderboardModal, openRouletteLeaderboardButton);
 });
 document.querySelector("#close-personal-roulette-stats").addEventListener("click", () => {
@@ -3403,6 +3500,9 @@ for (const modal of [rouletteLeaderboardModal, personalRouletteStatsModal]) {
     const returnFocusElement = modal === rouletteLeaderboardModal
       ? openRouletteLeaderboardButton
       : openPersonalRouletteStatsButton;
+    if (modal === rouletteLeaderboardModal) {
+      state.rouletteLeaderboardRealtimeChanges = [];
+    }
     closeRouletteStatsModal(modal, returnFocusElement);
   });
 }

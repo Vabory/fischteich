@@ -2673,23 +2673,36 @@ function renderRouletteLeaderboardPanel() {
   rouletteLeaderboardStatus.hidden = true;
   const heading = document.createElement("div");
   heading.className = "roulette-leaderboard-row roulette-leaderboard-heading";
-  for (const label of ["# / Name", "Gold", "Fische"]) {
+  for (const [className, label] of [
+    ["roulette-leaderboard-rank", ""],
+    ["roulette-leaderboard-name", "Name"],
+    ["roulette-leaderboard-gold", "Gold"],
+    ["roulette-leaderboard-total", "Fische"],
+  ]) {
     const cell = document.createElement("span");
+    cell.className = className;
     cell.textContent = label;
     heading.append(cell);
   }
   rouletteLeaderboardList.append(heading);
 
   state.rouletteLeaderboard.forEach((player, index) => {
+    const rank = index + 1;
     const row = document.createElement("div");
-    row.className = "roulette-leaderboard-row";
+    row.className = `roulette-leaderboard-row${rank <= 3 ? ` is-rank-${rank}` : ""}`;
+    const rankCell = document.createElement("span");
     const name = document.createElement("strong");
     const gold = document.createElement("span");
     const total = document.createElement("span");
-    name.textContent = `${index + 1}. ${player.displayName}`;
+    rankCell.className = "roulette-leaderboard-rank";
+    name.className = "roulette-leaderboard-name";
+    gold.className = "roulette-leaderboard-gold";
+    total.className = "roulette-leaderboard-total";
+    rankCell.textContent = `${rank}.`;
+    name.textContent = player.displayName;
     gold.textContent = String(player.gold);
     total.textContent = String(player.totalSpins);
-    row.append(name, gold, total);
+    row.append(rankCell, name, gold, total);
     rouletteLeaderboardList.append(row);
   });
 }

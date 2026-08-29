@@ -121,6 +121,7 @@ const manualTeamParticipantToggle = document.querySelector("#manual-team-partici
 const manualTeamParticipantPanel = document.querySelector("#manual-team-participant-panel");
 const manualTeamGrid = document.querySelector("#manual-team-grid");
 const addManualTeamButton = document.querySelector("#add-manual-team");
+const resetManualTeamsButton = document.querySelector("#reset-manual-teams");
 const divideManualTeamsButton = document.querySelector("#divide-manual-teams");
 const rageCageTitle = document.querySelector("#rage-cage-title");
 const rageCageParticipantNames = document.querySelector("#rage-cage-participant-names");
@@ -1339,6 +1340,10 @@ function renderManualTeamScreen() {
   );
   manualTeamGrid.prepend(...cards);
   addManualTeamButton.hidden = getCurrentTeamCount() >= MAX_MANUAL_TEAM_COUNT;
+  resetManualTeamsButton.disabled = state.manualTeamsReshuffling || !(
+    state.manualAssignments.some((teamMembers) => teamMembers.length > 0)
+    || state.automaticAssignments?.some((teamMembers) => teamMembers.length > 0)
+  );
   divideManualTeamsButton.textContent = state.automaticAssignments
     ? "Neu aufteilen"
     : "Aufteilen";
@@ -1483,6 +1488,40 @@ async function animateManualTeamReshuffle() {
     state.manualTeamsReshuffling = false;
     divideManualTeamsButton.disabled = false;
     divideManualTeamsButton.focus();
+  }
+}
+
+function clearManualTeamAssignments() {
+  state.manualAssignments = Array.from(
+    { length: state.manualTeamCount },
+    () => [],
+  );
+  state.automaticAssignments = null;
+  renderManualTeamScreen();
+}
+
+async function resetManualTeamAssignments() {
+  const hasAssignments = state.manualAssignments.some(
+    (teamMembers) => teamMembers.length > 0,
+  ) || state.automaticAssignments?.some(
+    (teamMembers) => teamMembers.length > 0,
+  );
+
+  if (state.manualTeamsReshuffling || !hasAssignments) {
+    return;
+  }
+
+  state.manualTeamsReshuffling = true;
+  resetManualTeamsButton.disabled = true;
+  divideManualTeamsButton.disabled = true;
+
+  try {
+    await animateReshuffle(manualTeamGrid, clearManualTeamAssignments);
+  } finally {
+    state.manualTeamsReshuffling = false;
+    divideManualTeamsButton.disabled = false;
+    resetManualTeamsButton.disabled = true;
+    resetManualTeamsButton.focus();
   }
 }
 
@@ -3623,6 +3662,9 @@ document.querySelector("#close-rage-cage-screen").addEventListener(
   closeRageCageTable,
 );
 addManualTeamButton.addEventListener("click", addManualTeam);
+resetManualTeamsButton.addEventListener("click", () => {
+  void resetManualTeamAssignments();
+});
 divideManualTeamsButton.addEventListener("click", handleManualTeamDivision);
 document.querySelector("#cancel-manual-team-reshuffle").addEventListener(
   "click",

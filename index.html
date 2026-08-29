@@ -13,14 +13,14 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=84">
+    <link rel="stylesheet" href="./style.css?v=85">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
     <script src="./auth.js?v=1" defer></script>
     <script src="./roulette-service.js?v=5" defer></script>
-    <script src="./script.js?v=53" defer></script>
+    <script src="./script.js?v=54" defer></script>
     <script src="./tournament-create.js?v=2" defer></script>
   </head>
   <body>
@@ -215,7 +215,8 @@
           </div>
 
           <div class="manual-team-actions">
-            <button class="manual-divide-button" id="divide-manual-teams" type="button">Teams aufteilen</button>
+            <button class="manual-team-reset-button secondary-button" id="reset-manual-teams" type="button" disabled>Reset</button>
+            <button class="manual-divide-button" id="divide-manual-teams" type="button">Aufteilen</button>
           </div>
         </div>
       </section>

@@ -1193,19 +1193,27 @@ h2 {
 }
 
 .manual-team-actions {
+  display: grid;
   padding-top: 10px;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  gap: 9px;
 }
 
+.manual-team-reset-button,
 .manual-divide-button {
   width: 100%;
   min-height: 56px;
   padding: 14px 20px;
   border-radius: 18px;
-  background: var(--pink);
-  box-shadow: 0 9px 24px rgb(241 90 154 / 24%);
   font-weight: 800;
 }
 
+.manual-divide-button {
+  background: var(--pink);
+  box-shadow: 0 9px 24px rgb(241 90 154 / 24%);
+}
+
+.manual-team-reset-button:active,
 .manual-divide-button:active,
 .manual-add-team-button:active,
 .manual-team-member-add-button:active,

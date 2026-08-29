@@ -19,12 +19,22 @@ const tournamentGuestModal = document.querySelector("#tournament-guest-modal");
 const tournamentGuestForm = document.querySelector("#tournament-guest-form");
 const tournamentGuestInput = document.querySelector("#tournament-guest-name");
 const tournamentGuestError = document.querySelector("#tournament-guest-error");
+const tournamentBuilderModal = document.querySelector("#tournament-builder-modal");
+const tournamentBuilderModalTitle = document.querySelector("#tournament-builder-modal-title");
+const tournamentBuilderModalTarget = document.querySelector("#tournament-builder-modal-target");
+const tournamentBuilderModalOptions = document.querySelector("#tournament-builder-modal-options");
+const tournamentBuilderModalEmpty = document.querySelector("#tournament-builder-modal-empty");
+const cancelTournamentBuilderSelectionButton = document.querySelector("#cancel-tournament-builder-selection");
+const confirmTournamentBuilderSelectionButton = document.querySelector("#confirm-tournament-builder-selection");
 const tournamentAbortModal = document.querySelector("#tournament-abort-modal");
 const cancelTournamentAbortButton = document.querySelector("#cancel-tournament-abort");
 const confirmTournamentAbortButton = document.querySelector("#confirm-tournament-abort");
 
 let lastCreatedTournamentId = null;
 let tournamentEntitySequence = 0;
+let tournamentBuilderModalContext = null;
+let tournamentBuilderResetting = false;
+const tournamentBuilderSelectionIds = new Set();
 
 function createTournamentRequestId() {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -340,13 +350,94 @@ function getBuilderConfig() {
     : { collection: tournamentCreateState.groups, sourceItems: getGroupEntryItems(), memberKey: "entryIds", targetKey: "targetGroupId", editable: false, kind: "Gruppe" };
 }
 
-function assignTournamentBuilderItem(itemId, targetId) {
+function getUnassignedTournamentBuilderItems(config = getBuilderConfig()) {
+  const assignedIds = getAssignedIds(config.collection, config.memberKey);
+  return config.sourceItems.filter((item) => !assignedIds.has(item.id));
+}
+
+function updateTournamentBuilderModalSelectionUi() {
+  for (const button of tournamentBuilderModalOptions.querySelectorAll(".manual-player-option")) {
+    const selected = tournamentBuilderSelectionIds.has(button.dataset.entryId);
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+  confirmTournamentBuilderSelectionButton.disabled = tournamentBuilderSelectionIds.size === 0;
+}
+
+function toggleTournamentBuilderModalSelection(entryId) {
+  if (tournamentBuilderSelectionIds.has(entryId)) tournamentBuilderSelectionIds.delete(entryId);
+  else tournamentBuilderSelectionIds.add(entryId);
+  updateTournamentBuilderModalSelectionUi();
+}
+
+function focusTournamentBuilderAddButton(targetId) {
+  [...document.querySelectorAll("[data-tournament-builder-add-id]")]
+    .find((button) => button.dataset.tournamentBuilderAddId === targetId)
+    ?.focus();
+}
+
+function closeTournamentBuilderModal({ restoreFocus = true } = {}) {
+  const targetId = tournamentBuilderModalContext?.targetId ?? null;
+  tournamentBuilderModal.hidden = true;
+  tournamentBuilderModalContext = null;
+  tournamentBuilderSelectionIds.clear();
+  tournamentBuilderModalOptions.replaceChildren();
+  if (restoreFocus && targetId) focusTournamentBuilderAddButton(targetId);
+}
+
+function openTournamentBuilderModal(targetId) {
   const config = getBuilderConfig();
   const target = config.collection.find((item) => item.id === targetId);
-  if (!target || getAssignedIds(config.collection, config.memberKey).has(itemId)) return;
-  target[config.memberKey].push(itemId);
+  const availableItems = getUnassignedTournamentBuilderItems(config);
+  if (!target || !availableItems.length || !tournamentBuilderModal.hidden) return;
+
+  tournamentBuilderModalContext = {
+    targetId,
+    phase: tournamentCreateState.phase,
+    memberKey: config.memberKey,
+  };
+  tournamentBuilderSelectionIds.clear();
+  tournamentBuilderModalTitle.textContent = tournamentCreateState.phase === "groups" && tournamentCreateState.type === "team"
+    ? "Teams hinzufügen"
+    : "Spieler hinzufügen";
+  tournamentBuilderModalTarget.textContent = target.name;
+  tournamentBuilderModalEmpty.textContent = tournamentCreateState.phase === "groups" && tournamentCreateState.type === "team"
+    ? "Alle Teams sind bereits zugeordnet."
+    : "Alle Spieler sind bereits zugeordnet.";
+
+  const buttons = availableItems.map((item) => {
+    const button = createButton("manual-player-option", item.name, () => toggleTournamentBuilderModalSelection(item.id));
+    button.dataset.entryId = item.id;
+    button.setAttribute("aria-pressed", "false");
+    return button;
+  });
+  tournamentBuilderModalOptions.replaceChildren(...buttons);
+  tournamentBuilderModalOptions.hidden = buttons.length === 0;
+  tournamentBuilderModalEmpty.hidden = buttons.length !== 0;
+  confirmTournamentBuilderSelectionButton.disabled = true;
+  tournamentBuilderModal.hidden = false;
+  (buttons[0] ?? cancelTournamentBuilderSelectionButton).focus();
+}
+
+function confirmTournamentBuilderSelection() {
+  const context = tournamentBuilderModalContext;
+  if (!context || context.phase !== tournamentCreateState.phase) return false;
+  const config = getBuilderConfig();
+  if (config.memberKey !== context.memberKey) return false;
+  const target = config.collection.find((item) => item.id === context.targetId);
+  const assignedIds = getAssignedIds(config.collection, config.memberKey);
+  const selectedItems = config.sourceItems.filter((item) => (
+    tournamentBuilderSelectionIds.has(item.id) && !assignedIds.has(item.id)
+  ));
+  if (!target || !selectedItems.length) return false;
+
+  target[config.memberKey].push(...selectedItems.map((item) => item.id));
+  const targetId = target.id;
   markTournamentDirty();
+  closeTournamentBuilderModal({ restoreFocus: false });
   renderTournamentWizard();
+  focusTournamentBuilderAddButton(targetId);
+  return true;
 }
 
 function removeTournamentBuilderItem(containerId, itemId) {
@@ -393,16 +484,15 @@ function removeTournamentContainer(id) {
 }
 
 function renderTournamentBuilderCard(item, config) {
-  const target = tournamentCreateState[config.targetKey] === item.id;
-  const card = createElement("article", `manual-team-card tournament-builder-card${target ? " is-target" : ""}`);
+  const card = createElement("article", "manual-team-card tournament-builder-card");
   const heading = createElement("h3", "", item.name);
-  const header = createElement("div", "tournament-builder-card-header");
-  header.append(heading);
+  const header = createElement("div", `tournament-builder-card-header${config.editable ? " is-editable" : ""}`);
   if (config.editable) {
     const edit = createButton("manual-team-edit-button", "✎", () => renameTournamentTeam(item, heading, edit));
     edit.setAttribute("aria-label", `${item.name} umbenennen`);
     header.append(edit);
   }
+  header.append(heading);
   if (config.collection.length > 2) {
     const remove = createButton("manual-remove-team-button", "×", () => removeTournamentContainer(item.id));
     remove.setAttribute("aria-label", `${item.name} entfernen`);
@@ -418,12 +508,12 @@ function renderTournamentBuilderCard(item, config) {
     members.append(row);
   });
   card.append(members);
-  const select = createButton("tournament-builder-target", target ? "Ziel ✓" : "+ Hier zuordnen", () => {
-    tournamentCreateState[config.targetKey] = item.id;
-    renderTournamentWizard();
-  });
-  select.setAttribute("aria-pressed", String(target));
-  card.append(select);
+  const availableCount = getUnassignedTournamentBuilderItems(config).length;
+  const addMembers = createButton("manual-team-member-add-button tournament-builder-add-members", "+", () => openTournamentBuilderModal(item.id));
+  addMembers.dataset.tournamentBuilderAddId = item.id;
+  addMembers.disabled = availableCount === 0;
+  addMembers.setAttribute("aria-label", `${tournamentCreateState.phase === "groups" && tournamentCreateState.type === "team" ? "Teams" : "Spieler"} zu ${item.name} hinzufügen`);
+  card.append(addMembers);
   return card;
 }
 
@@ -436,6 +526,33 @@ function distributeTournamentItems() {
   const grid = document.querySelector(".tournament-builder-grid");
   if (grid && typeof animateReshuffle === "function") void animateReshuffle(grid, renderTournamentWizard);
   else renderTournamentWizard();
+}
+
+async function resetTournamentBuilderAssignments() {
+  const config = getBuilderConfig();
+  const assignedCount = config.collection.reduce((total, item) => total + item[config.memberKey].length, 0);
+  if (!assignedCount || tournamentBuilderResetting) return;
+
+  const collection = config.collection;
+  const memberKey = config.memberKey;
+  const grid = document.querySelector(".tournament-builder-grid");
+  tournamentBuilderResetting = true;
+  document.querySelector(".tournament-builder-reset")?.setAttribute("disabled", "");
+  document.querySelector(".tournament-randomize-button")?.setAttribute("disabled", "");
+
+  const clearAssignments = () => {
+    collection.forEach((item) => { item[memberKey] = []; });
+    markTournamentDirty();
+    renderTournamentWizard();
+  };
+
+  try {
+    if (grid && typeof animateReshuffle === "function") await animateReshuffle(grid, clearAssignments);
+    else clearAssignments();
+  } finally {
+    tournamentBuilderResetting = false;
+    if (tournamentCreateState.step === 3) renderTournamentWizard();
+  }
 }
 
 function addTournamentContainer() {
@@ -452,9 +569,12 @@ function renderTournamentBuilder() {
   if (tournamentCreateState.phase === "teams") ensureTournamentTeams(); else ensureTournamentGroups();
   const config = getBuilderConfig();
   const assigned = getAssignedIds(config.collection, config.memberKey);
-  const unassigned = config.sourceItems.filter((item) => !assigned.has(item.id));
+  const unassigned = getUnassignedTournamentBuilderItems(config);
   const step = createElement("section", "tournament-step tournament-builder-step");
-  step.append(createParticipantSummary(`${config.sourceItems.length} Turnier ${tournamentCreateState.phase === "teams" ? "Teilnehmer" : "Teams"}:`, config.sourceItems.map((item) => item.name)));
+  const overviewEntryType = tournamentCreateState.phase === "groups" && tournamentCreateState.type === "team"
+    ? "Teams"
+    : "Teilnehmer";
+  step.append(createParticipantSummary(`${config.sourceItems.length} Turnier ${overviewEntryType}:`, config.sourceItems.map((item) => item.name)));
   const grid = createElement("div", "manual-team-grid tournament-builder-grid");
   config.collection.forEach((item) => grid.append(renderTournamentBuilderCard(item, config)));
   const maximumGroups = Math.floor(config.sourceItems.length / TOURNAMENT_MIN_GROUP_SIZE);
@@ -463,22 +583,26 @@ function renderTournamentBuilder() {
   add.disabled = config.kind === "Gruppe" ? config.collection.length >= maximumGroups : config.collection.length >= config.sourceItems.length;
   grid.append(add);
   step.append(grid);
+
+  const builderActions = createElement("div", "tournament-builder-actions");
+  const reset = createButton("secondary-button tournament-builder-reset", "Reset", () => { void resetTournamentBuilderAssignments(); });
+  reset.disabled = assigned.size === 0 || tournamentBuilderResetting;
+  const random = createButton("manual-divide-button tournament-randomize-button", "Zufällig aufteilen", distributeTournamentItems);
+  random.disabled = config.collection.length < 2 || tournamentBuilderResetting;
+  builderActions.append(reset, random);
+  step.append(builderActions);
+
   const unassignedCard = createElement("section", "tournament-card tournament-unassigned-card");
   const heading = createElement("div", "tournament-card-heading");
   heading.append(createElement("h3", "", "Noch zuordnen"), createElement("span", "tournament-count-badge", String(unassigned.length)));
   unassignedCard.append(heading);
   if (!unassigned.length) unassignedCard.append(createElement("p", "tournament-hint", `Alle ${tournamentCreateState.phase === "teams" ? "Teilnehmer" : "Teams"} sind genau einmal zugeordnet.`));
   else {
-    const target = config.collection.find((item) => item.id === tournamentCreateState[config.targetKey]);
-    unassignedCard.append(createElement("p", "tournament-hint", `Tippe einen Eintrag an, um ihn ${target ? `„${target.name}“` : "dem Ziel"} zuzuordnen.`));
     const choices = createElement("div", "tournament-unassigned-grid");
-    unassigned.forEach((item) => choices.append(createButton("tournament-member-button", `+ ${item.name}`, () => assignTournamentBuilderItem(item.id, tournamentCreateState[config.targetKey]))));
+    unassigned.forEach((item) => choices.append(createElement("span", "tournament-unassigned-item", item.name)));
     unassignedCard.append(choices);
   }
   step.append(unassignedCard);
-  const random = createButton("manual-divide-button tournament-randomize-button", assigned.size ? "Neu aufteilen" : "Zufällig aufteilen", distributeTournamentItems);
-  random.disabled = config.collection.length < 2;
-  step.append(random);
   if (tournamentCreateState.phase === "teams" && tournamentCreateState.groupStageEnabled && tournamentCreateState.teams.length < 4) step.append(createElement("p", "tournament-error", "Für zwei Gruppen mit je mindestens zwei Teams werden mindestens 4 Teams benötigt."));
   else if (unassigned.length) step.append(createElement("p", "tournament-error", `${unassigned.length} Einträge sind noch nicht zugeordnet.`));
   else if (config.collection.some((item) => !item[config.memberKey].length)) step.append(createElement("p", "tournament-error", `Jede ${config.kind} benötigt mindestens einen Eintrag.`));
@@ -840,12 +964,18 @@ tournamentGuestInput.addEventListener("input", () => {
   tournamentGuestError.hidden = true;
   tournamentGuestInput.setAttribute("aria-invalid", "false");
 });
+cancelTournamentBuilderSelectionButton.addEventListener("click", closeTournamentBuilderModal);
+confirmTournamentBuilderSelectionButton.addEventListener("click", confirmTournamentBuilderSelection);
+tournamentBuilderModal.addEventListener("click", (event) => {
+  if (event.target === tournamentBuilderModal) closeTournamentBuilderModal();
+});
 document.querySelector("#cancel-tournament-guest").addEventListener("click", closeTournamentGuestModal);
 tournamentGuestModal.addEventListener("click", (event) => { if (event.target === tournamentGuestModal) closeTournamentGuestModal(); });
 tournamentAbortModal.addEventListener("click", (event) => { if (event.target === tournamentAbortModal) closeTournamentAbortModal(); });
 window.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  if (!tournamentGuestModal.hidden) { event.preventDefault(); closeTournamentGuestModal(); }
+  if (!tournamentBuilderModal.hidden) { event.preventDefault(); closeTournamentBuilderModal(); }
+  else if (!tournamentGuestModal.hidden) { event.preventDefault(); closeTournamentGuestModal(); }
   else if (!tournamentAbortModal.hidden) { event.preventDefault(); closeTournamentAbortModal(); }
   else if (!tournamentCreateScreen.hidden) { event.preventDefault(); requestTournamentWizardClose(); }
 });

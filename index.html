@@ -13,7 +13,7 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=83">
+    <link rel="stylesheet" href="./style.css?v=84">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -21,7 +21,7 @@
     <script src="./auth.js?v=1" defer></script>
     <script src="./roulette-service.js?v=5" defer></script>
     <script src="./script.js?v=53" defer></script>
-    <script src="./tournament-create.js?v=1" defer></script>
+    <script src="./tournament-create.js?v=2" defer></script>
   </head>
   <body>
     <div id="app">
@@ -263,14 +263,15 @@
         <button class="close-button navigation-back-button tournament-create-close" id="close-tournament-create" type="button" aria-label="Turniererstellung verlassen">←</button>
         <div class="tournament-wizard-shell">
           <header class="tournament-wizard-header">
-            <p class="tournament-wizard-kicker" id="tournament-step-label">Schritt 1 von 4</p>
+            <p class="tournament-wizard-kicker" id="tournament-step-label">Schritt 1 von 5</p>
             <h1 id="tournament-create-title">Turnier erstellen</h1>
-            <div class="tournament-progress" id="tournament-progress" aria-label="Fortschritt: Schritt 1 von 4">
-              <span class="is-active"></span><span></span><span></span><span></span>
+            <div class="tournament-progress" id="tournament-progress" aria-label="Fortschritt: Schritt 1 von 5">
+              <span class="is-active"></span><span></span><span></span><span></span><span></span>
             </div>
           </header>
           <main class="tournament-wizard-content" id="tournament-wizard-content" aria-live="polite"></main>
           <footer class="tournament-wizard-actions" id="tournament-wizard-actions">
+            <button class="secondary-button tournament-footer-guest" id="tournament-footer-guest" type="button">+ Gast Fisch</button>
             <button class="secondary-button" id="tournament-step-back" type="button">Zurück</button>
             <button class="primary-button" id="tournament-step-next" type="button">Weiter</button>
           </footer>

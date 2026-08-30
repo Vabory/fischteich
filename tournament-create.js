@@ -29,6 +29,9 @@ const confirmTournamentBuilderSelectionButton = document.querySelector("#confirm
 const tournamentAbortModal = document.querySelector("#tournament-abort-modal");
 const cancelTournamentAbortButton = document.querySelector("#cancel-tournament-abort");
 const confirmTournamentAbortButton = document.querySelector("#confirm-tournament-abort");
+const tournamentStartModal = document.querySelector("#tournament-start-modal");
+const cancelTournamentStartButton = document.querySelector("#cancel-tournament-start");
+const confirmTournamentStartButton = document.querySelector("#confirm-tournament-start");
 
 let lastCreatedTournamentId = null;
 let tournamentEntitySequence = 0;
@@ -205,8 +208,9 @@ function validateTournamentStep(step = tournamentCreateState.step) {
 
 function updateTournamentProgress() {
   const displayStep = tournamentCreateState.success ? TOURNAMENT_STEP_COUNT : tournamentCreateState.step;
-  tournamentStepLabel.textContent = tournamentCreateState.success ? "Entwurf gespeichert" : `Schritt ${displayStep} von ${TOURNAMENT_STEP_COUNT}`;
-  tournamentProgress.setAttribute("aria-label", tournamentCreateState.success ? "Turnierentwurf gespeichert" : `Fortschritt: Schritt ${displayStep} von ${TOURNAMENT_STEP_COUNT}`);
+  const successLabel = tournamentCreateState.success?.started ? "Turnier gestartet" : "Entwurf gespeichert";
+  tournamentStepLabel.textContent = tournamentCreateState.success ? successLabel : `Schritt ${displayStep} von ${TOURNAMENT_STEP_COUNT}`;
+  tournamentProgress.setAttribute("aria-label", tournamentCreateState.success ? successLabel : `Fortschritt: Schritt ${displayStep} von ${TOURNAMENT_STEP_COUNT}`);
   [...tournamentProgress.children].forEach((dot, index) => {
     dot.classList.toggle("is-active", !tournamentCreateState.success && index === displayStep - 1);
     dot.classList.toggle("is-complete", tournamentCreateState.success || index < displayStep - 1);
@@ -218,8 +222,10 @@ function updateTournamentWizardActions() {
   if (tournamentCreateState.success) {
     tournamentGuestFooterButton.hidden = true;
     tournamentStepBackButton.hidden = true;
-    tournamentStepNextButton.textContent = "Weiter";
-    tournamentStepNextButton.disabled = false;
+    tournamentStepNextButton.textContent = tournamentCreateState.success.started
+      ? "Zum Hauptmenü"
+      : tournamentCreateState.success.isStarting ? "Wird gestartet …" : "Turnier starten";
+    tournamentStepNextButton.disabled = tournamentCreateState.success.isStarting;
     tournamentWizardActions.className = "tournament-wizard-actions is-single";
     return;
   }
@@ -757,7 +763,16 @@ function renderTournamentStepFive() {
 
 function renderTournamentSuccess() {
   const success = createElement("section", "tournament-success");
-  success.append(createElement("div", "tournament-success-icon", "✓"), createElement("h2", "", "Turnier erstellt"), createElement("strong", "", tournamentCreateState.success.title), createElement("p", "", "Der Entwurf mit seiner Gruppenstruktur wurde gespeichert. Matches und Brackets werden erst später erzeugt."));
+  const tournament = tournamentCreateState.success;
+  success.append(
+    createElement("div", "tournament-success-icon", "✓"),
+    createElement("h2", "", tournament.started ? "Turnier gestartet" : "Turnier erstellt"),
+    createElement("strong", "", tournament.title),
+    createElement("p", "", tournament.started
+      ? `${tournament.groupStageEnabled ? "Die Gruppenphase" : "Die KO-Phase"} ist bereit.`
+      : "Der Turnierentwurf wurde gespeichert und kann jetzt gestartet werden."),
+  );
+  if (tournament.startError) success.append(createElement("p", "tournament-error", tournament.startError));
   return success;
 }
 
@@ -809,6 +824,7 @@ function openTournamentWizard() {
 
 function discardTournamentWizard() {
   tournamentAbortModal.hidden = true;
+  tournamentStartModal.hidden = true;
   appElement.inert = false;
   tournamentCreateState = createInitialTournamentState();
   showMenu();
@@ -816,7 +832,7 @@ function discardTournamentWizard() {
 }
 
 function requestTournamentWizardClose() {
-  if (tournamentCreateState.isSaving) return;
+  if (tournamentCreateState.isSaving || tournamentCreateState.success?.isStarting) return;
   if (!tournamentCreateState.isDirty || tournamentCreateState.success) return discardTournamentWizard();
   appElement.inert = true;
   tournamentAbortModal.hidden = false;
@@ -827,6 +843,21 @@ function closeTournamentAbortModal() {
   tournamentAbortModal.hidden = true;
   appElement.inert = false;
   tournamentCreateCloseButton.focus();
+}
+
+function openTournamentStartModal() {
+  const tournament = tournamentCreateState.success;
+  if (!tournament || tournament.started || tournament.isStarting) return;
+  appElement.inert = true;
+  tournamentStartModal.hidden = false;
+  confirmTournamentStartButton.focus();
+}
+
+function closeTournamentStartModal(force = false) {
+  if (tournamentCreateState.success?.isStarting && !force) return;
+  tournamentStartModal.hidden = true;
+  appElement.inert = false;
+  tournamentStepNextButton.focus();
 }
 
 function createTournamentDraftEntries() {
@@ -897,8 +928,9 @@ async function saveTournamentDraft() {
     if (error) throw error;
     if (typeof data !== "string" || data.length < 30) throw new Error("Die Turnier-ID fehlt in der Serverantwort.");
     lastCreatedTournamentId = data;
+    const groupStageEnabled = tournamentCreateState.groupStageEnabled;
     tournamentCreateState = createInitialTournamentState();
-    tournamentCreateState.success = { id: data, title };
+    tournamentCreateState.success = { id: data, title, groupStageEnabled, isStarting: false, startError: "", started: false };
     renderTournamentWizard();
   } catch (error) {
     console.error("[Tournament] Draft save failed", JSON.stringify({
@@ -910,6 +942,45 @@ async function saveTournamentDraft() {
     tournamentCreateState.isSaving = false;
     tournamentCreateState.saveError = "Turnier konnte nicht gespeichert werden. Es wurden keine Teil-Datensätze angelegt. Bitte erneut versuchen.";
     renderTournamentWizard();
+  }
+}
+
+async function startTournament() {
+  const tournament = tournamentCreateState.success;
+  if (!tournament || tournament.started || tournament.isStarting) return;
+
+  tournament.isStarting = true;
+  tournament.startError = "";
+  confirmTournamentStartButton.disabled = true;
+  confirmTournamentStartButton.textContent = "Wird gestartet …";
+  updateTournamentWizardActions();
+
+  try {
+    const { data, error } = await supabaseClient.rpc("start_tournament", {
+      p_tournament_id: tournament.id,
+    });
+    if (error) throw error;
+    if (data !== tournament.id) throw new Error("Die Turnier-ID in der Serverantwort ist ungültig.");
+
+    tournament.isStarting = false;
+    tournament.started = true;
+    closeTournamentStartModal(true);
+    renderTournamentWizard();
+  } catch (error) {
+    console.error("[Tournament] Start failed", JSON.stringify({
+      tournamentId: tournament.id,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+    }));
+    tournament.isStarting = false;
+    tournament.startError = "Turnier konnte nicht gestartet werden. Der Entwurf wurde nicht verändert. Bitte erneut versuchen.";
+    closeTournamentStartModal(true);
+    renderTournamentWizard();
+  } finally {
+    confirmTournamentStartButton.disabled = false;
+    confirmTournamentStartButton.textContent = "Starten";
   }
 }
 
@@ -932,7 +1003,10 @@ function goToPreviousTournamentStep() {
 }
 
 function goToNextTournamentStep() {
-  if (tournamentCreateState.success) return discardTournamentWizard();
+  if (tournamentCreateState.success) {
+    if (tournamentCreateState.success.started) return discardTournamentWizard();
+    return openTournamentStartModal();
+  }
   if (tournamentCreateState.isSaving || !validateTournamentStep()) return;
   if (tournamentCreateState.step === 1) {
     if (tournamentCreateState.participants.length < 4) setTournamentGroupStage(false);
@@ -967,6 +1041,8 @@ tournamentStepBackButton.addEventListener("click", goToPreviousTournamentStep);
 tournamentStepNextButton.addEventListener("click", goToNextTournamentStep);
 cancelTournamentAbortButton.addEventListener("click", closeTournamentAbortModal);
 confirmTournamentAbortButton.addEventListener("click", discardTournamentWizard);
+cancelTournamentStartButton.addEventListener("click", () => closeTournamentStartModal());
+confirmTournamentStartButton.addEventListener("click", startTournament);
 
 tournamentGuestForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -999,15 +1075,17 @@ tournamentBuilderModal.addEventListener("click", (event) => {
 document.querySelector("#cancel-tournament-guest").addEventListener("click", closeTournamentGuestModal);
 tournamentGuestModal.addEventListener("click", (event) => { if (event.target === tournamentGuestModal) closeTournamentGuestModal(); });
 tournamentAbortModal.addEventListener("click", (event) => { if (event.target === tournamentAbortModal) closeTournamentAbortModal(); });
+tournamentStartModal.addEventListener("click", (event) => { if (event.target === tournamentStartModal) closeTournamentStartModal(); });
 window.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!tournamentBuilderModal.hidden) { event.preventDefault(); closeTournamentBuilderModal(); }
   else if (!tournamentGuestModal.hidden) { event.preventDefault(); closeTournamentGuestModal(); }
   else if (!tournamentAbortModal.hidden) { event.preventDefault(); closeTournamentAbortModal(); }
+  else if (!tournamentStartModal.hidden) { event.preventDefault(); closeTournamentStartModal(); }
   else if (!tournamentCreateScreen.hidden) { event.preventDefault(); requestTournamentWizardClose(); }
 });
 window.addEventListener("beforeunload", (event) => {
-  if (!tournamentCreateScreen.hidden && tournamentCreateState.isDirty && !tournamentCreateState.success) {
+  if (!tournamentCreateScreen.hidden && ((tournamentCreateState.isDirty && !tournamentCreateState.success) || tournamentCreateState.success?.isStarting)) {
     event.preventDefault();
     event.returnValue = "";
   }

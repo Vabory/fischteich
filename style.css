@@ -4016,6 +4016,10 @@ h2 {
   font-size: 0.84rem;
 }
 
+.tournament-success .tournament-error {
+  color: #ff9aa7;
+}
+
 .tournament-discard-button {
   background: #b63251;
 }

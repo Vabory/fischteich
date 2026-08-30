@@ -386,6 +386,9 @@ function showScreen(screen) {
     item.hidden = item !== screen;
     item.classList.toggle("is-active", item === screen);
   }
+  if (typeof handleTournamentScreenChange === "function") {
+    handleTournamentScreenChange(screen);
+  }
 }
 
 function showMenu() {

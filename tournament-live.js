@@ -7,12 +7,27 @@ const tournamentLiveContent = document.querySelector("#tournament-live-content")
 const closeTournamentLiveButton = document.querySelector("#close-tournament-live");
 const refreshTournamentLiveButton = document.querySelector("#refresh-tournament-live");
 const activeTournamentMenuCard = document.querySelector("#active-tournament");
+const tournamentMenuScreen = document.querySelector("#menu-screen");
+
+const TOURNAMENT_REALTIME_DEBOUNCE_MS = 100;
 
 let tournamentLiveId = null;
 let tournamentLiveRequestId = 0;
 let tournamentLiveMutationRunning = false;
 let tournamentLiveState = null;
 const tournamentLiveMatchErrors = new Map();
+let tournamentLiveRealtimeChannel = null;
+let tournamentLiveRealtimeRun = 0;
+let tournamentLiveRealtimeRemoval = Promise.resolve();
+let tournamentLiveRealtimeStart = Promise.resolve();
+let tournamentLiveRealtimeRefreshTimer = null;
+let tournamentLiveRealtimeRefreshQueued = false;
+let tournamentLiveRealtimeRefreshRunning = false;
+let activeTournamentRealtimeChannel = null;
+let activeTournamentRealtimeRun = 0;
+let activeTournamentRealtimeRemoval = Promise.resolve();
+let activeTournamentRealtimeRefreshTimer = null;
+let tournamentRealtimeAuthUserId = null;
 
 function createTournamentLiveElement(tagName, className = "", text = "") {
   const element = document.createElement(tagName);
@@ -49,6 +64,77 @@ function logTournamentLiveError(context, error, extra = {}) {
     details: error?.details,
     hint: error?.hint,
   }));
+}
+
+function getTournamentMatchServerSignature(match) {
+  return [
+    match?.updated_at,
+    match?.entry_a_id,
+    match?.entry_b_id,
+    match?.score_a,
+    match?.score_b,
+    match?.winner_entry_id,
+    match?.match_status,
+  ].map((value) => value ?? "").join("\u001f");
+}
+
+function captureTournamentLiveScoreDrafts() {
+  const drafts = new Map();
+  if (!tournamentLiveState?.canManage) return drafts;
+
+  const activeElement = document.activeElement;
+  for (const form of tournamentLiveContent.querySelectorAll("form[data-match-id]")) {
+    const match = tournamentLiveState.matches.find((item) => item.id === form.dataset.matchId);
+    const scoreAInput = form.elements.namedItem("scoreA");
+    const scoreBInput = form.elements.namedItem("scoreB");
+    if (!match || !(scoreAInput instanceof HTMLInputElement) || !(scoreBInput instanceof HTMLInputElement)) continue;
+
+    const serverScoreA = formatTournamentScore(match.score_a).replace("–", "");
+    const serverScoreB = formatTournamentScore(match.score_b).replace("–", "");
+    if (scoreAInput.value === serverScoreA && scoreBInput.value === serverScoreB) continue;
+
+    const focusedInput = activeElement === scoreAInput ? "scoreA" : activeElement === scoreBInput ? "scoreB" : null;
+    drafts.set(match.id, {
+      scoreA: scoreAInput.value,
+      scoreB: scoreBInput.value,
+      serverSignature: getTournamentMatchServerSignature(match),
+      focusedInput,
+      selectionStart: focusedInput ? activeElement.selectionStart : null,
+      selectionEnd: focusedInput ? activeElement.selectionEnd : null,
+    });
+  }
+  return drafts;
+}
+
+function restoreTournamentLiveScoreDrafts(drafts) {
+  if (!(drafts instanceof Map) || drafts.size === 0 || !tournamentLiveState?.canManage) return;
+
+  for (const [matchId, draft] of drafts) {
+    const match = tournamentLiveState.matches.find((item) => item.id === matchId);
+    if (!match || getTournamentMatchServerSignature(match) !== draft.serverSignature) continue;
+
+    const form = [...tournamentLiveContent.querySelectorAll("form[data-match-id]")]
+      .find((item) => item.dataset.matchId === matchId);
+    const scoreAInput = form?.elements.namedItem("scoreA");
+    const scoreBInput = form?.elements.namedItem("scoreB");
+    if (!(scoreAInput instanceof HTMLInputElement) || !(scoreBInput instanceof HTMLInputElement)) continue;
+
+    scoreAInput.value = draft.scoreA;
+    scoreBInput.value = draft.scoreB;
+    const focusedInput = draft.focusedInput === "scoreA" ? scoreAInput : draft.focusedInput === "scoreB" ? scoreBInput : null;
+    if (focusedInput) {
+      focusedInput.focus({ preventScroll: true });
+      if (draft.selectionStart !== null && draft.selectionEnd !== null) {
+        focusedInput.setSelectionRange(draft.selectionStart, draft.selectionEnd);
+      }
+    }
+  }
+}
+
+function renderTournamentLivePreservingScoreDrafts() {
+  const drafts = captureTournamentLiveScoreDrafts();
+  renderTournamentLive();
+  restoreTournamentLiveScoreDrafts(drafts);
 }
 
 async function refreshActiveTournamentCard() {
@@ -383,35 +469,49 @@ function renderTournamentLive() {
   else renderTournamentKnockout(tournamentLiveState);
 }
 
-async function loadTournamentLive() {
+async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = true, keepCurrentOnError = false } = {}) {
   if (!tournamentLiveId) return;
   const requestId = ++tournamentLiveRequestId;
-  renderTournamentLiveLoading();
+  const requestedTournamentId = tournamentLiveId;
+  if (showLoading) renderTournamentLiveLoading();
 
   try {
     const { data: tournament, error: tournamentError } = await supabaseClient
       .from("tournaments")
       .select("id,title,tournament_type,status,host_user_id,current_phase,group_stage_enabled,loser_bracket_enabled,advancers_per_group,deleted_at")
-      .eq("id", tournamentLiveId)
+      .eq("id", requestedTournamentId)
       .single();
-    if (tournamentError) throw tournamentError;
-    if (!["active", "finished"].includes(tournament.status) || tournament.deleted_at !== null) throw new Error("Das Turnier ist nicht verfügbar.");
+    if (tournamentError) {
+      if (tournamentError.code === "PGRST116") {
+        const unavailableError = new Error("Das Turnier ist nicht verfügbar.");
+        unavailableError.code = tournamentError.code;
+        unavailableError.tournamentUnavailable = true;
+        throw unavailableError;
+      }
+      throw tournamentError;
+    }
+    if (!["active", "finished"].includes(tournament.status) || tournament.deleted_at !== null) {
+      const unavailableError = new Error("Das Turnier ist nicht verfügbar.");
+      unavailableError.tournamentUnavailable = true;
+      throw unavailableError;
+    }
 
     const requests = [
-      supabaseClient.from("tournament_entries").select("id,display_name_snapshot,seed").eq("tournament_id", tournamentLiveId),
-      supabaseClient.from("tournament_groups").select("id,label,sort_order").eq("tournament_id", tournamentLiveId).order("sort_order"),
-      supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot,loser_advances_to_match_id,loser_advances_to_slot").eq("tournament_id", tournamentLiveId).order("round_number").order("match_order"),
-      supabaseClient.rpc("can_manage_tournament", { p_tournament_id: tournamentLiveId }),
+      supabaseClient.from("tournament_entries").select("id,display_name_snapshot,seed").eq("tournament_id", requestedTournamentId),
+      supabaseClient.from("tournament_groups").select("id,label,sort_order").eq("tournament_id", requestedTournamentId).order("sort_order"),
+      supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot,loser_advances_to_match_id,loser_advances_to_slot,updated_at").eq("tournament_id", requestedTournamentId).order("round_number").order("match_order"),
+      supabaseClient.rpc("can_manage_tournament", { p_tournament_id: requestedTournamentId }),
     ];
     if (tournament.group_stage_enabled) {
-      requests.push(supabaseClient.rpc("get_tournament_group_standings", { p_tournament_id: tournamentLiveId }));
+      requests.push(supabaseClient.rpc("get_tournament_group_standings", { p_tournament_id: requestedTournamentId }));
     }
 
     const results = await Promise.all(requests);
     for (const result of results) if (result.error) throw result.error;
-    if (requestId !== tournamentLiveRequestId) return;
+    if (requestId !== tournamentLiveRequestId || requestedTournamentId !== tournamentLiveId) return;
 
     const entries = results[0].data ?? [];
+    const scoreDrafts = preserveScoreDrafts ? captureTournamentLiveScoreDrafts() : null;
     tournamentLiveState = {
       tournament,
       entries,
@@ -422,10 +522,17 @@ async function loadTournamentLive() {
       standings: tournament.group_stage_enabled ? results[4].data ?? [] : [],
     };
     renderTournamentLive();
+    restoreTournamentLiveScoreDrafts(scoreDrafts);
   } catch (error) {
-    if (requestId !== tournamentLiveRequestId) return;
-    logTournamentLiveError("Tournament view load failed", error, { tournamentId: tournamentLiveId });
-    renderTournamentLiveLoadError();
+    if (requestId !== tournamentLiveRequestId || requestedTournamentId !== tournamentLiveId) return;
+    logTournamentLiveError("Tournament view load failed", error, { tournamentId: requestedTournamentId });
+    if (error?.tournamentUnavailable) {
+      tournamentLiveState = null;
+      renderTournamentLiveLoadError();
+      void stopTournamentLiveRealtime();
+    } else if (!keepCurrentOnError || !tournamentLiveState) {
+      renderTournamentLiveLoadError();
+    }
   }
 }
 
@@ -438,18 +545,18 @@ async function saveTournamentLiveMatchResult(form) {
 
   if (!validScore.test(rawScoreA) || !validScore.test(rawScoreB)) {
     tournamentLiveMatchErrors.set(matchId, "Bitte zwei gültige, nicht negative Scores eingeben.");
-    renderTournamentLive();
+    renderTournamentLivePreservingScoreDrafts();
     return;
   }
   if (Number(rawScoreA) === Number(rawScoreB)) {
     tournamentLiveMatchErrors.set(matchId, "Das Match benötigt einen Gewinner.");
-    renderTournamentLive();
+    renderTournamentLivePreservingScoreDrafts();
     return;
   }
 
   tournamentLiveMutationRunning = true;
   tournamentLiveMatchErrors.delete(matchId);
-  renderTournamentLive();
+  renderTournamentLivePreservingScoreDrafts();
   try {
     const { error } = await supabaseClient.rpc("set_tournament_match_result", {
       p_match_id: matchId,
@@ -458,7 +565,7 @@ async function saveTournamentLiveMatchResult(form) {
     });
     if (error) throw error;
     tournamentLiveMutationRunning = false;
-    await loadTournamentLive();
+    await loadTournamentLive({ preserveScoreDrafts: true, showLoading: false, keepCurrentOnError: true });
     void refreshActiveTournamentCard();
   } catch (error) {
     const matchStage = tournamentLiveState.matches.find((match) => match.id === matchId)?.stage;
@@ -472,21 +579,23 @@ async function saveTournamentLiveMatchResult(form) {
           ? "Das Match benötigt einen Gewinner."
           : "Ergebnis konnte nicht gespeichert werden. Bitte erneut versuchen.",
     );
-    renderTournamentLive();
+    renderTournamentLivePreservingScoreDrafts();
+  } finally {
+    resumeQueuedTournamentLiveRealtimeRefresh();
   }
 }
 
 async function advanceTournamentLiveFromGroups() {
   if (tournamentLiveMutationRunning || !tournamentLiveState?.canManage) return;
   tournamentLiveMutationRunning = true;
-  renderTournamentLive();
+  renderTournamentLivePreservingScoreDrafts();
   try {
     const { error } = await supabaseClient.rpc("advance_tournament_from_groups", {
       p_tournament_id: tournamentLiveId,
     });
     if (error) throw error;
     tournamentLiveMutationRunning = false;
-    await loadTournamentLive();
+    await loadTournamentLive({ preserveScoreDrafts: true, showLoading: false, keepCurrentOnError: true });
     void refreshActiveTournamentCard();
   } catch (error) {
     logTournamentLiveError("Group advancement failed", error, { tournamentId: tournamentLiveId });
@@ -494,15 +603,17 @@ async function advanceTournamentLiveFromGroups() {
     const notice = createTournamentLiveElement("p", "tournament-live-global-error", error?.message?.includes("Entscheidungsspiel")
       ? "Entscheidungsspiel erforderlich."
       : "KO-Phase konnte nicht erstellt werden. Bitte erneut versuchen.");
-    renderTournamentLive();
+    renderTournamentLivePreservingScoreDrafts();
     tournamentLiveContent.prepend(notice);
+  } finally {
+    resumeQueuedTournamentLiveRealtimeRefresh();
   }
 }
 
 async function createTournamentLiveTiebreaker(groupId) {
   if (tournamentLiveMutationRunning || !tournamentLiveState?.canManage || !groupId) return;
   tournamentLiveMutationRunning = true;
-  renderTournamentLive();
+  renderTournamentLivePreservingScoreDrafts();
   try {
     const { error } = await supabaseClient.rpc("create_group_tiebreaker", {
       p_tournament_id: tournamentLiveId,
@@ -510,14 +621,210 @@ async function createTournamentLiveTiebreaker(groupId) {
     });
     if (error) throw error;
     tournamentLiveMutationRunning = false;
-    await loadTournamentLive();
+    await loadTournamentLive({ preserveScoreDrafts: true, showLoading: false, keepCurrentOnError: true });
     void refreshActiveTournamentCard();
   } catch (error) {
     logTournamentLiveError("Group tiebreaker creation failed", error, { tournamentId: tournamentLiveId, groupId });
     tournamentLiveMutationRunning = false;
-    renderTournamentLive();
+    renderTournamentLivePreservingScoreDrafts();
     tournamentLiveContent.prepend(createTournamentLiveElement("p", "tournament-live-global-error", "Entscheidungsspiel konnte nicht erstellt werden. Bitte erneut versuchen."));
+  } finally {
+    resumeQueuedTournamentLiveRealtimeRefresh();
   }
+}
+
+function clearTournamentLiveRealtimeRefresh() {
+  if (tournamentLiveRealtimeRefreshTimer !== null) {
+    window.clearTimeout(tournamentLiveRealtimeRefreshTimer);
+    tournamentLiveRealtimeRefreshTimer = null;
+  }
+  tournamentLiveRealtimeRefreshQueued = false;
+}
+
+function queueTournamentLiveRealtimeRefresh() {
+  if (!tournamentLiveId || tournamentLiveScreen.hidden || !tournamentLiveRealtimeChannel) return;
+  tournamentLiveRealtimeRefreshQueued = true;
+  if (tournamentLiveRealtimeRefreshTimer !== null) window.clearTimeout(tournamentLiveRealtimeRefreshTimer);
+  tournamentLiveRealtimeRefreshTimer = window.setTimeout(() => {
+    tournamentLiveRealtimeRefreshTimer = null;
+    void runTournamentLiveRealtimeRefresh();
+  }, TOURNAMENT_REALTIME_DEBOUNCE_MS);
+}
+
+function resumeQueuedTournamentLiveRealtimeRefresh() {
+  if (!tournamentLiveRealtimeRefreshQueued || tournamentLiveMutationRunning || tournamentLiveRealtimeRefreshRunning) return;
+  queueTournamentLiveRealtimeRefresh();
+}
+
+async function runTournamentLiveRealtimeRefresh() {
+  if (!tournamentLiveRealtimeRefreshQueued || !tournamentLiveId || tournamentLiveScreen.hidden) return;
+  if (tournamentLiveMutationRunning || tournamentLiveRealtimeRefreshRunning) return;
+
+  tournamentLiveRealtimeRefreshQueued = false;
+  tournamentLiveRealtimeRefreshRunning = true;
+  console.info("[Tournament Realtime] refresh", { tournamentId: tournamentLiveId });
+  try {
+    await loadTournamentLive({ preserveScoreDrafts: true, showLoading: false, keepCurrentOnError: true });
+  } finally {
+    tournamentLiveRealtimeRefreshRunning = false;
+    resumeQueuedTournamentLiveRealtimeRefresh();
+  }
+}
+
+function removeTournamentLiveRealtimeChannel(channel) {
+  tournamentLiveRealtimeRemoval = tournamentLiveRealtimeRemoval
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        await supabaseClient.removeChannel(channel);
+        console.info("[Tournament Realtime] removed", { scope: "live" });
+      } catch (error) {
+        logTournamentLiveError("Realtime channel removal failed", error, { scope: "live" });
+      }
+    });
+  return tournamentLiveRealtimeRemoval;
+}
+
+async function stopTournamentLiveRealtime() {
+  tournamentLiveRealtimeRun += 1;
+  clearTournamentLiveRealtimeRefresh();
+  const channel = tournamentLiveRealtimeChannel;
+  tournamentLiveRealtimeChannel = null;
+  if (channel) await removeTournamentLiveRealtimeChannel(channel);
+}
+
+async function replaceTournamentLiveRealtime(tournamentId) {
+  await stopTournamentLiveRealtime();
+  if (!tournamentId || tournamentId !== tournamentLiveId || tournamentLiveScreen.hidden) return;
+
+  const auth = typeof getAppAuthState === "function" ? getAppAuthState() : null;
+  if (!auth?.currentAuthUser) return;
+
+  const run = ++tournamentLiveRealtimeRun;
+  const channel = supabaseClient
+    .channel(`tournament-live:${tournamentId}`)
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "tournaments",
+      filter: `id=eq.${tournamentId}`,
+    }, (payload) => {
+      if (run !== tournamentLiveRealtimeRun || channel !== tournamentLiveRealtimeChannel) return;
+      console.info("[Tournament Realtime] event", { table: "tournaments", eventType: payload.eventType, tournamentId });
+      queueTournamentLiveRealtimeRefresh();
+    })
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "tournament_matches",
+      filter: `tournament_id=eq.${tournamentId}`,
+    }, (payload) => {
+      if (run !== tournamentLiveRealtimeRun || channel !== tournamentLiveRealtimeChannel) return;
+      console.info("[Tournament Realtime] event", { table: "tournament_matches", eventType: payload.eventType, tournamentId });
+      queueTournamentLiveRealtimeRefresh();
+    });
+
+  tournamentLiveRealtimeChannel = channel;
+  channel.subscribe((status, error) => {
+    if (run !== tournamentLiveRealtimeRun || channel !== tournamentLiveRealtimeChannel) return;
+    if (status === "SUBSCRIBED") {
+      console.info("[Tournament Realtime] subscribed", { tournamentId });
+      queueTournamentLiveRealtimeRefresh();
+      return;
+    }
+    if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)) {
+      console.warn("[Tournament Realtime] channel status", { status, tournamentId, message: error?.message });
+    }
+  });
+}
+
+function startTournamentLiveRealtime(tournamentId) {
+  tournamentLiveRealtimeStart = tournamentLiveRealtimeStart
+    .catch(() => undefined)
+    .then(() => replaceTournamentLiveRealtime(tournamentId));
+  return tournamentLiveRealtimeStart;
+}
+
+function clearActiveTournamentRealtimeRefresh() {
+  if (activeTournamentRealtimeRefreshTimer !== null) {
+    window.clearTimeout(activeTournamentRealtimeRefreshTimer);
+    activeTournamentRealtimeRefreshTimer = null;
+  }
+}
+
+function queueActiveTournamentRealtimeRefresh() {
+  if (tournamentMenuScreen.hidden || !activeTournamentRealtimeChannel) return;
+  clearActiveTournamentRealtimeRefresh();
+  activeTournamentRealtimeRefreshTimer = window.setTimeout(() => {
+    activeTournamentRealtimeRefreshTimer = null;
+    void refreshActiveTournamentCard();
+  }, TOURNAMENT_REALTIME_DEBOUNCE_MS);
+}
+
+function removeActiveTournamentRealtimeChannel(channel) {
+  activeTournamentRealtimeRemoval = activeTournamentRealtimeRemoval
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        await supabaseClient.removeChannel(channel);
+        console.info("[Tournament Realtime] removed", { scope: "main-menu" });
+      } catch (error) {
+        logTournamentLiveError("Realtime channel removal failed", error, { scope: "main-menu" });
+      }
+    });
+  return activeTournamentRealtimeRemoval;
+}
+
+async function stopActiveTournamentRealtime() {
+  activeTournamentRealtimeRun += 1;
+  clearActiveTournamentRealtimeRefresh();
+  const channel = activeTournamentRealtimeChannel;
+  activeTournamentRealtimeChannel = null;
+  if (channel) await removeActiveTournamentRealtimeChannel(channel);
+}
+
+async function startActiveTournamentRealtime() {
+  if (activeTournamentRealtimeChannel || tournamentMenuScreen.hidden) return;
+  const auth = typeof getAppAuthState === "function" ? getAppAuthState() : null;
+  if (!auth?.currentAuthUser || !auth.currentProfile) return;
+
+  await activeTournamentRealtimeRemoval.catch(() => undefined);
+  if (activeTournamentRealtimeChannel || tournamentMenuScreen.hidden) return;
+
+  const run = ++activeTournamentRealtimeRun;
+  const channel = supabaseClient
+    .channel("tournament-main-menu:active")
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "tournaments",
+    }, (payload) => {
+      if (run !== activeTournamentRealtimeRun || channel !== activeTournamentRealtimeChannel) return;
+      console.info("[Tournament Realtime] event", { table: "tournaments", eventType: payload.eventType, scope: "main-menu" });
+      queueActiveTournamentRealtimeRefresh();
+    });
+
+  activeTournamentRealtimeChannel = channel;
+  channel.subscribe((status, error) => {
+    if (run !== activeTournamentRealtimeRun || channel !== activeTournamentRealtimeChannel) return;
+    if (status === "SUBSCRIBED") {
+      console.info("[Tournament Realtime] subscribed", { scope: "main-menu" });
+      queueActiveTournamentRealtimeRefresh();
+      return;
+    }
+    if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)) {
+      console.warn("[Tournament Realtime] channel status", { status, scope: "main-menu", message: error?.message });
+    }
+  });
+}
+
+function handleTournamentScreenChange(screen) {
+  if (screen !== tournamentLiveScreen) {
+    if (tournamentLiveId) tournamentLiveRequestId += 1;
+    void stopTournamentLiveRealtime();
+  }
+  if (screen === tournamentMenuScreen) void startActiveTournamentRealtime();
+  else void stopActiveTournamentRealtime();
 }
 
 function openTournamentLive(tournamentId) {
@@ -527,11 +834,13 @@ function openTournamentLive(tournamentId) {
   tournamentLiveMatchErrors.clear();
   showScreen(tournamentLiveScreen);
   closeTournamentLiveButton.focus();
+  void startTournamentLiveRealtime(tournamentId);
   void loadTournamentLive();
 }
 
 function closeTournamentLive() {
   tournamentLiveRequestId += 1;
+  void stopTournamentLiveRealtime();
   tournamentLiveId = null;
   tournamentLiveState = null;
   tournamentLiveMatchErrors.clear();
@@ -541,7 +850,7 @@ function closeTournamentLive() {
 
 activeTournamentMenuCard.addEventListener("click", () => openTournamentLive(activeTournamentMenuCard.dataset.tournamentId));
 closeTournamentLiveButton.addEventListener("click", closeTournamentLive);
-refreshTournamentLiveButton.addEventListener("click", () => void loadTournamentLive());
+refreshTournamentLiveButton.addEventListener("click", () => void loadTournamentLive({ preserveScoreDrafts: true, showLoading: false }));
 tournamentLiveContent.addEventListener("submit", (event) => {
   const form = event.target instanceof Element ? event.target.closest("form[data-match-id]") : null;
   if (!form) return;
@@ -564,4 +873,28 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
-subscribeToAppAuthState(() => void refreshActiveTournamentCard());
+subscribeToAppAuthState((auth) => {
+  const nextUserId = auth.currentAuthUser?.id ?? null;
+  const authUserChanged = nextUserId !== tournamentRealtimeAuthUserId;
+  tournamentRealtimeAuthUserId = nextUserId;
+  void refreshActiveTournamentCard();
+
+  if (!nextUserId) {
+    tournamentLiveRequestId += 1;
+    void stopTournamentLiveRealtime();
+    void stopActiveTournamentRealtime();
+    return;
+  }
+
+  if (authUserChanged) {
+    void stopActiveTournamentRealtime();
+    if (tournamentLiveId && !tournamentLiveScreen.hidden) {
+      void startTournamentLiveRealtime(tournamentLiveId);
+      void loadTournamentLive({ preserveScoreDrafts: true, showLoading: false, keepCurrentOnError: true });
+    } else {
+      handleTournamentScreenChange(document.querySelector(".screen.is-active"));
+    }
+    return;
+  }
+  handleTournamentScreenChange(document.querySelector(".screen.is-active"));
+});

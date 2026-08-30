@@ -873,12 +873,25 @@ async function saveTournamentDraft() {
   tournamentCreateState.saveError = "";
   updateTournamentWizardActions();
   try {
+    const entries = createTournamentDraftEntries();
+    const groups = createTournamentDraftGroups();
+    console.debug("[Tournament] Draft payload summary", JSON.stringify({
+      tournamentType: tournamentCreateState.type,
+      groupStageEnabled: tournamentCreateState.groupStageEnabled,
+      loserBracketEnabled: tournamentCreateState.loserBracketEnabled,
+      advancersPerGroup: tournamentCreateState.groupStageEnabled ? tournamentCreateState.advancersPerGroup : null,
+      entryCount: entries.length,
+      teamMemberCounts: tournamentCreateState.type === "team" ? entries.map((entry) => entry.members.length) : null,
+      groupCount: groups?.length ?? null,
+      groupEntryIndexes: groups?.map((group) => [...group.entry_indexes]) ?? null,
+      creationRequestIdIsUuid: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tournamentCreateState.requestId),
+    }));
     const { data, error } = await supabaseClient.rpc("create_tournament_draft", {
       p_title: title, p_tournament_type: tournamentCreateState.type,
       p_group_stage_enabled: tournamentCreateState.groupStageEnabled,
       p_loser_bracket_enabled: tournamentCreateState.loserBracketEnabled,
       p_advancers_per_group: tournamentCreateState.groupStageEnabled ? tournamentCreateState.advancersPerGroup : null,
-      p_entries: createTournamentDraftEntries(), p_groups: createTournamentDraftGroups(),
+      p_entries: entries, p_groups: groups,
       p_creation_request_id: tournamentCreateState.requestId,
     });
     if (error) throw error;
@@ -888,7 +901,12 @@ async function saveTournamentDraft() {
     tournamentCreateState.success = { id: data, title };
     renderTournamentWizard();
   } catch (error) {
-    console.error("[Tournament] Draft konnte nicht erstellt werden.", error);
+    console.error("[Tournament] Draft save failed", JSON.stringify({
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+    }));
     tournamentCreateState.isSaving = false;
     tournamentCreateState.saveError = "Turnier konnte nicht gespeichert werden. Es wurden keine Teil-Datensätze angelegt. Bitte erneut versuchen.";
     renderTournamentWizard();

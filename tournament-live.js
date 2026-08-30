@@ -23,7 +23,9 @@ function createTournamentLiveElement(tagName, className = "", text = "") {
 
 function formatTournamentPhase(phase) {
   if (phase === "group_stage") return "Gruppenphase";
-  if (phase === "winner_bracket") return "KO-Phase";
+  if (phase === "winner_bracket" || phase === "grand_final") return "KO-Phase";
+  if (phase === "grand_final_reset") return "Final-Reset";
+  if (phase === "finished") return "Abgeschlossen";
   return "Turnier";
 }
 
@@ -292,18 +294,71 @@ function getTournamentRoundLabel(matches, roundNumber, finalRoundNumber) {
   return `Runde ${roundNumber}`;
 }
 
-function renderTournamentKnockout(state) {
-  const knockoutMatches = state.matches
-    .filter((match) => match.stage === "winner_bracket" || match.stage === "final")
-    .sort((a, b) => a.round_number - b.round_number || a.match_order - b.match_order);
+function appendTournamentBracketSection(fragment, state, title, matches, className, roundLabel) {
+  if (matches.length === 0) return;
+  const section = createTournamentLiveElement("section", `tournament-live-section tournament-bracket-section ${className}`);
+  section.append(createTournamentLiveElement("h2", "", title));
   const rounds = new Map();
-  for (const match of knockoutMatches) {
+  for (const match of matches) {
     if (!rounds.has(match.round_number)) rounds.set(match.round_number, []);
     rounds.get(match.round_number).push(match);
   }
-  const finalRoundNumber = knockoutMatches.reduce((maximum, match) => Math.max(maximum, match.round_number), 0);
+  for (const [roundNumber, roundMatches] of rounds) {
+    section.append(createTournamentLiveElement("h3", "tournament-bracket-round-title", roundLabel(roundNumber, roundMatches)));
+    const list = createTournamentLiveElement("div", "tournament-match-list");
+    for (const match of roundMatches) list.append(createTournamentMatchCard(match, state.entryById, state.canManage));
+    section.append(list);
+  }
+  fragment.append(section);
+}
 
+function appendTournamentChampion(fragment, state) {
+  if (state.tournament.status !== "finished") return;
+  const championMatch = state.matches
+    .filter((match) => match.stage === "final" && match.match_status === "completed" && match.winner_entry_id)
+    .sort((a, b) => b.round_number - a.round_number || b.match_order - a.match_order)[0];
+  const championName = state.entryById.get(championMatch?.winner_entry_id)?.display_name_snapshot;
+  const banner = createTournamentLiveElement("section", "tournament-champion-banner");
+  banner.append(
+    createTournamentLiveElement("span", "", "Turnier abgeschlossen"),
+    createTournamentLiveElement("strong", "", championName ? `Champion: ${championName}` : "Champion ermittelt"),
+  );
+  fragment.append(banner);
+}
+
+function renderTournamentKnockout(state) {
+  const knockoutMatches = state.matches
+    .filter((match) => match.match_status !== "cancelled" && (match.stage === "winner_bracket" || match.stage === "loser_bracket" || match.stage === "final"))
+    .sort((a, b) => a.round_number - b.round_number || a.match_order - b.match_order);
   const fragment = document.createDocumentFragment();
+
+  appendTournamentChampion(fragment, state);
+
+  if (state.tournament.loser_bracket_enabled) {
+    const winnerMatches = knockoutMatches.filter((match) => match.stage === "winner_bracket");
+    const loserMatches = knockoutMatches.filter((match) => match.stage === "loser_bracket");
+    const finalMatches = knockoutMatches.filter((match) => match.stage === "final");
+    const winnerFinalRound = winnerMatches.reduce((maximum, match) => Math.max(maximum, match.round_number), 0);
+
+    appendTournamentBracketSection(fragment, state, "Winner Bracket", winnerMatches, "is-winner", (roundNumber) => (
+      roundNumber === winnerFinalRound ? "Winner Bracket Finale" : `Winner Runde ${roundNumber}`
+    ));
+    appendTournamentBracketSection(fragment, state, "Loser Bracket", loserMatches, "is-loser", (roundNumber) => `Loser Runde ${roundNumber}`);
+    appendTournamentBracketSection(fragment, state, "Grand Final", finalMatches, "is-final", (_roundNumber, matches) => matches[0]?.phase_label ?? "Grand Final");
+
+    if (knockoutMatches.length === 0) fragment.append(createTournamentLiveElement("p", "tournament-live-status", "Noch keine KO-Matches vorhanden."));
+    tournamentLiveContent.replaceChildren(fragment);
+    return;
+  }
+
+  const singleEliminationMatches = knockoutMatches.filter((match) => match.stage === "winner_bracket" || match.stage === "final");
+  const rounds = new Map();
+  for (const match of singleEliminationMatches) {
+    if (!rounds.has(match.round_number)) rounds.set(match.round_number, []);
+    rounds.get(match.round_number).push(match);
+  }
+  const finalRoundNumber = singleEliminationMatches.reduce((maximum, match) => Math.max(maximum, match.round_number), 0);
+
   for (const [roundNumber, matches] of rounds) {
     const section = createTournamentLiveElement("section", "tournament-live-section tournament-ko-round");
     section.append(createTournamentLiveElement("h2", "", getTournamentRoundLabel(matches, roundNumber, finalRoundNumber)));
@@ -313,7 +368,7 @@ function renderTournamentKnockout(state) {
     fragment.append(section);
   }
 
-  if (knockoutMatches.length === 0) {
+  if (singleEliminationMatches.length === 0) {
     fragment.append(createTournamentLiveElement("p", "tournament-live-status", "Noch keine KO-Matches vorhanden."));
   }
   tournamentLiveContent.replaceChildren(fragment);
@@ -336,16 +391,16 @@ async function loadTournamentLive() {
   try {
     const { data: tournament, error: tournamentError } = await supabaseClient
       .from("tournaments")
-      .select("id,title,tournament_type,status,host_user_id,current_phase,group_stage_enabled,advancers_per_group,deleted_at")
+      .select("id,title,tournament_type,status,host_user_id,current_phase,group_stage_enabled,loser_bracket_enabled,advancers_per_group,deleted_at")
       .eq("id", tournamentLiveId)
       .single();
     if (tournamentError) throw tournamentError;
-    if (tournament.status !== "active" || tournament.deleted_at !== null) throw new Error("Das Turnier ist nicht aktiv.");
+    if (!["active", "finished"].includes(tournament.status) || tournament.deleted_at !== null) throw new Error("Das Turnier ist nicht verfügbar.");
 
     const requests = [
       supabaseClient.from("tournament_entries").select("id,display_name_snapshot,seed").eq("tournament_id", tournamentLiveId),
       supabaseClient.from("tournament_groups").select("id,label,sort_order").eq("tournament_id", tournamentLiveId).order("sort_order"),
-      supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot").eq("tournament_id", tournamentLiveId).order("round_number").order("match_order"),
+      supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot,loser_advances_to_match_id,loser_advances_to_slot").eq("tournament_id", tournamentLiveId).order("round_number").order("match_order"),
       supabaseClient.rpc("can_manage_tournament", { p_tournament_id: tournamentLiveId }),
     ];
     if (tournament.group_stage_enabled) {
@@ -363,7 +418,7 @@ async function loadTournamentLive() {
       entryById: new Map(entries.map((entry) => [entry.id, entry])),
       groups: results[1].data ?? [],
       matches: results[2].data ?? [],
-      canManage: results[3].data === true,
+      canManage: tournament.status === "active" && results[3].data === true,
       standings: tournament.group_stage_enabled ? results[4].data ?? [] : [],
     };
     renderTournamentLive();

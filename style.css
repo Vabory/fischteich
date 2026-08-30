@@ -4164,6 +4164,17 @@ h2 {
 .tournament-group-advance p { margin: 7px 0 0; color: var(--muted); font-size: 0.78rem; }
 .tournament-group-advance button { width: 100%; min-height: 52px; }
 
+.tournament-bracket-section > h2 { margin-bottom: 4px; }
+.tournament-bracket-section.is-winner > h2 { color: #9beaff; }
+.tournament-bracket-section.is-loser > h2 { color: #ffd392; }
+.tournament-bracket-section.is-final > h2 { color: #72d99c; }
+.tournament-bracket-round-title { margin: 14px 1px 8px; color: rgb(221 228 245 / 68%); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.tournament-bracket-section.is-loser .tournament-match-card { border-color: rgb(255 190 93 / 13%); }
+.tournament-bracket-section.is-final .tournament-match-card { border-color: rgb(82 217 139 / 20%); }
+.tournament-champion-banner { display: grid; margin-bottom: 14px; padding: 16px; gap: 4px; border: 1px solid rgb(82 217 139 / 28%); border-radius: 18px; background: rgb(82 217 139 / 9%); text-align: center; }
+.tournament-champion-banner span { color: #72d99c; font-size: 0.7rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
+.tournament-champion-banner strong { color: #f4fff8; font-size: 1rem; }
+
 .tournament-discard-button {
   background: #b63251;
 }

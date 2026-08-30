@@ -398,6 +398,9 @@ function showMenu() {
   leaveModal.hidden = true;
   fingerRedistributeModal.hidden = true;
   showScreen(menuScreen);
+  if (typeof refreshActiveTournamentCard === "function") {
+    void refreshActiveTournamentCard();
+  }
 }
 
 function showTeamsMenu({ focusSelector = null } = {}) {

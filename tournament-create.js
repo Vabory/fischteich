@@ -319,7 +319,7 @@ function renderTournamentStepTwo() {
   const groupStagePossible = tournamentCreateState.participants.length >= 4;
   step.append(section, createTournamentToggle(
     "Gruppenphase",
-    groupStagePossible ? "Entries werden vor der KO-Runde auf Gruppen verteilt." : "Ab 4 Teilnehmern verfügbar.",
+    groupStagePossible ? "Teilnehmer werden vor der KO-Runde auf Gruppen verteilt." : "Ab 4 Teilnehmern verfügbar.",
     tournamentCreateState.groupStageEnabled,
     () => setTournamentGroupStage(!tournamentCreateState.groupStageEnabled),
     true,
@@ -519,7 +519,10 @@ function renderTournamentBuilderCard(item, config) {
   addMembers.dataset.tournamentBuilderAddId = item.id;
   addMembers.disabled = availableCount === 0;
   addMembers.setAttribute("aria-label", `${tournamentCreateState.phase === "groups" && tournamentCreateState.type === "team" ? "Teams" : "Spieler"} zu ${item.name} hinzufügen`);
-  card.append(addMembers);
+  const footer = createElement("div", "tournament-builder-card-footer");
+  const memberCount = createElement("span", "tournament-builder-member-count", `(${item[config.memberKey].length})`);
+  footer.append(addMembers, memberCount);
+  card.append(footer);
   return card;
 }
 

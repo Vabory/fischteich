@@ -3058,6 +3058,25 @@ h2 {
 .tournament-builder-members { flex: 0 1 auto; }
 .tournament-builder-add-members { flex: 0 0 auto; }
 .tournament-builder-add-members:disabled { opacity: 0.34; }
+.tournament-builder-card-footer {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 48px;
+}
+.tournament-builder-card-footer .tournament-builder-add-members { margin-top: 10px; }
+.tournament-builder-member-count {
+  position: absolute;
+  top: 10px;
+  left: calc(50% + 26px);
+  display: flex;
+  height: 38px;
+  align-items: center;
+  color: rgb(224 228 238 / 72%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
 .tournament-inline-name-input {
   width: 100%; min-width: 0; min-height: 36px; padding: 5px 7px;
   border: 1px solid #68d9ff; border-radius: 9px; outline: none;

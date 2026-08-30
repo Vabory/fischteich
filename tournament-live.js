@@ -234,9 +234,15 @@ function compareTournamentGroupStandings(left, right) {
   return Number(left.display_position) - Number(right.display_position);
 }
 
-function createTournamentScoreInput(match, slot, entryName) {
+function createTournamentMatchEntryLabel(entryName, hasBye = false) {
+  const label = createTournamentLiveElement("span", "tournament-match-entry-copy");
+  label.append(createTournamentLiveElement("span", "tournament-match-entry", entryName));
+  if (hasBye) label.append(createTournamentLiveElement("span", "tournament-match-bye", "Freilos"));
+  return label;
+}
+
+function createTournamentScoreInput(match, slot, entryName, hasBye = false) {
   const label = createTournamentLiveElement("label", "tournament-score-field");
-  const name = createTournamentLiveElement("span", "tournament-match-entry", entryName);
   const input = document.createElement("input");
   input.type = "number";
   input.inputMode = "decimal";
@@ -247,31 +253,65 @@ function createTournamentScoreInput(match, slot, entryName) {
   input.name = slot === "a" ? "scoreA" : "scoreB";
   input.value = formatTournamentScore(slot === "a" ? match.score_a : match.score_b).replace("–", "");
   input.setAttribute("aria-label", `Score ${entryName}`);
-  label.append(name, input);
+  label.append(createTournamentMatchEntryLabel(entryName, hasBye), input);
   return label;
 }
 
-function createTournamentMatchCard(match, entryById, canManage) {
+function getTournamentByeSlotKeys(state) {
+  const byeSlotKeys = new Set();
+  const matches = state?.matches ?? [];
+  const incomingWinnerSlotKeys = new Set();
+
+  for (const sourceMatch of matches) {
+    if (!sourceMatch.winner_advances_to_match_id || !["a", "b"].includes(sourceMatch.winner_advances_to_slot)) continue;
+    incomingWinnerSlotKeys.add(`${sourceMatch.winner_advances_to_match_id}:${sourceMatch.winner_advances_to_slot}`);
+  }
+
+  for (const match of matches) {
+    const isWinnerBracketSlot = match.stage === "winner_bracket"
+      || (match.stage === "final" && !state.tournament.loser_bracket_enabled);
+    if (!isWinnerBracketSlot || Number(match.round_number) <= 1) continue;
+
+    for (const slot of ["a", "b"]) {
+      const entryId = slot === "a" ? match.entry_a_id : match.entry_b_id;
+      const slotKey = `${match.id}:${slot}`;
+      if (!entryId || incomingWinnerSlotKeys.has(slotKey)) continue;
+
+      const appearedInEarlierKnockoutRound = matches.some((earlierMatch) => (
+        Number(earlierMatch.round_number) < Number(match.round_number)
+        && ["winner_bracket", "final"].includes(earlierMatch.stage)
+        && (earlierMatch.entry_a_id === entryId || earlierMatch.entry_b_id === entryId)
+      ));
+      if (!appearedInEarlierKnockoutRound) byeSlotKeys.add(slotKey);
+    }
+  }
+
+  return byeSlotKeys;
+}
+
+function createTournamentMatchCard(match, entryById, canManage, byeSlotKeys = new Set()) {
   const entryAName = entryById.get(match.entry_a_id)?.display_name_snapshot ?? "Wartet auf Gewinner";
   const entryBName = entryById.get(match.entry_b_id)?.display_name_snapshot ?? "Wartet auf Gewinner";
+  const entryAHasBye = byeSlotKeys.has(`${match.id}:a`);
+  const entryBHasBye = byeSlotKeys.has(`${match.id}:b`);
   const playable = Boolean(match.entry_a_id && match.entry_b_id);
   const card = createTournamentLiveElement(canManage && playable ? "form" : "article", `tournament-match-card${match.match_status === "completed" ? " is-completed" : ""}${!playable ? " is-waiting" : ""}`);
   card.dataset.matchId = match.id;
 
   if (canManage && playable) {
     card.append(
-      createTournamentScoreInput(match, "a", entryAName),
-      createTournamentScoreInput(match, "b", entryBName),
+      createTournamentScoreInput(match, "a", entryAName, entryAHasBye),
+      createTournamentScoreInput(match, "b", entryBName, entryBHasBye),
     );
     const saveButton = createTournamentLiveElement("button", "tournament-match-save", match.match_status === "completed" ? "Ergebnis ändern" : "Ergebnis speichern");
     saveButton.type = "submit";
     saveButton.disabled = tournamentLiveMutationRunning;
     card.append(saveButton);
   } else {
-    for (const [name, score] of [[entryAName, match.score_a], [entryBName, match.score_b]]) {
+    for (const [name, score, hasBye] of [[entryAName, match.score_a, entryAHasBye], [entryBName, match.score_b, entryBHasBye]]) {
       const row = createTournamentLiveElement("div", "tournament-match-read-row");
       row.append(
-        createTournamentLiveElement("span", "tournament-match-entry", name),
+        createTournamentMatchEntryLabel(name, hasBye),
         createTournamentLiveElement("strong", "tournament-match-score", formatTournamentScore(score)),
       );
       card.append(row);
@@ -387,7 +427,7 @@ function getTournamentRoundLabel(matches, roundNumber, finalRoundNumber) {
   return `Runde ${roundNumber}`;
 }
 
-function appendTournamentBracketSection(fragment, state, title, matches, className, roundLabel) {
+function appendTournamentBracketSection(fragment, state, title, matches, className, roundLabel, byeSlotKeys) {
   if (matches.length === 0) return;
   const section = createTournamentLiveElement("section", `tournament-live-section tournament-bracket-section ${className}`);
   section.append(createTournamentLiveElement("h2", "", title));
@@ -399,7 +439,7 @@ function appendTournamentBracketSection(fragment, state, title, matches, classNa
   for (const [roundNumber, roundMatches] of rounds) {
     section.append(createTournamentLiveElement("h3", "tournament-bracket-round-title", roundLabel(roundNumber, roundMatches)));
     const list = createTournamentLiveElement("div", "tournament-match-list");
-    for (const match of roundMatches) list.append(createTournamentMatchCard(match, state.entryById, state.canManage));
+    for (const match of roundMatches) list.append(createTournamentMatchCard(match, state.entryById, state.canManage, byeSlotKeys));
     section.append(list);
   }
   fragment.append(section);
@@ -424,6 +464,7 @@ function createTournamentKnockoutFragment(state, { includeChampion = true } = {}
     .filter((match) => match.match_status !== "cancelled" && (match.stage === "winner_bracket" || match.stage === "loser_bracket" || match.stage === "final"))
     .sort((a, b) => a.round_number - b.round_number || a.match_order - b.match_order);
   const fragment = document.createDocumentFragment();
+  const byeSlotKeys = getTournamentByeSlotKeys(state);
 
   if (includeChampion) appendTournamentChampion(fragment, state);
 
@@ -435,9 +476,9 @@ function createTournamentKnockoutFragment(state, { includeChampion = true } = {}
 
     appendTournamentBracketSection(fragment, state, "Winner Bracket", winnerMatches, "is-winner", (roundNumber) => (
       roundNumber === winnerFinalRound ? "Winner Bracket Finale" : `Winner Runde ${roundNumber}`
-    ));
-    appendTournamentBracketSection(fragment, state, "Loser Bracket", loserMatches, "is-loser", (roundNumber) => `Loser Runde ${roundNumber}`);
-    appendTournamentBracketSection(fragment, state, "Grand Final", finalMatches, "is-final", (_roundNumber, matches) => matches[0]?.phase_label ?? "Grand Final");
+    ), byeSlotKeys);
+    appendTournamentBracketSection(fragment, state, "Loser Bracket", loserMatches, "is-loser", (roundNumber) => `Loser Runde ${roundNumber}`, byeSlotKeys);
+    appendTournamentBracketSection(fragment, state, "Grand Final", finalMatches, "is-final", (_roundNumber, matches) => matches[0]?.phase_label ?? "Grand Final", byeSlotKeys);
 
     if (knockoutMatches.length === 0) fragment.append(createTournamentLiveElement("p", "tournament-live-status", "Noch keine KO-Matches vorhanden."));
     return fragment;
@@ -455,7 +496,7 @@ function createTournamentKnockoutFragment(state, { includeChampion = true } = {}
     const section = createTournamentLiveElement("section", "tournament-live-section tournament-ko-round");
     section.append(createTournamentLiveElement("h2", "", getTournamentRoundLabel(matches, roundNumber, finalRoundNumber)));
     const list = createTournamentLiveElement("div", "tournament-match-list");
-    for (const match of matches) list.append(createTournamentMatchCard(match, state.entryById, state.canManage));
+    for (const match of matches) list.append(createTournamentMatchCard(match, state.entryById, state.canManage, byeSlotKeys));
     section.append(list);
     fragment.append(section);
   }

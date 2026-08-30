@@ -4129,7 +4129,9 @@ h2 {
 .tournament-match-card.is-waiting { opacity: 0.58; }
 .tournament-score-field,
 .tournament-match-read-row { display: grid; min-width: 0; align-items: center; grid-template-columns: minmax(0, 1fr) 66px; gap: 10px; }
+.tournament-match-entry-copy { display: grid; min-width: 0; gap: 2px; }
 .tournament-match-entry { min-width: 0; color: #f7f9ff; font-size: 0.84rem; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tournament-match-bye { color: rgb(155 234 255 / 72%); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; line-height: 1.15; text-transform: uppercase; }
 .tournament-score-field input {
   width: 66px;
   height: 48px;

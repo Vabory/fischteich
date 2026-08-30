@@ -82,6 +82,7 @@ const context = vm.createContext({
   document: {
     activeElement: null,
     createElement: () => new FakeElement(),
+    createDocumentFragment: () => new FakeElement(),
     querySelector(selector) {
       if (selector === ".screen.is-active") return elements.get("#menu-screen");
       return elements.get(selector) ?? new FakeElement();
@@ -186,6 +187,35 @@ globalThis.runTournamentRealtimeTests = async function runTournamentRealtimeTest
   tournamentLiveState.matches = [{ ...oldMatch, updated_at: "v2", score_a: 3, score_b: 0 }];
   restoreTournamentLiveScoreDrafts(drafts);
   assert.equal([nextA.value, nextB.value].join(":"), ":", "changed matches must keep the server render");
+
+  const summaryState = {
+    tournament: { tournament_type: "team", finished_at: "2026-08-30T12:00:00Z" },
+    entries: [
+      { id: "team-1", entry_type: "team", sort_order: 0 },
+      { id: "team-2", entry_type: "team", sort_order: 1 },
+      { id: "team-3", entry_type: "team", sort_order: 2 },
+    ],
+    entryById: new Map([
+      ["team-1", { entry_type: "team" }],
+      ["team-2", { entry_type: "team" }],
+      ["team-3", { entry_type: "team" }],
+    ]),
+    placements: [
+      { entry_id: "team-1", placement: 1, display_name_snapshot: "Die Lachse", stats_snapshot: { matches_played: 3, matches_won: 3, score_for: 6, score_against: 2 } },
+      { entry_id: "team-2", placement: 3, display_name_snapshot: "Team Zwei", stats_snapshot: { matches_played: 2, matches_won: 1, score_for: 3, score_against: 3 } },
+      { entry_id: "team-3", placement: 3, display_name_snapshot: "Team Drei", stats_snapshot: { matches_played: 2, matches_won: 1, score_for: 3, score_against: 3 } },
+    ],
+    teamMembers: [
+      { team_entry_id: "team-1", display_name_snapshot: "Fabian", member_order: 0 },
+      { team_entry_id: "team-1", display_name_snapshot: "Julian", member_order: 1 },
+    ],
+  };
+  renderTournamentFinishedSummary(summaryState);
+  const flatten = (node) => [node, ...(node.children ?? []).flatMap(flatten)];
+  const summaryNodes = flatten(content);
+  assert.equal(summaryNodes.filter((node) => node.className?.includes("tournament-placement-group") && node.className?.includes("is-place-3")).length, 1, "shared third place should render as one group");
+  assert.equal(summaryNodes.filter((node) => node.className === "tournament-summary-entry").length, 3);
+  assert.ok(summaryNodes.some((node) => node.textContent === "Fabian · Julian"), "team member snapshots should be visible");
 
   await stopTournamentLiveRealtime();
   tournamentMenuScreen.hidden = false;

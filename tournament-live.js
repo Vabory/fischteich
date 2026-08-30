@@ -15,6 +15,9 @@ let tournamentLiveId = null;
 let tournamentLiveRequestId = 0;
 let tournamentLiveMutationRunning = false;
 let tournamentLiveState = null;
+let tournamentLiveReturnTarget = "menu";
+let tournamentLiveHistoricalOpen = false;
+let tournamentLiveFinishedView = "summary";
 const tournamentLiveMatchErrors = new Map();
 let tournamentLiveRealtimeChannel = null;
 let tournamentLiveRealtimeRun = 0;
@@ -281,7 +284,7 @@ function createTournamentMatchCard(match, entryById, canManage) {
   return card;
 }
 
-function renderTournamentGroupPhase(state) {
+function createTournamentGroupPhaseFragment(state, { includeActions = true } = {}) {
   const fragment = document.createDocumentFragment();
   const standingsByGroup = new Map();
   const regularMatches = state.matches.filter((match) => match.stage === "group" && !match.is_tiebreaker);
@@ -352,7 +355,7 @@ function renderTournamentGroupPhase(state) {
 
   const relevantTie = state.standings.some((standing) => standing.qualification_tie);
 
-  if (allComplete && state.canManage) {
+  if (includeActions && allComplete && state.canManage) {
     const action = createTournamentLiveElement("section", "tournament-group-advance");
     if (relevantTie) {
       action.append(
@@ -369,7 +372,11 @@ function renderTournamentGroupPhase(state) {
     fragment.append(action);
   }
 
-  tournamentLiveContent.replaceChildren(fragment);
+  return fragment;
+}
+
+function renderTournamentGroupPhase(state) {
+  tournamentLiveContent.replaceChildren(createTournamentGroupPhaseFragment(state));
 }
 
 function getTournamentRoundLabel(matches, roundNumber, finalRoundNumber) {
@@ -412,13 +419,13 @@ function appendTournamentChampion(fragment, state) {
   fragment.append(banner);
 }
 
-function renderTournamentKnockout(state) {
+function createTournamentKnockoutFragment(state, { includeChampion = true } = {}) {
   const knockoutMatches = state.matches
     .filter((match) => match.match_status !== "cancelled" && (match.stage === "winner_bracket" || match.stage === "loser_bracket" || match.stage === "final"))
     .sort((a, b) => a.round_number - b.round_number || a.match_order - b.match_order);
   const fragment = document.createDocumentFragment();
 
-  appendTournamentChampion(fragment, state);
+  if (includeChampion) appendTournamentChampion(fragment, state);
 
   if (state.tournament.loser_bracket_enabled) {
     const winnerMatches = knockoutMatches.filter((match) => match.stage === "winner_bracket");
@@ -433,8 +440,7 @@ function renderTournamentKnockout(state) {
     appendTournamentBracketSection(fragment, state, "Grand Final", finalMatches, "is-final", (_roundNumber, matches) => matches[0]?.phase_label ?? "Grand Final");
 
     if (knockoutMatches.length === 0) fragment.append(createTournamentLiveElement("p", "tournament-live-status", "Noch keine KO-Matches vorhanden."));
-    tournamentLiveContent.replaceChildren(fragment);
-    return;
+    return fragment;
   }
 
   const singleEliminationMatches = knockoutMatches.filter((match) => match.stage === "winner_bracket" || match.stage === "final");
@@ -457,14 +463,136 @@ function renderTournamentKnockout(state) {
   if (singleEliminationMatches.length === 0) {
     fragment.append(createTournamentLiveElement("p", "tournament-live-status", "Noch keine KO-Matches vorhanden."));
   }
+  return fragment;
+}
+
+function renderTournamentKnockout(state) {
+  tournamentLiveContent.replaceChildren(createTournamentKnockoutFragment(state));
+}
+
+function formatTournamentSummaryDate(value) {
+  const timestamp = typeof value === "string" ? Date.parse(value) : NaN;
+  if (!Number.isFinite(timestamp)) return "Abschlussdatum nicht verfügbar";
+  return new Date(timestamp).toLocaleDateString("de-AT", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function createTournamentPlacementEntry(state, placement) {
+  const entry = state.entryById.get(placement.entry_id);
+  const item = createTournamentLiveElement("div", "tournament-summary-entry");
+  const copy = createTournamentLiveElement("div", "tournament-summary-entry-copy");
+  copy.append(createTournamentLiveElement("strong", "", placement.display_name_snapshot));
+
+  if (entry?.entry_type === "team") {
+    const members = state.teamMembers
+      .filter((member) => member.team_entry_id === placement.entry_id)
+      .sort((left, right) => left.member_order - right.member_order)
+      .map((member) => member.display_name_snapshot);
+    if (members.length > 0) copy.append(createTournamentLiveElement("span", "tournament-summary-members", members.join(" · ")));
+  }
+
+  const stats = placement.stats_snapshot ?? {};
+  const statsAvailable = Number.isFinite(Number(stats.matches_played));
+  const statLine = createTournamentLiveElement("span", "tournament-summary-stats");
+  if (statsAvailable) {
+    statLine.textContent = `${Number(stats.matches_played)} Spiele · ${Number(stats.matches_won ?? 0)} Siege · Scores ${formatTournamentScore(stats.score_for ?? 0)}:${formatTournamentScore(stats.score_against ?? 0)}`;
+  } else {
+    statLine.textContent = "Statistik noch nicht nachberechnet";
+  }
+  copy.append(statLine);
+  item.append(copy);
+  return item;
+}
+
+function createTournamentPlacementGroup(state, placementNumber, placements, { podium = false } = {}) {
+  const emoji = placementNumber === 1 ? "🥇" : placementNumber === 2 ? "🥈" : placementNumber === 3 ? "🥉" : "";
+  const group = createTournamentLiveElement("article", `tournament-placement-group${podium ? " is-podium" : ""}${placementNumber <= 3 ? ` is-place-${placementNumber}` : ""}`);
+  const heading = createTournamentLiveElement("h3", "", `${emoji ? `${emoji} ` : ""}Platz ${placementNumber}`);
+  group.append(heading);
+  for (const placement of placements) group.append(createTournamentPlacementEntry(state, placement));
+  return group;
+}
+
+function renderTournamentFinishedSummary(state) {
+  const fragment = document.createDocumentFragment();
+  const intro = createTournamentLiveElement("section", "tournament-summary-intro");
+  intro.append(
+    createTournamentLiveElement("span", "", "Turnier abgeschlossen"),
+    createTournamentLiveElement("strong", "", formatTournamentSummaryDate(state.tournament.finished_at)),
+    createTournamentLiveElement("p", "", state.tournament.tournament_type === "team" ? "Teamturnier" : "Einzelturnier"),
+  );
+  fragment.append(intro);
+
+  const entryOrder = new Map(state.entries.map((entry) => [entry.id, entry.sort_order]));
+  const placementsByRank = new Map();
+  for (const placement of state.placements) {
+    if (!placementsByRank.has(placement.placement)) placementsByRank.set(placement.placement, []);
+    placementsByRank.get(placement.placement).push(placement);
+  }
+  for (const placements of placementsByRank.values()) {
+    placements.sort((left, right) => (entryOrder.get(left.entry_id) ?? 0) - (entryOrder.get(right.entry_id) ?? 0));
+  }
+
+  const podium = createTournamentLiveElement("section", "tournament-summary-podium");
+  podium.append(createTournamentLiveElement("h2", "", "Podium"));
+  for (const placementNumber of [1, 2, 3]) {
+    const placements = placementsByRank.get(placementNumber);
+    if (placements?.length) podium.append(createTournamentPlacementGroup(state, placementNumber, placements, { podium: true }));
+  }
+  if (podium.children.length > 1) fragment.append(podium);
+
+  const furtherPlacements = [...placementsByRank.entries()]
+    .filter(([placementNumber]) => placementNumber > 3)
+    .sort(([left], [right]) => left - right);
+  if (furtherPlacements.length > 0) {
+    const further = createTournamentLiveElement("section", "tournament-summary-further");
+    further.append(createTournamentLiveElement("h2", "", "Weitere Platzierungen"));
+    for (const [placementNumber, placements] of furtherPlacements) {
+      further.append(createTournamentPlacementGroup(state, placementNumber, placements));
+    }
+    fragment.append(further);
+  }
+
+  if (state.placements.length < state.entries.length) {
+    fragment.append(createTournamentLiveElement("p", "tournament-summary-backfill-note", "Für dieses ältere Turnier sind noch nicht alle Platzierungen nachberechnet."));
+  }
+
+  const historyButton = createTournamentLiveElement("button", "primary-button tournament-summary-history-button", "Turnierverlauf ansehen");
+  historyButton.type = "button";
+  historyButton.dataset.showTournamentHistory = "true";
+  fragment.append(historyButton);
+  tournamentLiveContent.replaceChildren(fragment);
+}
+
+function renderTournamentFinishedHistory(state) {
+  const fragment = document.createDocumentFragment();
+  const summaryButton = createTournamentLiveElement("button", "secondary-button tournament-history-summary-button", "← Zur Zusammenfassung");
+  summaryButton.type = "button";
+  summaryButton.dataset.showTournamentSummary = "true";
+  fragment.append(summaryButton);
+  if (state.tournament.group_stage_enabled) {
+    fragment.append(createTournamentGroupPhaseFragment(state, { includeActions: false }));
+  }
+  fragment.append(createTournamentKnockoutFragment(state, { includeChampion: false }));
   tournamentLiveContent.replaceChildren(fragment);
 }
 
 function renderTournamentLive() {
   if (!tournamentLiveState) return;
   tournamentLiveTitle.textContent = tournamentLiveState.tournament.title;
-  tournamentLivePhase.textContent = formatTournamentPhase(tournamentLiveState.tournament.current_phase);
+  const finished = tournamentLiveState.tournament.status === "finished";
+  tournamentLivePhase.textContent = finished
+    ? tournamentLiveFinishedView === "history" ? "Turnierverlauf" : "Zusammenfassung"
+    : formatTournamentPhase(tournamentLiveState.tournament.current_phase);
   refreshTournamentLiveButton.disabled = tournamentLiveMutationRunning;
+  if (finished) {
+    if (tournamentLiveFinishedView === "history") renderTournamentFinishedHistory(tournamentLiveState);
+    else renderTournamentFinishedSummary(tournamentLiveState);
+    return;
+  }
   if (tournamentLiveState.tournament.current_phase === "group_stage") renderTournamentGroupPhase(tournamentLiveState);
   else renderTournamentKnockout(tournamentLiveState);
 }
@@ -478,7 +606,7 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
   try {
     const { data: tournament, error: tournamentError } = await supabaseClient
       .from("tournaments")
-      .select("id,title,tournament_type,status,host_user_id,current_phase,group_stage_enabled,loser_bracket_enabled,advancers_per_group,deleted_at")
+      .select("id,title,tournament_type,status,host_user_id,current_phase,group_stage_enabled,loser_bracket_enabled,advancers_per_group,started_at,finished_at,deleted_at")
       .eq("id", requestedTournamentId)
       .single();
     if (tournamentError) {
@@ -497,13 +625,37 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
     }
 
     const requests = [
-      supabaseClient.from("tournament_entries").select("id,display_name_snapshot,seed").eq("tournament_id", requestedTournamentId),
+      supabaseClient.from("tournament_entries").select("id,entry_type,display_name_snapshot,seed,sort_order").eq("tournament_id", requestedTournamentId).order("sort_order"),
       supabaseClient.from("tournament_groups").select("id,label,sort_order").eq("tournament_id", requestedTournamentId).order("sort_order"),
       supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot,loser_advances_to_match_id,loser_advances_to_slot,updated_at").eq("tournament_id", requestedTournamentId).order("round_number").order("match_order"),
       supabaseClient.rpc("can_manage_tournament", { p_tournament_id: requestedTournamentId }),
     ];
+    let standingsResultIndex = null;
+    let placementsResultIndex = null;
+    let teamMembersResultIndex = null;
     if (tournament.group_stage_enabled) {
+      standingsResultIndex = requests.length;
       requests.push(supabaseClient.rpc("get_tournament_group_standings", { p_tournament_id: requestedTournamentId }));
+    }
+    if (tournament.status === "finished") {
+      placementsResultIndex = requests.length;
+      requests.push(
+        supabaseClient
+          .from("tournament_placements")
+          .select("id,entry_id,placement,display_name_snapshot,stats_snapshot,awarded_at")
+          .eq("tournament_id", requestedTournamentId)
+          .order("placement"),
+      );
+      if (tournament.tournament_type === "team") {
+        teamMembersResultIndex = requests.length;
+        requests.push(
+          supabaseClient
+            .from("tournament_team_members")
+            .select("team_entry_id,display_name_snapshot,member_order")
+            .eq("tournament_id", requestedTournamentId)
+            .order("member_order"),
+        );
+      }
     }
 
     const results = await Promise.all(requests);
@@ -512,6 +664,7 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
 
     const entries = results[0].data ?? [];
     const scoreDrafts = preserveScoreDrafts ? captureTournamentLiveScoreDrafts() : null;
+    const wasFinished = tournamentLiveState?.tournament.status === "finished";
     tournamentLiveState = {
       tournament,
       entries,
@@ -519,10 +672,14 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
       groups: results[1].data ?? [],
       matches: results[2].data ?? [],
       canManage: tournament.status === "active" && results[3].data === true,
-      standings: tournament.group_stage_enabled ? results[4].data ?? [] : [],
+      standings: standingsResultIndex === null ? [] : results[standingsResultIndex].data ?? [],
+      placements: placementsResultIndex === null ? [] : results[placementsResultIndex].data ?? [],
+      teamMembers: teamMembersResultIndex === null ? [] : results[teamMembersResultIndex].data ?? [],
     };
+    if (tournament.status === "finished" && !wasFinished) tournamentLiveFinishedView = "summary";
     renderTournamentLive();
     restoreTournamentLiveScoreDrafts(scoreDrafts);
+    if (tournament.status === "finished") void stopTournamentLiveRealtime();
   } catch (error) {
     if (requestId !== tournamentLiveRequestId || requestedTournamentId !== tournamentLiveId) return;
     logTournamentLiveError("Tournament view load failed", error, { tournamentId: requestedTournamentId });
@@ -827,25 +984,37 @@ function handleTournamentScreenChange(screen) {
   else void stopActiveTournamentRealtime();
 }
 
-function openTournamentLive(tournamentId) {
+function openTournamentLive(tournamentId, { returnTarget = "menu", historical = false } = {}) {
   if (!tournamentId) return;
   tournamentLiveId = tournamentId;
   tournamentLiveState = null;
+  tournamentLiveReturnTarget = returnTarget;
+  tournamentLiveHistoricalOpen = historical;
+  tournamentLiveFinishedView = "summary";
   tournamentLiveMatchErrors.clear();
   showScreen(tournamentLiveScreen);
   closeTournamentLiveButton.focus();
-  void startTournamentLiveRealtime(tournamentId);
+  if (!historical) void startTournamentLiveRealtime(tournamentId);
+  else void stopTournamentLiveRealtime();
   void loadTournamentLive();
 }
 
 function closeTournamentLive() {
+  const returnTarget = tournamentLiveReturnTarget;
   tournamentLiveRequestId += 1;
   void stopTournamentLiveRealtime();
   tournamentLiveId = null;
   tournamentLiveState = null;
+  tournamentLiveReturnTarget = "menu";
+  tournamentLiveHistoricalOpen = false;
+  tournamentLiveFinishedView = "summary";
   tournamentLiveMatchErrors.clear();
-  showMenu();
-  activeTournamentMenuCard.focus();
+  if (returnTarget === "archive" && typeof returnToTournamentArchive === "function") {
+    returnToTournamentArchive();
+  } else {
+    showMenu();
+    activeTournamentMenuCard.focus();
+  }
 }
 
 activeTournamentMenuCard.addEventListener("click", () => openTournamentLive(activeTournamentMenuCard.dataset.tournamentId));
@@ -859,6 +1028,18 @@ tournamentLiveContent.addEventListener("submit", (event) => {
 });
 tournamentLiveContent.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
+  if (event.target.closest("[data-show-tournament-history]")) {
+    tournamentLiveFinishedView = "history";
+    renderTournamentLive();
+    tournamentLiveContent.scrollTop = 0;
+    return;
+  }
+  if (event.target.closest("[data-show-tournament-summary]")) {
+    tournamentLiveFinishedView = "summary";
+    renderTournamentLive();
+    tournamentLiveContent.scrollTop = 0;
+    return;
+  }
   if (event.target.closest("#advance-tournament-groups")) {
     void advanceTournamentLiveFromGroups();
     return;
@@ -889,7 +1070,8 @@ subscribeToAppAuthState((auth) => {
   if (authUserChanged) {
     void stopActiveTournamentRealtime();
     if (tournamentLiveId && !tournamentLiveScreen.hidden) {
-      void startTournamentLiveRealtime(tournamentLiveId);
+      if (!tournamentLiveHistoricalOpen) void startTournamentLiveRealtime(tournamentLiveId);
+      else void stopTournamentLiveRealtime();
       void loadTournamentLive({ preserveScoreDrafts: true, showLoading: false, keepCurrentOnError: true });
     } else {
       handleTournamentScreenChange(document.querySelector(".screen.is-active"));

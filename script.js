@@ -389,6 +389,9 @@ function showScreen(screen) {
   if (typeof handleTournamentScreenChange === "function") {
     handleTournamentScreenChange(screen);
   }
+  if (typeof handleTournamentArchiveScreenChange === "function") {
+    handleTournamentArchiveScreenChange(screen);
+  }
 }
 
 function showMenu() {

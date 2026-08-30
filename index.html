@@ -13,16 +13,17 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=90">
+    <link rel="stylesheet" href="./style.css?v=91">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
     <script src="./auth.js?v=1" defer></script>
     <script src="./roulette-service.js?v=5" defer></script>
-    <script src="./script.js?v=55" defer></script>
+    <script src="./script.js?v=56" defer></script>
     <script src="./tournament-create.js?v=4" defer></script>
-    <script src="./tournament-live.js?v=6" defer></script>
+    <script src="./tournament-live.js?v=7" defer></script>
+    <script src="./tournament-archive.js?v=1" defer></script>
   </head>
   <body>
     <div id="app">
@@ -278,6 +279,20 @@
             <button class="primary-button" id="tournament-step-next" type="button">Weiter</button>
           </footer>
         </div>
+      </section>
+
+      <section class="screen tournament-archive-screen" id="tournament-archive-screen" aria-labelledby="tournament-archive-title" hidden>
+        <header class="tournament-live-header">
+          <button class="tournament-live-back" id="close-tournament-archive" type="button" aria-label="Zurück zum Hauptmenü">‹</button>
+          <div>
+            <p>Historie</p>
+            <h1 id="tournament-archive-title">Vergangene Turniere</h1>
+          </div>
+          <span class="tournament-archive-header-spacer" aria-hidden="true"></span>
+        </header>
+        <main class="tournament-archive-content" id="tournament-archive-content" aria-live="polite">
+          <p class="tournament-live-status">Turnierarchiv wird geladen …</p>
+        </main>
       </section>
 
       <section class="screen tournament-live-screen" id="tournament-live-screen" aria-labelledby="tournament-live-title" hidden>

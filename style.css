@@ -4108,6 +4108,15 @@ h2 {
 .tournament-standing-row.is-tied { background: rgb(255 190 93 / 8%); }
 .tournament-standing-row.is-relevant-tie { box-shadow: inset 2px 0 #ffbf61; }
 .tournament-tie-note { margin: 9px 2px 0; color: #ffc878; font-size: 0.72rem; font-weight: 800; }
+.tournament-tie-note.is-active { color: #9beaff; }
+.tournament-tie-note.is-resolved { color: #72d99c; }
+.tournament-tiebreaker-action { display: flex; margin-top: 10px; align-items: center; justify-content: space-between; gap: 10px; }
+.tournament-tiebreaker-action .tournament-tie-note { margin: 0; }
+.tournament-tiebreaker-create { min-height: 38px; padding: 8px 12px; border: 1px solid rgb(255 200 120 / 35%); border-radius: 11px; background: rgb(255 190 93 / 13%); color: #ffd392; font-size: 0.72rem; font-weight: 850; }
+.tournament-tiebreaker-area { margin-top: 16px; padding: 1px 10px 10px; border: 1px solid rgb(255 190 93 / 20%); border-radius: 15px; background: rgb(255 190 93 / 4%); }
+.tournament-tiebreaker-area .tournament-match-list-title { color: #ffd392; }
+.tournament-tiebreaker-round { margin: 10px 1px 7px; color: rgb(255 211 146 / 70%); font-size: 0.66rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.tournament-tiebreaker-area .tournament-match-list + .tournament-tiebreaker-round { margin-top: 14px; }
 
 .tournament-match-list-title { margin: 18px 0 9px; color: rgb(221 228 245 / 72%); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; }
 .tournament-match-list { display: grid; gap: 9px; }
@@ -4178,6 +4187,8 @@ h2 {
 }
 
 @media (max-width: 360px) {
+  .tournament-tiebreaker-action { align-items: stretch; flex-direction: column; }
+  .tournament-tiebreaker-create { width: 100%; }
   .tournament-participant-grid,
   .tournament-unassigned-grid,
   .tournament-summary-facts {

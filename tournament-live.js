@@ -191,16 +191,56 @@ function renderTournamentGroupPhase(state) {
     const groupStandings = standingsByGroup.get(group.id) ?? [];
     section.append(createTournamentStandingTable(groupStandings));
 
-    if (allComplete && groupStandings.some((standing) => standing.qualification_tie)) {
-      section.append(createTournamentLiveElement("p", "tournament-tie-note", "Entscheidung erforderlich"));
+    const groupRegularMatches = regularMatches.filter((match) => match.group_id === group.id);
+    const groupRegularComplete = groupRegularMatches.length > 0 && groupRegularMatches.every((match) => match.match_status === "completed");
+    const tiebreakerMatches = state.matches
+      .filter((match) => match.stage === "group" && match.group_id === group.id && match.is_tiebreaker)
+      .sort((a, b) => (a.tiebreaker_round ?? 0) - (b.tiebreaker_round ?? 0) || a.match_order - b.match_order);
+    const tieStatus = groupStandings.find((standing) => standing.tiebreaker_status === "in_progress")?.tiebreaker_status
+      ?? groupStandings.find((standing) => standing.qualification_tie)?.tiebreaker_status
+      ?? (groupStandings.some((standing) => standing.qualification_tie) ? "unresolved" : "none");
+
+    if (groupRegularComplete && tieStatus === "unresolved") {
+      const tieAction = createTournamentLiveElement("div", "tournament-tiebreaker-action");
+      tieAction.append(createTournamentLiveElement("p", "tournament-tie-note", tiebreakerMatches.length > 0 ? "Weiteres Entscheidungsspiel erforderlich" : "Entscheidungsspiel erforderlich"));
+      if (state.canManage) {
+        const button = createTournamentLiveElement("button", "tournament-tiebreaker-create", tournamentLiveMutationRunning ? "Wird erstellt …" : "Entscheidungsspiel erstellen");
+        button.type = "button";
+        button.dataset.createTiebreaker = group.id;
+        button.disabled = tournamentLiveMutationRunning;
+        tieAction.append(button);
+      }
+      section.append(tieAction);
+    } else if (tieStatus === "in_progress") {
+      section.append(createTournamentLiveElement("p", "tournament-tie-note is-active", "Entscheidungsspiele laufen"));
+    } else if (tiebreakerMatches.length > 0) {
+      section.append(createTournamentLiveElement("p", "tournament-tie-note is-resolved", "Entscheidung entschieden"));
     }
 
-    const matches = state.matches
-      .filter((match) => match.stage === "group" && match.group_id === group.id)
+    const matches = regularMatches
+      .filter((match) => match.group_id === group.id)
       .sort((a, b) => a.round_number - b.round_number || a.match_order - b.match_order);
     const matchList = createTournamentLiveElement("div", "tournament-match-list");
     for (const match of matches) matchList.append(createTournamentMatchCard(match, state.entryById, state.canManage));
     section.append(createTournamentLiveElement("h3", "tournament-match-list-title", "Matches"), matchList);
+
+    if (tiebreakerMatches.length > 0) {
+      const tiebreakerArea = createTournamentLiveElement("div", "tournament-tiebreaker-area");
+      const rounds = new Map();
+      for (const match of tiebreakerMatches) {
+        const round = match.tiebreaker_round ?? 1;
+        if (!rounds.has(round)) rounds.set(round, []);
+        rounds.get(round).push(match);
+      }
+      tiebreakerArea.append(createTournamentLiveElement("h3", "tournament-match-list-title", tiebreakerMatches.length === 1 ? "Entscheidungsspiel" : "Entscheidungsspiele"));
+      for (const [round, roundMatches] of rounds) {
+        if (rounds.size > 1) tiebreakerArea.append(createTournamentLiveElement("p", "tournament-tiebreaker-round", `Entscheidungsrunde ${round}`));
+        const roundList = createTournamentLiveElement("div", "tournament-match-list");
+        for (const match of roundMatches) roundList.append(createTournamentMatchCard(match, state.entryById, state.canManage));
+        tiebreakerArea.append(roundList);
+      }
+      section.append(tiebreakerArea);
+    }
     fragment.append(section);
   }
 
@@ -287,7 +327,7 @@ async function loadTournamentLive() {
     const requests = [
       supabaseClient.from("tournament_entries").select("id,display_name_snapshot,seed").eq("tournament_id", tournamentLiveId),
       supabaseClient.from("tournament_groups").select("id,label,sort_order").eq("tournament_id", tournamentLiveId).order("sort_order"),
-      supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,winner_advances_to_match_id,winner_advances_to_slot").eq("tournament_id", tournamentLiveId).order("round_number").order("match_order"),
+      supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot").eq("tournament_id", tournamentLiveId).order("round_number").order("match_order"),
       supabaseClient.rpc("can_manage_tournament", { p_tournament_id: tournamentLiveId }),
     ];
     if (tournament.group_stage_enabled) {
@@ -385,6 +425,27 @@ async function advanceTournamentLiveFromGroups() {
   }
 }
 
+async function createTournamentLiveTiebreaker(groupId) {
+  if (tournamentLiveMutationRunning || !tournamentLiveState?.canManage || !groupId) return;
+  tournamentLiveMutationRunning = true;
+  renderTournamentLive();
+  try {
+    const { error } = await supabaseClient.rpc("create_group_tiebreaker", {
+      p_tournament_id: tournamentLiveId,
+      p_group_id: groupId,
+    });
+    if (error) throw error;
+    tournamentLiveMutationRunning = false;
+    await loadTournamentLive();
+    void refreshActiveTournamentCard();
+  } catch (error) {
+    logTournamentLiveError("Group tiebreaker creation failed", error, { tournamentId: tournamentLiveId, groupId });
+    tournamentLiveMutationRunning = false;
+    renderTournamentLive();
+    tournamentLiveContent.prepend(createTournamentLiveElement("p", "tournament-live-global-error", "Entscheidungsspiel konnte nicht erstellt werden. Bitte erneut versuchen."));
+  }
+}
+
 function openTournamentLive(tournamentId) {
   if (!tournamentId) return;
   tournamentLiveId = tournamentId;
@@ -414,7 +475,13 @@ tournamentLiveContent.addEventListener("submit", (event) => {
   void saveTournamentLiveMatchResult(form);
 });
 tournamentLiveContent.addEventListener("click", (event) => {
-  if (event.target instanceof Element && event.target.closest("#advance-tournament-groups")) void advanceTournamentLiveFromGroups();
+  if (!(event.target instanceof Element)) return;
+  if (event.target.closest("#advance-tournament-groups")) {
+    void advanceTournamentLiveFromGroups();
+    return;
+  }
+  const tiebreakerButton = event.target.closest("[data-create-tiebreaker]");
+  if (tiebreakerButton) void createTournamentLiveTiebreaker(tiebreakerButton.dataset.createTiebreaker);
 });
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !tournamentLiveScreen.hidden && !tournamentLiveMutationRunning) {

@@ -96,7 +96,7 @@ const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 assert.doesNotMatch(source, /Turnier erstellt|Entwurf gespeichert|is-create-tournament/);
 assert.match(source, /is-start-tournament/);
 assert.match(styles, /#tournament-step-next\.is-start-tournament/);
-assert.match(html, /style\.css\?v=93/);
+assert.match(html, /style\.css\?v=94/);
 assert.match(html, /tournament-create\.js\?v=5/);
 const tests = `
 function validStepFiveState() {

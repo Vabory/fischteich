@@ -13,7 +13,7 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=93">
+    <link rel="stylesheet" href="./style.css?v=94">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -22,8 +22,9 @@
     <script src="./roulette-service.js?v=5" defer></script>
     <script src="./script.js?v=56" defer></script>
     <script src="./tournament-create.js?v=5" defer></script>
-    <script src="./tournament-live.js?v=8" defer></script>
+    <script src="./tournament-live.js?v=9" defer></script>
     <script src="./tournament-archive.js?v=1" defer></script>
+    <script src="./tournament-trash.js?v=1" defer></script>
   </head>
   <body>
     <div id="app">
@@ -295,6 +296,20 @@
         </main>
       </section>
 
+      <section class="screen tournament-trash-screen" id="tournament-trash-screen" aria-labelledby="tournament-trash-title" hidden>
+        <header class="tournament-live-header">
+          <button class="tournament-live-back" id="close-tournament-trash" type="button" aria-label="Zurück zu den Einstellungen">‹</button>
+          <div>
+            <p>Administration</p>
+            <h1 id="tournament-trash-title">Turnier-Papierkorb</h1>
+          </div>
+          <span class="tournament-archive-header-spacer" aria-hidden="true"></span>
+        </header>
+        <main class="tournament-trash-content" id="tournament-trash-content" aria-live="polite">
+          <p class="tournament-live-status">Papierkorb wird geladen …</p>
+        </main>
+      </section>
+
       <section class="screen tournament-live-screen" id="tournament-live-screen" aria-labelledby="tournament-live-title" hidden>
         <header class="tournament-live-header">
           <button class="tournament-live-back" id="close-tournament-live" type="button" aria-label="Turnier schließen">‹</button>
@@ -302,7 +317,10 @@
             <p id="tournament-live-phase">Turnier</p>
             <h1 id="tournament-live-title">Laufendes Turnier</h1>
           </div>
-          <button class="tournament-live-refresh" id="refresh-tournament-live" type="button" aria-label="Turnier aktualisieren">↻</button>
+          <div class="tournament-live-header-actions">
+            <button class="tournament-live-delete" id="delete-tournament-live" type="button" aria-label="Turnier löschen" hidden>🗑</button>
+            <button class="tournament-live-refresh" id="refresh-tournament-live" type="button" aria-label="Turnier aktualisieren">↻</button>
+          </div>
         </header>
         <main class="tournament-live-content" id="tournament-live-content" aria-live="polite">
           <p class="tournament-live-status">Turnier wird geladen …</p>
@@ -473,6 +491,10 @@
           <strong class="settings-current-name" id="settings-current-name"></strong>
           <button class="primary-button settings-rename-button" id="open-display-name-rename" type="button">Name ändern</button>
         </div>
+        <div class="settings-admin-section" id="settings-admin-section" hidden>
+          <span class="settings-name-label">Administration</span>
+          <button class="secondary-button settings-trash-button" id="open-tournament-trash" type="button">Turnier-Papierkorb</button>
+        </div>
       </section>
     </div>
 
@@ -627,6 +649,30 @@
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-tournament-start" type="button">Abbrechen</button>
           <button class="primary-button" id="confirm-tournament-start" type="button">Starten</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="tournament-delete-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-delete-title" hidden>
+      <div class="modal-card tournament-lifecycle-modal-card">
+        <h2 id="tournament-delete-title">Turnier löschen?</h2>
+        <p id="tournament-delete-copy"></p>
+        <p class="guest-fish-error" id="tournament-delete-error" aria-live="polite" hidden></p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-tournament-delete" type="button">Abbrechen</button>
+          <button class="primary-button tournament-trash-action" id="confirm-tournament-delete" type="button">In Papierkorb</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="tournament-restore-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-restore-title" hidden>
+      <div class="modal-card tournament-lifecycle-modal-card">
+        <h2 id="tournament-restore-title">Turnier wiederherstellen?</h2>
+        <p id="tournament-restore-copy"></p>
+        <p class="guest-fish-error" id="tournament-restore-error" aria-live="polite" hidden></p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-tournament-restore" type="button">Abbrechen</button>
+          <button class="primary-button" id="confirm-tournament-restore" type="button">Wiederherstellen</button>
         </div>
       </div>
     </div>

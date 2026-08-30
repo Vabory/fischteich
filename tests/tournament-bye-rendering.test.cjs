@@ -65,8 +65,8 @@ const styles = fs.readFileSync(path.join(__dirname, "..", "style.css"), "utf8");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 assert.match(styles, /\.tournament-match-entry-copy\s*\{[^}]*min-width:\s*0/s);
 assert.match(styles, /\.tournament-match-bye\s*\{[^}]*font-size:\s*0\.62rem/s);
-assert.match(html, /style\.css\?v=93/);
-assert.match(html, /tournament-live\.js\?v=8/);
+assert.match(html, /style\.css\?v=94/);
+assert.match(html, /tournament-live\.js\?v=9/);
 const tests = `
 function createSingleEliminationFixture(entryCount) {
   let bracketSize = 1;

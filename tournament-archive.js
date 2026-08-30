@@ -127,6 +127,7 @@ function closeTournamentArchive() {
 function returnToTournamentArchive() {
   showScreen(tournamentArchiveScreen);
   closeTournamentArchiveButton.focus();
+  void loadTournamentArchive();
 }
 
 function handleTournamentArchiveScreenChange(screen) {

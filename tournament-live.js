@@ -6,6 +6,12 @@ const tournamentLivePhase = document.querySelector("#tournament-live-phase");
 const tournamentLiveContent = document.querySelector("#tournament-live-content");
 const closeTournamentLiveButton = document.querySelector("#close-tournament-live");
 const refreshTournamentLiveButton = document.querySelector("#refresh-tournament-live");
+const deleteTournamentLiveButton = document.querySelector("#delete-tournament-live");
+const tournamentDeleteModal = document.querySelector("#tournament-delete-modal");
+const tournamentDeleteCopy = document.querySelector("#tournament-delete-copy");
+const tournamentDeleteError = document.querySelector("#tournament-delete-error");
+const cancelTournamentDeleteButton = document.querySelector("#cancel-tournament-delete");
+const confirmTournamentDeleteButton = document.querySelector("#confirm-tournament-delete");
 const activeTournamentMenuCard = document.querySelector("#active-tournament");
 const tournamentMenuScreen = document.querySelector("#menu-screen");
 
@@ -14,6 +20,7 @@ const TOURNAMENT_REALTIME_DEBOUNCE_MS = 100;
 let tournamentLiveId = null;
 let tournamentLiveRequestId = 0;
 let tournamentLiveMutationRunning = false;
+let tournamentLiveDeleteRunning = false;
 let tournamentLiveState = null;
 let tournamentLiveReturnTarget = "menu";
 let tournamentLiveHistoricalOpen = false;
@@ -178,17 +185,18 @@ async function refreshActiveTournamentCard() {
 function renderTournamentLiveLoading() {
   tournamentLiveContent.replaceChildren(createTournamentLiveElement("p", "tournament-live-status", "Turnier wird geladen …"));
   refreshTournamentLiveButton.disabled = true;
+  deleteTournamentLiveButton.hidden = true;
 }
 
-function renderTournamentLiveLoadError() {
+function renderTournamentLiveLoadError({ unavailable = false } = {}) {
   const panel = createTournamentLiveElement("section", "tournament-live-empty");
-  const retry = createTournamentLiveElement("button", "primary-button", "Erneut laden");
-  retry.type = "button";
-  retry.addEventListener("click", () => void loadTournamentLive());
+  const action = createTournamentLiveElement("button", "primary-button", unavailable ? "Zum Hauptmenü" : "Erneut laden");
+  action.type = "button";
+  action.addEventListener("click", unavailable ? closeTournamentLive : () => void loadTournamentLive());
   panel.append(
-    createTournamentLiveElement("h2", "", "Turnier konnte nicht geladen werden"),
-    createTournamentLiveElement("p", "", "Bitte prüfe die Verbindung und versuche es erneut."),
-    retry,
+    createTournamentLiveElement("h2", "", unavailable ? "Turnier nicht verfügbar" : "Turnier konnte nicht geladen werden"),
+    createTournamentLiveElement("p", "", unavailable ? "Dieses Turnier wurde gelöscht oder ist nicht mehr sichtbar." : "Bitte prüfe die Verbindung und versuche es erneut."),
+    action,
   );
   tournamentLiveContent.replaceChildren(panel);
   refreshTournamentLiveButton.disabled = false;
@@ -605,6 +613,12 @@ function renderTournamentFinishedSummary(state) {
   historyButton.type = "button";
   historyButton.dataset.showTournamentHistory = "true";
   fragment.append(historyButton);
+  if (state.canDelete) {
+    const deleteButton = createTournamentLiveElement("button", "secondary-button tournament-summary-delete-button", "Turnier löschen");
+    deleteButton.type = "button";
+    deleteButton.dataset.deleteTournament = "true";
+    fragment.append(deleteButton);
+  }
   tournamentLiveContent.replaceChildren(fragment);
 }
 
@@ -629,6 +643,8 @@ function renderTournamentLive() {
     ? tournamentLiveFinishedView === "history" ? "Turnierverlauf" : "Zusammenfassung"
     : formatTournamentPhase(tournamentLiveState.tournament.current_phase);
   refreshTournamentLiveButton.disabled = tournamentLiveMutationRunning;
+  deleteTournamentLiveButton.hidden = !tournamentLiveState.canDelete || finished;
+  deleteTournamentLiveButton.disabled = tournamentLiveMutationRunning || tournamentLiveDeleteRunning;
   if (finished) {
     if (tournamentLiveFinishedView === "history") renderTournamentFinishedHistory(tournamentLiveState);
     else renderTournamentFinishedSummary(tournamentLiveState);
@@ -670,6 +686,7 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
       supabaseClient.from("tournament_groups").select("id,label,sort_order").eq("tournament_id", requestedTournamentId).order("sort_order"),
       supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot,loser_advances_to_match_id,loser_advances_to_slot,updated_at").eq("tournament_id", requestedTournamentId).order("round_number").order("match_order"),
       supabaseClient.rpc("can_manage_tournament", { p_tournament_id: requestedTournamentId }),
+      supabaseClient.rpc("can_soft_delete_tournament", { p_tournament_id: requestedTournamentId }),
     ];
     let standingsResultIndex = null;
     let placementsResultIndex = null;
@@ -713,6 +730,7 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
       groups: results[1].data ?? [],
       matches: results[2].data ?? [],
       canManage: tournament.status === "active" && results[3].data === true,
+      canDelete: results[4].data === true,
       standings: standingsResultIndex === null ? [] : results[standingsResultIndex].data ?? [],
       placements: placementsResultIndex === null ? [] : results[placementsResultIndex].data ?? [],
       teamMembers: teamMembersResultIndex === null ? [] : results[teamMembersResultIndex].data ?? [],
@@ -726,8 +744,8 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
     logTournamentLiveError("Tournament view load failed", error, { tournamentId: requestedTournamentId });
     if (error?.tournamentUnavailable) {
       tournamentLiveState = null;
-      renderTournamentLiveLoadError();
-      void stopTournamentLiveRealtime();
+      await stopTournamentLiveRealtime();
+      renderTournamentLiveLoadError({ unavailable: true });
     } else if (!keepCurrentOnError || !tournamentLiveState) {
       renderTournamentLiveLoadError();
     }
@@ -943,6 +961,65 @@ function startTournamentLiveRealtime(tournamentId) {
   return tournamentLiveRealtimeStart;
 }
 
+function getTournamentDeleteCopy(status) {
+  if (status === "active") {
+    return "Das laufende Turnier wird in den Papierkorb verschoben. Alle bisherigen Ergebnisse bleiben gespeichert. Nur ein Admin kann es wiederherstellen.";
+  }
+  if (status === "finished") {
+    return "Das abgeschlossene Turnier wird aus dem Archiv entfernt und in den Papierkorb verschoben. Nur ein Admin kann es wiederherstellen.";
+  }
+  return "Der Turnierentwurf wird in den Papierkorb verschoben. Nur ein Admin kann ihn wiederherstellen.";
+}
+
+function openTournamentDeleteModal() {
+  if (!tournamentLiveState?.canDelete || tournamentLiveDeleteRunning) return;
+  tournamentDeleteCopy.textContent = getTournamentDeleteCopy(tournamentLiveState.tournament.status);
+  tournamentDeleteError.hidden = true;
+  tournamentDeleteError.textContent = "";
+  appElement.inert = true;
+  tournamentDeleteModal.hidden = false;
+  confirmTournamentDeleteButton.focus();
+}
+
+function closeTournamentDeleteModal(force = false) {
+  if (tournamentLiveDeleteRunning && !force) return;
+  tournamentDeleteModal.hidden = true;
+  appElement.inert = false;
+  tournamentDeleteError.hidden = true;
+  const focusTarget = tournamentLiveState?.tournament.status === "finished"
+    ? tournamentLiveContent.querySelector("[data-delete-tournament]")
+    : deleteTournamentLiveButton;
+  focusTarget?.focus({ preventScroll: true });
+}
+
+async function softDeleteOpenTournament() {
+  if (tournamentLiveDeleteRunning || !tournamentLiveState?.canDelete || !tournamentLiveId) return;
+  const deletingTournamentId = tournamentLiveId;
+  tournamentLiveDeleteRunning = true;
+  confirmTournamentDeleteButton.disabled = true;
+  confirmTournamentDeleteButton.textContent = "Wird verschoben …";
+  deleteTournamentLiveButton.disabled = true;
+  tournamentDeleteError.hidden = true;
+
+  try {
+    const { error } = await supabaseClient.rpc("soft_delete_tournament", { p_tournament_id: deletingTournamentId });
+    if (error) throw error;
+    if (deletingTournamentId !== tournamentLiveId) return;
+    await stopTournamentLiveRealtime();
+    closeTournamentDeleteModal(true);
+    closeTournamentLive();
+  } catch (error) {
+    logTournamentLiveError("Tournament soft delete failed", error, { tournamentId: deletingTournamentId });
+    tournamentDeleteError.textContent = "Das Turnier konnte nicht in den Papierkorb verschoben werden. Bitte versuche es erneut.";
+    tournamentDeleteError.hidden = false;
+  } finally {
+    tournamentLiveDeleteRunning = false;
+    confirmTournamentDeleteButton.disabled = false;
+    confirmTournamentDeleteButton.textContent = "In Papierkorb";
+    if (tournamentLiveState) renderTournamentLive();
+  }
+}
+
 function clearActiveTournamentRealtimeRefresh() {
   if (activeTournamentRealtimeRefreshTimer !== null) {
     window.clearTimeout(activeTournamentRealtimeRefreshTimer);
@@ -1033,6 +1110,7 @@ function openTournamentLive(tournamentId, { returnTarget = "menu", historical = 
   tournamentLiveHistoricalOpen = historical;
   tournamentLiveFinishedView = "summary";
   tournamentLiveMatchErrors.clear();
+  deleteTournamentLiveButton.hidden = true;
   showScreen(tournamentLiveScreen);
   closeTournamentLiveButton.focus();
   if (!historical) void startTournamentLiveRealtime(tournamentId);
@@ -1050,6 +1128,7 @@ function closeTournamentLive() {
   tournamentLiveHistoricalOpen = false;
   tournamentLiveFinishedView = "summary";
   tournamentLiveMatchErrors.clear();
+  deleteTournamentLiveButton.hidden = true;
   if (returnTarget === "archive" && typeof returnToTournamentArchive === "function") {
     returnToTournamentArchive();
   } else {
@@ -1061,6 +1140,12 @@ function closeTournamentLive() {
 activeTournamentMenuCard.addEventListener("click", () => openTournamentLive(activeTournamentMenuCard.dataset.tournamentId));
 closeTournamentLiveButton.addEventListener("click", closeTournamentLive);
 refreshTournamentLiveButton.addEventListener("click", () => void loadTournamentLive({ preserveScoreDrafts: true, showLoading: false }));
+deleteTournamentLiveButton.addEventListener("click", openTournamentDeleteModal);
+cancelTournamentDeleteButton.addEventListener("click", () => closeTournamentDeleteModal());
+confirmTournamentDeleteButton.addEventListener("click", () => void softDeleteOpenTournament());
+tournamentDeleteModal.addEventListener("click", (event) => {
+  if (event.target === tournamentDeleteModal) closeTournamentDeleteModal();
+});
 tournamentLiveContent.addEventListener("submit", (event) => {
   const form = event.target instanceof Element ? event.target.closest("form[data-match-id]") : null;
   if (!form) return;
@@ -1069,6 +1154,10 @@ tournamentLiveContent.addEventListener("submit", (event) => {
 });
 tournamentLiveContent.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
+  if (event.target.closest("[data-delete-tournament]")) {
+    openTournamentDeleteModal();
+    return;
+  }
   if (event.target.closest("[data-show-tournament-history]")) {
     tournamentLiveFinishedView = "history";
     renderTournamentLive();
@@ -1089,6 +1178,11 @@ tournamentLiveContent.addEventListener("click", (event) => {
   if (tiebreakerButton) void createTournamentLiveTiebreaker(tiebreakerButton.dataset.createTiebreaker);
 });
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !tournamentDeleteModal.hidden) {
+    event.preventDefault();
+    closeTournamentDeleteModal();
+    return;
+  }
   if (event.key === "Escape" && !tournamentLiveScreen.hidden && !tournamentLiveMutationRunning) {
     event.preventDefault();
     closeTournamentLive();

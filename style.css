@@ -7,6 +7,7 @@
   --muted: #aeb5cc;
   --pink: #f15a9a;
   --blue: #21237a;
+  --tournament-accent: #68d9ff;
   --marker-size: 76px;
 }
 
@@ -3041,11 +3042,19 @@ h2 {
   background: linear-gradient(145deg, rgb(17 25 48 / 94%), rgb(8 12 28 / 94%));
   flex-direction: column;
 }
-.tournament-builder-card-header { position: relative; min-height: 36px; padding: 0 38px 0 4px; }
-.tournament-builder-card-header.is-editable { padding-left: 38px; }
+.tournament-builder-card { --tournament-card-control-inset: 7px; }
+.tournament-builder-card-header { position: static; min-height: 36px; padding: 0 38px; }
 .tournament-builder-card-header h3 { margin: 2px 0 10px; overflow-wrap: anywhere; text-align: center; }
-.tournament-builder-card-header .manual-team-edit-button { top: 0; left: 0; right: auto; }
-.tournament-builder-card-header .manual-remove-team-button { top: 0; right: 0; left: auto; }
+.tournament-builder-card-header .manual-team-edit-button {
+  top: var(--tournament-card-control-inset);
+  left: var(--tournament-card-control-inset);
+  right: auto;
+}
+.tournament-builder-card-header .manual-remove-team-button {
+  top: var(--tournament-card-control-inset);
+  right: var(--tournament-card-control-inset);
+  left: auto;
+}
 .tournament-builder-members { flex: 0 1 auto; }
 .tournament-builder-add-members { flex: 0 0 auto; }
 .tournament-builder-add-members:disabled { opacity: 0.34; }
@@ -3398,7 +3407,7 @@ h2 {
 
 .tournament-wizard-kicker {
   margin: 0 0 3px;
-  color: #68d9ff;
+  color: var(--tournament-accent);
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -3924,6 +3933,16 @@ h2 {
 
 .tournament-wizard-actions button {
   min-height: 52px;
+}
+
+#tournament-step-next {
+  background: var(--tournament-accent);
+  box-shadow: 0 9px 24px rgb(104 217 255 / 24%);
+}
+
+#tournament-step-next.is-create-tournament {
+  background: var(--pink);
+  box-shadow: 0 9px 24px rgb(241 90 154 / 24%);
 }
 
 .tournament-wizard-actions button:disabled {

@@ -214,6 +214,7 @@ function updateTournamentProgress() {
 }
 
 function updateTournamentWizardActions() {
+  tournamentStepNextButton.classList.toggle("is-create-tournament", !tournamentCreateState.success && tournamentCreateState.step === 5);
   if (tournamentCreateState.success) {
     tournamentGuestFooterButton.hidden = true;
     tournamentStepBackButton.hidden = true;
@@ -346,8 +347,13 @@ function createParticipantSummary(title, names) {
 
 function getBuilderConfig() {
   return tournamentCreateState.phase === "teams"
-    ? { collection: tournamentCreateState.teams, sourceItems: tournamentCreateState.participants, memberKey: "memberIds", targetKey: "targetTeamId", editable: true, kind: "Team" }
-    : { collection: tournamentCreateState.groups, sourceItems: getGroupEntryItems(), memberKey: "entryIds", targetKey: "targetGroupId", editable: false, kind: "Gruppe" };
+    ? { collection: tournamentCreateState.teams, sourceItems: tournamentCreateState.participants, memberKey: "memberIds", targetKey: "targetTeamId", editable: true, kind: "Team", entryType: "player" }
+    : { collection: tournamentCreateState.groups, sourceItems: getGroupEntryItems(), memberKey: "entryIds", targetKey: "targetGroupId", editable: false, kind: "Gruppe", entryType: tournamentCreateState.type === "team" ? "team" : "player" };
+}
+
+function getTournamentBuilderAssignmentMessage(config, count) {
+  const noun = config.entryType === "team" ? (count === 1 ? "Team" : "Teams") : "Spieler";
+  return `${count} ${noun} ${count === 1 ? "ist" : "sind"} noch nicht zugeordnet.`;
 }
 
 function getUnassignedTournamentBuilderItems(config = getBuilderConfig()) {
@@ -571,9 +577,7 @@ function renderTournamentBuilder() {
   const assigned = getAssignedIds(config.collection, config.memberKey);
   const unassigned = getUnassignedTournamentBuilderItems(config);
   const step = createElement("section", "tournament-step tournament-builder-step");
-  const overviewEntryType = tournamentCreateState.phase === "groups" && tournamentCreateState.type === "team"
-    ? "Teams"
-    : "Teilnehmer";
+  const overviewEntryType = config.entryType === "team" ? "Teams" : "Teilnehmer";
   step.append(createParticipantSummary(`${config.sourceItems.length} Turnier ${overviewEntryType}:`, config.sourceItems.map((item) => item.name)));
   const grid = createElement("div", "manual-team-grid tournament-builder-grid");
   config.collection.forEach((item) => grid.append(renderTournamentBuilderCard(item, config)));
@@ -596,7 +600,7 @@ function renderTournamentBuilder() {
   const heading = createElement("div", "tournament-card-heading");
   heading.append(createElement("h3", "", "Noch zuordnen"), createElement("span", "tournament-count-badge", String(unassigned.length)));
   unassignedCard.append(heading);
-  if (!unassigned.length) unassignedCard.append(createElement("p", "tournament-hint", `Alle ${tournamentCreateState.phase === "teams" ? "Teilnehmer" : "Teams"} sind genau einmal zugeordnet.`));
+  if (!unassigned.length) unassignedCard.append(createElement("p", "tournament-hint", `Alle ${config.entryType === "team" ? "Teams" : "Spieler"} sind genau einmal zugeordnet.`));
   else {
     const choices = createElement("div", "tournament-unassigned-grid");
     unassigned.forEach((item) => choices.append(createElement("span", "tournament-unassigned-item", item.name)));
@@ -604,9 +608,11 @@ function renderTournamentBuilder() {
   }
   step.append(unassignedCard);
   if (tournamentCreateState.phase === "teams" && tournamentCreateState.groupStageEnabled && tournamentCreateState.teams.length < 4) step.append(createElement("p", "tournament-error", "Für zwei Gruppen mit je mindestens zwei Teams werden mindestens 4 Teams benötigt."));
-  else if (unassigned.length) step.append(createElement("p", "tournament-error", `${unassigned.length} Einträge sind noch nicht zugeordnet.`));
-  else if (config.collection.some((item) => !item[config.memberKey].length)) step.append(createElement("p", "tournament-error", `Jede ${config.kind} benötigt mindestens einen Eintrag.`));
-  else if (config.kind === "Gruppe" && config.collection.some((item) => item.entryIds.length < TOURNAMENT_MIN_GROUP_SIZE)) step.append(createElement("p", "tournament-error", "Jede Gruppe benötigt mindestens zwei Entries."));
+  else if (unassigned.length) step.append(createElement("p", "tournament-error", getTournamentBuilderAssignmentMessage(config, unassigned.length)));
+  else if (config.collection.some((item) => !item[config.memberKey].length)) step.append(createElement("p", "tournament-error", config.kind === "Team"
+    ? "Jedes Team benötigt mindestens einen Spieler."
+    : `Jede Gruppe benötigt mindestens ${config.entryType === "team" ? "ein Team" : "einen Spieler"}.`));
+  else if (config.kind === "Gruppe" && config.collection.some((item) => item.entryIds.length < TOURNAMENT_MIN_GROUP_SIZE)) step.append(createElement("p", "tournament-error", `Jede Gruppe benötigt mindestens zwei ${config.entryType === "team" ? "Teams" : "Spieler"}.`));
   return step;
 }
 

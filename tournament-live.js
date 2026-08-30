@@ -461,7 +461,8 @@ async function saveTournamentLiveMatchResult(form) {
     await loadTournamentLive();
     void refreshActiveTournamentCard();
   } catch (error) {
-    logTournamentLiveError("Match result save failed", error, { tournamentId: tournamentLiveId, matchId });
+    const matchStage = tournamentLiveState.matches.find((match) => match.id === matchId)?.stage;
+    logTournamentLiveError("Match result failed", error, { tournamentId: tournamentLiveId, matchId, matchStage });
     tournamentLiveMutationRunning = false;
     tournamentLiveMatchErrors.set(
       matchId,

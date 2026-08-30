@@ -112,7 +112,11 @@ function createTournamentStandingTable(standings) {
   table.append(header);
 
   for (const standing of standings) {
-    const row = createTournamentLiveElement("div", `tournament-standing-row${standing.is_tied ? " is-tied" : ""}${standing.qualification_tie ? " is-relevant-tie" : ""}`);
+    const wonQualificationTiebreaker = standing.tiebreaker_status === "resolved"
+      && standing.tiebreaker_round !== null
+      && standing.tiebreaker_round !== undefined
+      && standing.qualified === true;
+    const row = createTournamentLiveElement("div", `tournament-standing-row${standing.is_tied ? " is-tied" : ""}${standing.qualification_tie ? " is-relevant-tie" : ""}${wonQualificationTiebreaker ? " is-tiebreaker-qualified" : ""}`);
     row.append(
       createTournamentLiveElement("strong", "", standing.display_name),
       createTournamentLiveElement("span", "", String(standing.played)),
@@ -123,6 +127,20 @@ function createTournamentStandingTable(standings) {
     table.append(row);
   }
   return table;
+}
+
+function compareTournamentGroupStandings(left, right) {
+  const regularRankDifference = Number(left.standing_rank) - Number(right.standing_rank);
+  if (regularRankDifference !== 0) return regularRankDifference;
+
+  const leftFinalRank = left.final_qualification_rank === null || left.final_qualification_rank === undefined
+    ? Number.POSITIVE_INFINITY
+    : Number(left.final_qualification_rank);
+  const rightFinalRank = right.final_qualification_rank === null || right.final_qualification_rank === undefined
+    ? Number.POSITIVE_INFINITY
+    : Number(right.final_qualification_rank);
+  if (leftFinalRank !== rightFinalRank) return leftFinalRank - rightFinalRank;
+  return Number(left.display_position) - Number(right.display_position);
 }
 
 function createTournamentScoreInput(match, slot, entryName) {
@@ -188,7 +206,7 @@ function renderTournamentGroupPhase(state) {
   for (const group of state.groups) {
     const section = createTournamentLiveElement("section", "tournament-live-section tournament-group-section");
     section.append(createTournamentLiveElement("h2", "", group.label));
-    const groupStandings = standingsByGroup.get(group.id) ?? [];
+    const groupStandings = [...(standingsByGroup.get(group.id) ?? [])].sort(compareTournamentGroupStandings);
     section.append(createTournamentStandingTable(groupStandings));
 
     const groupRegularMatches = regularMatches.filter((match) => match.group_id === group.id);
@@ -214,7 +232,7 @@ function renderTournamentGroupPhase(state) {
     } else if (tieStatus === "in_progress") {
       section.append(createTournamentLiveElement("p", "tournament-tie-note is-active", "Entscheidungsspiele laufen"));
     } else if (tiebreakerMatches.length > 0) {
-      section.append(createTournamentLiveElement("p", "tournament-tie-note is-resolved", "Entscheidung entschieden"));
+      section.append(createTournamentLiveElement("p", "tournament-tie-note is-resolved", "Entscheidung abgeschlossen"));
     }
 
     const matches = regularMatches

@@ -4107,6 +4107,7 @@ h2 {
 .tournament-standing-row.is-header span:first-child { text-align: left; }
 .tournament-standing-row.is-tied { background: rgb(255 190 93 / 8%); }
 .tournament-standing-row.is-relevant-tie { box-shadow: inset 2px 0 #ffbf61; }
+.tournament-standing-row.is-tiebreaker-qualified { background: rgb(82 217 139 / 10%); box-shadow: inset 2px 0 rgb(114 217 156 / 78%); }
 .tournament-tie-note { margin: 9px 2px 0; color: #ffc878; font-size: 0.72rem; font-weight: 800; }
 .tournament-tie-note.is-active { color: #9beaff; }
 .tournament-tie-note.is-resolved { color: #72d99c; }

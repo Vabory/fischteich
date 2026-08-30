@@ -3966,7 +3966,7 @@ h2 {
   box-shadow: 0 9px 24px rgb(104 217 255 / 24%);
 }
 
-#tournament-step-next.is-create-tournament {
+#tournament-step-next.is-start-tournament {
   background: var(--pink);
   box-shadow: 0 9px 24px rgb(241 90 154 / 24%);
 }
@@ -4014,10 +4014,6 @@ h2 {
   margin: 12px auto 0;
   color: var(--muted);
   font-size: 0.84rem;
-}
-
-.tournament-success .tournament-error {
-  color: #ff9aa7;
 }
 
 /* Laufendes Turnier: funktionale mobile Ergebnis- und Rundenansicht. */

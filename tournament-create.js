@@ -57,8 +57,8 @@ function createInitialTournamentState() {
     step: 1, phase: "teams", title: "", titleError: false, type: null,
     participants: [], teams: [], groups: [], targetTeamId: null, targetGroupId: null,
     groupStageEnabled: true, advancersPerGroup: 1, loserBracketEnabled: false,
-    requestId: createTournamentRequestId(), isDirty: false, isSaving: false,
-    saveError: "", success: null,
+    requestId: createTournamentRequestId(), draftTournamentId: null,
+    isDirty: false, isSubmitting: false, saveError: "", success: null,
   };
 }
 
@@ -208,7 +208,7 @@ function validateTournamentStep(step = tournamentCreateState.step) {
 
 function updateTournamentProgress() {
   const displayStep = tournamentCreateState.success ? TOURNAMENT_STEP_COUNT : tournamentCreateState.step;
-  const successLabel = tournamentCreateState.success?.started ? "Turnier gestartet" : "Entwurf gespeichert";
+  const successLabel = "Turnier gestartet";
   tournamentStepLabel.textContent = tournamentCreateState.success ? successLabel : `Schritt ${displayStep} von ${TOURNAMENT_STEP_COUNT}`;
   tournamentProgress.setAttribute("aria-label", tournamentCreateState.success ? successLabel : `Fortschritt: Schritt ${displayStep} von ${TOURNAMENT_STEP_COUNT}`);
   [...tournamentProgress.children].forEach((dot, index) => {
@@ -218,14 +218,13 @@ function updateTournamentProgress() {
 }
 
 function updateTournamentWizardActions() {
-  tournamentStepNextButton.classList.toggle("is-create-tournament", !tournamentCreateState.success && tournamentCreateState.step === 5);
+  tournamentStepNextButton.classList.toggle("is-start-tournament", !tournamentCreateState.success && tournamentCreateState.step === 5);
+  tournamentCreateCloseButton.hidden = Boolean(tournamentCreateState.success);
   if (tournamentCreateState.success) {
     tournamentGuestFooterButton.hidden = true;
     tournamentStepBackButton.hidden = true;
-    tournamentStepNextButton.textContent = tournamentCreateState.success.started
-      ? "Zum Hauptmenü"
-      : tournamentCreateState.success.isStarting ? "Wird gestartet …" : "Turnier starten";
-    tournamentStepNextButton.disabled = tournamentCreateState.success.isStarting;
+    tournamentStepNextButton.textContent = "Zum Hauptmenü";
+    tournamentStepNextButton.disabled = false;
     tournamentWizardActions.className = "tournament-wizard-actions is-single";
     return;
   }
@@ -233,12 +232,14 @@ function updateTournamentWizardActions() {
   tournamentGuestFooterButton.hidden = !first;
   tournamentStepBackButton.hidden = false;
   tournamentStepBackButton.textContent = first ? "Reset" : "Zurück";
-  tournamentStepBackButton.disabled = tournamentCreateState.isSaving || (first && tournamentCreateState.participants.length === 0);
+  tournamentStepBackButton.disabled = tournamentCreateState.isSubmitting
+    || Boolean(tournamentCreateState.draftTournamentId)
+    || (first && tournamentCreateState.participants.length === 0);
   tournamentWizardActions.className = `tournament-wizard-actions${first ? " is-participant-footer" : ""}`;
   if (tournamentCreateState.step === 5) {
     const auth = getTournamentAuthState();
-    tournamentStepNextButton.textContent = tournamentCreateState.isSaving ? "Wird erstellt …" : "Turnier erstellen";
-    tournamentStepNextButton.disabled = tournamentCreateState.isSaving || !validateTournamentStep(5) || !auth.currentAuthUser || !auth.currentProfile;
+    tournamentStepNextButton.textContent = tournamentCreateState.isSubmitting ? "Wird gestartet …" : "Turnier starten";
+    tournamentStepNextButton.disabled = tournamentCreateState.isSubmitting || !validateTournamentStep(5) || !auth.currentAuthUser || !auth.currentProfile;
   } else {
     tournamentStepNextButton.textContent = "Weiter";
     tournamentStepNextButton.disabled = !validateTournamentStep();
@@ -729,6 +730,7 @@ function renderTournamentStepFive() {
   input.maxLength = TOURNAMENT_TITLE_MAX_LENGTH;
   input.placeholder = "z. B. Sommer Dart Turnier";
   input.value = tournamentCreateState.title;
+  input.disabled = Boolean(tournamentCreateState.draftTournamentId);
   input.setAttribute("aria-invalid", String(tournamentCreateState.titleError));
   const error = createElement("p", "tournament-title-error", "Bitte gib einen Turniernamen ein.");
   error.hidden = !tournamentCreateState.titleError;
@@ -766,13 +768,10 @@ function renderTournamentSuccess() {
   const tournament = tournamentCreateState.success;
   success.append(
     createElement("div", "tournament-success-icon", "✓"),
-    createElement("h2", "", tournament.started ? "Turnier gestartet" : "Turnier erstellt"),
+    createElement("h2", "", "Turnier gestartet"),
     createElement("strong", "", tournament.title),
-    createElement("p", "", tournament.started
-      ? `${tournament.groupStageEnabled ? "Die Gruppenphase" : "Die KO-Phase"} ist bereit.`
-      : "Der Turnierentwurf wurde gespeichert und kann jetzt gestartet werden."),
+    createElement("p", "", `${tournament.groupStageEnabled ? "Die Gruppenphase" : "Die KO-Phase"} ist bereit.`),
   );
-  if (tournament.startError) success.append(createElement("p", "tournament-error", tournament.startError));
   return success;
 }
 
@@ -832,7 +831,7 @@ function discardTournamentWizard() {
 }
 
 function requestTournamentWizardClose() {
-  if (tournamentCreateState.isSaving || tournamentCreateState.success?.isStarting) return;
+  if (tournamentCreateState.isSubmitting) return;
   if (!tournamentCreateState.isDirty || tournamentCreateState.success) return discardTournamentWizard();
   appElement.inert = true;
   tournamentAbortModal.hidden = false;
@@ -846,15 +845,21 @@ function closeTournamentAbortModal() {
 }
 
 function openTournamentStartModal() {
-  const tournament = tournamentCreateState.success;
-  if (!tournament || tournament.started || tournament.isStarting) return;
+  if (tournamentCreateState.success || tournamentCreateState.isSubmitting || !validateTournamentStep(5)) return;
+  if (!tournamentCreateState.title.trim()) return showTournamentTitleError();
+  const auth = getTournamentAuthState();
+  if (!auth.currentAuthUser || !auth.currentProfile) {
+    tournamentCreateState.saveError = "Authentifizierung ist nicht verfügbar. Bitte versuche es später erneut.";
+    renderTournamentWizard();
+    return;
+  }
   appElement.inert = true;
   tournamentStartModal.hidden = false;
   confirmTournamentStartButton.focus();
 }
 
 function closeTournamentStartModal(force = false) {
-  if (tournamentCreateState.success?.isStarting && !force) return;
+  if (tournamentCreateState.isSubmitting && !force) return;
   tournamentStartModal.hidden = true;
   appElement.inert = false;
   tournamentStepNextButton.focus();
@@ -890,102 +895,91 @@ function showTournamentTitleError() {
   });
 }
 
-async function saveTournamentDraft() {
-  if (tournamentCreateState.isSaving || !validateTournamentStep(5)) return;
+async function saveAndStartTournament() {
+  if (tournamentCreateState.success || tournamentCreateState.isSubmitting || !validateTournamentStep(5)) return;
+
   const title = tournamentCreateState.title.trim();
-  if (!title) return showTournamentTitleError();
-  const auth = getTournamentAuthState();
-  if (!auth.currentAuthUser || !auth.currentProfile) {
-    tournamentCreateState.saveError = "Authentifizierung ist nicht verfügbar. Bitte versuche es später erneut.";
-    renderTournamentWizard();
-    return;
+  if (!title) {
+    closeTournamentStartModal(true);
+    return showTournamentTitleError();
   }
-  tournamentCreateState.isSaving = true;
+
+  tournamentCreateState.isSubmitting = true;
   tournamentCreateState.saveError = "";
-  updateTournamentWizardActions();
-  try {
-    const entries = createTournamentDraftEntries();
-    const groups = createTournamentDraftGroups();
-    console.debug("[Tournament] Draft payload summary", JSON.stringify({
-      tournamentType: tournamentCreateState.type,
-      groupStageEnabled: tournamentCreateState.groupStageEnabled,
-      loserBracketEnabled: tournamentCreateState.loserBracketEnabled,
-      advancersPerGroup: tournamentCreateState.groupStageEnabled ? tournamentCreateState.advancersPerGroup : null,
-      entryCount: entries.length,
-      teamMemberCounts: tournamentCreateState.type === "team" ? entries.map((entry) => entry.members.length) : null,
-      groupCount: groups?.length ?? null,
-      groupEntryIndexes: groups?.map((group) => [...group.entry_indexes]) ?? null,
-      creationRequestIdIsUuid: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tournamentCreateState.requestId),
-    }));
-    const { data, error } = await supabaseClient.rpc("create_tournament_draft", {
-      p_title: title, p_tournament_type: tournamentCreateState.type,
-      p_group_stage_enabled: tournamentCreateState.groupStageEnabled,
-      p_loser_bracket_enabled: tournamentCreateState.loserBracketEnabled,
-      p_advancers_per_group: tournamentCreateState.groupStageEnabled ? tournamentCreateState.advancersPerGroup : null,
-      p_entries: entries, p_groups: groups,
-      p_creation_request_id: tournamentCreateState.requestId,
-    });
-    if (error) throw error;
-    if (typeof data !== "string" || data.length < 30) throw new Error("Die Turnier-ID fehlt in der Serverantwort.");
-    lastCreatedTournamentId = data;
-    const groupStageEnabled = tournamentCreateState.groupStageEnabled;
-    tournamentCreateState = createInitialTournamentState();
-    tournamentCreateState.success = { id: data, title, groupStageEnabled, isStarting: false, startError: "", started: false };
-    renderTournamentWizard();
-  } catch (error) {
-    console.error("[Tournament] Draft save failed", JSON.stringify({
-      code: error?.code,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
-    }));
-    tournamentCreateState.isSaving = false;
-    tournamentCreateState.saveError = "Turnier konnte nicht gespeichert werden. Es wurden keine Teil-Datensätze angelegt. Bitte erneut versuchen.";
-    renderTournamentWizard();
-  }
-}
-
-async function startTournament() {
-  const tournament = tournamentCreateState.success;
-  if (!tournament || tournament.started || tournament.isStarting) return;
-
-  tournament.isStarting = true;
-  tournament.startError = "";
   confirmTournamentStartButton.disabled = true;
   confirmTournamentStartButton.textContent = "Wird gestartet …";
+  cancelTournamentStartButton.disabled = true;
   updateTournamentWizardActions();
 
+  let mutationStage = "draft";
   try {
+    if (!tournamentCreateState.draftTournamentId) {
+      const entries = createTournamentDraftEntries();
+      const groups = createTournamentDraftGroups();
+      console.debug("[Tournament] Draft payload summary", JSON.stringify({
+        tournamentType: tournamentCreateState.type,
+        groupStageEnabled: tournamentCreateState.groupStageEnabled,
+        loserBracketEnabled: tournamentCreateState.loserBracketEnabled,
+        advancersPerGroup: tournamentCreateState.groupStageEnabled ? tournamentCreateState.advancersPerGroup : null,
+        entryCount: entries.length,
+        teamMemberCounts: tournamentCreateState.type === "team" ? entries.map((entry) => entry.members.length) : null,
+        groupCount: groups?.length ?? null,
+        groupEntryIndexes: groups?.map((group) => [...group.entry_indexes]) ?? null,
+        creationRequestIdIsUuid: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tournamentCreateState.requestId),
+      }));
+      const { data, error } = await supabaseClient.rpc("create_tournament_draft", {
+        p_title: title, p_tournament_type: tournamentCreateState.type,
+        p_group_stage_enabled: tournamentCreateState.groupStageEnabled,
+        p_loser_bracket_enabled: tournamentCreateState.loserBracketEnabled,
+        p_advancers_per_group: tournamentCreateState.groupStageEnabled ? tournamentCreateState.advancersPerGroup : null,
+        p_entries: entries, p_groups: groups,
+        p_creation_request_id: tournamentCreateState.requestId,
+      });
+      if (error) throw error;
+      if (typeof data !== "string" || data.length < 30) {
+        throw new Error("Die Turnier-ID fehlt in der Serverantwort.");
+      }
+      tournamentCreateState.draftTournamentId = data;
+      lastCreatedTournamentId = data;
+    }
+
+    mutationStage = "start";
     const { data, error } = await supabaseClient.rpc("start_tournament", {
-      p_tournament_id: tournament.id,
+      p_tournament_id: tournamentCreateState.draftTournamentId,
     });
     if (error) throw error;
-    if (data !== tournament.id) throw new Error("Die Turnier-ID in der Serverantwort ist ungültig.");
+    if (data !== tournamentCreateState.draftTournamentId) throw new Error("Die Turnier-ID in der Serverantwort ist ungültig.");
 
-    tournament.isStarting = false;
-    tournament.started = true;
+    const startedTournamentId = tournamentCreateState.draftTournamentId;
+    const groupStageEnabled = tournamentCreateState.groupStageEnabled;
+    tournamentCreateState.isSubmitting = false;
+    tournamentCreateState.success = { id: startedTournamentId, title, groupStageEnabled };
     closeTournamentStartModal(true);
     renderTournamentWizard();
   } catch (error) {
-    console.error("[Tournament] Start failed", JSON.stringify({
-      tournamentId: tournament.id,
+    const draftFailed = mutationStage === "draft";
+    console.error(`[Tournament] ${draftFailed ? "Draft save" : "Start"} failed`, JSON.stringify({
+      tournamentId: tournamentCreateState.draftTournamentId,
       code: error?.code,
       message: error?.message,
       details: error?.details,
       hint: error?.hint,
     }));
-    tournament.isStarting = false;
-    tournament.startError = "Turnier konnte nicht gestartet werden. Der Entwurf wurde nicht verändert. Bitte erneut versuchen.";
+    tournamentCreateState.isSubmitting = false;
+    tournamentCreateState.saveError = draftFailed
+      ? "Turnier konnte nicht gespeichert werden. Deine Eingaben bleiben erhalten. Bitte erneut versuchen."
+      : "Der Entwurf wurde gespeichert, aber das Turnier konnte nicht gestartet werden. Bitte erneut versuchen.";
     closeTournamentStartModal(true);
     renderTournamentWizard();
   } finally {
     confirmTournamentStartButton.disabled = false;
     confirmTournamentStartButton.textContent = "Starten";
+    cancelTournamentStartButton.disabled = false;
   }
 }
 
 function goToPreviousTournamentStep() {
-  if (tournamentCreateState.isSaving || tournamentCreateState.success) return;
+  if (tournamentCreateState.isSubmitting || tournamentCreateState.draftTournamentId || tournamentCreateState.success) return;
   if (tournamentCreateState.step === 1) resetTournamentParticipants();
   else if (tournamentCreateState.step === 2) tournamentCreateState.step = 1;
   else if (tournamentCreateState.step === 3) {
@@ -1004,10 +998,9 @@ function goToPreviousTournamentStep() {
 
 function goToNextTournamentStep() {
   if (tournamentCreateState.success) {
-    if (tournamentCreateState.success.started) return discardTournamentWizard();
-    return openTournamentStartModal();
+    return discardTournamentWizard();
   }
-  if (tournamentCreateState.isSaving || !validateTournamentStep()) return;
+  if (tournamentCreateState.isSubmitting || !validateTournamentStep()) return;
   if (tournamentCreateState.step === 1) {
     if (tournamentCreateState.participants.length < 4) setTournamentGroupStage(false);
     tournamentCreateState.step = 2;
@@ -1029,7 +1022,7 @@ function goToNextTournamentStep() {
       tournamentCreateState.step = 4;
     }
   } else if (tournamentCreateState.step === 4) tournamentCreateState.step = 5;
-  else if (tournamentCreateState.step === 5) return void saveTournamentDraft();
+  else if (tournamentCreateState.step === 5) return openTournamentStartModal();
   renderTournamentWizard();
   tournamentWizardContent.scrollTop = 0;
 }
@@ -1042,7 +1035,7 @@ tournamentStepNextButton.addEventListener("click", goToNextTournamentStep);
 cancelTournamentAbortButton.addEventListener("click", closeTournamentAbortModal);
 confirmTournamentAbortButton.addEventListener("click", discardTournamentWizard);
 cancelTournamentStartButton.addEventListener("click", () => closeTournamentStartModal());
-confirmTournamentStartButton.addEventListener("click", startTournament);
+confirmTournamentStartButton.addEventListener("click", saveAndStartTournament);
 
 tournamentGuestForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -1085,7 +1078,7 @@ window.addEventListener("keydown", (event) => {
   else if (!tournamentCreateScreen.hidden) { event.preventDefault(); requestTournamentWizardClose(); }
 });
 window.addEventListener("beforeunload", (event) => {
-  if (!tournamentCreateScreen.hidden && ((tournamentCreateState.isDirty && !tournamentCreateState.success) || tournamentCreateState.success?.isStarting)) {
+  if (!tournamentCreateScreen.hidden && ((tournamentCreateState.isDirty && !tournamentCreateState.success) || tournamentCreateState.isSubmitting)) {
     event.preventDefault();
     event.returnValue = "";
   }

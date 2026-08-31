@@ -21,6 +21,7 @@ class FakeElement {
   removeAttribute() {}
   setAttribute() {}
   focus() { context.document.activeElement = this; }
+  querySelector() { return null; }
   querySelectorAll() { return []; }
 }
 
@@ -81,6 +82,7 @@ const context = vm.createContext({
   FormData: class {},
   document: {
     activeElement: null,
+    addEventListener() {},
     createElement: () => new FakeElement(),
     createDocumentFragment: () => new FakeElement(),
     querySelector(selector) {

@@ -96,8 +96,8 @@ const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 assert.doesNotMatch(source, /Turnier erstellt|Entwurf gespeichert|is-create-tournament/);
 assert.match(source, /is-start-tournament/);
 assert.match(styles, /#tournament-step-next\.is-start-tournament/);
-assert.match(html, /style\.css\?v=95/);
-assert.match(html, /tournament-create\.js\?v=5/);
+assert.match(html, /style\.css\?v=96/);
+assert.match(html, /tournament-create\.js\?v=6/);
 const tests = `
 function validStepFiveState() {
   const next = createInitialTournamentState();
@@ -200,6 +200,77 @@ globalThis.runTournamentCreateStartFlowTests = async function runTournamentCreat
   assert.equal(draftAttempts, 2);
   assert.equal(startAttempts, 1);
   assert.equal(tournamentCreateState.success.id, draftId);
+
+  const originalRenderTournamentWizard = renderTournamentWizard;
+  renderTournamentWizard = () => {};
+  const participants = Array.from({ length: 7 }, (_, index) => ({ id: "p" + (index + 1), name: "P" + (index + 1) }));
+  const assignmentCases = [
+    {
+      label: "team builder without groups",
+      type: "team",
+      phase: "teams",
+      collectionKey: "teams",
+      memberKey: "memberIds",
+      manualKey: "manualMemberIds",
+      fixedIds: ["p1", "p2"],
+      sourceCount: 7,
+      collection: [
+        { id: "t1", name: "T1", memberIds: ["p1", "p2", "p3"], manualMemberIds: ["p1", "p2"] },
+        { id: "t2", name: "T2", memberIds: ["p4", "p5"], manualMemberIds: [] },
+        { id: "t3", name: "T3", memberIds: ["p6", "p7"], manualMemberIds: [] },
+      ],
+    },
+    {
+      label: "individual group builder",
+      type: "individual",
+      phase: "groups",
+      collectionKey: "groups",
+      memberKey: "entryIds",
+      manualKey: "manualEntryIds",
+      fixedIds: ["p1", "p2"],
+      sourceCount: 7,
+      collection: [
+        { id: "g1", name: "A", entryIds: ["p1", "p2", "p3"], manualEntryIds: ["p1", "p2"] },
+        { id: "g2", name: "B", entryIds: ["p4", "p5"], manualEntryIds: [] },
+        { id: "g3", name: "C", entryIds: ["p6", "p7"], manualEntryIds: [] },
+      ],
+    },
+    {
+      label: "team group builder",
+      type: "team",
+      phase: "groups",
+      collectionKey: "groups",
+      memberKey: "entryIds",
+      manualKey: "manualEntryIds",
+      fixedIds: ["t1", "t2"],
+      sourceCount: 7,
+      teams: Array.from({ length: 7 }, (_, index) => ({ id: "t" + (index + 1), name: "T" + (index + 1), memberIds: [] })),
+      collection: [
+        { id: "g1", name: "A", entryIds: ["t1", "t2", "t3"], manualEntryIds: ["t1", "t2"] },
+        { id: "g2", name: "B", entryIds: ["t4", "t5"], manualEntryIds: [] },
+        { id: "g3", name: "C", entryIds: ["t6", "t7"], manualEntryIds: [] },
+      ],
+    },
+  ];
+
+  for (const assignmentCase of assignmentCases) {
+    tournamentCreateState = createInitialTournamentState();
+    tournamentCreateState.type = assignmentCase.type;
+    tournamentCreateState.phase = assignmentCase.phase;
+    tournamentCreateState.participants = participants;
+    if (assignmentCase.teams) tournamentCreateState.teams = assignmentCase.teams;
+    tournamentCreateState[assignmentCase.collectionKey] = assignmentCase.collection;
+    distributeTournamentItems();
+    const collection = tournamentCreateState[assignmentCase.collectionKey];
+    assert.deepEqual(collection[0][assignmentCase.manualKey], assignmentCase.fixedIds, assignmentCase.label + " must retain manual ownership");
+    assert.ok(assignmentCase.fixedIds.every((id) => collection[0][assignmentCase.memberKey].includes(id)));
+    assert.equal(new Set(collection.flatMap((item) => item[assignmentCase.memberKey])).size, assignmentCase.sourceCount);
+    const sizes = collection.map((item) => item[assignmentCase.memberKey].length);
+    assert.ok(Math.max(...sizes) - Math.min(...sizes) <= 1, assignmentCase.label + " must remain balanced");
+    await resetTournamentBuilderAssignments();
+    assert.ok(collection.every((item) => item[assignmentCase.memberKey].length === 0 && item[assignmentCase.manualKey].length === 0));
+  }
+  renderTournamentWizard = originalRenderTournamentWizard;
 };
 `;
 

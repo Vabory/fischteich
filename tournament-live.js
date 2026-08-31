@@ -11,6 +11,11 @@ const toggleTournamentCorrectionButton = document.querySelector("#toggle-tournam
 const tournamentCorrectionModal = document.querySelector("#tournament-correction-modal");
 const cancelTournamentCorrectionButton = document.querySelector("#cancel-tournament-correction");
 const confirmTournamentCorrectionButton = document.querySelector("#confirm-tournament-correction");
+const tournamentFinalizeModal = document.querySelector("#tournament-finalize-modal");
+const tournamentFinalizeError = document.querySelector("#tournament-finalize-error");
+const cancelTournamentFinalizeButton = document.querySelector("#cancel-tournament-finalize");
+const confirmTournamentFinalizeButton = document.querySelector("#confirm-tournament-finalize");
+const tournamentTeamPopover = document.querySelector("#tournament-team-popover");
 const tournamentDeleteModal = document.querySelector("#tournament-delete-modal");
 const tournamentDeleteCopy = document.querySelector("#tournament-delete-copy");
 const tournamentDeleteError = document.querySelector("#tournament-delete-error");
@@ -25,11 +30,13 @@ let tournamentLiveId = null;
 let tournamentLiveRequestId = 0;
 let tournamentLiveMutationRunning = false;
 let tournamentLiveDeleteRunning = false;
+let tournamentLiveFinalizeRunning = false;
 let tournamentLiveState = null;
 let tournamentLiveReturnTarget = "menu";
 let tournamentLiveHistoricalOpen = false;
 let tournamentLiveFinishedView = "summary";
 let tournamentCorrectionMode = false;
+let tournamentOpenTeamEntryId = null;
 const tournamentLiveMatchErrors = new Map();
 let tournamentLiveRealtimeChannel = null;
 let tournamentLiveRealtimeRun = 0;
@@ -146,6 +153,20 @@ function restoreTournamentLiveScoreDrafts(drafts) {
   }
 }
 
+function captureTournamentMatchScrollAnchor(matchId) {
+  const card = [...tournamentLiveContent.querySelectorAll("[data-match-id]")]
+    .find((item) => item.dataset.matchId === matchId);
+  return card ? { matchId, viewportTop: card.getBoundingClientRect().top } : null;
+}
+
+function restoreTournamentMatchScrollAnchor(anchor) {
+  if (!anchor) return;
+  const card = [...tournamentLiveContent.querySelectorAll("[data-match-id]")]
+    .find((item) => item.dataset.matchId === anchor.matchId);
+  if (!card) return;
+  tournamentLiveContent.scrollTop += card.getBoundingClientRect().top - anchor.viewportTop;
+}
+
 function renderTournamentLivePreservingScoreDrafts() {
   const drafts = captureTournamentLiveScoreDrafts();
   renderTournamentLive();
@@ -247,15 +268,68 @@ function compareTournamentGroupStandings(left, right) {
   return Number(left.display_position) - Number(right.display_position);
 }
 
-function createTournamentMatchEntryLabel(entryName, hasBye = false) {
+function closeTournamentTeamPopover() {
+  tournamentOpenTeamEntryId = null;
+  tournamentTeamPopover.hidden = true;
+  tournamentTeamPopover.replaceChildren();
+}
+
+function positionTournamentTeamPopover(trigger) {
+  const viewportGap = 12;
+  const triggerRect = trigger.getBoundingClientRect();
+  const popoverRect = tournamentTeamPopover.getBoundingClientRect();
+  const left = Math.min(
+    Math.max(viewportGap, triggerRect.left),
+    Math.max(viewportGap, window.innerWidth - popoverRect.width - viewportGap),
+  );
+  const spaceBelow = window.innerHeight - triggerRect.bottom - viewportGap;
+  const top = spaceBelow >= popoverRect.height + 8
+    ? triggerRect.bottom + 7
+    : Math.max(viewportGap, triggerRect.top - popoverRect.height - 7);
+  tournamentTeamPopover.style.left = `${left}px`;
+  tournamentTeamPopover.style.top = `${top}px`;
+}
+
+function toggleTournamentTeamPopover(trigger, entryId) {
+  if (tournamentOpenTeamEntryId === entryId && !tournamentTeamPopover.hidden) {
+    closeTournamentTeamPopover();
+    return;
+  }
+  const entry = tournamentLiveState?.entryById.get(entryId);
+  const members = (tournamentLiveState?.teamMembers ?? [])
+    .filter((member) => member.team_entry_id === entryId)
+    .sort((left, right) => left.member_order - right.member_order);
+  if (!entry || !members.length) return;
+
+  const title = createTournamentLiveElement("strong", "tournament-team-popover-title", entry.display_name_snapshot);
+  const list = createTournamentLiveElement("ul", "tournament-team-popover-list");
+  for (const member of members) list.append(createTournamentLiveElement("li", "", member.display_name_snapshot));
+  tournamentTeamPopover.replaceChildren(title, list);
+  tournamentOpenTeamEntryId = entryId;
+  tournamentTeamPopover.hidden = false;
+  positionTournamentTeamPopover(trigger);
+}
+
+function createTournamentMatchEntryLabel(entryName, hasBye = false, entryId = null) {
   const label = createTournamentLiveElement("span", "tournament-match-entry-copy");
-  label.append(createTournamentLiveElement("span", "tournament-match-entry", entryName));
+  const hasTeamMembers = tournamentLiveState?.tournament.tournament_type === "team"
+    && entryId
+    && tournamentLiveState.teamMembers.some((member) => member.team_entry_id === entryId);
+  if (hasTeamMembers) {
+    const trigger = createTournamentLiveElement("button", "tournament-match-entry tournament-team-trigger", `${entryName} ▾`);
+    trigger.type = "button";
+    trigger.dataset.teamEntryId = entryId;
+    trigger.setAttribute("aria-haspopup", "dialog");
+    label.append(trigger);
+  } else {
+    label.append(createTournamentLiveElement("span", "tournament-match-entry", entryName));
+  }
   if (hasBye) label.append(createTournamentLiveElement("span", "tournament-match-bye", "Freilos"));
   return label;
 }
 
 function createTournamentScoreInput(match, slot, entryName, hasBye = false) {
-  const label = createTournamentLiveElement("label", "tournament-score-field");
+  const label = createTournamentLiveElement("div", "tournament-score-field");
   const input = document.createElement("input");
   input.type = "number";
   input.inputMode = "decimal";
@@ -266,7 +340,7 @@ function createTournamentScoreInput(match, slot, entryName, hasBye = false) {
   input.name = slot === "a" ? "scoreA" : "scoreB";
   input.value = formatTournamentScore(slot === "a" ? match.score_a : match.score_b).replace("–", "");
   input.setAttribute("aria-label", `Score ${entryName}`);
-  label.append(createTournamentMatchEntryLabel(entryName, hasBye), input);
+  label.append(createTournamentMatchEntryLabel(entryName, hasBye, slot === "a" ? match.entry_a_id : match.entry_b_id), input);
   return label;
 }
 
@@ -325,10 +399,10 @@ function createTournamentMatchCard(match, entryById, canManage, byeSlotKeys = ne
     saveButton.disabled = tournamentLiveMutationRunning;
     card.append(saveButton);
   } else {
-    for (const [name, score, hasBye] of [[entryAName, match.score_a, entryAHasBye], [entryBName, match.score_b, entryBHasBye]]) {
+    for (const [name, score, hasBye, entryId] of [[entryAName, match.score_a, entryAHasBye, match.entry_a_id], [entryBName, match.score_b, entryBHasBye, match.entry_b_id]]) {
       const row = createTournamentLiveElement("div", "tournament-match-read-row");
       row.append(
-        createTournamentMatchEntryLabel(name, hasBye),
+        createTournamentMatchEntryLabel(name, hasBye, entryId),
         createTournamentLiveElement("strong", "tournament-match-score", formatTournamentScore(score)),
       );
       card.append(row);
@@ -633,19 +707,35 @@ function renderTournamentFinishedSummary(state) {
 
 function renderTournamentFinishedHistory(state) {
   const fragment = document.createDocumentFragment();
-  const summaryButton = createTournamentLiveElement("button", "secondary-button tournament-history-summary-button", "← Zur Zusammenfassung");
-  summaryButton.type = "button";
-  summaryButton.dataset.showTournamentSummary = "true";
-  fragment.append(summaryButton);
   if (state.tournament.group_stage_enabled) {
     fragment.append(createTournamentGroupPhaseFragment(state, { includeActions: false }));
   }
   fragment.append(createTournamentKnockoutFragment(state, { includeChampion: false }));
+  const summaryButton = createTournamentLiveElement("button", "secondary-button tournament-history-summary-button", "Zur Zusammenfassung  →");
+  summaryButton.type = "button";
+  summaryButton.dataset.showTournamentSummary = "true";
+  fragment.append(summaryButton);
   tournamentLiveContent.replaceChildren(fragment);
+}
+
+function appendTournamentFinalizeAction(state) {
+  if (!state.canFinalize || state.tournament.status !== "active") return;
+  const action = createTournamentLiveElement("section", "tournament-finalize-action");
+  action.append(
+    createTournamentLiveElement("strong", "", "Alle entscheidenden Ergebnisse sind eingetragen."),
+    createTournamentLiveElement("span", "", "Prüfe den Turnierverlauf und schließe das Turnier anschließend ab."),
+  );
+  const button = createTournamentLiveElement("button", "primary-button tournament-finalize-button", tournamentLiveFinalizeRunning ? "Wird abgeschlossen …" : "Turnier abschließen!");
+  button.type = "button";
+  button.dataset.finalizeTournament = "true";
+  button.disabled = tournamentLiveMutationRunning || tournamentLiveFinalizeRunning;
+  action.append(button);
+  tournamentLiveContent.append(action);
 }
 
 function renderTournamentLive() {
   if (!tournamentLiveState) return;
+  closeTournamentTeamPopover();
   tournamentLiveTitle.textContent = tournamentLiveState.tournament.title;
   const finished = tournamentLiveState.tournament.status === "finished";
   tournamentLivePhase.textContent = finished
@@ -668,6 +758,8 @@ function renderTournamentLive() {
   } else {
     renderTournamentKnockout(tournamentLiveState);
   }
+
+  appendTournamentFinalizeAction(tournamentLiveState);
 
   if (tournamentCorrectionMode) {
     const notice = createTournamentLiveElement("aside", "tournament-correction-notice");
@@ -716,6 +808,7 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
       supabaseClient.from("tournament_matches").select("id,stage,phase_label,group_id,entry_a_id,entry_b_id,score_a,score_b,winner_entry_id,match_status,round_number,match_order,is_tiebreaker,tiebreaker_round,winner_advances_to_match_id,winner_advances_to_slot,loser_advances_to_match_id,loser_advances_to_slot,updated_at").eq("tournament_id", requestedTournamentId).order("round_number").order("match_order"),
       supabaseClient.rpc("can_manage_tournament", { p_tournament_id: requestedTournamentId }),
       supabaseClient.rpc("can_soft_delete_tournament", { p_tournament_id: requestedTournamentId }),
+      supabaseClient.rpc("can_finalize_tournament", { p_tournament_id: requestedTournamentId }),
     ];
     let standingsResultIndex = null;
     let placementsResultIndex = null;
@@ -733,16 +826,16 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
           .eq("tournament_id", requestedTournamentId)
           .order("placement"),
       );
-      if (tournament.tournament_type === "team") {
-        teamMembersResultIndex = requests.length;
-        requests.push(
-          supabaseClient
-            .from("tournament_team_members")
-            .select("team_entry_id,display_name_snapshot,member_order")
-            .eq("tournament_id", requestedTournamentId)
-            .order("member_order"),
-        );
-      }
+    }
+    if (tournament.tournament_type === "team") {
+      teamMembersResultIndex = requests.length;
+      requests.push(
+        supabaseClient
+          .from("tournament_team_members")
+          .select("team_entry_id,display_name_snapshot,member_order")
+          .eq("tournament_id", requestedTournamentId)
+          .order("member_order"),
+      );
     }
 
     const results = await Promise.all(requests);
@@ -760,6 +853,7 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
       matches: results[2].data ?? [],
       canManage: tournament.status === "active" && results[3].data === true,
       canDelete: results[4].data === true,
+      canFinalize: tournament.status === "active" && results[5].data === true,
       standings: standingsResultIndex === null ? [] : results[standingsResultIndex].data ?? [],
       placements: placementsResultIndex === null ? [] : results[placementsResultIndex].data ?? [],
       teamMembers: teamMembersResultIndex === null ? [] : results[teamMembersResultIndex].data ?? [],
@@ -800,6 +894,7 @@ async function saveTournamentLiveMatchResult(form) {
     return;
   }
 
+  const scrollAnchor = captureTournamentMatchScrollAnchor(matchId);
   tournamentLiveMutationRunning = true;
   tournamentLiveMatchErrors.delete(matchId);
   renderTournamentLivePreservingScoreDrafts();
@@ -819,6 +914,7 @@ async function saveTournamentLiveMatchResult(form) {
       showLoading: false,
       keepCurrentOnError: true,
     });
+    restoreTournamentMatchScrollAnchor(scrollAnchor);
     void refreshActiveTournamentCard();
   } catch (error) {
     const matchStage = tournamentLiveState.matches.find((match) => match.id === matchId)?.stage;
@@ -1134,6 +1230,7 @@ async function startActiveTournamentRealtime() {
 
 function handleTournamentScreenChange(screen) {
   if (screen !== tournamentLiveScreen) {
+    closeTournamentTeamPopover();
     if (tournamentLiveId) tournamentLiveRequestId += 1;
     void stopTournamentLiveRealtime();
   }
@@ -1149,6 +1246,7 @@ function openTournamentLive(tournamentId, { returnTarget = "menu", historical = 
   tournamentLiveHistoricalOpen = historical;
   tournamentLiveFinishedView = "summary";
   tournamentCorrectionMode = false;
+  closeTournamentTeamPopover();
   tournamentLiveMatchErrors.clear();
   deleteTournamentLiveButton.hidden = true;
   showScreen(tournamentLiveScreen);
@@ -1168,9 +1266,11 @@ function closeTournamentLive() {
   tournamentLiveHistoricalOpen = false;
   tournamentLiveFinishedView = "summary";
   tournamentCorrectionMode = false;
+  closeTournamentTeamPopover();
   tournamentLiveMatchErrors.clear();
   deleteTournamentLiveButton.hidden = true;
   toggleTournamentCorrectionButton.hidden = true;
+  if (!tournamentFinalizeModal.hidden) closeTournamentFinalizeModal(true);
   if (returnTarget === "archive" && typeof returnToTournamentArchive === "function") {
     returnToTournamentArchive();
   } else {
@@ -1210,6 +1310,53 @@ function activateTournamentCorrectionMode() {
   tournamentLiveContent.scrollTop = 0;
 }
 
+function openTournamentFinalizeModal() {
+  if (!tournamentLiveState?.canFinalize || tournamentLiveFinalizeRunning) return;
+  tournamentFinalizeError.hidden = true;
+  tournamentFinalizeError.textContent = "";
+  document.querySelector("#app").inert = true;
+  tournamentFinalizeModal.hidden = false;
+  confirmTournamentFinalizeButton.focus({ preventScroll: true });
+}
+
+function closeTournamentFinalizeModal(force = false) {
+  if (tournamentLiveFinalizeRunning && !force) return;
+  tournamentFinalizeModal.hidden = true;
+  document.querySelector("#app").inert = false;
+  tournamentFinalizeError.hidden = true;
+  tournamentLiveContent.querySelector("[data-finalize-tournament]")?.focus({ preventScroll: true });
+}
+
+async function finalizeOpenTournament() {
+  if (!tournamentLiveState?.canFinalize || tournamentLiveFinalizeRunning || !tournamentLiveId) return;
+  tournamentLiveFinalizeRunning = true;
+  tournamentLiveMutationRunning = true;
+  confirmTournamentFinalizeButton.disabled = true;
+  confirmTournamentFinalizeButton.textContent = "Wird abgeschlossen …";
+  tournamentFinalizeError.hidden = true;
+  try {
+    const { error } = await supabaseClient.rpc("finalize_tournament", {
+      p_tournament_id: tournamentLiveId,
+    });
+    if (error) throw error;
+    closeTournamentFinalizeModal(true);
+    tournamentLiveFinalizeRunning = false;
+    tournamentLiveMutationRunning = false;
+    await loadTournamentLive({ showLoading: false, keepCurrentOnError: true });
+    void refreshActiveTournamentCard();
+  } catch (error) {
+    logTournamentLiveError("Tournament finalize failed", error, { tournamentId: tournamentLiveId });
+    tournamentFinalizeError.textContent = "Das Turnier konnte nicht abgeschlossen werden. Bitte Ergebnisse erneut prüfen.";
+    tournamentFinalizeError.hidden = false;
+  } finally {
+    tournamentLiveFinalizeRunning = false;
+    tournamentLiveMutationRunning = false;
+    confirmTournamentFinalizeButton.disabled = false;
+    confirmTournamentFinalizeButton.textContent = "Turnier abschließen";
+    resumeQueuedTournamentLiveRealtimeRefresh();
+  }
+}
+
 activeTournamentMenuCard.addEventListener("click", () => openTournamentLive(activeTournamentMenuCard.dataset.tournamentId));
 closeTournamentLiveButton.addEventListener("click", closeTournamentLive);
 refreshTournamentLiveButton.addEventListener("click", () => void loadTournamentLive({ preserveScoreDrafts: true, showLoading: false }));
@@ -1222,6 +1369,11 @@ cancelTournamentCorrectionButton.addEventListener("click", () => closeTournament
 confirmTournamentCorrectionButton.addEventListener("click", activateTournamentCorrectionMode);
 tournamentCorrectionModal.addEventListener("click", (event) => {
   if (event.target === tournamentCorrectionModal) closeTournamentCorrectionModal();
+});
+cancelTournamentFinalizeButton.addEventListener("click", () => closeTournamentFinalizeModal());
+confirmTournamentFinalizeButton.addEventListener("click", () => void finalizeOpenTournament());
+tournamentFinalizeModal.addEventListener("click", (event) => {
+  if (event.target === tournamentFinalizeModal) closeTournamentFinalizeModal();
 });
 cancelTournamentDeleteButton.addEventListener("click", () => closeTournamentDeleteModal());
 confirmTournamentDeleteButton.addEventListener("click", () => void softDeleteOpenTournament());
@@ -1238,6 +1390,15 @@ tournamentLiveContent.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
   if (event.target.closest("[data-delete-tournament]")) {
     openTournamentDeleteModal();
+    return;
+  }
+  const teamTrigger = event.target.closest("[data-team-entry-id]");
+  if (teamTrigger) {
+    toggleTournamentTeamPopover(teamTrigger, teamTrigger.dataset.teamEntryId);
+    return;
+  }
+  if (event.target.closest("[data-finalize-tournament]")) {
+    openTournamentFinalizeModal();
     return;
   }
   if (event.target.closest("[data-end-tournament-correction]")) {
@@ -1263,7 +1424,23 @@ tournamentLiveContent.addEventListener("click", (event) => {
   const tiebreakerButton = event.target.closest("[data-create-tiebreaker]");
   if (tiebreakerButton) void createTournamentLiveTiebreaker(tiebreakerButton.dataset.createTiebreaker);
 });
+document.addEventListener("click", (event) => {
+  if (tournamentTeamPopover.hidden || !(event.target instanceof Element)) return;
+  if (tournamentTeamPopover.contains(event.target) || event.target.closest("[data-team-entry-id]")) return;
+  closeTournamentTeamPopover();
+});
+window.addEventListener("resize", closeTournamentTeamPopover);
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !tournamentTeamPopover.hidden) {
+    event.preventDefault();
+    closeTournamentTeamPopover();
+    return;
+  }
+  if (event.key === "Escape" && !tournamentFinalizeModal.hidden) {
+    event.preventDefault();
+    closeTournamentFinalizeModal();
+    return;
+  }
   if (event.key === "Escape" && !tournamentCorrectionModal.hidden) {
     event.preventDefault();
     closeTournamentCorrectionModal();
@@ -1289,6 +1466,7 @@ subscribeToAppAuthState((auth) => {
     tournamentLiveMatchErrors.clear();
   }
   if (!auth.isAdmin && !tournamentCorrectionModal.hidden) closeTournamentCorrectionModal(true);
+  if (!auth.currentAuthUser && !tournamentFinalizeModal.hidden) closeTournamentFinalizeModal(true);
   void refreshActiveTournamentCard();
 
   if (!nextUserId) {

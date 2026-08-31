@@ -24,6 +24,7 @@ class FakeElement {
   removeAttribute() {}
   setAttribute() {}
   focus() {}
+  querySelector() { return null; }
   querySelectorAll() { return []; }
 }
 
@@ -42,6 +43,7 @@ const context = vm.createContext({
   FormData: class {},
   document: {
     activeElement: null,
+    addEventListener() {},
     createElement: () => new FakeElement(),
     createDocumentFragment: () => new FakeElement(),
     querySelector: (selector) => elements.get(selector) ?? new FakeElement(),
@@ -65,8 +67,8 @@ const styles = fs.readFileSync(path.join(__dirname, "..", "style.css"), "utf8");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 assert.match(styles, /\.tournament-match-entry-copy\s*\{[^}]*min-width:\s*0/s);
 assert.match(styles, /\.tournament-match-bye\s*\{[^}]*font-size:\s*0\.62rem/s);
-assert.match(html, /style\.css\?v=95/);
-assert.match(html, /tournament-live\.js\?v=10/);
+assert.match(html, /style\.css\?v=96/);
+assert.match(html, /tournament-live\.js\?v=11/);
 const tests = `
 function createSingleEliminationFixture(entryCount) {
   let bracketSize = 1;

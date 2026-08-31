@@ -123,11 +123,11 @@ function getGroupLabel(index) {
 }
 
 function createTournamentTeam() {
-  return { id: nextEntityId("draft-team"), name: `Team ${tournamentCreateState.teams.length + 1}`, memberIds: [] };
+  return { id: nextEntityId("draft-team"), name: `Team ${tournamentCreateState.teams.length + 1}`, memberIds: [], manualMemberIds: [] };
 }
 
 function createTournamentGroup() {
-  return { id: nextEntityId("draft-group"), name: getGroupLabel(tournamentCreateState.groups.length), entryIds: [] };
+  return { id: nextEntityId("draft-group"), name: getGroupLabel(tournamentCreateState.groups.length), entryIds: [], manualEntryIds: [] };
 }
 
 function ensureTournamentTeams() {
@@ -324,14 +324,17 @@ function renderTournamentStepTwo() {
   });
   section.append(grid);
   const groupStagePossible = tournamentCreateState.participants.length >= 4;
-  step.append(section, createTournamentToggle(
+  const groupStageToggle = createTournamentToggle(
     "Gruppenphase",
     groupStagePossible ? "Teilnehmer werden vor der KO-Runde auf Gruppen verteilt." : "Ab 4 Teilnehmern verfügbar.",
     tournamentCreateState.groupStageEnabled,
     () => setTournamentGroupStage(!tournamentCreateState.groupStageEnabled),
-    true,
+    false,
     !groupStagePossible,
-  ));
+  );
+  groupStageToggle.classList.add("tournament-group-stage-card");
+  section.append(groupStageToggle);
+  step.append(section);
   return step;
 }
 
@@ -354,8 +357,8 @@ function createParticipantSummary(title, names) {
 
 function getBuilderConfig() {
   return tournamentCreateState.phase === "teams"
-    ? { collection: tournamentCreateState.teams, sourceItems: tournamentCreateState.participants, memberKey: "memberIds", targetKey: "targetTeamId", editable: true, kind: "Team", entryType: "player" }
-    : { collection: tournamentCreateState.groups, sourceItems: getGroupEntryItems(), memberKey: "entryIds", targetKey: "targetGroupId", editable: false, kind: "Gruppe", entryType: tournamentCreateState.type === "team" ? "team" : "player" };
+    ? { collection: tournamentCreateState.teams, sourceItems: tournamentCreateState.participants, memberKey: "memberIds", manualKey: "manualMemberIds", targetKey: "targetTeamId", editable: true, kind: "Team", entryType: "player" }
+    : { collection: tournamentCreateState.groups, sourceItems: getGroupEntryItems(), memberKey: "entryIds", manualKey: "manualEntryIds", targetKey: "targetGroupId", editable: false, kind: "Gruppe", entryType: tournamentCreateState.type === "team" ? "team" : "player" };
 }
 
 function getTournamentBuilderAssignmentMessage(config, count) {
@@ -445,6 +448,8 @@ function confirmTournamentBuilderSelection() {
   if (!target || !selectedItems.length) return false;
 
   target[config.memberKey].push(...selectedItems.map((item) => item.id));
+  target[config.manualKey] ??= [];
+  target[config.manualKey].push(...selectedItems.map((item) => item.id));
   const targetId = target.id;
   markTournamentDirty();
   closeTournamentBuilderModal({ restoreFocus: false });
@@ -458,6 +463,7 @@ function removeTournamentBuilderItem(containerId, itemId) {
   const container = config.collection.find((item) => item.id === containerId);
   if (!container) return;
   container[config.memberKey] = container[config.memberKey].filter((id) => id !== itemId);
+  container[config.manualKey] = (container[config.manualKey] ?? []).filter((id) => id !== itemId);
   markTournamentDirty();
   renderTournamentWizard();
 }
@@ -516,7 +522,8 @@ function renderTournamentBuilderCard(item, config) {
   item[config.memberKey].forEach((memberId) => {
     const member = config.sourceItems.find((entry) => entry.id === memberId);
     if (!member) return;
-    const row = createElement("li", "is-manually-assigned");
+    const manuallyAssigned = (item[config.manualKey] ?? []).includes(memberId);
+    const row = createElement("li", manuallyAssigned ? "is-manually-assigned" : "is-randomly-assigned");
     row.append(createButton("manual-fixed-member-button", `− ${member.name}`, () => removeTournamentBuilderItem(item.id, memberId)));
     members.append(row);
   });
@@ -535,9 +542,21 @@ function renderTournamentBuilderCard(item, config) {
 
 function distributeTournamentItems() {
   const config = getBuilderConfig();
-  const randomized = typeof shuffle === "function" ? shuffle(config.sourceItems) : [...config.sourceItems].sort(() => Math.random() - 0.5);
-  config.collection.forEach((item) => { item[config.memberKey] = []; });
-  randomized.forEach((item, index) => config.collection[index % config.collection.length][config.memberKey].push(item.id));
+  const manuallyAssignedIds = new Set();
+  config.collection.forEach((item) => {
+    item[config.manualKey] ??= [];
+    item[config.manualKey] = item[config.manualKey].filter((id) => item[config.memberKey].includes(id));
+    item[config.memberKey] = [...item[config.manualKey]];
+    item[config.manualKey].forEach((id) => manuallyAssignedIds.add(id));
+  });
+  const available = config.sourceItems.filter((item) => !manuallyAssignedIds.has(item.id));
+  const randomized = typeof shuffle === "function" ? shuffle(available) : [...available].sort(() => Math.random() - 0.5);
+  randomized.forEach((item) => {
+    const smallestSize = Math.min(...config.collection.map((container) => container[config.memberKey].length));
+    const smallest = config.collection.filter((container) => container[config.memberKey].length === smallestSize);
+    const target = smallest[Math.floor(Math.random() * smallest.length)];
+    target[config.memberKey].push(item.id);
+  });
   markTournamentDirty();
   const grid = document.querySelector(".tournament-builder-grid");
   if (grid && typeof animateReshuffle === "function") void animateReshuffle(grid, renderTournamentWizard);
@@ -557,7 +576,10 @@ async function resetTournamentBuilderAssignments() {
   document.querySelector(".tournament-randomize-button")?.setAttribute("disabled", "");
 
   const clearAssignments = () => {
-    collection.forEach((item) => { item[memberKey] = []; });
+    collection.forEach((item) => {
+      item[memberKey] = [];
+      item[config.manualKey] = [];
+    });
     markTournamentDirty();
     renderTournamentWizard();
   };

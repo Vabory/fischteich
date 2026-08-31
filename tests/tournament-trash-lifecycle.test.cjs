@@ -44,8 +44,8 @@ assert.match(html, /id="settings-admin-actions"[^>]*hidden/);
 assert.match(html, /id="tournament-trash-screen"[^>]*hidden/);
 assert.match(html, /id="tournament-delete-modal"/);
 assert.match(html, /id="tournament-restore-modal"/);
-assert.match(html, /style\.css\?v=95/);
-assert.match(html, /tournament-live\.js\?v=10/);
+assert.match(html, /style\.css\?v=96/);
+assert.match(html, /tournament-live\.js\?v=11/);
 assert.match(html, /tournament-trash\.js\?v=2/);
 
 assert.match(liveSource, /supabaseClient\.rpc\("can_soft_delete_tournament"/);

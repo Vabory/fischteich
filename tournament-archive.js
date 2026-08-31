@@ -34,7 +34,7 @@ function renderTournamentArchiveStatus(message, { retry = false } = {}) {
   tournamentArchiveContent.replaceChildren(panel);
 }
 
-function createTournamentArchiveCard(tournament, champion) {
+function createTournamentArchiveCard(tournament, placements) {
   const card = document.createElement("button");
   card.type = "button";
   card.className = "tournament-archive-card";
@@ -47,10 +47,24 @@ function createTournamentArchiveCard(tournament, champion) {
   meta.textContent = `${formatTournamentArchiveDate(tournament.finished_at)} · ${tournament.tournament_type === "team" ? "Teamturnier" : "Einzelturnier"}`;
   const title = document.createElement("strong");
   title.textContent = tournament.title;
-  const winner = document.createElement("span");
-  winner.className = "tournament-archive-card-winner";
-  winner.textContent = champion ? `🥇 ${champion.display_name_snapshot}` : "Platzierungen noch nicht verfügbar";
-  copy.append(meta, title, winner);
+  const podium = document.createElement("span");
+  podium.className = "tournament-archive-card-podium";
+  const placementGroups = new Map();
+  for (const placement of placements ?? []) {
+    if (!placementGroups.has(placement.placement)) placementGroups.set(placement.placement, []);
+    placementGroups.get(placement.placement).push(placement.display_name_snapshot);
+  }
+  const medals = new Map([[1, "🥇"], [2, "🥈"], [3, "🥉"]]);
+  for (const place of [1, 2, 3]) {
+    const names = placementGroups.get(place);
+    if (!names?.length) continue;
+    const row = document.createElement("span");
+    row.className = `tournament-archive-placement is-place-${place}`;
+    row.textContent = `${medals.get(place)} ${names.join(" · ")}`;
+    podium.append(row);
+  }
+  if (!podium.children.length) podium.textContent = "Platzierungen noch nicht verfügbar";
+  copy.append(meta, title, podium);
 
   const arrow = document.createElement("span");
   arrow.className = "tournament-archive-card-arrow";
@@ -77,15 +91,16 @@ async function loadTournamentArchive() {
     if (requestId !== tournamentArchiveRequestId) return;
 
     const tournamentIds = (tournaments ?? []).map((tournament) => tournament.id);
-    let champions = [];
+    let podiumPlacements = [];
     if (tournamentIds.length > 0) {
       const { data, error } = await supabaseClient
         .from("tournament_placements")
-        .select("tournament_id,entry_id,display_name_snapshot")
+        .select("tournament_id,entry_id,placement,display_name_snapshot")
         .in("tournament_id", tournamentIds)
-        .eq("placement", 1);
+        .lte("placement", 3)
+        .order("placement");
       if (error) throw error;
-      champions = data ?? [];
+      podiumPlacements = data ?? [];
     }
     if (requestId !== tournamentArchiveRequestId) return;
 
@@ -94,11 +109,15 @@ async function loadTournamentArchive() {
       return;
     }
 
-    const championByTournamentId = new Map(champions.map((placement) => [placement.tournament_id, placement]));
+    const placementsByTournamentId = new Map();
+    for (const placement of podiumPlacements) {
+      if (!placementsByTournamentId.has(placement.tournament_id)) placementsByTournamentId.set(placement.tournament_id, []);
+      placementsByTournamentId.get(placement.tournament_id).push(placement);
+    }
     const list = document.createElement("div");
     list.className = "tournament-archive-list";
     for (const tournament of tournaments) {
-      list.append(createTournamentArchiveCard(tournament, championByTournamentId.get(tournament.id)));
+      list.append(createTournamentArchiveCard(tournament, placementsByTournamentId.get(tournament.id) ?? []));
     }
     tournamentArchiveContent.replaceChildren(list);
   } catch (error) {

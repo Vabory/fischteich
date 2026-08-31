@@ -39,13 +39,14 @@ assert.doesNotMatch(softDeleteBody, /can_manage_tournament/);
 assert.doesNotMatch(softDeleteBody, /tournament_(entries|teams|team_members|groups|group_entries|matches|placements)/);
 
 assert.match(html, /id="delete-tournament-live"/);
-assert.match(html, /id="settings-admin-section"[^>]*hidden/);
+assert.match(html, /id="settings-admin-section"/);
+assert.match(html, /id="settings-admin-actions"[^>]*hidden/);
 assert.match(html, /id="tournament-trash-screen"[^>]*hidden/);
 assert.match(html, /id="tournament-delete-modal"/);
 assert.match(html, /id="tournament-restore-modal"/);
-assert.match(html, /style\.css\?v=94/);
-assert.match(html, /tournament-live\.js\?v=9/);
-assert.match(html, /tournament-trash\.js\?v=1/);
+assert.match(html, /style\.css\?v=95/);
+assert.match(html, /tournament-live\.js\?v=10/);
+assert.match(html, /tournament-trash\.js\?v=2/);
 
 assert.match(liveSource, /supabaseClient\.rpc\("can_soft_delete_tournament"/);
 assert.match(liveSource, /supabaseClient\.rpc\("soft_delete_tournament"/);

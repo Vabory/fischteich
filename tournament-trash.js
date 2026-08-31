@@ -4,16 +4,22 @@ const tournamentTrashScreen = document.querySelector("#tournament-trash-screen")
 const tournamentTrashContent = document.querySelector("#tournament-trash-content");
 const openTournamentTrashButton = document.querySelector("#open-tournament-trash");
 const closeTournamentTrashButton = document.querySelector("#close-tournament-trash");
-const settingsAdminSection = document.querySelector("#settings-admin-section");
 const tournamentRestoreModal = document.querySelector("#tournament-restore-modal");
 const tournamentRestoreCopy = document.querySelector("#tournament-restore-copy");
 const tournamentRestoreError = document.querySelector("#tournament-restore-error");
 const cancelTournamentRestoreButton = document.querySelector("#cancel-tournament-restore");
 const confirmTournamentRestoreButton = document.querySelector("#confirm-tournament-restore");
+const tournamentHardDeleteModal = document.querySelector("#tournament-hard-delete-modal");
+const tournamentHardDeleteNameInput = document.querySelector("#tournament-hard-delete-name");
+const tournamentHardDeleteError = document.querySelector("#tournament-hard-delete-error");
+const cancelTournamentHardDeleteButton = document.querySelector("#cancel-tournament-hard-delete");
+const confirmTournamentHardDeleteButton = document.querySelector("#confirm-tournament-hard-delete");
 
 let tournamentTrashRequestId = 0;
 let tournamentTrashRestoreRunning = false;
 let tournamentTrashSelection = null;
+let tournamentTrashHardDeleteRunning = false;
+let tournamentTrashNotice = "";
 
 function createTournamentTrashElement(tagName, className = "", text = "") {
   const element = document.createElement(tagName);
@@ -89,12 +95,25 @@ function createTournamentTrashCard(tournament) {
   if (tournament.started_at) facts.append(createTournamentTrashFact("Gestartet", formatTournamentTrashDate(tournament.started_at)));
   if (tournament.finished_at) facts.append(createTournamentTrashFact("Beendet", formatTournamentTrashDate(tournament.finished_at)));
 
+  const actions = createTournamentTrashElement("div", "tournament-trash-card-actions");
   const restore = createTournamentTrashElement("button", "primary-button tournament-trash-restore-button", "Wiederherstellen");
   restore.type = "button";
   restore.dataset.restoreTournamentId = tournament.id;
   restore.addEventListener("click", () => openTournamentRestoreModal(tournament));
-  card.append(heading, facts, restore);
+  const hardDelete = createTournamentTrashElement("button", "secondary-button tournament-trash-hard-delete-button", "Endgültig löschen");
+  hardDelete.type = "button";
+  hardDelete.dataset.hardDeleteTournamentId = tournament.id;
+  hardDelete.addEventListener("click", () => openTournamentHardDeleteModal(tournament));
+  actions.append(restore, hardDelete);
+  card.append(heading, facts, actions);
   return card;
+}
+
+function appendTournamentTrashNotice() {
+  if (!tournamentTrashNotice) return;
+  const notice = createTournamentTrashElement("p", "tournament-trash-success", tournamentTrashNotice);
+  tournamentTrashNotice = "";
+  tournamentTrashContent.prepend(notice);
 }
 
 async function loadTournamentTrash() {
@@ -111,13 +130,15 @@ async function loadTournamentTrash() {
     if (error) throw error;
     if (requestId !== tournamentTrashRequestId || tournamentTrashScreen.hidden) return;
     if (!data?.length) {
-      renderTournamentTrashStatus("Der Turnier-Papierkorb ist leer.");
+      renderTournamentTrashStatus(tournamentTrashNotice || "Der Turnier-Papierkorb ist leer.");
+      tournamentTrashNotice = "";
       return;
     }
 
     const list = createTournamentTrashElement("div", "tournament-trash-list");
     for (const tournament of data) list.append(createTournamentTrashCard(tournament));
     tournamentTrashContent.replaceChildren(list);
+    appendTournamentTrashNotice();
   } catch (error) {
     if (requestId !== tournamentTrashRequestId) return;
     console.error("[Tournament Trash] load failed", JSON.stringify({
@@ -126,6 +147,71 @@ async function loadTournamentTrash() {
       details: error?.details,
     }));
     renderTournamentTrashStatus("Der Turnier-Papierkorb konnte nicht geladen werden.", { retry: true });
+  }
+}
+
+function syncTournamentHardDeleteConfirmation() {
+  confirmTournamentHardDeleteButton.disabled = tournamentTrashHardDeleteRunning
+    || tournamentHardDeleteNameInput.value !== tournamentTrashSelection?.title;
+}
+
+function openTournamentHardDeleteModal(tournament) {
+  if (!getAppAuthState().isAdmin || tournamentTrashHardDeleteRunning) return;
+  tournamentTrashSelection = tournament;
+  tournamentHardDeleteNameInput.value = "";
+  tournamentHardDeleteError.hidden = true;
+  tournamentHardDeleteError.textContent = "";
+  confirmTournamentHardDeleteButton.disabled = true;
+  appElement.inert = true;
+  tournamentHardDeleteModal.hidden = false;
+  tournamentHardDeleteNameInput.focus({ preventScroll: true });
+}
+
+function closeTournamentHardDeleteModal(force = false) {
+  if (tournamentTrashHardDeleteRunning && !force) return;
+  const selectedId = tournamentTrashSelection?.id;
+  tournamentHardDeleteModal.hidden = true;
+  appElement.inert = false;
+  tournamentHardDeleteError.hidden = true;
+  tournamentHardDeleteNameInput.value = "";
+  tournamentTrashSelection = null;
+  tournamentTrashContent.querySelector(`[data-hard-delete-tournament-id="${selectedId}"]`)?.focus({ preventScroll: true });
+}
+
+async function hardDeleteSelectedTournament() {
+  if (
+    tournamentTrashHardDeleteRunning
+    || !tournamentTrashSelection
+    || !getAppAuthState().isAdmin
+    || tournamentHardDeleteNameInput.value !== tournamentTrashSelection.title
+  ) return;
+
+  const tournamentId = tournamentTrashSelection.id;
+  tournamentTrashHardDeleteRunning = true;
+  confirmTournamentHardDeleteButton.disabled = true;
+  confirmTournamentHardDeleteButton.textContent = "Wird gelöscht …";
+  tournamentHardDeleteError.hidden = true;
+  try {
+    const { error } = await supabaseClient.rpc("hard_delete_tournament", {
+      p_tournament_id: tournamentId,
+    });
+    if (error) throw error;
+    closeTournamentHardDeleteModal(true);
+    tournamentTrashNotice = "Turnier endgültig gelöscht.";
+    await loadTournamentTrash();
+  } catch (error) {
+    console.error("[Tournament Trash] hard delete failed", JSON.stringify({
+      tournamentId,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+    }));
+    tournamentHardDeleteError.textContent = "Das Turnier konnte nicht endgültig gelöscht werden.";
+    tournamentHardDeleteError.hidden = false;
+  } finally {
+    tournamentTrashHardDeleteRunning = false;
+    confirmTournamentHardDeleteButton.textContent = "Endgültig löschen";
+    syncTournamentHardDeleteConfirmation();
   }
 }
 
@@ -206,6 +292,12 @@ openTournamentTrashButton.addEventListener("click", openTournamentTrash);
 closeTournamentTrashButton.addEventListener("click", closeTournamentTrash);
 cancelTournamentRestoreButton.addEventListener("click", () => closeTournamentRestoreModal());
 confirmTournamentRestoreButton.addEventListener("click", () => void restoreSelectedTournament());
+tournamentHardDeleteNameInput.addEventListener("input", syncTournamentHardDeleteConfirmation);
+cancelTournamentHardDeleteButton.addEventListener("click", () => closeTournamentHardDeleteModal());
+confirmTournamentHardDeleteButton.addEventListener("click", () => void hardDeleteSelectedTournament());
+tournamentHardDeleteModal.addEventListener("click", (event) => {
+  if (event.target === tournamentHardDeleteModal) closeTournamentHardDeleteModal();
+});
 tournamentRestoreModal.addEventListener("click", (event) => {
   if (event.target === tournamentRestoreModal) closeTournamentRestoreModal();
 });
@@ -213,6 +305,9 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !tournamentRestoreModal.hidden) {
     event.preventDefault();
     closeTournamentRestoreModal();
+  } else if (event.key === "Escape" && !tournamentHardDeleteModal.hidden) {
+    event.preventDefault();
+    closeTournamentHardDeleteModal();
   } else if (event.key === "Escape" && !tournamentTrashScreen.hidden) {
     event.preventDefault();
     closeTournamentTrash();
@@ -220,9 +315,9 @@ window.addEventListener("keydown", (event) => {
 });
 
 subscribeToAppAuthState((auth) => {
-  settingsAdminSection.hidden = !auth.isAdmin;
   if (!auth.isAdmin && !tournamentTrashScreen.hidden) {
     if (!tournamentRestoreModal.hidden) closeTournamentRestoreModal(true);
+    if (!tournamentHardDeleteModal.hidden) closeTournamentHardDeleteModal(true);
     closeTournamentTrash();
   }
 });

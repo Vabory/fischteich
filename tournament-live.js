@@ -7,6 +7,10 @@ const tournamentLiveContent = document.querySelector("#tournament-live-content")
 const closeTournamentLiveButton = document.querySelector("#close-tournament-live");
 const refreshTournamentLiveButton = document.querySelector("#refresh-tournament-live");
 const deleteTournamentLiveButton = document.querySelector("#delete-tournament-live");
+const toggleTournamentCorrectionButton = document.querySelector("#toggle-tournament-correction");
+const tournamentCorrectionModal = document.querySelector("#tournament-correction-modal");
+const cancelTournamentCorrectionButton = document.querySelector("#cancel-tournament-correction");
+const confirmTournamentCorrectionButton = document.querySelector("#confirm-tournament-correction");
 const tournamentDeleteModal = document.querySelector("#tournament-delete-modal");
 const tournamentDeleteCopy = document.querySelector("#tournament-delete-copy");
 const tournamentDeleteError = document.querySelector("#tournament-delete-error");
@@ -25,6 +29,7 @@ let tournamentLiveState = null;
 let tournamentLiveReturnTarget = "menu";
 let tournamentLiveHistoricalOpen = false;
 let tournamentLiveFinishedView = "summary";
+let tournamentCorrectionMode = false;
 const tournamentLiveMatchErrors = new Map();
 let tournamentLiveRealtimeChannel = null;
 let tournamentLiveRealtimeRun = 0;
@@ -303,15 +308,19 @@ function createTournamentMatchCard(match, entryById, canManage, byeSlotKeys = ne
   const entryAHasBye = byeSlotKeys.has(`${match.id}:a`);
   const entryBHasBye = byeSlotKeys.has(`${match.id}:b`);
   const playable = Boolean(match.entry_a_id && match.entry_b_id);
-  const card = createTournamentLiveElement(canManage && playable ? "form" : "article", `tournament-match-card${match.match_status === "completed" ? " is-completed" : ""}${!playable ? " is-waiting" : ""}`);
+  const correcting = tournamentCorrectionMode
+    && getAppAuthState().isAdmin
+    && match.match_status === "completed";
+  const editable = playable && (tournamentCorrectionMode ? correcting : canManage);
+  const card = createTournamentLiveElement(editable ? "form" : "article", `tournament-match-card${match.match_status === "completed" ? " is-completed" : ""}${!playable ? " is-waiting" : ""}${correcting ? " is-admin-correction" : ""}`);
   card.dataset.matchId = match.id;
 
-  if (canManage && playable) {
+  if (editable) {
     card.append(
       createTournamentScoreInput(match, "a", entryAName, entryAHasBye),
       createTournamentScoreInput(match, "b", entryBName, entryBHasBye),
     );
-    const saveButton = createTournamentLiveElement("button", "tournament-match-save", match.match_status === "completed" ? "Ergebnis ändern" : "Ergebnis speichern");
+    const saveButton = createTournamentLiveElement("button", "tournament-match-save", correcting ? "Korrigieren" : match.match_status === "completed" ? "Ergebnis ändern" : "Ergebnis speichern");
     saveButton.type = "submit";
     saveButton.disabled = tournamentLiveMutationRunning;
     card.append(saveButton);
@@ -643,15 +652,35 @@ function renderTournamentLive() {
     ? tournamentLiveFinishedView === "history" ? "Turnierverlauf" : "Zusammenfassung"
     : formatTournamentPhase(tournamentLiveState.tournament.current_phase);
   refreshTournamentLiveButton.disabled = tournamentLiveMutationRunning;
+  const canCorrect = getAppAuthState().isAdmin
+    && ["active", "finished"].includes(tournamentLiveState.tournament.status);
+  if (!canCorrect) tournamentCorrectionMode = false;
+  toggleTournamentCorrectionButton.hidden = !canCorrect;
+  toggleTournamentCorrectionButton.textContent = tournamentCorrectionMode ? "Korrekturmodus beenden" : "Korrekturmodus";
+  toggleTournamentCorrectionButton.classList.toggle("is-active", tournamentCorrectionMode);
   deleteTournamentLiveButton.hidden = !tournamentLiveState.canDelete || finished;
   deleteTournamentLiveButton.disabled = tournamentLiveMutationRunning || tournamentLiveDeleteRunning;
   if (finished) {
     if (tournamentLiveFinishedView === "history") renderTournamentFinishedHistory(tournamentLiveState);
     else renderTournamentFinishedSummary(tournamentLiveState);
-    return;
+  } else if (tournamentLiveState.tournament.current_phase === "group_stage") {
+    renderTournamentGroupPhase(tournamentLiveState);
+  } else {
+    renderTournamentKnockout(tournamentLiveState);
   }
-  if (tournamentLiveState.tournament.current_phase === "group_stage") renderTournamentGroupPhase(tournamentLiveState);
-  else renderTournamentKnockout(tournamentLiveState);
+
+  if (tournamentCorrectionMode) {
+    const notice = createTournamentLiveElement("aside", "tournament-correction-notice");
+    notice.append(
+      createTournamentLiveElement("strong", "", "ADMIN · KORREKTURMODUS"),
+      createTournamentLiveElement("span", "", "Nur abgeschlossene Matches können administrativ korrigiert werden."),
+    );
+    const endButton = createTournamentLiveElement("button", "tournament-correction-end", "Korrekturmodus beenden");
+    endButton.type = "button";
+    endButton.dataset.endTournamentCorrection = "true";
+    notice.append(endButton);
+    tournamentLiveContent.prepend(notice);
+  }
 }
 
 async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = true, keepCurrentOnError = false } = {}) {
@@ -753,7 +782,8 @@ async function loadTournamentLive({ preserveScoreDrafts = false, showLoading = t
 }
 
 async function saveTournamentLiveMatchResult(form) {
-  if (tournamentLiveMutationRunning || !tournamentLiveState?.canManage) return;
+  const correctionAllowed = tournamentCorrectionMode && getAppAuthState().isAdmin;
+  if (tournamentLiveMutationRunning || (!tournamentLiveState?.canManage && !correctionAllowed)) return;
   const matchId = form.dataset.matchId;
   const rawScoreA = String(new FormData(form).get("scoreA") ?? "").trim().replace(",", ".");
   const rawScoreB = String(new FormData(form).get("scoreB") ?? "").trim().replace(",", ".");
@@ -774,14 +804,21 @@ async function saveTournamentLiveMatchResult(form) {
   tournamentLiveMatchErrors.delete(matchId);
   renderTournamentLivePreservingScoreDrafts();
   try {
-    const { error } = await supabaseClient.rpc("set_tournament_match_result", {
+    const { error } = await supabaseClient.rpc(
+      correctionAllowed ? "admin_set_tournament_match_result" : "set_tournament_match_result",
+      {
       p_match_id: matchId,
       p_score_a: rawScoreA,
       p_score_b: rawScoreB,
-    });
+      },
+    );
     if (error) throw error;
     tournamentLiveMutationRunning = false;
-    await loadTournamentLive({ preserveScoreDrafts: true, showLoading: false, keepCurrentOnError: true });
+    await loadTournamentLive({
+      preserveScoreDrafts: !correctionAllowed,
+      showLoading: false,
+      keepCurrentOnError: true,
+    });
     void refreshActiveTournamentCard();
   } catch (error) {
     const matchStage = tournamentLiveState.matches.find((match) => match.id === matchId)?.stage;
@@ -789,8 +826,10 @@ async function saveTournamentLiveMatchResult(form) {
     tournamentLiveMutationRunning = false;
     tournamentLiveMatchErrors.set(
       matchId,
-      error?.message?.includes("abhängige Matches")
-        ? "Dieses Ergebnis kann nicht geändert werden, weil bereits abhängige Matches gespielt wurden."
+      error?.message?.includes("Folgematches") || error?.message?.includes("abhängige Matches")
+        ? "Diese Korrektur würde bereits gespielte Folgematches beeinflussen."
+        : error?.message?.includes("Finalstruktur")
+          ? "Diese Korrektur würde die Finalstruktur verändern und ist derzeit gesperrt."
         : error?.message?.includes("Gewinner")
           ? "Das Match benötigt einen Gewinner."
           : "Ergebnis konnte nicht gespeichert werden. Bitte erneut versuchen.",
@@ -1109,6 +1148,7 @@ function openTournamentLive(tournamentId, { returnTarget = "menu", historical = 
   tournamentLiveReturnTarget = returnTarget;
   tournamentLiveHistoricalOpen = historical;
   tournamentLiveFinishedView = "summary";
+  tournamentCorrectionMode = false;
   tournamentLiveMatchErrors.clear();
   deleteTournamentLiveButton.hidden = true;
   showScreen(tournamentLiveScreen);
@@ -1127,8 +1167,10 @@ function closeTournamentLive() {
   tournamentLiveReturnTarget = "menu";
   tournamentLiveHistoricalOpen = false;
   tournamentLiveFinishedView = "summary";
+  tournamentCorrectionMode = false;
   tournamentLiveMatchErrors.clear();
   deleteTournamentLiveButton.hidden = true;
+  toggleTournamentCorrectionButton.hidden = true;
   if (returnTarget === "archive" && typeof returnToTournamentArchive === "function") {
     returnToTournamentArchive();
   } else {
@@ -1137,10 +1179,50 @@ function closeTournamentLive() {
   }
 }
 
+function openTournamentCorrectionModal() {
+  if (!getAppAuthState().isAdmin || !tournamentLiveState || tournamentLiveMutationRunning) return;
+  document.querySelector("#app").inert = true;
+  tournamentCorrectionModal.hidden = false;
+  confirmTournamentCorrectionButton.focus({ preventScroll: true });
+}
+
+function closeTournamentCorrectionModal(force = false) {
+  if (tournamentLiveMutationRunning && !force) return;
+  tournamentCorrectionModal.hidden = true;
+  document.querySelector("#app").inert = false;
+  toggleTournamentCorrectionButton.focus({ preventScroll: true });
+}
+
+function endTournamentCorrectionMode() {
+  if (!tournamentCorrectionMode || tournamentLiveMutationRunning) return;
+  tournamentCorrectionMode = false;
+  tournamentLiveMatchErrors.clear();
+  renderTournamentLive();
+}
+
+function activateTournamentCorrectionMode() {
+  if (!getAppAuthState().isAdmin || !tournamentLiveState) return;
+  closeTournamentCorrectionModal(true);
+  tournamentCorrectionMode = true;
+  tournamentLiveMatchErrors.clear();
+  if (tournamentLiveState.tournament.status === "finished") tournamentLiveFinishedView = "history";
+  renderTournamentLive();
+  tournamentLiveContent.scrollTop = 0;
+}
+
 activeTournamentMenuCard.addEventListener("click", () => openTournamentLive(activeTournamentMenuCard.dataset.tournamentId));
 closeTournamentLiveButton.addEventListener("click", closeTournamentLive);
 refreshTournamentLiveButton.addEventListener("click", () => void loadTournamentLive({ preserveScoreDrafts: true, showLoading: false }));
 deleteTournamentLiveButton.addEventListener("click", openTournamentDeleteModal);
+toggleTournamentCorrectionButton.addEventListener("click", () => {
+  if (tournamentCorrectionMode) endTournamentCorrectionMode();
+  else openTournamentCorrectionModal();
+});
+cancelTournamentCorrectionButton.addEventListener("click", () => closeTournamentCorrectionModal());
+confirmTournamentCorrectionButton.addEventListener("click", activateTournamentCorrectionMode);
+tournamentCorrectionModal.addEventListener("click", (event) => {
+  if (event.target === tournamentCorrectionModal) closeTournamentCorrectionModal();
+});
 cancelTournamentDeleteButton.addEventListener("click", () => closeTournamentDeleteModal());
 confirmTournamentDeleteButton.addEventListener("click", () => void softDeleteOpenTournament());
 tournamentDeleteModal.addEventListener("click", (event) => {
@@ -1156,6 +1238,10 @@ tournamentLiveContent.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
   if (event.target.closest("[data-delete-tournament]")) {
     openTournamentDeleteModal();
+    return;
+  }
+  if (event.target.closest("[data-end-tournament-correction]")) {
+    endTournamentCorrectionMode();
     return;
   }
   if (event.target.closest("[data-show-tournament-history]")) {
@@ -1178,6 +1264,11 @@ tournamentLiveContent.addEventListener("click", (event) => {
   if (tiebreakerButton) void createTournamentLiveTiebreaker(tiebreakerButton.dataset.createTiebreaker);
 });
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !tournamentCorrectionModal.hidden) {
+    event.preventDefault();
+    closeTournamentCorrectionModal();
+    return;
+  }
   if (event.key === "Escape" && !tournamentDeleteModal.hidden) {
     event.preventDefault();
     closeTournamentDeleteModal();
@@ -1193,6 +1284,11 @@ subscribeToAppAuthState((auth) => {
   const nextUserId = auth.currentAuthUser?.id ?? null;
   const authUserChanged = nextUserId !== tournamentRealtimeAuthUserId;
   tournamentRealtimeAuthUserId = nextUserId;
+  if (!auth.isAdmin && tournamentCorrectionMode) {
+    tournamentCorrectionMode = false;
+    tournamentLiveMatchErrors.clear();
+  }
+  if (!auth.isAdmin && !tournamentCorrectionModal.hidden) closeTournamentCorrectionModal(true);
   void refreshActiveTournamentCard();
 
   if (!nextUserId) {

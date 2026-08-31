@@ -13,18 +13,18 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=94">
+    <link rel="stylesheet" href="./style.css?v=95">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
-    <script src="./auth.js?v=1" defer></script>
+    <script src="./auth.js?v=2" defer></script>
     <script src="./roulette-service.js?v=5" defer></script>
-    <script src="./script.js?v=56" defer></script>
+    <script src="./script.js?v=57" defer></script>
     <script src="./tournament-create.js?v=5" defer></script>
-    <script src="./tournament-live.js?v=9" defer></script>
+    <script src="./tournament-live.js?v=10" defer></script>
     <script src="./tournament-archive.js?v=1" defer></script>
-    <script src="./tournament-trash.js?v=1" defer></script>
+    <script src="./tournament-trash.js?v=2" defer></script>
   </head>
   <body>
     <div id="app">
@@ -318,6 +318,7 @@
             <h1 id="tournament-live-title">Laufendes Turnier</h1>
           </div>
           <div class="tournament-live-header-actions">
+            <button class="tournament-admin-correction-toggle" id="toggle-tournament-correction" type="button" hidden>Korrekturmodus</button>
             <button class="tournament-live-delete" id="delete-tournament-live" type="button" aria-label="Turnier löschen" hidden>🗑</button>
             <button class="tournament-live-refresh" id="refresh-tournament-live" type="button" aria-label="Turnier aktualisieren">↻</button>
           </div>
@@ -491,11 +492,31 @@
           <strong class="settings-current-name" id="settings-current-name"></strong>
           <button class="primary-button settings-rename-button" id="open-display-name-rename" type="button">Name ändern</button>
         </div>
-        <div class="settings-admin-section" id="settings-admin-section" hidden>
+        <div class="settings-admin-section" id="settings-admin-section">
           <span class="settings-name-label">Administration</span>
-          <button class="secondary-button settings-trash-button" id="open-tournament-trash" type="button">Turnier-Papierkorb</button>
+          <p class="settings-admin-status" id="settings-admin-status">Adminfunktionen sind geschützt.</p>
+          <button class="secondary-button settings-admin-login-button" id="open-admin-login" type="button">Admin anmelden</button>
+          <div class="settings-admin-actions" id="settings-admin-actions" hidden>
+            <button class="secondary-button settings-trash-button" id="open-tournament-trash" type="button">Turnier-Papierkorb</button>
+            <button class="settings-admin-logout-button" id="admin-logout" type="button">Admin abmelden</button>
+          </div>
         </div>
       </section>
+    </div>
+
+    <div class="modal-backdrop" id="admin-login-modal" role="dialog" aria-modal="true" aria-labelledby="admin-login-title" hidden>
+      <form class="modal-card admin-login-card" id="admin-login-form" novalidate>
+        <h2 id="admin-login-title">Admin anmelden</h2>
+        <label class="welcome-identity-label" for="admin-login-email">E-Mail</label>
+        <input class="guest-fish-input" id="admin-login-email" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+        <label class="welcome-identity-label" for="admin-login-password">Passwort</label>
+        <input class="guest-fish-input" id="admin-login-password" name="password" type="password" autocomplete="current-password" enterkeyhint="done" required>
+        <p class="guest-fish-error" id="admin-login-error" aria-live="polite" hidden>Admin-Anmeldung fehlgeschlagen.</p>
+        <div class="modal-actions guest-fish-actions">
+          <button class="secondary-button" id="cancel-admin-login" type="button">Abbrechen</button>
+          <button class="primary-button" id="submit-admin-login" type="submit">Anmelden</button>
+        </div>
+      </form>
     </div>
 
     <div class="modal-backdrop guest-fish-backdrop" id="display-name-rename-modal" role="dialog" aria-modal="true" aria-labelledby="display-name-rename-title" hidden>
@@ -673,6 +694,31 @@
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-tournament-restore" type="button">Abbrechen</button>
           <button class="primary-button" id="confirm-tournament-restore" type="button">Wiederherstellen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="tournament-hard-delete-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-hard-delete-title" hidden>
+      <div class="modal-card tournament-lifecycle-modal-card tournament-hard-delete-card">
+        <h2 id="tournament-hard-delete-title">Turnier endgültig löschen?</h2>
+        <p>Dieses Turnier und alle dazugehörigen Daten werden dauerhaft gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
+        <label class="welcome-identity-label" for="tournament-hard-delete-name">Zum Bestätigen den Turniernamen eingeben.</label>
+        <input class="guest-fish-input" id="tournament-hard-delete-name" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <p class="guest-fish-error" id="tournament-hard-delete-error" aria-live="polite" hidden></p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-tournament-hard-delete" type="button">Abbrechen</button>
+          <button class="primary-button tournament-trash-action" id="confirm-tournament-hard-delete" type="button" disabled>Endgültig löschen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="tournament-correction-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-correction-title" hidden>
+      <div class="modal-card tournament-lifecycle-modal-card tournament-correction-modal-card">
+        <h2 id="tournament-correction-title">Korrekturmodus aktivieren?</h2>
+        <p>Änderungen an abgeschlossenen Ergebnissen können nachfolgende Matches, Platzierungen und Statistiken beeinflussen. Dieser Modus ist ausschließlich für administrative Korrekturen gedacht.</p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-tournament-correction" type="button">Abbrechen</button>
+          <button class="primary-button tournament-correction-confirm" id="confirm-tournament-correction" type="button">Korrekturmodus</button>
         </div>
       </div>
     </div>

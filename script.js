@@ -177,6 +177,16 @@ const welcomeIdentityError = document.querySelector("#welcome-identity-error");
 const openSettingsButton = document.querySelector("#open-settings");
 const settingsModal = document.querySelector("#settings-modal");
 const settingsCurrentName = document.querySelector("#settings-current-name");
+const settingsAdminStatus = document.querySelector("#settings-admin-status");
+const settingsAdminActions = document.querySelector("#settings-admin-actions");
+const openAdminLoginButton = document.querySelector("#open-admin-login");
+const adminLogoutButton = document.querySelector("#admin-logout");
+const adminLoginModal = document.querySelector("#admin-login-modal");
+const adminLoginForm = document.querySelector("#admin-login-form");
+const adminLoginEmail = document.querySelector("#admin-login-email");
+const adminLoginPassword = document.querySelector("#admin-login-password");
+const adminLoginError = document.querySelector("#admin-login-error");
+const submitAdminLoginButton = document.querySelector("#submit-admin-login");
 const openDisplayNameRenameButton = document.querySelector("#open-display-name-rename");
 const displayNameRenameModal = document.querySelector("#display-name-rename-modal");
 const displayNameRenameForm = document.querySelector("#display-name-rename-form");
@@ -667,11 +677,92 @@ function renderSettingsIdentity() {
   settingsCurrentName.textContent = getDisplayName() || "—";
 }
 
+function renderSettingsAdmin(auth = getAppAuthState()) {
+  const isAdmin = auth.isAdmin === true;
+  settingsAdminStatus.textContent = isAdmin ? "Admin angemeldet" : "Adminfunktionen sind geschützt.";
+  settingsAdminStatus.classList.toggle("is-admin", isAdmin);
+  openAdminLoginButton.hidden = isAdmin;
+  settingsAdminActions.hidden = !isAdmin;
+}
+
 function openSettingsModal() {
   renderSettingsIdentity();
+  renderSettingsAdmin();
   appElement.inert = true;
   settingsModal.hidden = false;
   document.querySelector("#close-settings").focus({ preventScroll: true });
+}
+
+function setAdminLoginRunning(running) {
+  submitAdminLoginButton.disabled = running;
+  document.querySelector("#cancel-admin-login").disabled = running;
+  adminLoginEmail.disabled = running;
+  adminLoginPassword.disabled = running;
+  submitAdminLoginButton.textContent = running ? "Wird angemeldet …" : "Anmelden";
+}
+
+function openAdminLoginModal() {
+  if (getAppAuthState().isAdmin) return;
+  settingsModal.hidden = true;
+  adminLoginError.hidden = true;
+  adminLoginError.textContent = "Admin-Anmeldung fehlgeschlagen.";
+  adminLoginModal.hidden = false;
+  appElement.inert = true;
+  window.setTimeout(() => adminLoginEmail.focus({ preventScroll: true }), 0);
+}
+
+function closeAdminLoginModal({ reopenSettings = true, clearCredentials = true } = {}) {
+  if (submitAdminLoginButton.disabled) return;
+  adminLoginModal.hidden = true;
+  adminLoginError.hidden = true;
+  if (clearCredentials) adminLoginForm.reset();
+  appElement.inert = false;
+  if (reopenSettings) openSettingsModal();
+}
+
+async function submitAdminLogin() {
+  const email = adminLoginEmail.value.trim();
+  const password = adminLoginPassword.value;
+  if (!email || !password) {
+    adminLoginError.textContent = "Bitte E-Mail und Passwort eingeben.";
+    adminLoginError.hidden = false;
+    return;
+  }
+
+  setAdminLoginRunning(true);
+  adminLoginError.hidden = true;
+  try {
+    await signInAdminWithPassword(email, password);
+    setAdminLoginRunning(false);
+    closeAdminLoginModal({ reopenSettings: true, clearCredentials: true });
+  } catch (error) {
+    console.error("[Admin Login] failed", {
+      code: error?.code,
+      message: error?.message,
+    });
+    setAdminLoginRunning(false);
+    adminLoginError.textContent = "Admin-Anmeldung fehlgeschlagen.";
+    adminLoginError.hidden = false;
+    adminLoginPassword.focus({ preventScroll: true });
+  }
+}
+
+async function logoutAdminFromSettings() {
+  if (!getAppAuthState().isAdmin || adminLogoutButton.disabled) return;
+  adminLogoutButton.disabled = true;
+  adminLogoutButton.textContent = "Wird abgemeldet …";
+  try {
+    await signOutAdmin();
+  } catch (error) {
+    console.error("[Admin Logout] failed", {
+      code: error?.code,
+      message: error?.message,
+    });
+  } finally {
+    adminLogoutButton.disabled = false;
+    adminLogoutButton.textContent = "Admin abmelden";
+    renderSettingsAdmin();
+  }
 }
 
 function closeSettingsModal() {
@@ -3565,6 +3656,16 @@ document.querySelector("#start-manual-participants").addEventListener("click", (
 });
 openSettingsButton.addEventListener("click", openSettingsModal);
 document.querySelector("#close-settings").addEventListener("click", closeSettingsModal);
+openAdminLoginButton.addEventListener("click", openAdminLoginModal);
+adminLoginForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void submitAdminLogin();
+});
+document.querySelector("#cancel-admin-login").addEventListener("click", () => closeAdminLoginModal());
+adminLoginModal.addEventListener("click", (event) => {
+  if (event.target === adminLoginModal) closeAdminLoginModal();
+});
+adminLogoutButton.addEventListener("click", () => void logoutAdminFromSettings());
 openDisplayNameRenameButton.addEventListener("click", openDisplayNameRenameModal);
 displayNameRenameForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -3813,6 +3914,8 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     if (!welcomeIdentityModal.hidden) {
       return;
+    } else if (!adminLoginModal.hidden) {
+      closeAdminLoginModal();
     } else if (!displayNameRenameModal.hidden) {
       closeDisplayNameRenameModal();
     } else if (!settingsModal.hidden) {
@@ -3849,4 +3952,5 @@ document.addEventListener("keydown", (event) => {
 updateMarkerSize();
 renderRouletteStats();
 initializeLocalIdentity();
+subscribeToAppAuthState((auth) => renderSettingsAdmin(auth));
 void initializeAppAuth();

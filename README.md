@@ -1,5 +1,6 @@
-# team-splitter
-Simple mobile multi-touch team splitter
+# Fischteich
+
+Mobile Fischteich-Web-App für Teamaufteilung, Fisch Roulette und Turniere.
 
 ## Tournament placement backfill
 

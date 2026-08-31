@@ -13,7 +13,7 @@
     <title>Fischteich Angel</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=96">
+    <link rel="stylesheet" href="./style.css?v=97">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -21,8 +21,8 @@
     <script src="./auth.js?v=2" defer></script>
     <script src="./roulette-service.js?v=5" defer></script>
     <script src="./script.js?v=57" defer></script>
-    <script src="./tournament-create.js?v=6" defer></script>
-    <script src="./tournament-live.js?v=11" defer></script>
+    <script src="./tournament-create.js?v=7" defer></script>
+    <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
     <script src="./tournament-trash.js?v=2" defer></script>
   </head>
@@ -681,7 +681,7 @@
         <p class="guest-fish-error" id="tournament-delete-error" aria-live="polite" hidden></p>
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-tournament-delete" type="button">Abbrechen</button>
-          <button class="primary-button tournament-trash-action" id="confirm-tournament-delete" type="button">In Papierkorb</button>
+          <button class="primary-button tournament-trash-action" id="confirm-tournament-delete" type="button">Löschen</button>
         </div>
       </div>
     </div>
@@ -726,7 +726,7 @@
     <div class="modal-backdrop" id="tournament-finalize-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-finalize-title" hidden>
       <div class="modal-card tournament-lifecycle-modal-card tournament-finalize-modal-card">
         <h2 id="tournament-finalize-title">Turnier abschließen?</h2>
-        <p>Bitte prüfe die Ergebnisse noch einmal. Nach dem Abschließen wird das Turnier in die Historie verschoben. Spätere Änderungen sind nur noch im Admin-Korrekturmodus möglich.</p>
+        <p>Bitte prüfe die Ergebnisse noch einmal. Nach dem Abschließen wird das Turnier beendet und gespeichert!</p>
         <p class="guest-fish-error" id="tournament-finalize-error" aria-live="polite" hidden></p>
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-tournament-finalize" type="button">Abbrechen</button>

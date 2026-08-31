@@ -333,7 +333,12 @@ function renderTournamentStepTwo() {
     !groupStagePossible,
   );
   groupStageToggle.classList.add("tournament-group-stage-card");
-  section.append(groupStageToggle);
+  const optionalSection = createElement("div", "tournament-format-optional");
+  optionalSection.append(
+    createElement("p", "tournament-section-label tournament-optional-label", "Optional"),
+    groupStageToggle,
+  );
+  section.append(optionalSection);
   step.append(section);
   return step;
 }

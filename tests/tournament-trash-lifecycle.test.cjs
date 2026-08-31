@@ -44,8 +44,8 @@ assert.match(html, /id="settings-admin-actions"[^>]*hidden/);
 assert.match(html, /id="tournament-trash-screen"[^>]*hidden/);
 assert.match(html, /id="tournament-delete-modal"/);
 assert.match(html, /id="tournament-restore-modal"/);
-assert.match(html, /style\.css\?v=96/);
-assert.match(html, /tournament-live\.js\?v=11/);
+assert.match(html, /style\.css\?v=97/);
+assert.match(html, /tournament-live\.js\?v=12/);
 assert.match(html, /tournament-trash\.js\?v=2/);
 
 assert.match(liveSource, /supabaseClient\.rpc\("can_soft_delete_tournament"/);
@@ -55,7 +55,10 @@ assert.match(liveSource, /await stopTournamentLiveRealtime\(\);[\s\S]*closeTourn
 assert.match(liveSource, /Dieses Turnier wurde gelöscht oder ist nicht mehr sichtbar/);
 assert.match(liveSource, /tournament\.status === "active" && results\[3\]\.data === true/);
 assert.match(liveSource, /canDelete: results\[4\]\.data === true/);
-assert.match(liveSource, /data-delete-tournament/);
+assert.doesNotMatch(liveSource, /data-delete-tournament/);
+assert.match(liveSource, /deleteTournamentLiveButton\.hidden = !tournamentLiveState\.canDelete/);
+assert.match(liveSource, /supabaseClient\.rpc\("soft_delete_tournament"/);
+assert.doesNotMatch(liveSource, /supabaseClient\.rpc\("hard_delete_tournament"/);
 
 assert.match(trashSource, /if \(!auth\.isAdmin\)/);
 assert.match(trashSource, /supabaseClient\.rpc\("get_tournament_trash"\)/);

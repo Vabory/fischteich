@@ -16,17 +16,23 @@ const migration = read("supabase/migrations/20260831010000_separate_match_comple
 
 assert.match(html, /id="tournament-finalize-modal"/);
 assert.match(html, /id="tournament-team-popover"[^>]*role="dialog"/);
-assert.match(html, /style\.css\?v=96/);
-assert.match(html, /tournament-create\.js\?v=6/);
-assert.match(html, /tournament-live\.js\?v=11/);
+assert.match(html, /style\.css\?v=97/);
+assert.match(html, /tournament-create\.js\?v=7/);
+assert.match(html, /tournament-live\.js\?v=12/);
 assert.match(html, /tournament-archive\.js\?v=2/);
+assert.match(html, /Bitte prüfe die Ergebnisse noch einmal\. Nach dem Abschließen wird das Turnier beendet und gespeichert!/);
+assert.doesNotMatch(html, /Spätere Änderungen sind nur noch im Admin-Korrekturmodus möglich/);
+assert.match(html, /id="confirm-tournament-delete"[^>]*>Löschen<\/button>/);
 
 const stepTwo = createSource.slice(
   createSource.indexOf("function renderTournamentStepTwo()"),
   createSource.indexOf("function createParticipantSummary"),
 );
-assert.ok(stepTwo.indexOf("section.append(grid)") < stepTwo.indexOf("section.append(groupStageToggle)"));
+assert.ok(stepTwo.indexOf("section.append(grid)") < stepTwo.indexOf("section.append(optionalSection)"));
 assert.match(stepTwo, /groupStageToggle\.classList\.add\("tournament-group-stage-card"\)/);
+assert.match(stepTwo, /"tournament-section-label tournament-optional-label", "Optional"/);
+assert.match(css, /\.tournament-format-optional\s*\{[^}]*border-top:\s*1px solid/s);
+assert.match(css, /\.tournament-format-optional\s*\{[^}]*margin-top:\s*clamp\(22px, 4vh, 34px\)/s);
 
 const distribute = createSource.slice(
   createSource.indexOf("function distributeTournamentItems()"),
@@ -49,6 +55,19 @@ assert.match(liveSource, /restoreTournamentMatchScrollAnchor\(scrollAnchor\)/);
 assert.match(liveSource, /rpc\("can_finalize_tournament"/);
 assert.match(liveSource, /rpc\("finalize_tournament"/);
 assert.match(liveSource, /"Turnier abschließen!"/);
+assert.match(liveSource, /Bist du dir sicher, dass du das laufende Turnier frühzeitig beenden und löschen möchtest\?/);
+assert.match(liveSource, /Das abgeschlossene Turnier wird aus dem Archiv entfernt und gelöscht\./);
+assert.match(liveSource, /confirmTournamentDeleteButton\.textContent = "Löschen"/);
+assert.match(liveSource, /supabaseClient\.rpc\("soft_delete_tournament"/);
+assert.doesNotMatch(liveSource, /supabaseClient\.rpc\("hard_delete_tournament"/);
+
+const finishedSummary = liveSource.slice(
+  liveSource.indexOf("function renderTournamentFinishedSummary"),
+  liveSource.indexOf("function renderTournamentFinishedHistory"),
+);
+assert.match(finishedSummary, /primary-button tournament-finalize-button tournament-summary-history-button/);
+assert.doesNotMatch(finishedSummary, /data-delete-tournament|tournament-summary-delete-button/);
+assert.match(liveSource, /deleteTournamentLiveButton\.hidden = !tournamentLiveState\.canDelete/);
 
 const finishedHistory = liveSource.slice(
   liveSource.indexOf("function renderTournamentFinishedHistory"),

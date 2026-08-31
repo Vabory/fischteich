@@ -4602,14 +4602,6 @@ h2 {
   margin-top: 14px;
 }
 
-.tournament-summary-delete-button {
-  width: 100%;
-  min-height: 46px;
-  margin-top: 9px;
-  border-color: rgb(255 102 144 / 28%);
-  color: #ff9abb;
-}
-
 .tournament-trash-action,
 .tournament-discard-button {
   background: #b63251;
@@ -4717,7 +4709,7 @@ h2 {
 }
 
 .tournament-group-stage-card {
-  margin-top: 13px;
+  margin-top: 10px;
   padding: 18px 17px;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 20px;
@@ -4729,6 +4721,19 @@ h2 {
 .tournament-group-stage-card .tournament-toggle-copy strong { font-size: 0.94rem; letter-spacing: 0.03em; text-transform: uppercase; }
 .tournament-group-stage-card .tournament-toggle-copy span { margin-top: 6px; font-size: 0.78rem; line-height: 1.35; }
 .tournament-builder-members li.is-randomly-assigned { opacity: 0.88; }
+
+.tournament-format-optional {
+  margin-top: clamp(22px, 4vh, 34px);
+  padding-top: 16px;
+  border-top: 1px solid rgb(255 255 255 / 11%);
+}
+
+.tournament-optional-label {
+  margin-bottom: 0;
+  color: rgb(205 217 239 / 55%);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+}
 
 /* The current tournament remains secondary to the four main actions, but visibly live. */
 .active-tournament-card {
@@ -4817,6 +4822,7 @@ h2 {
 .tournament-finalize-action strong { color: #bcefff; font-size: 0.88rem; }
 .tournament-finalize-action span { color: rgb(211 229 240 / 68%); font-size: 0.72rem; line-height: 1.4; }
 .tournament-finalize-button { min-height: 54px; margin-top: 8px; background: linear-gradient(135deg, #168db7, #236de0); box-shadow: 0 10px 26px rgb(35 109 224 / 25%); }
+.tournament-summary-history-button.tournament-finalize-button { margin-top: 14px; }
 .tournament-finalize-modal-card { text-align: left; }
 .tournament-finalize-modal-card h2 { text-align: center; }
 .tournament-finalize-confirm { background: linear-gradient(135deg, #168db7, #236de0); }
@@ -4826,6 +4832,7 @@ h2 {
 }
 
 @media (max-height: 700px) {
+  .tournament-format-optional { margin-top: 18px; padding-top: 12px; }
   .tournament-group-stage-card { padding-block: 12px; }
   .tournament-group-stage-card .tournament-toggle-row { min-height: 58px; }
 }

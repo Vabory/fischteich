@@ -692,16 +692,10 @@ function renderTournamentFinishedSummary(state) {
     fragment.append(createTournamentLiveElement("p", "tournament-summary-backfill-note", "Für dieses ältere Turnier sind noch nicht alle Platzierungen nachberechnet."));
   }
 
-  const historyButton = createTournamentLiveElement("button", "primary-button tournament-summary-history-button", "Turnierverlauf ansehen");
+  const historyButton = createTournamentLiveElement("button", "primary-button tournament-finalize-button tournament-summary-history-button", "Turnierverlauf ansehen");
   historyButton.type = "button";
   historyButton.dataset.showTournamentHistory = "true";
   fragment.append(historyButton);
-  if (state.canDelete) {
-    const deleteButton = createTournamentLiveElement("button", "secondary-button tournament-summary-delete-button", "Turnier löschen");
-    deleteButton.type = "button";
-    deleteButton.dataset.deleteTournament = "true";
-    fragment.append(deleteButton);
-  }
   tournamentLiveContent.replaceChildren(fragment);
 }
 
@@ -748,7 +742,7 @@ function renderTournamentLive() {
   toggleTournamentCorrectionButton.hidden = !canCorrect;
   toggleTournamentCorrectionButton.textContent = tournamentCorrectionMode ? "Korrekturmodus beenden" : "Korrekturmodus";
   toggleTournamentCorrectionButton.classList.toggle("is-active", tournamentCorrectionMode);
-  deleteTournamentLiveButton.hidden = !tournamentLiveState.canDelete || finished;
+  deleteTournamentLiveButton.hidden = !tournamentLiveState.canDelete;
   deleteTournamentLiveButton.disabled = tournamentLiveMutationRunning || tournamentLiveDeleteRunning;
   if (finished) {
     if (tournamentLiveFinishedView === "history") renderTournamentFinishedHistory(tournamentLiveState);
@@ -1098,10 +1092,10 @@ function startTournamentLiveRealtime(tournamentId) {
 
 function getTournamentDeleteCopy(status) {
   if (status === "active") {
-    return "Das laufende Turnier wird in den Papierkorb verschoben. Alle bisherigen Ergebnisse bleiben gespeichert. Nur ein Admin kann es wiederherstellen.";
+    return "Bist du dir sicher, dass du das laufende Turnier frühzeitig beenden und löschen möchtest?";
   }
   if (status === "finished") {
-    return "Das abgeschlossene Turnier wird aus dem Archiv entfernt und in den Papierkorb verschoben. Nur ein Admin kann es wiederherstellen.";
+    return "Das abgeschlossene Turnier wird aus dem Archiv entfernt und gelöscht.";
   }
   return "Der Turnierentwurf wird in den Papierkorb verschoben. Nur ein Admin kann ihn wiederherstellen.";
 }
@@ -1121,10 +1115,7 @@ function closeTournamentDeleteModal(force = false) {
   tournamentDeleteModal.hidden = true;
   appElement.inert = false;
   tournamentDeleteError.hidden = true;
-  const focusTarget = tournamentLiveState?.tournament.status === "finished"
-    ? tournamentLiveContent.querySelector("[data-delete-tournament]")
-    : deleteTournamentLiveButton;
-  focusTarget?.focus({ preventScroll: true });
+  deleteTournamentLiveButton.focus({ preventScroll: true });
 }
 
 async function softDeleteOpenTournament() {
@@ -1132,7 +1123,7 @@ async function softDeleteOpenTournament() {
   const deletingTournamentId = tournamentLiveId;
   tournamentLiveDeleteRunning = true;
   confirmTournamentDeleteButton.disabled = true;
-  confirmTournamentDeleteButton.textContent = "Wird verschoben …";
+  confirmTournamentDeleteButton.textContent = "Wird gelöscht …";
   deleteTournamentLiveButton.disabled = true;
   tournamentDeleteError.hidden = true;
 
@@ -1145,12 +1136,12 @@ async function softDeleteOpenTournament() {
     closeTournamentLive();
   } catch (error) {
     logTournamentLiveError("Tournament soft delete failed", error, { tournamentId: deletingTournamentId });
-    tournamentDeleteError.textContent = "Das Turnier konnte nicht in den Papierkorb verschoben werden. Bitte versuche es erneut.";
+    tournamentDeleteError.textContent = "Das Turnier konnte nicht gelöscht werden. Bitte versuche es erneut.";
     tournamentDeleteError.hidden = false;
   } finally {
     tournamentLiveDeleteRunning = false;
     confirmTournamentDeleteButton.disabled = false;
-    confirmTournamentDeleteButton.textContent = "In Papierkorb";
+    confirmTournamentDeleteButton.textContent = "Löschen";
     if (tournamentLiveState) renderTournamentLive();
   }
 }
@@ -1388,10 +1379,6 @@ tournamentLiveContent.addEventListener("submit", (event) => {
 });
 tournamentLiveContent.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
-  if (event.target.closest("[data-delete-tournament]")) {
-    openTournamentDeleteModal();
-    return;
-  }
   const teamTrigger = event.target.closest("[data-team-entry-id]");
   if (teamTrigger) {
     toggleTournamentTeamPopover(teamTrigger, teamTrigger.dataset.teamEntryId);

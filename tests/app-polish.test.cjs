@@ -12,9 +12,9 @@ const css = read("style.css");
 const script = read("script.js");
 const service = read("roulette-service.js");
 
-assert.match(html, /style\.css\?v=98/);
+assert.match(html, /style\.css\?v=99/);
 assert.match(html, /roulette-service\.js\?v=6/);
-assert.match(html, /script\.js\?v=58/);
+assert.match(html, /script\.js\?v=59/);
 
 assert.match(html, /<p class="settings-app-version" id="settings-app-version"><\/p>/);
 assert.equal((script.match(/const FISCHTEICH_APP_VERSION = "1\.0"/g) ?? []).length, 1);

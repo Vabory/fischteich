@@ -237,6 +237,37 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
+.buffalo-menu-button {
+  position: absolute;
+  z-index: 3;
+  top: max(calc(env(safe-area-inset-top) + 10px), 18px);
+  right: max(calc(env(safe-area-inset-right) + 10px), 18px);
+  display: grid;
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid rgb(255 209 104 / 42%);
+  border-radius: 50%;
+  background: rgb(15 9 14 / 82%);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 34%), inset 0 0 14px rgb(255 196 79 / 8%);
+  font-size: 1.48rem;
+  line-height: 1;
+  place-items: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 120ms ease-out, transform 120ms ease-out;
+}
+
+.buffalo-menu-button:active {
+  border-color: rgb(255 219 132 / 72%);
+  transform: scale(0.94);
+}
+
+.buffalo-menu-button:focus-visible {
+  outline: 2px solid #ffd06d;
+  outline-offset: 3px;
+}
+
 .roulette-background {
   position: absolute;
   z-index: 0;
@@ -446,6 +477,70 @@ h2 {
 .active-tournament-card:focus-visible {
   outline: 2px solid #75dfa0;
   outline-offset: 2px;
+}
+
+.buffalo-live-card {
+  width: 100%;
+  min-height: 54px;
+  margin: clamp(-17px, -4vw, -12px) auto 0;
+  padding: 7px 10px;
+  align-items: center;
+  border: 1px solid rgb(255 200 83 / 38%);
+  border-radius: 14px;
+  background: rgb(13 8 16 / 90%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 24%), inset 0 0 18px rgb(255 193 60 / 5%);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  text-align: left;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.buffalo-live-card:not([hidden]) {
+  display: grid;
+}
+
+.active-tournament-card:not([hidden]) + .buffalo-live-card {
+  margin-top: 7px;
+}
+
+.buffalo-live-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.buffalo-live-copy,
+.buffalo-live-copy span,
+.buffalo-live-copy strong {
+  display: block;
+  min-width: 0;
+}
+
+.buffalo-live-kicker {
+  color: #f5bc50;
+  font-size: 0.57rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.buffalo-live-copy strong {
+  overflow: hidden;
+  margin-top: 2px;
+  color: #fff;
+  font-size: 0.77rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buffalo-live-countdown {
+  color: #ffe7ac;
+  font-size: 1.16rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.025em;
 }
 
 .menu-secondary-actions {
@@ -2789,6 +2884,104 @@ h2 {
   margin: 24px 0 12px;
   color: rgb(239 243 255 / 68%);
   font-size: 0.84rem;
+}
+
+.buffalo-timer-backdrop {
+  padding:
+    max(12px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+}
+
+.buffalo-timer-modal-card {
+  width: min(100%, 390px);
+  max-height: min(94dvh, 650px);
+  padding: 17px 14px 14px;
+  border-color: rgb(255 203 87 / 28%);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0, rgb(124 78 22 / 18%), transparent 42%),
+    linear-gradient(145deg, rgb(16 18 38 / 99%), rgb(6 7 18 / 99%));
+}
+
+.buffalo-timer-modal-card .roulette-modal-kicker {
+  margin: 0 0 3px;
+  color: #f4bd55;
+}
+
+.buffalo-timer-modal-card h2 {
+  margin: 0 0 3px;
+  font-size: 1.38rem;
+}
+
+.buffalo-rules-link {
+  display: inline-block;
+  min-height: 28px;
+  padding: 5px 7px;
+  color: #71dcff;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-underline-offset: 3px;
+}
+
+.buffalo-selection-hint,
+.buffalo-timer-modal-card .buffalo-selection-hint {
+  margin: 5px 0 7px;
+  color: rgb(241 244 255 / 72%);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.buffalo-person-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.buffalo-person-option {
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 3px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 5%);
+  box-shadow: none;
+  color: rgb(244 247 255 / 82%);
+  font-size: clamp(0.64rem, 2.8vw, 0.72rem);
+  font-weight: 720;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color 100ms ease-out, background 100ms ease-out, transform 100ms ease-out;
+}
+
+.buffalo-person-option.is-other {
+  grid-column: 1 / -1;
+  color: #ffd982;
+}
+
+.buffalo-person-option.is-selected {
+  border-color: #ffd064;
+  background: linear-gradient(135deg, rgb(242 47 142 / 34%), rgb(54 187 232 / 28%));
+  box-shadow: inset 0 0 0 1px rgb(255 226 155 / 22%), 0 0 13px rgb(255 194 67 / 12%);
+  color: #fff;
+}
+
+.buffalo-person-option:active {
+  transform: scale(0.97);
+}
+
+.buffalo-timer-actions {
+  margin-top: 10px;
+}
+
+.buffalo-timer-actions button {
+  min-height: 43px;
+  padding: 10px 8px;
+  border-radius: 13px;
+  font-size: 0.78rem;
 }
 
 .roulette-leaderboard-list {

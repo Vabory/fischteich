@@ -14,14 +14,15 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=98">
+    <link rel="stylesheet" href="./style.css?v=99">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
     <script src="./auth.js?v=2" defer></script>
     <script src="./roulette-service.js?v=6" defer></script>
-    <script src="./script.js?v=58" defer></script>
+    <script src="./buffalo-service.js?v=1" defer></script>
+    <script src="./script.js?v=59" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -48,6 +49,9 @@
           draggable="false"
           aria-hidden="true"
         >
+        <button class="buffalo-menu-button" id="open-buffalo-timer" type="button" aria-label="Buffalo Timer öffnen">
+          <span aria-hidden="true">🐃</span>
+        </button>
         <main class="menu-card">
           <div class="menu-actions">
             <button id="start-two-teams" type="button" aria-label="Teams aufteilen">
@@ -81,6 +85,15 @@
             </div>
             <span class="active-tournament-arrow" aria-hidden="true">›</span>
           </button>
+
+          <section class="buffalo-live-card" id="buffalo-live-status" aria-label="Laufender Buffalo Timer" aria-live="polite" hidden>
+            <span class="buffalo-live-icon" aria-hidden="true">🐃</span>
+            <span class="buffalo-live-copy">
+              <span class="buffalo-live-kicker">Buffalo läuft</span>
+              <strong id="buffalo-live-name">—</strong>
+            </span>
+            <time class="buffalo-live-countdown" id="buffalo-live-countdown">03:00</time>
+          </section>
         </main>
 
         <nav class="menu-secondary-actions" aria-label="Weitere Bereiche">
@@ -795,6 +808,20 @@
         <strong class="roulette-personal-name" id="personal-roulette-name">—</strong>
         <p class="roulette-panel-status" id="personal-roulette-status" aria-live="polite">Wird geladen …</p>
         <div class="roulette-personal-grid" id="personal-roulette-grid"></div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop roulette-stats-backdrop buffalo-timer-backdrop" id="buffalo-timer-modal" role="dialog" aria-modal="true" aria-labelledby="buffalo-timer-title" hidden>
+      <div class="modal-card roulette-stats-modal-card buffalo-timer-modal-card">
+        <p class="roulette-modal-kicker">FISCHTEICH</p>
+        <h2 id="buffalo-timer-title">Buffalo Timer</h2>
+        <a class="buffalo-rules-link" href="https://ris-buffalo.eu/" target="_blank" rel="noopener noreferrer external">Buffalo Regelwerk ↗</a>
+        <p class="buffalo-selection-hint" id="buffalo-selection-hint">Wer wurde erwischt?</p>
+        <div class="buffalo-person-grid" id="buffalo-person-grid" role="group" aria-labelledby="buffalo-selection-hint"></div>
+        <div class="modal-actions buffalo-timer-actions">
+          <button class="secondary-button" id="cancel-buffalo-timer" type="button">Abbrechen</button>
+          <button class="primary-button" id="start-buffalo-timer" type="button" disabled>Timer starten!</button>
+        </div>
       </div>
     </div>
 

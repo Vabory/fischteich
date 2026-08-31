@@ -230,6 +230,13 @@ const personalRouletteGrid = document.querySelector("#personal-roulette-grid");
 const activeTournamentCard = document.querySelector("#active-tournament");
 const activeTournamentName = document.querySelector("#active-tournament-name");
 const activeTournamentPhase = document.querySelector("#active-tournament-phase");
+const openBuffaloTimerButton = document.querySelector("#open-buffalo-timer");
+const buffaloTimerModal = document.querySelector("#buffalo-timer-modal");
+const buffaloPersonGrid = document.querySelector("#buffalo-person-grid");
+const startBuffaloTimerButton = document.querySelector("#start-buffalo-timer");
+const buffaloLiveStatus = document.querySelector("#buffalo-live-status");
+const buffaloLiveName = document.querySelector("#buffalo-live-name");
+const buffaloLiveCountdown = document.querySelector("#buffalo-live-countdown");
 
 function setActiveTournament(tournament = null) {
   if (tournament === null) {
@@ -382,6 +389,9 @@ const state = {
   rouletteGoldEventActive: false,
   rouletteGoldEventToastTimer: null,
   rouletteGoldEventSeenIds: new Set(),
+  buffaloSelection: null,
+  buffaloEvent: null,
+  buffaloTimerInterval: null,
 };
 
 let rouletteAssetPreloadPromise = null;
@@ -420,6 +430,141 @@ function showMenu() {
   if (typeof refreshActiveTournamentCard === "function") {
     void refreshActiveTournamentCard();
   }
+}
+
+function createBuffaloSelection(kind, friendName = null) {
+  return kind === "other"
+    ? { kind: "other", friendName: null }
+    : { kind: "friend", friendName };
+}
+
+function renderBuffaloPersonOptions() {
+  if (buffaloPersonGrid.childElementCount > 0) return;
+
+  const options = [
+    ...FRIENDS.map((friendName) => createBuffaloSelection("friend", friendName)),
+    createBuffaloSelection("other"),
+  ];
+
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "buffalo-person-option";
+    button.dataset.buffaloKind = option.kind;
+    if (option.friendName) button.dataset.buffaloFriendName = option.friendName;
+    button.textContent = option.kind === "other" ? "Jemand anderes" : option.friendName;
+    button.setAttribute("aria-pressed", "false");
+    if (option.kind === "other") button.classList.add("is-other");
+    buffaloPersonGrid.append(button);
+  }
+}
+
+function renderBuffaloSelection() {
+  const selectedSelection = window.buffaloService?.normalizeSelection(
+    state.buffaloSelection,
+  ) ?? null;
+
+  for (const button of buffaloPersonGrid.querySelectorAll("[data-buffalo-kind]")) {
+    const option = createBuffaloSelection(
+      button.dataset.buffaloKind,
+      button.dataset.buffaloFriendName ?? null,
+    );
+    const normalizedOption = window.buffaloService?.normalizeSelection(option) ?? null;
+    const selected = selectedSelection !== null
+      && normalizedOption !== null
+      && selectedSelection.kind === normalizedOption.kind
+      && selectedSelection.friendName === normalizedOption.friendName;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+
+  startBuffaloTimerButton.disabled = state.buffaloSelection === null;
+}
+
+function selectBuffaloPerson(button) {
+  const nextSelection = createBuffaloSelection(
+    button.dataset.buffaloKind,
+    button.dataset.buffaloFriendName ?? null,
+  );
+  state.buffaloSelection = window.buffaloService?.toggleSelection(
+    state.buffaloSelection,
+    nextSelection,
+  ) ?? null;
+  renderBuffaloSelection();
+}
+
+function openBuffaloTimerModal() {
+  renderBuffaloPersonOptions();
+  state.buffaloSelection = null;
+  renderBuffaloSelection();
+  appElement.inert = true;
+  buffaloTimerModal.hidden = false;
+  buffaloPersonGrid.querySelector("button")?.focus({ preventScroll: true });
+}
+
+function closeBuffaloTimerModal({ restoreFocus = true } = {}) {
+  buffaloTimerModal.hidden = true;
+  state.buffaloSelection = null;
+  renderBuffaloSelection();
+  appElement.inert = false;
+  if (restoreFocus) openBuffaloTimerButton.focus({ preventScroll: true });
+}
+
+function formatBuffaloCountdown(milliseconds) {
+  const remainingSeconds = Math.ceil(Math.max(0, milliseconds) / 1000);
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function stopBuffaloTimerUi() {
+  if (state.buffaloTimerInterval !== null) {
+    window.clearInterval(state.buffaloTimerInterval);
+    state.buffaloTimerInterval = null;
+  }
+  state.buffaloEvent = null;
+  buffaloLiveStatus.hidden = true;
+}
+
+function renderBuffaloTimer() {
+  const event = window.buffaloService?.getActiveEvent() ?? null;
+  if (!event) {
+    stopBuffaloTimerUi();
+    return;
+  }
+
+  state.buffaloEvent = event;
+  buffaloLiveName.textContent = event.selection.displayName;
+  buffaloLiveCountdown.textContent = formatBuffaloCountdown(
+    window.buffaloService.getRemainingMilliseconds(event),
+  );
+  buffaloLiveStatus.hidden = false;
+}
+
+function startBuffaloTimerUi(event) {
+  stopBuffaloTimerUi();
+  state.buffaloEvent = event;
+  renderBuffaloTimer();
+  if (state.buffaloEvent) {
+    state.buffaloTimerInterval = window.setInterval(renderBuffaloTimer, 250);
+  }
+}
+
+function startSelectedBuffaloTimer() {
+  if (!state.buffaloSelection || !window.buffaloService) return false;
+
+  const event = window.buffaloService.startEvent(state.buffaloSelection);
+  if (!event) return false;
+
+  closeBuffaloTimerModal();
+  startBuffaloTimerUi(event);
+  return true;
+}
+
+function restoreBuffaloTimer() {
+  const event = window.buffaloService?.getActiveEvent() ?? null;
+  if (event) startBuffaloTimerUi(event);
+  else stopBuffaloTimerUi();
 }
 
 function showTeamsMenu({ focusSelector = null } = {}) {
@@ -3697,6 +3842,19 @@ settingsModal.addEventListener("click", (event) => {
   }
 });
 document.querySelector("#start-roulette").addEventListener("click", openRoulette);
+openBuffaloTimerButton.addEventListener("click", openBuffaloTimerModal);
+buffaloPersonGrid.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-buffalo-kind]");
+  if (button) selectBuffaloPerson(button);
+});
+document.querySelector("#cancel-buffalo-timer").addEventListener(
+  "click",
+  () => closeBuffaloTimerModal(),
+);
+startBuffaloTimerButton.addEventListener("click", startSelectedBuffaloTimer);
+buffaloTimerModal.addEventListener("click", (event) => {
+  if (event.target === buffaloTimerModal) closeBuffaloTimerModal();
+});
 rouletteSpinButton.addEventListener("click", startRoulette);
 rouletteRetryButton.addEventListener("click", () => {
   void initializeRoulette();
@@ -3920,10 +4078,18 @@ window.addEventListener("resize", () => {
 });
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") restoreBuffaloTimer();
+});
+window.addEventListener("storage", (event) => {
+  if (event.key === window.buffaloService?.storageKey) restoreBuffaloTimer();
+});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     if (!welcomeIdentityModal.hidden) {
       return;
+    } else if (!buffaloTimerModal.hidden) {
+      closeBuffaloTimerModal();
     } else if (!adminLoginModal.hidden) {
       closeAdminLoginModal();
     } else if (!displayNameRenameModal.hidden) {
@@ -3962,5 +4128,6 @@ document.addEventListener("keydown", (event) => {
 updateMarkerSize();
 renderRouletteStats();
 initializeLocalIdentity();
+restoreBuffaloTimer();
 subscribeToAppAuthState((auth) => renderSettingsAdmin(auth));
 void initializeAppAuth();

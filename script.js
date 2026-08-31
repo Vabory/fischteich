@@ -50,6 +50,7 @@ const MIN_TEAM_COUNT = 2;
 const MAX_TEAM_COUNT = 10;
 const MIN_MANUAL_TEAM_COUNT = 2;
 const MAX_MANUAL_TEAM_COUNT = 20;
+const FISCHTEICH_APP_VERSION = "1.0";
 const RAGE_CAGE_MIN_ANIMATION_STEPS = 12;
 const RESHUFFLE_FADE_OUT_DURATION = 190;
 const RESHUFFLE_FADE_IN_DURATION = 300;
@@ -179,6 +180,7 @@ const settingsModal = document.querySelector("#settings-modal");
 const settingsCurrentName = document.querySelector("#settings-current-name");
 const settingsAdminStatus = document.querySelector("#settings-admin-status");
 const settingsAdminActions = document.querySelector("#settings-admin-actions");
+const settingsAppVersion = document.querySelector("#settings-app-version");
 const openAdminLoginButton = document.querySelector("#open-admin-login");
 const adminLogoutButton = document.querySelector("#admin-logout");
 const adminLoginModal = document.querySelector("#admin-login-modal");
@@ -192,6 +194,7 @@ const displayNameRenameModal = document.querySelector("#display-name-rename-moda
 const displayNameRenameForm = document.querySelector("#display-name-rename-form");
 const displayNameRenameInput = document.querySelector("#display-name-rename-input");
 const displayNameRenameError = document.querySelector("#display-name-rename-error");
+settingsAppVersion.textContent = `Fischteich Version ${FISCHTEICH_APP_VERSION}`;
 const leaveModal = document.querySelector("#leave-modal");
 const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
 const rageCageReshuffleModal = document.querySelector("#rage-cage-reshuffle-modal");
@@ -1336,6 +1339,11 @@ function removeManualParticipantFromTeam(teamIndex, participantId) {
   document.querySelector(`[data-manual-player-team-index="${teamIndex}"]`)?.focus();
 }
 
+function getManualTeamMemberCount(teamIndex) {
+  return (state.manualAssignments[teamIndex]?.length ?? 0)
+    + (state.automaticAssignments?.[teamIndex]?.length ?? 0);
+}
+
 function createManualTeamCard(teamIndex) {
   const card = document.createElement("article");
   const heading = document.createElement("h3");
@@ -1408,8 +1416,10 @@ function createManualTeamCard(teamIndex) {
   card.append(heading, memberList);
 
   const addMemberButton = document.createElement("button");
+  const cardFooter = document.createElement("div");
+  const memberCount = document.createElement("span");
   addMemberButton.type = "button";
-  addMemberButton.className = "manual-team-member-add-button";
+  addMemberButton.className = "manual-team-member-add-button tournament-builder-add-members";
   addMemberButton.textContent = "+";
   addMemberButton.dataset.manualPlayerTeamIndex = teamIndex;
   addMemberButton.setAttribute(
@@ -1417,7 +1427,11 @@ function createManualTeamCard(teamIndex) {
     `Spieler manuell zu ${teamName} hinzufügen`,
   );
   addMemberButton.addEventListener("click", () => openManualPlayerModal(teamIndex));
-  card.append(addMemberButton);
+  cardFooter.className = "tournament-builder-card-footer manual-team-card-footer";
+  memberCount.className = "tournament-builder-member-count";
+  memberCount.textContent = `(${getManualTeamMemberCount(teamIndex)})`;
+  cardFooter.append(addMemberButton, memberCount);
+  card.append(cardFooter);
 
   return card;
 }
@@ -2820,7 +2834,7 @@ function normalizeRouletteLeaderboard(value) {
       ? new Date(item.last_gold_hit_at).toISOString()
       : null;
 
-    if (!displayName || [totalSpins, turbolachs, nitroforelle, gold].includes(null)) {
+    if (!displayName || [totalSpins, turbolachs, nitroforelle, gold].includes(null) || gold < 1) {
       continue;
     }
 
@@ -2872,7 +2886,7 @@ function applyRouletteLeaderboardChange(payload, { render = true } = {}) {
     ? []
     : normalizeRouletteLeaderboard([payload?.new]);
 
-  if (normalizedRows === null || (eventType !== "DELETE" && normalizedRows.length !== 1)) {
+  if (normalizedRows === null || normalizedRows.length > 1) {
     return false;
   }
 
@@ -3095,20 +3109,16 @@ function renderPersonalRouletteStatsPanel() {
 
   personalRouletteGrid.append(
     createRouletteMetric("Turbolachse", String(player.turbolachs), "is-turbolachs"),
+    createRouletteMetric("Turbolachs-Quote", formatRouletteQuote(player.turbolachs, player.totalSpins), "is-turbolachs"),
     createRouletteMetric("Nitroforellen", String(player.nitroforelle), "is-nitroforelle"),
+    createRouletteMetric("Nitroforellen-Quote", formatRouletteQuote(player.nitroforelle, player.totalSpins), "is-nitroforelle"),
     createRouletteMetric("Goldfische", String(player.gold), "is-gold"),
-    createRouletteMetric("Fische gesamt", String(player.totalSpins), "is-total"),
+    createRouletteMetric("Goldfisch-Quote", formatRouletteQuote(player.gold, player.totalSpins), "is-gold"),
+    createRouletteMetric("Fische gesamt", String(player.totalSpins), "is-wide is-total"),
     createRouletteMetric(
       "Letzter Goldfisch",
       formatPersonalRouletteLastGoldHit(player.lastGoldHit),
-      "is-wide",
-    ),
-    createRouletteMetric("Nitroforellen-Quote", formatRouletteQuote(player.nitroforelle, player.totalSpins)),
-    createRouletteMetric("Turbolachs-Quote", formatRouletteQuote(player.turbolachs, player.totalSpins)),
-    createRouletteMetric(
-      "Gold-Hit-Quote",
-      formatRouletteQuote(player.gold, player.totalSpins),
-      "is-wide is-gold-quote",
+      "is-wide is-last-gold",
     ),
   );
 }

@@ -45,6 +45,7 @@ async function getRouletteLeaderboard() {
       "display_name,total_spins,turbolachs_count,nitroforelle_count,"
       + "goldfish_count,last_gold_hit_at,created_at,updated_at",
     )
+    .gt("goldfish_count", 0)
     .order("goldfish_count", { ascending: false })
     .order("total_spins", { ascending: false })
     .order("display_name", { ascending: true });

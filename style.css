@@ -2706,6 +2706,17 @@ h2 {
   min-height: 48px;
 }
 
+.settings-app-version {
+  margin: 20px 0 0 !important;
+  padding-top: 15px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+  color: rgb(199 208 225 / 48%) !important;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 .admin-login-card {
   display: grid;
   gap: 9px;
@@ -2977,6 +2988,10 @@ h2 {
   font-weight: 750;
   letter-spacing: 0.025em;
   line-height: 1.2;
+  hyphens: none;
+  overflow-wrap: normal;
+  text-align: center;
+  word-break: normal;
 }
 
 .roulette-personal-metric strong {
@@ -2990,11 +3005,11 @@ h2 {
   color: #ffd66e;
 }
 
-.roulette-personal-metric.is-turbolachs span {
+.roulette-personal-metric.is-turbolachs strong {
   color: #73ddff;
 }
 
-.roulette-personal-metric.is-nitroforelle span {
+.roulette-personal-metric.is-nitroforelle strong {
   color: #ff7db9;
 }
 
@@ -3003,17 +3018,12 @@ h2 {
 }
 
 .roulette-personal-metric.is-wide {
-  min-height: 65px;
+  min-height: 74px;
   grid-column: 1 / -1;
 }
 
-.roulette-personal-metric.is-wide strong {
+.roulette-personal-metric.is-last-gold strong {
   font-size: 0.94rem;
-}
-
-.roulette-personal-metric.is-gold-quote strong {
-  color: #ffd66e;
-  font-size: 1.18rem;
 }
 
 @media (max-width: 360px) {

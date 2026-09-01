@@ -2709,7 +2709,9 @@ button.is-release-pressed {
 
 .settings-card {
   position: relative;
+  max-height: min(92dvh, 720px);
   padding: 26px 26px 28px;
+  overflow-y: auto;
   border-color: rgb(86 202 255 / 24%);
   background: linear-gradient(145deg, rgb(15 22 45 / 98%), rgb(6 9 25 / 98%));
   box-shadow:
@@ -2794,6 +2796,94 @@ button.is-release-pressed {
   width: 100%;
   min-height: 52px;
   margin-top: 24px;
+}
+
+.settings-push-section {
+  width: 100%;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  text-align: left;
+}
+
+.settings-push-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-push-copy,
+.settings-push-copy strong,
+.settings-push-copy span {
+  display: block;
+}
+
+.settings-push-copy strong {
+  color: #f7f9ff;
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.settings-push-copy span {
+  margin-top: 3px;
+  color: rgb(199 208 225 / 62%);
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.settings-push-toggle {
+  position: relative;
+  width: 50px;
+  min-width: 50px;
+  min-height: 29px;
+  padding: 3px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 999px;
+  background: rgb(4 10 25 / 88%);
+  box-shadow: inset 0 0 8px rgb(0 0 0 / 32%);
+  transition: background 140ms ease-out, border-color 140ms ease-out, opacity 140ms ease-out;
+}
+
+.settings-push-toggle span {
+  display: block;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #d8dfec;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 38%);
+  transform: translateX(0);
+  transition: background 140ms ease-out, transform 140ms ease-out;
+}
+
+.settings-push-toggle[aria-checked="true"] {
+  border-color: rgb(83 220 170 / 52%);
+  background: rgb(24 143 103 / 72%);
+}
+
+.settings-push-toggle[aria-checked="true"] span {
+  background: #fff;
+  transform: translateX(21px);
+}
+
+.settings-push-toggle:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.settings-push-status {
+  margin: 9px 0 0 !important;
+  color: rgb(199 208 225 / 62%) !important;
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.settings-push-status.is-active {
+  color: #8de6c1 !important;
+}
+
+.settings-push-status.is-error {
+  color: #ff9aa9 !important;
 }
 
 .settings-admin-section {

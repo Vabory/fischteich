@@ -1,0 +1,2 @@
+[functions.buffalo-push-worker]
+verify_jwt = false

@@ -14,7 +14,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=102">
+    <link rel="stylesheet" href="./style.css?v=103">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -22,8 +22,9 @@
     <script src="./auth.js?v=2" defer></script>
     <script src="./roulette-service.js?v=6" defer></script>
     <script src="./buffalo-service.js?v=2" defer></script>
+    <script src="./push-service.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=61" defer></script>
+    <script src="./script.js?v=62" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -513,6 +514,18 @@
           <span class="settings-name-label">Aktueller Name</span>
           <strong class="settings-current-name" id="settings-current-name"></strong>
           <button class="primary-button settings-rename-button" id="open-display-name-rename" type="button">Name ändern</button>
+        </div>
+        <div class="settings-push-section" id="settings-buffalo-push-section">
+          <div class="settings-push-row">
+            <span class="settings-push-copy">
+              <strong>Buffalo Benachrichtigungen</strong>
+              <span>Start und Ende als Push erhalten</span>
+            </span>
+            <button class="settings-push-toggle" id="toggle-buffalo-push" type="button" role="switch" aria-checked="false" aria-label="Buffalo Benachrichtigungen aktivieren">
+              <span aria-hidden="true"></span>
+            </button>
+          </div>
+          <p class="settings-push-status" id="settings-buffalo-push-status" aria-live="polite">Status wird geprüft …</p>
         </div>
         <div class="settings-admin-section" id="settings-admin-section">
           <span class="settings-name-label">Administration</span>

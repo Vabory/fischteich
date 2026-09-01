@@ -182,6 +182,8 @@ const welcomeIdentityError = document.querySelector("#welcome-identity-error");
 const openSettingsButton = document.querySelector("#open-settings");
 const settingsModal = document.querySelector("#settings-modal");
 const settingsCurrentName = document.querySelector("#settings-current-name");
+const buffaloPushToggle = document.querySelector("#toggle-buffalo-push");
+const buffaloPushStatus = document.querySelector("#settings-buffalo-push-status");
 const settingsAdminStatus = document.querySelector("#settings-admin-status");
 const settingsAdminActions = document.querySelector("#settings-admin-actions");
 const settingsAppVersion = document.querySelector("#settings-app-version");
@@ -408,6 +410,8 @@ const state = {
   buffaloNotice: null,
   buffaloRefreshPromise: null,
   buffaloRealtimeUnsubscribe: null,
+  buffaloPushSettingsRunning: false,
+  buffaloPushSettingsRequestId: 0,
 };
 
 let rouletteAssetPreloadPromise = null;
@@ -936,6 +940,7 @@ function completeLocalIdentitySetup() {
   welcomeIdentityModal.hidden = true;
   appElement.inert = false;
   void syncCurrentAuthProfileDisplayName(identity.displayName);
+  void initializeBuffaloPush();
   document.querySelector("#start-two-teams").focus();
   return true;
 }
@@ -950,6 +955,127 @@ function renderSettingsIdentity() {
   settingsCurrentName.textContent = getDisplayName() || "—";
 }
 
+function setBuffaloPushSettingsUi({ checked, status, error = false, active = false, disabled }) {
+  buffaloPushToggle.setAttribute("aria-checked", String(checked));
+  buffaloPushToggle.setAttribute(
+    "aria-label",
+    checked
+      ? "Buffalo Benachrichtigungen deaktivieren"
+      : "Buffalo Benachrichtigungen aktivieren",
+  );
+  buffaloPushToggle.disabled = disabled;
+  buffaloPushStatus.textContent = status;
+  buffaloPushStatus.classList.toggle("is-error", error);
+  buffaloPushStatus.classList.toggle("is-active", active);
+}
+
+async function renderBuffaloPushSettings({ repair = true } = {}) {
+  const requestId = state.buffaloPushSettingsRequestId + 1;
+  state.buffaloPushSettingsRequestId = requestId;
+  setBuffaloPushSettingsUi({
+    checked: false,
+    status: "Status wird geprüft …",
+    disabled: true,
+  });
+
+  try {
+    const service = window.buffaloPushService;
+    if (!service) throw new Error("Push service is unavailable");
+    const shouldRepair = repair && service.getPreference() === true;
+    const pushState = shouldRepair ? await service.repair() : await service.getState();
+    if (requestId !== state.buffaloPushSettingsRequestId) return;
+
+    if (!pushState.supported) {
+      setBuffaloPushSettingsUi({
+        checked: false,
+        status: "Web Push wird in diesem Browser oder App-Kontext nicht unterstützt.",
+        error: true,
+        disabled: true,
+      });
+    } else if (pushState.permission === "denied") {
+      setBuffaloPushSettingsUi({
+        checked: false,
+        status: "Benachrichtigungen sind im Browser oder System verweigert.",
+        error: true,
+        disabled: true,
+      });
+    } else if (pushState.active) {
+      setBuffaloPushSettingsUi({
+        checked: true,
+        status: "Aktiviert auf diesem Gerät.",
+        active: true,
+        disabled: state.buffaloPushSettingsRunning,
+      });
+    } else {
+      const status = pushState.preference === false
+        ? "Deaktiviert auf diesem Gerät."
+        : pushState.preference === true
+          ? "Aktivierung muss auf diesem Gerät bestätigt werden."
+          : "Noch nicht eingerichtet.";
+      setBuffaloPushSettingsUi({
+        checked: false,
+        status,
+        disabled: state.buffaloPushSettingsRunning,
+      });
+    }
+  } catch (error) {
+    if (requestId !== state.buffaloPushSettingsRequestId) return;
+    console.warn("Buffalo-Push-Status konnte nicht aktualisiert werden.", {
+      type: error instanceof Error ? error.name : "UnknownError",
+    });
+    setBuffaloPushSettingsUi({
+      checked: false,
+      status: "Buffalo Benachrichtigungen konnten nicht aktualisiert werden.",
+      error: true,
+      disabled: false,
+    });
+  }
+}
+
+async function toggleBuffaloPushSettings() {
+  if (state.buffaloPushSettingsRunning || !window.buffaloPushService) return;
+  state.buffaloPushSettingsRunning = true;
+  const currentlyEnabled = buffaloPushToggle.getAttribute("aria-checked") === "true";
+  setBuffaloPushSettingsUi({
+    checked: currentlyEnabled,
+    status: currentlyEnabled ? "Wird deaktiviert …" : "Wird aktiviert …",
+    disabled: true,
+  });
+  let succeeded = false;
+
+  try {
+    if (currentlyEnabled) await window.buffaloPushService.disable();
+    else await window.buffaloPushService.enable();
+    succeeded = true;
+  } catch (error) {
+    console.warn("Buffalo-Push-Einstellung konnte nicht geändert werden.", {
+      type: error instanceof Error ? error.name : "UnknownError",
+    });
+    setBuffaloPushSettingsUi({
+      checked: currentlyEnabled,
+      status: error instanceof Error
+        ? error.message
+        : "Buffalo Benachrichtigungen konnten nicht geändert werden.",
+      error: true,
+      disabled: false,
+    });
+  } finally {
+    state.buffaloPushSettingsRunning = false;
+    if (succeeded) await renderBuffaloPushSettings({ repair: false });
+  }
+}
+
+async function initializeBuffaloPush() {
+  if (!window.buffaloPushService || !hasLocalIdentity()) return;
+  try {
+    await window.buffaloPushService.repair();
+  } catch (error) {
+    console.warn("Buffalo-Push-Subscription konnte nicht automatisch erneuert werden.", {
+      type: error instanceof Error ? error.name : "UnknownError",
+    });
+  }
+}
+
 function renderSettingsAdmin(auth = getAppAuthState()) {
   const isAdmin = auth.isAdmin === true;
   settingsAdminStatus.textContent = isAdmin ? "Admin angemeldet" : "Adminfunktionen sind geschützt.";
@@ -961,6 +1087,7 @@ function renderSettingsAdmin(auth = getAppAuthState()) {
 function openSettingsModal() {
   renderSettingsIdentity();
   renderSettingsAdmin();
+  void renderBuffaloPushSettings();
   appElement.inert = true;
   settingsModal.hidden = false;
   document.querySelector("#close-settings").focus({ preventScroll: true });
@@ -4045,6 +4172,9 @@ document.querySelector("#start-manual-participants").addEventListener("click", (
 });
 openSettingsButton.addEventListener("click", openSettingsModal);
 document.querySelector("#close-settings").addEventListener("click", closeSettingsModal);
+buffaloPushToggle.addEventListener("click", () => {
+  void toggleBuffaloPushSettings();
+});
 openAdminLoginButton.addEventListener("click", openAdminLoginModal);
 adminLoginForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -4376,5 +4506,6 @@ updateMarkerSize();
 renderRouletteStats();
 initializeLocalIdentity();
 initializeBuffaloTimer();
+void initializeBuffaloPush();
 subscribeToAppAuthState((auth) => renderSettingsAdmin(auth));
 void initializeAppAuth();

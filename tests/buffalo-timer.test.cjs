@@ -13,6 +13,9 @@ const css = read("style.css");
 const script = read("script.js");
 const serviceSource = read("buffalo-service.js");
 const migration = read("supabase/migrations/20260901000000_create_buffalo_events.sql");
+const rpcFixMigration = read(
+  "supabase/migrations/20260901010000_fix_buffalo_rpc_special_expressions.sql",
+);
 const DEVICE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 function makeServerRow({
@@ -283,9 +286,42 @@ test("migration retains history and enables Realtime idempotently", () => {
   assert.doesNotMatch(migration, /delete from public\.buffalo_events/i);
 });
 
+test("follow-up migration fixes PostgreSQL special expressions without weakening the RPC", () => {
+  assert.match(rpcFixMigration, /create or replace function public\.start_buffalo_event\(/i);
+  assert.match(
+    rpcFixMigration,
+    /v_target_friend_name text := nullif\([\s\S]*''::text[\s\S]*\);/i,
+  );
+  assert.match(
+    rpcFixMigration,
+    /v_target_display_name := coalesce\([\s\S]*'Jemand anderes'::text[\s\S]*\);/i,
+  );
+  assert.doesNotMatch(rpcFixMigration, /pg_catalog\.(?:nullif|coalesce)\s*\(/i);
+  assert.match(rpcFixMigration, /security definer\s+set search_path = ''/i);
+  assert.match(rpcFixMigration, /pg_catalog\.pg_advisory_xact_lock\(204273, 1\)/i);
+  assert.match(rpcFixMigration, /v_now \+ interval '3 minutes'/i);
+  assert.match(
+    rpcFixMigration,
+    /revoke all on function public\.start_buffalo_event\(uuid, text, text, text, text\)/i,
+  );
+  assert.match(
+    rpcFixMigration,
+    /grant execute on function public\.start_buffalo_event\(uuid, text, text, text, text\)/i,
+  );
+});
+
+test("get_active_buffalo_event has no schema-qualified SQL special expressions", () => {
+  const getActiveFunction = migration.slice(
+    migration.indexOf("create function public.get_active_buffalo_event"),
+    migration.indexOf("create function public.start_buffalo_event"),
+  );
+  assert.doesNotMatch(getActiveFunction, /pg_catalog\.(?:nullif|coalesce)\s*\(/i);
+  assert.match(getActiveFunction, /security definer\s+set search_path = ''/i);
+});
+
 test("loads versioned assets and the Buffalo service before the UI bundle", () => {
-  assert.match(html, /style\.css\?v=102/);
-  assert.match(html, /buffalo-service\.js\?v=2[\s\S]*script\.js\?v=61/);
+  assert.match(html, /style\.css\?v=103/);
+  assert.match(html, /buffalo-service\.js\?v=2[\s\S]*script\.js\?v=62/);
 });
 
 test("keeps central FRIENDS options and adds only minimal active/error UI", () => {

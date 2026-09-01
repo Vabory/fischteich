@@ -14,16 +14,16 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=101">
+    <link rel="stylesheet" href="./style.css?v=102">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
     <script src="./auth.js?v=2" defer></script>
     <script src="./roulette-service.js?v=6" defer></script>
-    <script src="./buffalo-service.js?v=1" defer></script>
+    <script src="./buffalo-service.js?v=2" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=60" defer></script>
+    <script src="./script.js?v=61" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -824,6 +824,12 @@
         <p class="roulette-modal-kicker">FISCHTEICH</p>
         <h2 id="buffalo-timer-title">Buffalo Timer</h2>
         <a class="buffalo-rules-link" href="https://ris-buffalo.eu/" target="_blank" rel="noopener noreferrer external">Buffalo Regelwerk ↗</a>
+        <section class="buffalo-modal-active" id="buffalo-modal-active" aria-label="Aktiver Buffalo Timer" hidden>
+          <span>Buffalo Timer läuft bereits</span>
+          <strong id="buffalo-modal-active-name">—</strong>
+          <time id="buffalo-modal-active-countdown">03:00</time>
+        </section>
+        <p class="buffalo-modal-feedback" id="buffalo-modal-feedback" aria-live="polite" hidden></p>
         <p class="buffalo-selection-hint" id="buffalo-selection-hint">Wer wurde erwischt?</p>
         <div class="buffalo-person-grid" id="buffalo-person-grid" role="group" aria-labelledby="buffalo-selection-hint"></div>
         <div class="modal-actions buffalo-timer-actions">

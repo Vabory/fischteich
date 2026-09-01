@@ -238,6 +238,12 @@ const openBuffaloTimerButton = document.querySelector("#open-buffalo-timer");
 const buffaloTimerModal = document.querySelector("#buffalo-timer-modal");
 const buffaloPersonGrid = document.querySelector("#buffalo-person-grid");
 const startBuffaloTimerButton = document.querySelector("#start-buffalo-timer");
+const cancelBuffaloTimerButton = document.querySelector("#cancel-buffalo-timer");
+const buffaloSelectionHint = document.querySelector("#buffalo-selection-hint");
+const buffaloModalFeedback = document.querySelector("#buffalo-modal-feedback");
+const buffaloModalActive = document.querySelector("#buffalo-modal-active");
+const buffaloModalActiveName = document.querySelector("#buffalo-modal-active-name");
+const buffaloModalActiveCountdown = document.querySelector("#buffalo-modal-active-countdown");
 const buffaloLiveStatus = document.querySelector("#buffalo-live-status");
 const buffaloLiveName = document.querySelector("#buffalo-live-name");
 const buffaloLiveCountdown = document.querySelector("#buffalo-live-countdown");
@@ -397,6 +403,11 @@ const state = {
   buffaloSelection: null,
   buffaloEvent: null,
   buffaloTimerInterval: null,
+  buffaloStarting: false,
+  buffaloSyncError: null,
+  buffaloNotice: null,
+  buffaloRefreshPromise: null,
+  buffaloRealtimeUnsubscribe: null,
 };
 
 let rouletteAssetPreloadPromise = null;
@@ -483,10 +494,13 @@ function renderBuffaloSelection() {
     button.setAttribute("aria-pressed", String(selected));
   }
 
-  startBuffaloTimerButton.disabled = state.buffaloSelection === null;
+  startBuffaloTimerButton.disabled = state.buffaloSelection === null
+    || state.buffaloStarting
+    || state.buffaloEvent !== null;
 }
 
 function selectBuffaloPerson(button) {
+  if (state.buffaloEvent || state.buffaloStarting) return;
   const nextSelection = createBuffaloSelection(
     button.dataset.buffaloKind,
     button.dataset.buffaloFriendName ?? null,
@@ -498,19 +512,54 @@ function selectBuffaloPerson(button) {
   renderBuffaloSelection();
 }
 
+function renderBuffaloModalState() {
+  const event = state.buffaloEvent;
+  const hasActiveEvent = event !== null
+    && window.buffaloService.getRemainingMilliseconds(event) > 0;
+
+  buffaloModalActive.hidden = !hasActiveEvent;
+  buffaloSelectionHint.hidden = hasActiveEvent;
+  buffaloPersonGrid.hidden = hasActiveEvent;
+  startBuffaloTimerButton.hidden = hasActiveEvent;
+  cancelBuffaloTimerButton.textContent = hasActiveEvent ? "Schließen" : "Abbrechen";
+
+  if (hasActiveEvent) {
+    buffaloModalActiveName.textContent = event.selection.displayName;
+    buffaloModalActiveCountdown.textContent = formatBuffaloCountdown(
+      window.buffaloService.getRemainingMilliseconds(event),
+    );
+  }
+
+  const feedback = state.buffaloStarting
+    ? "Buffalo Timer wird gestartet …"
+    : state.buffaloNotice || state.buffaloSyncError;
+  buffaloModalFeedback.textContent = feedback || "";
+  buffaloModalFeedback.hidden = !feedback;
+  buffaloModalFeedback.classList.toggle("is-error", Boolean(state.buffaloSyncError));
+  startBuffaloTimerButton.textContent = state.buffaloStarting
+    ? "Wird gestartet …"
+    : "Timer starten!";
+  renderBuffaloSelection();
+}
+
 function openBuffaloTimerModal() {
   renderBuffaloPersonOptions();
   state.buffaloSelection = null;
-  renderBuffaloSelection();
+  state.buffaloNotice = null;
+  renderBuffaloModalState();
   appElement.inert = true;
   buffaloTimerModal.hidden = false;
-  buffaloPersonGrid.querySelector("button")?.focus({ preventScroll: true });
+  const focusTarget = state.buffaloEvent
+    ? cancelBuffaloTimerButton
+    : buffaloPersonGrid.querySelector("button");
+  focusTarget?.focus({ preventScroll: true });
 }
 
 function closeBuffaloTimerModal({ restoreFocus = true } = {}) {
   buffaloTimerModal.hidden = true;
   state.buffaloSelection = null;
-  renderBuffaloSelection();
+  state.buffaloNotice = null;
+  renderBuffaloModalState();
   appElement.inert = false;
   if (restoreFocus) openBuffaloTimerButton.focus({ preventScroll: true });
 }
@@ -529,21 +578,24 @@ function stopBuffaloTimerUi() {
   }
   state.buffaloEvent = null;
   buffaloLiveStatus.hidden = true;
+  renderBuffaloModalState();
 }
 
 function renderBuffaloTimer() {
-  const event = window.buffaloService?.getActiveEvent() ?? null;
-  if (!event) {
+  const event = state.buffaloEvent;
+  const remainingMilliseconds = event
+    ? window.buffaloService.getRemainingMilliseconds(event)
+    : 0;
+  if (!event || remainingMilliseconds <= 0) {
+    if (event) window.buffaloService.clearEvent(event.id);
     stopBuffaloTimerUi();
     return;
   }
 
-  state.buffaloEvent = event;
   buffaloLiveName.textContent = event.selection.displayName;
-  buffaloLiveCountdown.textContent = formatBuffaloCountdown(
-    window.buffaloService.getRemainingMilliseconds(event),
-  );
+  buffaloLiveCountdown.textContent = formatBuffaloCountdown(remainingMilliseconds);
   buffaloLiveStatus.hidden = false;
+  renderBuffaloModalState();
 }
 
 function startBuffaloTimerUi(event) {
@@ -555,21 +607,89 @@ function startBuffaloTimerUi(event) {
   }
 }
 
-function startSelectedBuffaloTimer() {
-  if (!state.buffaloSelection || !window.buffaloService) return false;
+async function startSelectedBuffaloTimer() {
+  if (
+    !state.buffaloSelection
+    || !window.buffaloService
+    || state.buffaloStarting
+    || state.buffaloEvent
+  ) return false;
 
-  const event = window.buffaloService.startEvent(state.buffaloSelection);
-  if (!event) return false;
+  state.buffaloStarting = true;
+  state.buffaloSyncError = null;
+  state.buffaloNotice = null;
+  renderBuffaloModalState();
 
-  closeBuffaloTimerModal();
-  startBuffaloTimerUi(event);
-  return true;
+  try {
+    const result = await window.buffaloService.startEvent(state.buffaloSelection);
+    startBuffaloTimerUi(result.event);
+    if (result.created) {
+      closeBuffaloTimerModal();
+    } else {
+      state.buffaloNotice = "Buffalo Timer läuft bereits – der aktive Timer wurde übernommen.";
+    }
+    return result.created;
+  } catch (error) {
+    console.warn("Buffalo Timer konnte nicht gestartet werden.", error);
+    state.buffaloSyncError = "Buffalo Timer konnte nicht gestartet werden. Bitte Verbindung prüfen.";
+    return false;
+  } finally {
+    state.buffaloStarting = false;
+    renderBuffaloModalState();
+  }
 }
 
-function restoreBuffaloTimer() {
-  const event = window.buffaloService?.getActiveEvent() ?? null;
+function restoreBuffaloTimerFromCache() {
+  const event = window.buffaloService?.getCachedEvent() ?? null;
   if (event) startBuffaloTimerUi(event);
   else stopBuffaloTimerUi();
+}
+
+function applyBuffaloServerEvent(event) {
+  state.buffaloSyncError = null;
+  if (event) startBuffaloTimerUi(event);
+  else stopBuffaloTimerUi();
+}
+
+async function refreshBuffaloTimer() {
+  if (!window.buffaloService?.loadActiveEvent) return null;
+  if (state.buffaloRefreshPromise) return state.buffaloRefreshPromise;
+
+  state.buffaloRefreshPromise = window.buffaloService.loadActiveEvent()
+    .then((event) => {
+      applyBuffaloServerEvent(event);
+      return event;
+    })
+    .catch((error) => {
+      console.warn("Aktiver Buffalo Timer konnte nicht geladen werden.", error);
+      state.buffaloSyncError = "Buffalo-Status konnte nicht aktualisiert werden. Bitte Verbindung prüfen.";
+      renderBuffaloModalState();
+      return state.buffaloEvent;
+    })
+    .finally(() => {
+      state.buffaloRefreshPromise = null;
+    });
+  return state.buffaloRefreshPromise;
+}
+
+function initializeBuffaloTimer() {
+  restoreBuffaloTimerFromCache();
+  if (!state.buffaloRealtimeUnsubscribe && window.buffaloService?.subscribe) {
+    state.buffaloRealtimeUnsubscribe = window.buffaloService.subscribe(
+      applyBuffaloServerEvent,
+      (status, error) => {
+        if (status === "SUBSCRIBED") {
+          state.buffaloSyncError = null;
+          renderBuffaloModalState();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "SYNC_ERROR") {
+          console.warn(`Buffalo-Realtime ist nicht verbunden (${status}).`, error);
+          state.buffaloSyncError = "Buffalo-Realtime ist derzeit nicht verbunden.";
+          renderBuffaloModalState();
+        }
+      },
+    );
+  }
+  void refreshBuffaloTimer();
 }
 
 function showTeamsMenu({ focusSelector = null } = {}) {
@@ -3965,7 +4085,9 @@ document.querySelector("#cancel-buffalo-timer").addEventListener(
   "click",
   () => closeBuffaloTimerModal(),
 );
-startBuffaloTimerButton.addEventListener("click", startSelectedBuffaloTimer);
+startBuffaloTimerButton.addEventListener("click", () => {
+  void startSelectedBuffaloTimer();
+});
 buffaloTimerModal.addEventListener("click", (event) => {
   if (event.target === buffaloTimerModal) closeBuffaloTimerModal();
 });
@@ -4194,10 +4316,20 @@ window.addEventListener("resize", () => {
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") restoreBuffaloTimer();
+  if (document.visibilityState === "visible") void refreshBuffaloTimer();
 });
 window.addEventListener("storage", (event) => {
-  if (event.key === window.buffaloService?.storageKey) restoreBuffaloTimer();
+  if (event.key === window.buffaloService?.storageKey) void refreshBuffaloTimer();
+});
+window.addEventListener("pagehide", () => {
+  if (state.buffaloRealtimeUnsubscribe) {
+    const unsubscribe = state.buffaloRealtimeUnsubscribe;
+    state.buffaloRealtimeUnsubscribe = null;
+    void unsubscribe();
+  }
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) initializeBuffaloTimer();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -4243,6 +4375,6 @@ document.addEventListener("keydown", (event) => {
 updateMarkerSize();
 renderRouletteStats();
 initializeLocalIdentity();
-restoreBuffaloTimer();
+initializeBuffaloTimer();
 subscribeToAppAuthState((auth) => renderSettingsAdmin(auth));
 void initializeAppAuth();

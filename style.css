@@ -2958,6 +2958,58 @@ button.is-release-pressed {
   text-underline-offset: 3px;
 }
 
+.buffalo-modal-active {
+  margin: 10px 0 4px;
+  padding: 11px 12px;
+  border: 1px solid rgb(255 207 101 / 28%);
+  border-radius: 13px;
+  background: rgb(255 196 71 / 8%);
+  text-align: center;
+}
+
+.buffalo-modal-active:not([hidden]) {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 3px 10px;
+}
+
+.buffalo-modal-active span {
+  grid-column: 1 / -1;
+  color: #f4bd55;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.buffalo-modal-active strong {
+  overflow: hidden;
+  color: #fff;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buffalo-modal-active time {
+  color: #ffe7ac;
+  font-size: 1.16rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.buffalo-modal-feedback {
+  margin: 7px 0 2px;
+  color: rgb(239 243 255 / 72%);
+  font-size: 0.73rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.buffalo-modal-feedback.is-error {
+  color: #ff9aa9;
+}
+
 .buffalo-selection-hint,
 .buffalo-timer-modal-card .buffalo-selection-hint {
   margin: 5px 0 7px;

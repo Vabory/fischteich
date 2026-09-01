@@ -98,6 +98,7 @@ button:focus-visible {
 
 .menu-screen {
   --menu-bg-center-to-bottom-shift: max(0px, calc(108.0891vw - 50dvh));
+  --menu-secondary-button-size: clamp(58px, 17vw, 74px);
 
   display: block;
   padding: 0;
@@ -325,24 +326,24 @@ h2 {
 }
 
 .menu-actions {
-  --menu-visible-gap: clamp(6px, 0.8dvh, 10px);
+  --menu-button-hit-height: 50px;
+  --menu-visible-gap: clamp(10px, 1.25dvh, 12px);
 
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  display: grid;
+  grid-auto-rows: var(--menu-button-hit-height);
+  gap: var(--menu-visible-gap);
 }
 
 .menu-actions button + button {
-  /* Die Prozentwerte gleichen nur die unterschiedlichen transparenten PNG-Ränder aus. */
-  margin-top: calc(var(--menu-visible-gap) - 17.3%);
+  margin-top: 0;
 }
 
 .menu-actions button:nth-child(3) {
-  margin-top: calc(var(--menu-visible-gap) - 20.2%);
+  margin-top: 0;
 }
 
 .menu-actions button:nth-child(4) {
-  margin-top: calc(var(--menu-visible-gap) - 16.1%);
+  margin-top: 0;
 }
 
 .menu-card {
@@ -351,6 +352,7 @@ h2 {
   top: calc(
     clamp(342px, calc(51.5dvh + 22px), 506px)
     - var(--menu-bg-center-to-bottom-shift)
+    + 8px
   );
   left: 50%;
   width: min(73vw, 286px);
@@ -358,8 +360,10 @@ h2 {
 }
 
 .menu-actions button {
+  position: relative;
   display: block;
   width: 100%;
+  height: var(--menu-button-hit-height);
   min-height: 0;
   padding: 0;
   border: 0;
@@ -367,6 +371,7 @@ h2 {
   background: transparent;
   box-shadow: none;
   line-height: 0;
+  overflow: visible;
   transition: transform 110ms ease-out;
 }
 
@@ -375,28 +380,33 @@ h2 {
 }
 
 .menu-actions button:nth-child(1) {
-  top: -8px;
+  top: 0;
 }
 
 .menu-actions button:nth-child(2) {
-  top: -6.7px;
+  top: 0;
 }
 
 .menu-actions button:nth-child(3) {
-  top: 4.9px;
+  top: 0;
 }
 
 .menu-actions img {
+  position: absolute;
+  top: 50%;
+  left: 0;
   display: block;
   width: 100%;
   height: auto;
   object-fit: contain;
   pointer-events: none;
+  transform: translateY(-50%);
   user-select: none;
   -webkit-user-drag: none;
 }
 
-.menu-actions button:active {
+.menu-actions button:active,
+.menu-actions button.is-release-pressed {
   box-shadow: none;
   transform: scale(0.975);
 }
@@ -404,7 +414,7 @@ h2 {
 .active-tournament-card {
   width: 100%;
   min-height: 65px;
-  margin-top: clamp(-20px, -4.8vw, -16px);
+  margin-top: 8px;
   margin-left: 50%;
   padding: 8px 12px;
   align-items: center;
@@ -501,6 +511,15 @@ h2 {
 }
 
 .active-tournament-card:not([hidden]) + .buffalo-live-card {
+  width: min(
+    100%,
+    calc(
+      100vw
+      - var(--menu-secondary-button-size)
+      - var(--menu-secondary-button-size)
+      - 52px
+    )
+  );
   margin-top: 7px;
 }
 
@@ -553,21 +572,21 @@ h2 {
 
   position: absolute;
   z-index: 2;
-  right: max(20px, env(safe-area-inset-right));
+  right: max(18px, calc(env(safe-area-inset-right) + 10px));
   bottom: calc(
     var(--menu-lower-base-bottom)
     - var(--menu-lower-effective-shift)
   );
-  left: max(20px, env(safe-area-inset-left));
+  left: max(18px, calc(env(safe-area-inset-left) + 10px));
   display: flex;
-  width: min(75vw, 304px);
-  margin-inline: auto;
+  width: auto;
+  margin-inline: 0;
   align-items: center;
   justify-content: space-between;
 }
 
 .menu-secondary-actions button {
-  width: clamp(58px, 17vw, 74px);
+  width: var(--menu-secondary-button-size);
   min-height: 0;
   padding: 0;
   border: 0;
@@ -587,8 +606,13 @@ h2 {
   -webkit-user-drag: none;
 }
 
-.menu-secondary-actions button:active {
+.menu-secondary-actions button:active,
+.menu-secondary-actions button.is-release-pressed {
   transform: scale(0.96);
+}
+
+button.is-release-pressed {
+  filter: brightness(0.9);
 }
 
 .primary-button,
@@ -3334,6 +3358,25 @@ h2 {
   line-height: 1;
   pointer-events: none;
 }
+
+.manual-team-card-footer {
+  display: flex;
+  padding-top: 10px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.manual-team-card-footer .tournament-builder-add-members {
+  margin: 0;
+}
+
+.manual-team-card-footer .tournament-builder-member-count {
+  position: static;
+  display: flex;
+  height: 38px;
+  align-items: center;
+}
 .tournament-inline-name-input {
   width: 100%; min-width: 0; min-height: 36px; padding: 5px 7px;
   border: 1px solid #68d9ff; border-radius: 9px; outline: none;
@@ -3408,6 +3451,10 @@ h2 {
 .tournament-wizard-actions.is-single { grid-template-columns: 1fr; }
 
 @media (max-height: 700px) {
+  .menu-screen {
+    --menu-secondary-button-size: clamp(50px, 14vw, 60px);
+  }
+
   .tournament-type-card { min-height: 105px; padding-block: 14px; }
   .tournament-builder-card { min-height: 140px; }
 }
@@ -3459,6 +3506,7 @@ h2 {
     top: calc(
       clamp(300px, 52dvh, 364px)
       - var(--menu-bg-center-to-bottom-shift)
+      + 16px
     );
     width: min(73vw, 36.5dvh, 286px);
   }
@@ -3467,9 +3515,6 @@ h2 {
     width: clamp(82px, 23vw, 104px);
   }
 
-  .menu-secondary-actions button {
-    width: clamp(50px, 14vw, 60px);
-  }
 }
 
 @media (max-height: 620px) {
@@ -4940,14 +4985,14 @@ h2 {
 
 /* The current tournament remains secondary to the four main actions, but visibly live. */
 .active-tournament-card {
-  min-height: 78px;
-  padding: 12px 15px;
-  border-radius: 17px;
+  min-height: 70px;
+  padding: 9px 13px;
+  border-radius: 15px;
   box-shadow: 0 9px 24px rgb(0 0 0 / 28%), 0 0 18px rgb(73 211 137 / 7%);
 }
 
-.active-tournament-name { margin-top: 4px !important; font-size: 0.92rem; }
-.active-tournament-phase { margin-top: 3px !important; font-size: 0.72rem; }
+.active-tournament-name { margin-top: 3px !important; font-size: 0.88rem; }
+.active-tournament-phase { margin-top: 2px !important; font-size: 0.7rem; }
 .active-tournament-status-point {
   animation: tournament-live-pulse 2s ease-in-out infinite;
   box-shadow: 0 0 0 0 rgb(82 217 139 / 25%);

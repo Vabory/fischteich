@@ -16,7 +16,7 @@ const migration = read("supabase/migrations/20260831010000_separate_match_comple
 
 assert.match(html, /id="tournament-finalize-modal"/);
 assert.match(html, /id="tournament-team-popover"[^>]*role="dialog"/);
-assert.match(html, /style\.css\?v=99/);
+assert.match(html, /style\.css\?v=100/);
 assert.match(html, /tournament-create\.js\?v=7/);
 assert.match(html, /tournament-live\.js\?v=12/);
 assert.match(html, /tournament-archive\.js\?v=2/);
@@ -79,7 +79,7 @@ assert.match(archiveSource, /\.lte\("placement", 3\)/);
 assert.match(archiveSource, /for \(const place of \[1, 2, 3\]\)/);
 assert.match(archiveSource, /names\.join\(" · "\)/);
 
-assert.match(css, /\.active-tournament-card\s*\{[^}]*min-height:\s*78px/s);
+assert.match(css, /\.active-tournament-card\s*\{[^}]*min-height:\s*70px[^}]*padding:\s*9px 13px[^}]*border-radius:\s*15px/s);
 assert.match(css, /\.active-tournament-status-point\s*\{[^}]*animation:\s*tournament-live-pulse/s);
 assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.active-tournament-status-point\s*\{[^}]*animation:\s*none/s);
 assert.match(css, /\.tournament-team-popover\s*\{[^}]*position:\s*fixed[^}]*z-index:\s*30/s);

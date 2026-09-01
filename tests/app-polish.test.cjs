@@ -12,8 +12,9 @@ const css = read("style.css");
 const script = read("script.js");
 const service = read("roulette-service.js");
 
-assert.match(html, /style\.css\?v=99/);
+assert.match(html, /style\.css\?v=100/);
 assert.match(html, /roulette-service\.js\?v=6/);
+assert.match(html, /button-release\.js\?v=1/);
 assert.match(html, /script\.js\?v=59/);
 
 assert.match(html, /<p class="settings-app-version" id="settings-app-version"><\/p>/);
@@ -115,6 +116,9 @@ assert.equal(counterContext.countMembers(0), 0, "reset should return to zero");
 
 assert.match(script, /memberCount\.textContent = `\(\$\{getManualTeamMemberCount\(teamIndex\)\}\)`/);
 assert.match(script, /memberCount\.className = "tournament-builder-member-count"/);
+assert.match(css, /\.manual-team-card-footer\s*\{[^}]*display:\s*flex[^}]*align-items:\s*center[^}]*gap:\s*8px/s);
+assert.match(css, /\.manual-team-card-footer \.tournament-builder-member-count\s*\{[^}]*position:\s*static[^}]*height:\s*38px[^}]*align-items:\s*center/s);
+assert.match(css, /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-card\s*\{[^}]*--menu-secondary-button-size[^}]*margin-top:\s*7px/s);
 
 (async () => {
   const result = await serviceContext.window.rouletteService.getRouletteLeaderboard();

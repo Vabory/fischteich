@@ -116,7 +116,7 @@ test("a friend replaces the other selection", () => {
 });
 
 test("loads the Buffalo service before the main UI bundle", () => {
-  assert.match(html, /buffalo-service\.js\?v=1[\s\S]*script\.js\?v=59/);
+  assert.match(html, /buffalo-service\.js\?v=1[\s\S]*script\.js\?v=60/);
 });
 
 test("provides safe menu, modal, disabled start and external rulebook controls", () => {

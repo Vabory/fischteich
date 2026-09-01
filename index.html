@@ -14,7 +14,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=100">
+    <link rel="stylesheet" href="./style.css?v=101">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -23,7 +23,7 @@
     <script src="./roulette-service.js?v=6" defer></script>
     <script src="./buffalo-service.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=59" defer></script>
+    <script src="./script.js?v=60" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -265,6 +265,12 @@
               <div class="rage-cage-cups">
                 <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                 <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                <i class="rage-cage-cup--extra rage-cage-cup--upper"></i>
+                <i class="rage-cage-cup--extra rage-cage-cup--upper"></i>
+                <i class="rage-cage-cup--extra rage-cage-cup--upper"></i>
+                <i class="rage-cage-cup--extra rage-cage-cup--lower"></i>
+                <i class="rage-cage-cup--extra rage-cage-cup--lower"></i>
+                <i class="rage-cage-cup--extra rage-cage-cup--lower"></i>
               </div>
               <span class="rage-cage-table-mark rage-cage-table-mark--bottom">RAGE<br>CAGE</span>
             </div>
@@ -272,8 +278,9 @@
           </div>
 
           <div class="rage-cage-actions">
-            <button class="rage-cage-reshuffle-button" id="rage-cage-reshuffle" type="button">Neu aufteilen</button>
-            <button class="rage-cage-start-button" id="rage-cage-start-position" type="button">Startposition</button>
+            <button class="rage-cage-randomize-button primary-button" id="rage-cage-randomize" type="button">Zufällig verteilen</button>
+            <button class="rage-cage-start-button secondary-button" id="rage-cage-start-position" type="button" hidden>Startpositionen</button>
+            <button class="rage-cage-reshuffle-button primary-button" id="rage-cage-reshuffle" type="button" hidden>Neu verteilen</button>
           </div>
         </div>
       </section>
@@ -582,7 +589,7 @@
 
     <div class="modal-backdrop" id="rage-cage-reshuffle-modal" role="dialog" aria-modal="true" aria-labelledby="rage-cage-reshuffle-title" hidden>
       <div class="modal-card">
-        <h2 id="rage-cage-reshuffle-title">Neu aufteilen?</h2>
+        <h2 id="rage-cage-reshuffle-title">Neu verteilen?</h2>
         <div class="modal-actions">
           <button class="secondary-button" id="cancel-rage-cage-reshuffle" type="button">Nein</button>
           <button class="primary-button" id="confirm-rage-cage-reshuffle" type="button">Ja</button>

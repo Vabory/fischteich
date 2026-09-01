@@ -1518,11 +1518,11 @@ button.is-release-pressed {
 .rage-cage-cups {
   position: absolute;
   z-index: 3;
-  top: 50%;
+  top: 14%;
+  bottom: 14%;
   left: 50%;
   width: 58px;
-  height: 82px;
-  transform: translate(-50%, -50%) rotate(-2deg);
+  transform: translateX(-50%) rotate(-2deg);
 }
 
 .rage-cage-cups i {
@@ -1556,6 +1556,15 @@ button.is-release-pressed {
 .rage-cage-cups i:nth-child(12) { --cup-x: 16px; --cup-y: 32px; --cup-rotation: 12deg; }
 .rage-cage-cups i:nth-child(13) { --cup-x: -21px; --cup-y: 40px; --cup-rotation: 5deg; }
 .rage-cage-cups i:nth-child(14) { --cup-x: 4px; --cup-y: 45px; --cup-rotation: -5deg; }
+.rage-cage-cups i.rage-cage-cup--extra { --cup-y: 0px; }
+.rage-cage-cups i.rage-cage-cup--upper { top: 22%; }
+.rage-cage-cups i.rage-cage-cup--lower { top: 78%; }
+.rage-cage-cups i:nth-child(15),
+.rage-cage-cups i:nth-child(18) { --cup-x: -20px; --cup-rotation: -7deg; }
+.rage-cage-cups i:nth-child(16),
+.rage-cage-cups i:nth-child(19) { --cup-x: 0px; --cup-rotation: 2deg; }
+.rage-cage-cups i:nth-child(17),
+.rage-cage-cups i:nth-child(20) { --cup-x: 20px; --cup-rotation: 8deg; }
 
 @keyframes rage-cage-participant-panel-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.985); }
@@ -1627,7 +1636,8 @@ button.is-release-pressed {
 }
 
 .rage-cage-reshuffle-button,
-.rage-cage-start-button {
+.rage-cage-start-button,
+.rage-cage-randomize-button {
   min-height: 54px;
   padding: 12px 10px;
   border-radius: 17px;
@@ -1635,23 +1645,22 @@ button.is-release-pressed {
   font-weight: 800;
 }
 
-.rage-cage-reshuffle-button {
-  border: 1px solid rgb(255 255 255 / 16%);
-  background: rgb(255 255 255 / 9%);
-}
-
-.rage-cage-start-button {
-  background: var(--pink);
-  box-shadow: 0 9px 24px rgb(241 90 154 / 24%);
+.rage-cage-randomize-button {
+  grid-column: 1 / -1;
 }
 
 .rage-cage-reshuffle-button:active,
-.rage-cage-start-button:active {
+.rage-cage-start-button:active,
+.rage-cage-randomize-button:active,
+.rage-cage-reshuffle-button.is-release-pressed,
+.rage-cage-start-button.is-release-pressed,
+.rage-cage-randomize-button.is-release-pressed {
   transform: scale(0.97);
 }
 
 .rage-cage-reshuffle-button:disabled,
-.rage-cage-start-button:disabled {
+.rage-cage-start-button:disabled,
+.rage-cage-randomize-button:disabled {
   cursor: default;
   filter: saturate(0.55);
   opacity: 0.58;
@@ -3576,7 +3585,8 @@ button.is-release-pressed {
   }
 
   .rage-cage-reshuffle-button,
-  .rage-cage-start-button {
+  .rage-cage-start-button,
+  .rage-cage-randomize-button {
     min-height: 48px;
   }
 }

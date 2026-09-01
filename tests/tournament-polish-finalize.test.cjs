@@ -16,7 +16,7 @@ const migration = read("supabase/migrations/20260831010000_separate_match_comple
 
 assert.match(html, /id="tournament-finalize-modal"/);
 assert.match(html, /id="tournament-team-popover"[^>]*role="dialog"/);
-assert.match(html, /style\.css\?v=100/);
+assert.match(html, /style\.css\?v=101/);
 assert.match(html, /tournament-create\.js\?v=7/);
 assert.match(html, /tournament-live\.js\?v=12/);
 assert.match(html, /tournament-archive\.js\?v=2/);

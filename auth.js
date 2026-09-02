@@ -71,11 +71,26 @@ async function loadAppProfile(userId) {
   }
 
   const profile = normalizeAppProfile(data);
+  if (profile) return profile;
 
-  if (!profile) {
-    throw new Error("Authenticated user has no valid app_profiles row");
-  }
+  // A persisted Auth session can outlive a missing/legacy app_profiles row.
+  // Repair only the currently authenticated user's profile through a narrow
+  // auth.uid()-bound RPC; local device identity remains untouched.
+  return ensureCurrentAppProfile(getDisplayName() || "Fisch");
+}
 
+async function ensureCurrentAppProfile(displayName = getDisplayName() || "Fisch") {
+  const normalizedDisplayName = normalizeDisplayName(displayName);
+  if (!normalizedDisplayName) throw new TypeError("A valid display name is required");
+
+  const { data, error } = await supabaseClient.rpc(
+    "ensure_my_app_profile",
+    { p_display_name: normalizedDisplayName },
+  );
+  if (error) throw error;
+
+  const profile = normalizeAppProfile(data);
+  if (!profile) throw new Error("Profile repair returned no valid app profile");
   return profile;
 }
 
@@ -187,7 +202,12 @@ async function ensureAnonymousAuthSession({ allowRetry = false } = {}) {
 
   anonymousSignInPromise = (async () => {
     try {
-      const { data, error } = await supabaseClient.auth.signInAnonymously();
+      const localDisplayName = getDisplayName();
+      const { data, error } = await supabaseClient.auth.signInAnonymously({
+        options: {
+          data: localDisplayName ? { display_name: localDisplayName } : {},
+        },
+      });
 
       if (error) {
         throw error;
@@ -288,7 +308,7 @@ async function syncCurrentAuthProfileDisplayName(displayName = getDisplayName())
   }
 
   try {
-    const profile = await updateAuthenticatedProfileDisplayName(normalizedDisplayName);
+    const profile = await ensureCurrentAppProfile(normalizedDisplayName);
     appAuthState.currentProfile = profile;
     appAuthState.isAdmin = profile.appRole === "admin";
     appAuthState.lastError = null;

@@ -1,3 +1,8 @@
+[auth]
+# Hosted projects must enable the matching "Allow anonymous sign-ins" setting
+# in the Supabase Dashboard separately; this entry configures local Supabase.
+enable_anonymous_sign_ins = true
+
 [functions.buffalo-push-worker]
 verify_jwt = false
 

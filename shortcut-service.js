@@ -41,17 +41,39 @@ function getConfiguredAppleShortcutUrl() {
   }
 }
 
-async function getShortcutAccessJwt() {
+async function getShortcutManagementIdentity() {
   if (typeof initializeAppAuth === "function") await initializeAppAuth();
-  const { data, error } = await supabaseClient.auth.getSession();
+  let { data, error } = await supabaseClient.auth.getSession();
+  if (error) throw error;
+
+  if (!data.session && typeof ensureAnonymousAuthSession === "function") {
+    await ensureAnonymousAuthSession({ allowRetry: true });
+    ({ data, error } = await supabaseClient.auth.getSession());
+    if (error) throw error;
+  }
+
+  if (!data.session?.access_token) {
+    throw new Error("Shortcut setup requires an authenticated app session");
+  }
+  const identity = getLocalIdentity();
+  if (!identity) throw new Error("A local identity is required for shortcut setup");
+
+  if (typeof ensureCurrentAppProfile === "function") {
+    await ensureCurrentAppProfile(identity.displayName);
+  }
+
+  // The profile RPC may have refreshed a near-expiry session. Read the current
+  // persisted session once more so the Edge Function always receives its
+  // latest access token rather than a stale pre-RPC snapshot.
+  ({ data, error } = await supabaseClient.auth.getSession());
   if (error) throw error;
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("Shortcut setup requires an authenticated app session");
-  return accessToken;
+  return Object.freeze({ accessToken, identity });
 }
 
-async function requestShortcutManagement(action, deviceId) {
-  const accessToken = await getShortcutAccessJwt();
+async function requestShortcutManagement(action) {
+  const { accessToken, identity } = await getShortcutManagementIdentity();
   const response = await fetch(BUFFALO_SHORTCUT_ENDPOINT, {
     method: "POST",
     headers: {
@@ -59,7 +81,7 @@ async function requestShortcutManagement(action, deviceId) {
       authorization: `Bearer ${accessToken}`,
       apikey: SUPABASE_PUBLISHABLE_KEY,
     },
-    body: JSON.stringify({ action, deviceId }),
+    body: JSON.stringify({ action, deviceId: identity.deviceId }),
     cache: "no-store",
     referrerPolicy: "no-referrer",
   });
@@ -79,22 +101,16 @@ async function requestShortcutManagement(action, deviceId) {
   return result;
 }
 
-function getShortcutDeviceId() {
-  const identity = typeof getLocalIdentity === "function" ? getLocalIdentity() : null;
-  if (!identity) throw new Error("A local identity is required for shortcut setup");
-  return identity.deviceId;
-}
-
 function getBuffaloShortcutStatus() {
-  return requestShortcutManagement("status", getShortcutDeviceId());
+  return requestShortcutManagement("status");
 }
 
 function provisionBuffaloShortcut() {
-  return requestShortcutManagement("provision", getShortcutDeviceId());
+  return requestShortcutManagement("provision");
 }
 
 function revokeBuffaloShortcut() {
-  return requestShortcutManagement("revoke", getShortcutDeviceId());
+  return requestShortcutManagement("revoke");
 }
 
 window.buffaloShortcutService = Object.freeze({

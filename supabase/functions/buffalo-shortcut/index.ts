@@ -107,7 +107,8 @@ async function handleManagementAction(
     .select("display_name")
     .eq("user_id", authData.user.id)
     .maybeSingle();
-  if (profileError || !profile?.display_name) {
+  if (profileError) throw profileError;
+  if (!profile?.display_name) {
     return json({ ok: false, error: "identity_unavailable" }, 409);
   }
 

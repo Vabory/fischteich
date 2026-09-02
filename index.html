@@ -14,7 +14,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=104">
+    <link rel="stylesheet" href="./style.css?v=105">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -53,7 +53,7 @@
           aria-hidden="true"
         >
         <button class="buffalo-menu-button" id="open-buffalo-timer" type="button" aria-label="Buffalo Timer öffnen">
-          <span aria-hidden="true">🐃</span>
+          Buffalo Timer
         </button>
         <main class="menu-card">
           <div class="menu-actions">
@@ -90,9 +90,8 @@
           </button>
 
           <section class="buffalo-live-card" id="buffalo-live-status" aria-label="Laufender Buffalo Timer" aria-live="polite" hidden>
-            <span class="buffalo-live-icon" aria-hidden="true">🐃</span>
             <span class="buffalo-live-copy">
-              <span class="buffalo-live-kicker">Buffalo läuft</span>
+              <span class="buffalo-live-kicker">BUFFALO TIMER</span>
               <strong id="buffalo-live-name">—</strong>
             </span>
             <time class="buffalo-live-countdown" id="buffalo-live-countdown">03:00</time>
@@ -883,7 +882,6 @@
 
     <div class="modal-backdrop roulette-stats-backdrop buffalo-timer-backdrop" id="buffalo-timer-modal" role="dialog" aria-modal="true" aria-labelledby="buffalo-timer-title" hidden>
       <div class="modal-card roulette-stats-modal-card buffalo-timer-modal-card">
-        <p class="roulette-modal-kicker">FISCHTEICH</p>
         <h2 id="buffalo-timer-title">Buffalo Timer</h2>
         <a class="buffalo-rules-link" href="https://ris-buffalo.eu/" target="_blank" rel="noopener noreferrer external">Buffalo Regelwerk ↗</a>
         <section class="buffalo-modal-active" id="buffalo-modal-active" aria-label="Aktiver Buffalo Timer" hidden>

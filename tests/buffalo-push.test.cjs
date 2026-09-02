@@ -201,8 +201,8 @@ async function dispatchWorkerEvent(listener, event) {
 }
 
 for (const [type, title, tagPrefix] of [
-  ["buffalo_start", "🦬 Buffalo!", "buffalo-start-"],
-  ["buffalo_end", "⏰ Buffalo vorbei!", "buffalo-end-"],
+  ["buffalo_start", "Buffalo! 🍻", "buffalo-start-"],
+  ["buffalo_end", "Buffalo vorbei! ⏳", "buffalo-end-"],
 ]) {
   test(`service worker displays ${type} with an event-specific tag`, async () => {
     const harness = createServiceWorkerHarness();
@@ -281,6 +281,16 @@ test("worker accepts only the cron secret and builds payloads from claimed datab
   assert.match(edgeWorker, /claim_due_buffalo_push_deliveries/);
   assert.match(edgeWorker, /type: "buffalo_start"/);
   assert.match(edgeWorker, /type: "buffalo_end"/);
+  assert.match(edgeWorker, /title: "Buffalo! 🍻"/);
+  assert.match(
+    edgeWorker,
+    /body: `\$\{delivery\.caller_display_name\} hat \$\{target\} Buffalo gecalled! Der 3min\. Timer wurde gestartet\.`/,
+  );
+  assert.match(edgeWorker, /title: "Buffalo vorbei! ⏳"/);
+  assert.match(
+    edgeWorker,
+    /body: `Der Buffalo Timer ist vorbei! \$\{target\} muss das Getränk ausgetrunken haben\.`/,
+  );
   assert.doesNotMatch(edgeWorker, /await request\.json\(\)/);
   assert.doesNotMatch(deliveryExpansion, /caller_device_id\s*<>|subscription\.device_id\s*<>/i);
 });

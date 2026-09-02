@@ -44,7 +44,7 @@ assert.match(html, /id="settings-admin-actions"[^>]*hidden/);
 assert.match(html, /id="tournament-trash-screen"[^>]*hidden/);
 assert.match(html, /id="tournament-delete-modal"/);
 assert.match(html, /id="tournament-restore-modal"/);
-assert.match(html, /style\.css\?v=104/);
+assert.match(html, /style\.css\?v=105/);
 assert.match(html, /tournament-live\.js\?v=12/);
 assert.match(html, /tournament-trash\.js\?v=2/);
 

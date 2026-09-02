@@ -52,8 +52,8 @@ function createNotificationPayload(delivery: PushDelivery) {
     return {
       type: "buffalo_start",
       eventId: delivery.event_id,
-      title: "🦬 Buffalo!",
-      body: `${delivery.caller_display_name} hat ${target} Buffalo gecalled. Der 3min. Timer wurde jetzt gestartet!`,
+      title: "Buffalo! 🍻",
+      body: `${delivery.caller_display_name} hat ${target} Buffalo gecalled! Der 3min. Timer wurde gestartet.`,
       tag: `buffalo-start-${delivery.event_id}`,
       url: "./",
     };
@@ -61,8 +61,8 @@ function createNotificationPayload(delivery: PushDelivery) {
   return {
     type: "buffalo_end",
     eventId: delivery.event_id,
-    title: "⏰ Buffalo vorbei!",
-    body: `Der Buffalo Timer ist vorbei! ${target} muss sein Getränk ausgetrunken haben.`,
+    title: "Buffalo vorbei! ⏳",
+    body: `Der Buffalo Timer ist vorbei! ${target} muss das Getränk ausgetrunken haben.`,
     tag: `buffalo-end-${delivery.event_id}`,
     url: "./",
   };

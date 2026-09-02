@@ -320,8 +320,23 @@ test("get_active_buffalo_event has no schema-qualified SQL special expressions",
 });
 
 test("loads versioned assets and the Buffalo service before the UI bundle", () => {
-  assert.match(html, /style\.css\?v=104/);
+  assert.match(html, /style\.css\?v=105/);
   assert.match(html, /buffalo-service\.js\?v=2[\s\S]*script\.js\?v=63/);
+});
+
+test("uses the text-only Buffalo polish without changing the selection grid", () => {
+  assert.match(
+    html,
+    /id="open-buffalo-timer"[^>]*aria-label="Buffalo Timer öffnen"[^>]*>\s*Buffalo Timer\s*<\/button>/,
+  );
+  assert.match(html, /class="buffalo-live-kicker">BUFFALO TIMER<\/span>/);
+  assert.doesNotMatch(html, /🐃|🦬/);
+  assert.doesNotMatch(html, /<p class="roulette-modal-kicker">FISCHTEICH<\/p>/);
+  assert.match(css, /\.buffalo-menu-button\s*\{[^}]*border-radius:\s*999px[^}]*white-space:\s*nowrap/s);
+  assert.match(css, /\.buffalo-live-card\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto/s);
+  assert.match(css, /\.buffalo-timer-modal-card h2\s*\{[^}]*color:\s*#f4bd55/s);
+  assert.match(css, /\.buffalo-rules-link\s*\{[^}]*margin-bottom:\s*5px/s);
+  assert.match(css, /\.buffalo-person-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s);
 });
 
 test("keeps central FRIENDS options and adds only minimal active/error UI", () => {

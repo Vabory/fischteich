@@ -1,2 +1,8 @@
 [functions.buffalo-push-worker]
 verify_jwt = false
+
+[functions.buffalo-shortcut]
+# Apple Shortcuts/Watch and Android HTTP automations do not hold a Supabase JWT.
+# The function validates its own per-device token for start requests and
+# validates a Supabase access token explicitly for setup/reset requests.
+verify_jwt = false

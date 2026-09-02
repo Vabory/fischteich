@@ -14,7 +14,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=103">
+    <link rel="stylesheet" href="./style.css?v=104">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -23,8 +23,9 @@
     <script src="./roulette-service.js?v=6" defer></script>
     <script src="./buffalo-service.js?v=2" defer></script>
     <script src="./push-service.js?v=1" defer></script>
+    <script src="./shortcut-service.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=62" defer></script>
+    <script src="./script.js?v=63" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -527,6 +528,25 @@
           </div>
           <p class="settings-push-status" id="settings-buffalo-push-status" aria-live="polite">Status wird geprüft …</p>
         </div>
+        <div class="settings-shortcut-section" id="settings-buffalo-shortcut-section">
+          <span class="settings-name-label">Buffalo Schnellzugriff</span>
+          <div class="settings-shortcut-platform" id="settings-shortcut-ios" hidden>
+            <strong>Siri &amp; Apple Watch</strong>
+            <p>Starte Buffalo direkt mit Siri oder deiner Apple Watch.</p>
+            <button class="secondary-button settings-shortcut-button" id="setup-apple-shortcut" type="button">Kurzbefehl einrichten</button>
+          </div>
+          <div class="settings-shortcut-platform" id="settings-shortcut-android" hidden>
+            <strong>Android Sprachsteuerung</strong>
+            <p>Richte einen sicheren HTTP-Schnellzugriff für eine Android-Automation ein.</p>
+            <button class="secondary-button settings-shortcut-button" id="setup-android-shortcut" type="button">Einrichtung anzeigen</button>
+          </div>
+          <div class="settings-shortcut-platform" id="settings-shortcut-other" hidden>
+            <strong>Sprachsteuerung</strong>
+            <p>Die Sprachsteuerung kann auf deinem Smartphone eingerichtet werden.</p>
+          </div>
+          <p class="settings-shortcut-status" id="settings-shortcut-status" aria-live="polite">Status wird geprüft …</p>
+          <button class="settings-shortcut-reset" id="reset-shortcut-access" type="button" hidden>Zugriff zurücksetzen</button>
+        </div>
         <div class="settings-admin-section" id="settings-admin-section">
           <span class="settings-name-label">Administration</span>
           <p class="settings-admin-status" id="settings-admin-status">Adminfunktionen sind geschützt.</p>
@@ -537,6 +557,35 @@
           </div>
         </div>
         <p class="settings-app-version" id="settings-app-version"></p>
+      </section>
+    </div>
+
+    <div class="modal-backdrop shortcut-setup-backdrop" id="shortcut-setup-modal" role="dialog" aria-modal="true" aria-labelledby="shortcut-setup-title" hidden>
+      <section class="modal-card shortcut-setup-card">
+        <button class="settings-close-button" id="close-shortcut-setup" type="button" aria-label="Schnellzugriff schließen">×</button>
+        <h2 id="shortcut-setup-title">Buffalo Schnellzugriff</h2>
+        <div id="shortcut-setup-intro">
+          <p id="shortcut-setup-description"></p>
+          <div class="shortcut-setup-notes" id="shortcut-apple-notes" hidden>
+            <p>Der Kurzbefehl wird auf dem iPhone erstellt und kann danach mit „Hey Siri, Buffalo“ sowie auf der Apple Watch laufen.</p>
+            <a class="secondary-button shortcut-share-link" id="apple-shortcut-share-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Vorlage in Kurzbefehle öffnen</a>
+          </div>
+          <div class="shortcut-setup-notes" id="shortcut-android-notes" hidden>
+            <p>Android bietet für PWAs keine universelle direkte Assistant-/Gemini-Aktion. Die Daten unten sind für eine HTTP-Automation vorgesehen.</p>
+          </div>
+          <button class="primary-button shortcut-create-button" id="create-shortcut-access" type="button">Sicheren Zugang erzeugen</button>
+        </div>
+        <div class="shortcut-credentials" id="shortcut-credentials" hidden>
+          <p class="shortcut-secret-warning">Der Token wird nur jetzt angezeigt. Behandle ihn wie ein Passwort und übernimm ihn direkt in deinen Kurzbefehl.</p>
+          <label for="shortcut-endpoint">POST-Endpunkt</label>
+          <div class="shortcut-copy-row"><input id="shortcut-endpoint" type="text" readonly><button type="button" data-copy-shortcut="shortcut-endpoint">Kopieren</button></div>
+          <label for="shortcut-device-id">deviceId</label>
+          <div class="shortcut-copy-row"><input id="shortcut-device-id" type="text" readonly><button type="button" data-copy-shortcut="shortcut-device-id">Kopieren</button></div>
+          <label for="shortcut-token">Header-Token</label>
+          <div class="shortcut-copy-row"><input id="shortcut-token" type="text" readonly><button type="button" data-copy-shortcut="shortcut-token">Kopieren</button></div>
+          <p class="shortcut-inline-feedback" id="shortcut-inline-feedback" aria-live="polite"></p>
+        </div>
+        <p class="shortcut-setup-error" id="shortcut-setup-error" aria-live="polite" hidden>Schnellzugriff konnte nicht eingerichtet werden.</p>
       </section>
     </div>
 

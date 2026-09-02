@@ -184,6 +184,23 @@ const settingsModal = document.querySelector("#settings-modal");
 const settingsCurrentName = document.querySelector("#settings-current-name");
 const buffaloPushToggle = document.querySelector("#toggle-buffalo-push");
 const buffaloPushStatus = document.querySelector("#settings-buffalo-push-status");
+const shortcutIosPanel = document.querySelector("#settings-shortcut-ios");
+const shortcutAndroidPanel = document.querySelector("#settings-shortcut-android");
+const shortcutOtherPanel = document.querySelector("#settings-shortcut-other");
+const shortcutSettingsStatus = document.querySelector("#settings-shortcut-status");
+const resetShortcutAccessButton = document.querySelector("#reset-shortcut-access");
+const shortcutSetupModal = document.querySelector("#shortcut-setup-modal");
+const shortcutSetupDescription = document.querySelector("#shortcut-setup-description");
+const shortcutAppleNotes = document.querySelector("#shortcut-apple-notes");
+const shortcutAndroidNotes = document.querySelector("#shortcut-android-notes");
+const appleShortcutShareLink = document.querySelector("#apple-shortcut-share-link");
+const createShortcutAccessButton = document.querySelector("#create-shortcut-access");
+const shortcutCredentials = document.querySelector("#shortcut-credentials");
+const shortcutEndpointInput = document.querySelector("#shortcut-endpoint");
+const shortcutDeviceIdInput = document.querySelector("#shortcut-device-id");
+const shortcutTokenInput = document.querySelector("#shortcut-token");
+const shortcutInlineFeedback = document.querySelector("#shortcut-inline-feedback");
+const shortcutSetupError = document.querySelector("#shortcut-setup-error");
 const settingsAdminStatus = document.querySelector("#settings-admin-status");
 const settingsAdminActions = document.querySelector("#settings-admin-actions");
 const settingsAppVersion = document.querySelector("#settings-app-version");
@@ -412,6 +429,9 @@ const state = {
   buffaloRealtimeUnsubscribe: null,
   buffaloPushSettingsRunning: false,
   buffaloPushSettingsRequestId: 0,
+  buffaloShortcutPlatform: "other",
+  buffaloShortcutSettingsRunning: false,
+  buffaloShortcutSettingsRequestId: 0,
 };
 
 let rouletteAssetPreloadPromise = null;
@@ -1076,6 +1096,156 @@ async function initializeBuffaloPush() {
   }
 }
 
+function renderBuffaloShortcutPlatform() {
+  const platform = window.buffaloShortcutService?.getPlatform?.() ?? "other";
+  state.buffaloShortcutPlatform = platform;
+  shortcutIosPanel.hidden = platform !== "ios";
+  shortcutAndroidPanel.hidden = platform !== "android";
+  shortcutOtherPanel.hidden = platform !== "other";
+  shortcutSettingsStatus.hidden = platform === "other";
+  resetShortcutAccessButton.hidden = true;
+}
+
+function setBuffaloShortcutStatus(message, { active = false, error = false } = {}) {
+  shortcutSettingsStatus.textContent = message;
+  shortcutSettingsStatus.classList.toggle("is-active", active);
+  shortcutSettingsStatus.classList.toggle("is-error", error);
+}
+
+async function renderBuffaloShortcutStatus() {
+  if (state.buffaloShortcutPlatform === "other") return;
+  const requestId = state.buffaloShortcutSettingsRequestId + 1;
+  state.buffaloShortcutSettingsRequestId = requestId;
+  setBuffaloShortcutStatus("Status wird geprüft …");
+  resetShortcutAccessButton.hidden = true;
+
+  try {
+    const result = await window.buffaloShortcutService.getStatus();
+    if (requestId !== state.buffaloShortcutSettingsRequestId) return;
+    const active = result.status === "active";
+    setBuffaloShortcutStatus(active ? "Aktiv auf diesem Gerät." : "Nicht eingerichtet.", { active });
+    resetShortcutAccessButton.hidden = !active;
+  } catch (error) {
+    if (requestId !== state.buffaloShortcutSettingsRequestId) return;
+    console.warn("Buffalo-Schnellzugriffstatus konnte nicht geladen werden.", {
+      code: error?.code ?? "request_failed",
+      status: error?.status ?? null,
+    });
+    setBuffaloShortcutStatus(
+      error?.code === "device_already_registered"
+        ? "Der Schnellzugriff muss neu verbunden werden."
+        : "Verbindung zu Supabase fehlgeschlagen.",
+      { error: true },
+    );
+  }
+}
+
+function clearShortcutCredentials() {
+  shortcutEndpointInput.value = "";
+  shortcutDeviceIdInput.value = "";
+  shortcutTokenInput.value = "";
+  shortcutCredentials.hidden = true;
+  shortcutInlineFeedback.textContent = "";
+}
+
+function openShortcutSetup(platform) {
+  if (!window.buffaloShortcutService || !["ios", "android"].includes(platform)) return;
+  state.buffaloShortcutPlatform = platform;
+  clearShortcutCredentials();
+  shortcutSetupError.hidden = true;
+  shortcutAppleNotes.hidden = platform !== "ios";
+  shortcutAndroidNotes.hidden = platform !== "android";
+  shortcutSetupDescription.textContent = platform === "ios"
+    ? "Erzeuge zuerst die einmaligen Zugangsdaten für deinen Apple-Kurzbefehl."
+    : "Erzeuge zuerst die einmaligen Zugangsdaten für deine Android-Automation.";
+  createShortcutAccessButton.textContent = "Sicheren Zugang erzeugen";
+  createShortcutAccessButton.disabled = false;
+  const shareUrl = window.buffaloShortcutService.appleShortcutUrl;
+  appleShortcutShareLink.hidden = platform !== "ios" || !shareUrl;
+  if (shareUrl) appleShortcutShareLink.href = shareUrl;
+  settingsModal.inert = true;
+  shortcutSetupModal.hidden = false;
+  createShortcutAccessButton.focus({ preventScroll: true });
+}
+
+function closeShortcutSetup() {
+  if (state.buffaloShortcutSettingsRunning) return;
+  shortcutSetupModal.hidden = true;
+  settingsModal.inert = false;
+  clearShortcutCredentials();
+  const focusTarget = state.buffaloShortcutPlatform === "android"
+    ? document.querySelector("#setup-android-shortcut")
+    : document.querySelector("#setup-apple-shortcut");
+  focusTarget?.focus({ preventScroll: true });
+}
+
+async function createShortcutAccess() {
+  if (state.buffaloShortcutSettingsRunning) return;
+  state.buffaloShortcutSettingsRunning = true;
+  createShortcutAccessButton.disabled = true;
+  createShortcutAccessButton.textContent = "Zugang wird erzeugt …";
+  shortcutSetupError.hidden = true;
+  clearShortcutCredentials();
+
+  try {
+    const result = await window.buffaloShortcutService.provision();
+    shortcutEndpointInput.value = result.endpoint;
+    shortcutDeviceIdInput.value = result.deviceId;
+    shortcutTokenInput.value = result.token;
+    shortcutCredentials.hidden = false;
+    shortcutInlineFeedback.textContent = "Zugang aktiv. Übernimm jetzt alle drei Werte in die Automation.";
+    createShortcutAccessButton.textContent = "Token erneut erzeugen";
+    setBuffaloShortcutStatus("Aktiv auf diesem Gerät.", { active: true });
+    resetShortcutAccessButton.hidden = false;
+  } catch (error) {
+    console.warn("Buffalo-Schnellzugriff konnte nicht eingerichtet werden.", {
+      code: error?.code ?? "request_failed",
+      status: error?.status ?? null,
+    });
+    shortcutSetupError.textContent = error?.code === "device_already_registered"
+      ? "Dieses Gerät ist bereits mit einer anderen App-Sitzung verbunden."
+      : "Schnellzugriff konnte nicht eingerichtet werden. Bitte Verbindung prüfen.";
+    shortcutSetupError.hidden = false;
+    createShortcutAccessButton.textContent = "Erneut versuchen";
+  } finally {
+    state.buffaloShortcutSettingsRunning = false;
+    createShortcutAccessButton.disabled = false;
+  }
+}
+
+async function revokeShortcutAccess() {
+  if (state.buffaloShortcutSettingsRunning) return;
+  state.buffaloShortcutSettingsRunning = true;
+  resetShortcutAccessButton.disabled = true;
+  setBuffaloShortcutStatus("Zugriff wird zurückgesetzt …");
+  try {
+    await window.buffaloShortcutService.revoke();
+    setBuffaloShortcutStatus("Nicht eingerichtet.");
+    resetShortcutAccessButton.hidden = true;
+  } catch (error) {
+    console.warn("Buffalo-Schnellzugriff konnte nicht widerrufen werden.", {
+      code: error?.code ?? "request_failed",
+      status: error?.status ?? null,
+    });
+    setBuffaloShortcutStatus("Zugriff konnte nicht zurückgesetzt werden.", { error: true });
+  } finally {
+    state.buffaloShortcutSettingsRunning = false;
+    resetShortcutAccessButton.disabled = false;
+  }
+}
+
+async function copyShortcutValue(input) {
+  if (!input?.value) return;
+  try {
+    await navigator.clipboard.writeText(input.value);
+    shortcutInlineFeedback.textContent = `${input.labels?.[0]?.textContent ?? "Wert"} kopiert.`;
+  } catch {
+    input.focus({ preventScroll: true });
+    input.select();
+    shortcutInlineFeedback.textContent = "Wert ist markiert und kann kopiert werden.";
+  }
+}
+
 function renderSettingsAdmin(auth = getAppAuthState()) {
   const isAdmin = auth.isAdmin === true;
   settingsAdminStatus.textContent = isAdmin ? "Admin angemeldet" : "Adminfunktionen sind geschützt.";
@@ -1087,6 +1257,8 @@ function renderSettingsAdmin(auth = getAppAuthState()) {
 function openSettingsModal() {
   renderSettingsIdentity();
   renderSettingsAdmin();
+  renderBuffaloShortcutPlatform();
+  void renderBuffaloShortcutStatus();
   void renderBuffaloPushSettings();
   appElement.inert = true;
   settingsModal.hidden = false;
@@ -4175,6 +4347,19 @@ document.querySelector("#close-settings").addEventListener("click", closeSetting
 buffaloPushToggle.addEventListener("click", () => {
   void toggleBuffaloPushSettings();
 });
+document.querySelector("#setup-apple-shortcut").addEventListener("click", () => openShortcutSetup("ios"));
+document.querySelector("#setup-android-shortcut").addEventListener("click", () => openShortcutSetup("android"));
+document.querySelector("#close-shortcut-setup").addEventListener("click", closeShortcutSetup);
+createShortcutAccessButton.addEventListener("click", () => void createShortcutAccess());
+resetShortcutAccessButton.addEventListener("click", () => void revokeShortcutAccess());
+shortcutSetupModal.addEventListener("click", (event) => {
+  if (event.target === shortcutSetupModal) closeShortcutSetup();
+});
+document.querySelectorAll("[data-copy-shortcut]").forEach((button) => {
+  button.addEventListener("click", () => {
+    void copyShortcutValue(document.querySelector(`#${button.dataset.copyShortcut}`));
+  });
+});
 openAdminLoginButton.addEventListener("click", openAdminLoginModal);
 adminLoginForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -4465,6 +4650,8 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     if (!welcomeIdentityModal.hidden) {
       return;
+    } else if (!shortcutSetupModal.hidden) {
+      closeShortcutSetup();
     } else if (!buffaloTimerModal.hidden) {
       closeBuffaloTimerModal();
     } else if (!adminLoginModal.hidden) {

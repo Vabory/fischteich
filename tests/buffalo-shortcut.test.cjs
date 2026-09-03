@@ -12,6 +12,9 @@ const serviceSource = read("shortcut-service.js");
 const script = read("script.js");
 const html = read("index.html");
 const migration = read("supabase/migrations/20260902000000_create_buffalo_shortcut_access.sql");
+const serviceRoleGrantMigration = read(
+  "supabase/migrations/20260902020000_grant_buffalo_shortcut_service_role_tables.sql",
+);
 const edgeFunction = read("supabase/functions/buffalo-shortcut/index.ts");
 const edgeConfig = read("supabase/config.toml");
 const buffaloService = read("buffalo-service.js");
@@ -157,6 +160,24 @@ test("shortcut tables and RPC stay private", () => {
   assert.match(migration, /revoke all on table public\.buffalo_shortcut_devices from public, anon, authenticated/);
   assert.match(migration, /grant execute on function public\.start_buffalo_event_from_shortcut[\s\S]*to service_role/);
   assert.doesNotMatch(migration, /to anon|to authenticated/);
+});
+
+test("service role receives only the direct table privileges required by buffalo-shortcut", () => {
+  assert.match(
+    serviceRoleGrantMigration,
+    /grant select on table public\.app_profiles to service_role/i,
+  );
+  assert.match(
+    serviceRoleGrantMigration,
+    /grant select, insert, update on table public\.buffalo_shortcut_devices to service_role/i,
+  );
+  assert.match(
+    serviceRoleGrantMigration,
+    /grant select on table public\.buffalo_shortcut_targets to service_role/i,
+  );
+  assert.doesNotMatch(serviceRoleGrantMigration, /grant all|\bdelete\b/i);
+  assert.doesNotMatch(serviceRoleGrantMigration, /\bto\s+(?:anon|authenticated)\b/i);
+  assert.doesNotMatch(serviceRoleGrantMigration, /disable row level security|create policy|alter policy/i);
 });
 
 test("no service-role, worker, VAPID or shortcut token secret is shipped to the browser", () => {

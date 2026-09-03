@@ -1,0 +1,18 @@
+# Local environment and secret files
+.env
+.env.*
+!.env.example
+
+# Local dependencies and generated test output
+node_modules/
+coverage/
+
+# Supabase CLI state
+supabase/.temp/
+
+# Local logs and editor/OS artifacts
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db

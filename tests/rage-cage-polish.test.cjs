@@ -11,14 +11,30 @@ const html = read("index.html");
 const css = read("style.css");
 const script = read("script.js");
 
-assert.match(html, /style\.css\?v=105/);
-assert.match(html, /script\.js\?v=63/);
+assert.match(html, /style\.css\?v=106/);
+assert.match(html, /script\.js\?v=64/);
 assert.equal((html.match(/rage-cage-cup--extra/g) ?? []).length, 6);
 assert.equal((html.match(/rage-cage-cup--upper/g) ?? []).length, 3);
 assert.equal((html.match(/rage-cage-cup--lower/g) ?? []).length, 3);
 assert.match(css, /\.rage-cage-cups i\s*\{[^}]*width:\s*13px[^}]*height:\s*13px[^}]*border:\s*3px solid #df3848/s);
-assert.match(css, /\.rage-cage-cups i\.rage-cage-cup--upper\s*\{\s*top:\s*22%/);
-assert.match(css, /\.rage-cage-cups i\.rage-cage-cup--lower\s*\{\s*top:\s*78%/);
+assert.doesNotMatch(css, /rage-cage-cup--(?:upper|lower)\s*\{[^}]*top:/s);
+
+const cupPositions = new Map(
+  [...css.matchAll(
+    /\.rage-cage-cups i:nth-child\((\d+)\)\s*\{\s*--cup-x:\s*(-?\d+)px;\s*--cup-y:\s*(-?\d+)px;/g,
+  )].map((match) => [Number(match[1]), { x: Number(match[2]), y: Number(match[3]) }]),
+);
+assert.equal(cupPositions.size, 20);
+const mainCups = Array.from({ length: 14 }, (_, index) => cupPositions.get(index + 1));
+const upperExtraCups = [15, 16, 17].map((index) => cupPositions.get(index));
+const lowerExtraCups = [18, 19, 20].map((index) => cupPositions.get(index));
+const distance = (first, second) => Math.hypot(first.x - second.x, first.y - second.y);
+const nearestMainCupDistance = (cup) => Math.min(...mainCups.map((mainCup) => distance(cup, mainCup)));
+assert.ok(upperExtraCups.every((cup) => cup.y < Math.min(...mainCups.map(({ y }) => y))));
+assert.ok(lowerExtraCups.every((cup) => cup.y > Math.max(...mainCups.map(({ y }) => y))));
+assert.ok([...upperExtraCups, ...lowerExtraCups].every((cup) => nearestMainCupDistance(cup) <= 22));
+assert.ok(new Set(upperExtraCups.map(({ y }) => y)).size > 1, "upper cups are not a horizontal row");
+assert.ok(new Set(lowerExtraCups.map(({ y }) => y)).size > 1, "lower cups are not a horizontal row");
 
 const actionsMarkup = html.slice(
   html.indexOf('<div class="rage-cage-actions">'),
@@ -35,7 +51,8 @@ const openSource = script.slice(
   script.indexOf("function closeRageCageTable()"),
 );
 assert.match(openSource, /resetRageCageDistribution\(\)/);
-assert.doesNotMatch(openSource, /createRageCageSeats\(\)/);
+assert.match(openSource, /createRageCageSeatPositions\(\)/);
+assert.doesNotMatch(openSource, /assignRageCagePlayers\(\)/);
 const closeSource = script.slice(
   script.indexOf("function closeRageCageTable()"),
   script.indexOf("async function animateInitialRageCageDistribution()"),
@@ -45,9 +62,9 @@ const actionRenderSource = script.slice(
   script.indexOf("function renderRageCageActions()"),
   script.indexOf("function openRageCageTable()"),
 );
-assert.match(actionRenderSource, /rageCageRandomizeButton\.hidden = hasDistribution/);
-assert.match(actionRenderSource, /rageCageStartButton\.hidden = !hasDistribution/);
-assert.match(actionRenderSource, /rageCageReshuffleButton\.hidden = !hasDistribution/);
+assert.match(actionRenderSource, /rageCageRandomizeButton\.hidden = hasAssignments/);
+assert.match(actionRenderSource, /rageCageStartButton\.hidden = !hasAssignments/);
+assert.match(actionRenderSource, /rageCageReshuffleButton\.hidden = !hasAssignments/);
 
 const timingSource = script.slice(
   script.indexOf("function getRageCageStartAnimationTiming"),
@@ -99,8 +116,10 @@ for (const [point, anchor, xSign, ySign, textAlign] of syntheticCorners) {
   assert.equal(Math.sign(label.offsetX), xSign);
   assert.equal(Math.sign(label.offsetY), ySign);
   assert.equal(label.textAlign, textAlign);
-  assert.ok(Math.abs(Math.abs(label.offsetX) - 63.75) < 0.001);
-  assert.equal(Math.abs(label.offsetY), 24);
+  assert.ok(Math.abs(Math.abs(label.offsetX) - 54.375) < 0.001);
+  assert.equal(Math.abs(label.offsetY), 22);
+  assert.ok(Math.hypot(label.offsetX, label.offsetY) > 55, "label clears its marker");
+  assert.ok(Math.hypot(label.offsetX, label.offsetY) < 64, "corner label stays close to its marker");
 }
 
 const tableBounds = { left: 110, top: 45, right: 260, bottom: 445, width: 150, height: 400 };
@@ -108,7 +127,7 @@ const cornerRadius = 42;
 const perimeter = 2 * (tableBounds.width - 84) + 2 * (tableBounds.height - 84) + 2 * Math.PI * cornerRadius;
 let actualTopRight = 0;
 let actualBottomLeft = 0;
-for (const seatCount of [4, 6, 8, 10, 13, 19]) {
+for (const seatCount of [4, 6, 9, 10, 13, 19]) {
   for (let seatIndex = 0; seatIndex < seatCount; seatIndex += 1) {
     const point = geometryContext.getPoint(perimeter * seatIndex / seatCount, tableBounds, cornerRadius);
     const label = geometryContext.getLabel(point, 375);
@@ -124,28 +143,66 @@ assert.ok(actualTopRight > 1, "right-top is covered across seat counts");
 assert.ok(actualBottomLeft > 1, "left-bottom is covered across seat counts");
 
 const seatFactorySource = script.slice(
-  script.indexOf("function createRageCageSeats()"),
+  script.indexOf("function createRageCageSeatPositions()"),
   script.indexOf("function resetRageCageDistribution()"),
 );
-let reverse = false;
 const seatFactoryContext = vm.createContext({
   state: {
-    selectedParticipants: Array.from({ length: 6 }, (_, index) => ({ id: index + 1, name: `P${index + 1}` })),
+    selectedParticipants: [],
     rageCageSeats: [],
   },
   stopRageCageStartAnimation() {},
-  shuffle(items) { reverse = !reverse; return reverse ? [...items].reverse() : [...items]; },
+  shuffle(items) { return [...items].reverse(); },
 });
 vm.runInContext(`${seatFactorySource}
-  this.createSeats = createRageCageSeats;
+  this.createPositions = createRageCageSeatPositions;
+  this.assignPlayers = assignRageCagePlayers;
+  this.hasAssignments = hasRageCagePlayerAssignments;
 `, seatFactoryContext);
-seatFactoryContext.createSeats();
-const firstOrder = seatFactoryContext.state.rageCageSeats.map((seat) => seat.player.id);
-seatFactoryContext.createSeats();
-const secondOrder = seatFactoryContext.state.rageCageSeats.map((seat) => seat.player.id);
-assert.equal(new Set(firstOrder).size, 6);
-assert.equal(new Set(secondOrder).size, 6);
-assert.notDeepEqual(firstOrder, secondOrder);
-assert.equal(seatFactoryContext.state.rageCageSeats.length, 6);
+
+for (const seatCount of [4, 6, 9, 10, 13, 19]) {
+  seatFactoryContext.state.selectedParticipants = Array.from(
+    { length: seatCount },
+    (_, index) => ({ id: index + 1, name: `P${index + 1}` }),
+  );
+  seatFactoryContext.createPositions();
+  const seatReferences = [...seatFactoryContext.state.rageCageSeats];
+  const markerIndices = seatReferences.map((seat) => seat.seatIndex);
+
+  assert.equal(seatReferences.length, seatCount);
+  assert.equal(seatReferences.filter((seat) => seat.player !== null).length, 0);
+  assert.equal(seatFactoryContext.hasAssignments(), false);
+
+  seatFactoryContext.assignPlayers();
+  const assignedPlayers = Array.from(
+    seatFactoryContext.state.rageCageSeats,
+    (seat) => seat.player.id,
+  );
+  assert.deepEqual(
+    Array.from(seatFactoryContext.state.rageCageSeats, (seat) => seat.seatIndex),
+    markerIndices,
+    `${seatCount} player markers keep their seat indices`,
+  );
+  assert.ok(
+    seatFactoryContext.state.rageCageSeats.every((seat, index) => seat === seatReferences[index]),
+    `${seatCount} player assignments reuse the existing marker seats`,
+  );
+  assert.equal(new Set(assignedPlayers).size, seatCount);
+  assert.equal(seatFactoryContext.hasAssignments(), true);
+}
+
+const renderSeatsSource = script.slice(
+  script.indexOf("function renderRageCageSeats()"),
+  script.indexOf("function participantListTextOverflows"),
+);
+assert.match(renderSeatsSource, /seatElement\.append\(dotElement\);\s*if \(seat\.player\)/s);
+assert.match(renderSeatsSource, /: `Sitzplatz \$\{seat\.seatIndex \+ 1\}`/);
+
+const initialDistributionSource = script.slice(
+  script.indexOf("async function animateInitialRageCageDistribution()"),
+  script.indexOf("function openRageCageReshuffleConfirmation()"),
+);
+assert.match(initialDistributionSource, /assignRageCagePlayers\(\)/);
+assert.doesNotMatch(initialDistributionSource, /createRageCageSeatPositions\(\)/);
 
 console.log("rage cage polish tests: ok");

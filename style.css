@@ -1556,15 +1556,12 @@ button.is-release-pressed {
 .rage-cage-cups i:nth-child(12) { --cup-x: 16px; --cup-y: 32px; --cup-rotation: 12deg; }
 .rage-cage-cups i:nth-child(13) { --cup-x: -21px; --cup-y: 40px; --cup-rotation: 5deg; }
 .rage-cage-cups i:nth-child(14) { --cup-x: 4px; --cup-y: 45px; --cup-rotation: -5deg; }
-.rage-cage-cups i.rage-cage-cup--extra { --cup-y: 0px; }
-.rage-cage-cups i.rage-cage-cup--upper { top: 22%; }
-.rage-cage-cups i.rage-cage-cup--lower { top: 78%; }
-.rage-cage-cups i:nth-child(15),
-.rage-cage-cups i:nth-child(18) { --cup-x: -20px; --cup-rotation: -7deg; }
-.rage-cage-cups i:nth-child(16),
-.rage-cage-cups i:nth-child(19) { --cup-x: 0px; --cup-rotation: 2deg; }
-.rage-cage-cups i:nth-child(17),
-.rage-cage-cups i:nth-child(20) { --cup-x: 20px; --cup-rotation: 8deg; }
+.rage-cage-cups i:nth-child(15) { --cup-x: -20px; --cup-y: -49px; --cup-rotation: -7deg; }
+.rage-cage-cups i:nth-child(16) { --cup-x: 1px; --cup-y: -54px; --cup-rotation: 2deg; }
+.rage-cage-cups i:nth-child(17) { --cup-x: 20px; --cup-y: -43px; --cup-rotation: 8deg; }
+.rage-cage-cups i:nth-child(18) { --cup-x: -19px; --cup-y: 59px; --cup-rotation: -8deg; }
+.rage-cage-cups i:nth-child(19) { --cup-x: 2px; --cup-y: 66px; --cup-rotation: 3deg; }
+.rage-cage-cups i:nth-child(20) { --cup-x: 20px; --cup-y: 56px; --cup-rotation: 10deg; }
 
 @keyframes rage-cage-participant-panel-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.985); }

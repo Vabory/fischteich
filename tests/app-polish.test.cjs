@@ -12,10 +12,10 @@ const css = read("style.css");
 const script = read("script.js");
 const service = read("roulette-service.js");
 
-assert.match(html, /style\.css\?v=105/);
+assert.match(html, /style\.css\?v=106/);
 assert.match(html, /roulette-service\.js\?v=6/);
 assert.match(html, /button-release\.js\?v=1/);
-assert.match(html, /script\.js\?v=63/);
+assert.match(html, /script\.js\?v=64/);
 
 assert.match(html, /<p class="settings-app-version" id="settings-app-version"><\/p>/);
 assert.equal((script.match(/const FISCHTEICH_APP_VERSION = "1\.0"/g) ?? []).length, 1);

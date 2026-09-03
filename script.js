@@ -2226,15 +2226,35 @@ function setRageCageStartPositions(startA = null, startB = null) {
   }
 }
 
-function createRageCageSeats() {
+function createRageCageSeatPositions() {
+  state.rageCageSeats = Array.from(
+    { length: state.selectedParticipants.length },
+    (_, seatIndex) => ({
+      player: null,
+      seatIndex,
+      dotPosition: null,
+      labelPosition: null,
+      isStartPosition: false,
+    }),
+  );
+}
+
+function assignRageCagePlayers() {
   stopRageCageStartAnimation();
-  state.rageCageSeats = shuffle(state.selectedParticipants).map((player, seatIndex) => ({
-    player,
-    seatIndex,
-    dotPosition: null,
-    labelPosition: null,
-    isStartPosition: false,
-  }));
+  if (state.rageCageSeats.length !== state.selectedParticipants.length) {
+    createRageCageSeatPositions();
+  }
+
+  const randomizedPlayers = shuffle(state.selectedParticipants);
+  state.rageCageSeats.forEach((seat, seatIndex) => {
+    seat.player = randomizedPlayers[seatIndex];
+    seat.isStartPosition = false;
+  });
+}
+
+function hasRageCagePlayerAssignments() {
+  return state.rageCageSeats.length > 0
+    && state.rageCageSeats.every((seat) => seat.player !== null);
 }
 
 function resetRageCageDistribution() {
@@ -2333,6 +2353,7 @@ function getRageCagePathPoint(distance, tableBounds, cornerRadius) {
 
 function getRageCageLabelGeometry(point, stageWidth) {
   const horizontalDistance = Math.min(72, Math.max(60, stageWidth * 0.17));
+  const cornerHorizontalDistance = Math.min(62, Math.max(52, stageWidth * 0.145));
   const hasHorizontalNormal = Math.abs(point.normalX) > 0.28;
   const hasVerticalNormal = Math.abs(point.normalY) > 0.28;
   const horizontalSide = point.normalX < 0 ? "left" : "right";
@@ -2341,8 +2362,8 @@ function getRageCageLabelGeometry(point, stageWidth) {
   if (hasHorizontalNormal && hasVerticalNormal) {
     return {
       anchor: `${verticalSide}-${horizontalSide}`,
-      offsetX: Math.sign(point.normalX) * horizontalDistance,
-      offsetY: Math.sign(point.normalY) * 24,
+      offsetX: Math.sign(point.normalX) * cornerHorizontalDistance,
+      offsetY: Math.sign(point.normalY) * 22,
       textAlign: point.normalX < 0 ? "right" : "left",
     };
   }
@@ -2405,10 +2426,9 @@ function renderRageCageSeats() {
     const labelY = point.y + labelGeometry.offsetY;
     const seatElement = document.createElement("div");
     const dotElement = document.createElement("span");
-    const labelElement = document.createElement("span");
 
     seat.dotPosition = { x: point.x, y: point.y };
-    seat.labelPosition = { x: labelX, y: labelY };
+    seat.labelPosition = seat.player ? { x: labelX, y: labelY } : null;
     seatElement.className = "rage-cage-seat";
     seatElement.classList.toggle("is-start-position", seat.isStartPosition);
     seatElement.classList.toggle("has-compact-label", compactLabels);
@@ -2422,14 +2442,20 @@ function renderRageCageSeats() {
     seatElement.dataset.seatIndex = String(seat.seatIndex);
     seatElement.setAttribute(
       "aria-label",
-      `${seat.player.name}${seat.isStartPosition ? ", Startposition" : ""}`,
+      seat.player
+        ? `${seat.player.name}${seat.isStartPosition ? ", Startposition" : ""}`
+        : `Sitzplatz ${seat.seatIndex + 1}`,
     );
     dotElement.className = "rage-cage-dot";
     dotElement.setAttribute("aria-hidden", "true");
-    labelElement.className = "rage-cage-player-name";
-    labelElement.textContent = seat.player.name;
-    labelElement.style.textAlign = labelGeometry.textAlign;
-    seatElement.append(dotElement, labelElement);
+    seatElement.append(dotElement);
+    if (seat.player) {
+      const labelElement = document.createElement("span");
+      labelElement.className = "rage-cage-player-name";
+      labelElement.textContent = seat.player.name;
+      labelElement.style.textAlign = labelGeometry.textAlign;
+      seatElement.append(labelElement);
+    }
     return seatElement;
   });
 
@@ -2531,10 +2557,10 @@ function renderRageCageTable() {
 }
 
 function renderRageCageActions() {
-  const hasDistribution = state.rageCageSeats.length > 0;
-  rageCageRandomizeButton.hidden = hasDistribution;
-  rageCageStartButton.hidden = !hasDistribution;
-  rageCageReshuffleButton.hidden = !hasDistribution;
+  const hasAssignments = hasRageCagePlayerAssignments();
+  rageCageRandomizeButton.hidden = hasAssignments;
+  rageCageStartButton.hidden = !hasAssignments;
+  rageCageReshuffleButton.hidden = !hasAssignments;
 }
 
 function openRageCageTable() {
@@ -2543,6 +2569,7 @@ function openRageCageTable() {
   }
 
   resetRageCageDistribution();
+  createRageCageSeatPositions();
   closeParticipantListPanel(rageCageParticipantList);
   showScreen(rageCageScreen);
   renderRageCageTable();
@@ -2560,7 +2587,7 @@ function closeRageCageTable() {
 }
 
 async function animateInitialRageCageDistribution() {
-  if (state.rageCageSeats.length > 0 || state.rageCageReshuffling) return;
+  if (hasRageCagePlayerAssignments() || state.rageCageReshuffling) return;
 
   const run = ++state.rageCageTransitionRun;
   state.rageCageReshuffling = true;
@@ -2569,7 +2596,7 @@ async function animateInitialRageCageDistribution() {
   try {
     await animateReshuffle(rageCageSeats, () => {
       if (run !== state.rageCageTransitionRun || rageCageScreen.hidden) return;
-      createRageCageSeats();
+      assignRageCagePlayers();
       renderRageCageSeats();
       renderRageCageActions();
     });
@@ -2607,7 +2634,7 @@ function closeRageCageReshuffleConfirmation({ restoreFocus = true } = {}) {
 }
 
 function reshuffleRageCagePlayers() {
-  createRageCageSeats();
+  assignRageCagePlayers();
   renderRageCageSeats();
 }
 

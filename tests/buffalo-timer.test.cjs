@@ -320,8 +320,8 @@ test("get_active_buffalo_event has no schema-qualified SQL special expressions",
 });
 
 test("loads versioned assets and the Buffalo service before the UI bundle", () => {
-  assert.match(html, /style\.css\?v=107/);
-  assert.match(html, /buffalo-service\.js\?v=2[\s\S]*script\.js\?v=65/);
+  assert.match(html, /style\.css\?v=109/);
+  assert.match(html, /buffalo-service\.js\?v=2[\s\S]*script\.js\?v=67/);
 });
 
 test("uses the text-only Buffalo polish without changing the selection grid", () => {

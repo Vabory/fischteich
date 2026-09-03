@@ -11,6 +11,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const serviceSource = read("shortcut-service.js");
 const script = read("script.js");
 const html = read("index.html");
+const style = read("style.css");
 const migration = read("supabase/migrations/20260902000000_create_buffalo_shortcut_access.sql");
 const serviceRoleGrantMigration = read(
   "supabase/migrations/20260902020000_grant_buffalo_shortcut_service_role_tables.sql",
@@ -20,7 +21,7 @@ const edgeConfig = read("supabase/config.toml");
 const buffaloService = read("buffalo-service.js");
 const pushMigration = read("supabase/migrations/20260901020000_create_buffalo_push_infrastructure.sql");
 
-function createPlatformHarness(navigator) {
+function createPlatformHarness(navigator, source = serviceSource) {
   const window = { navigator };
   const context = vm.createContext({
     window,
@@ -33,7 +34,7 @@ function createPlatformHarness(navigator) {
     Number,
     Error,
   });
-  vm.runInContext(serviceSource, context, { filename: "shortcut-service.js" });
+  vm.runInContext(source, context, { filename: "shortcut-service.js" });
   return window.buffaloShortcutService;
 }
 
@@ -80,7 +81,38 @@ test("Apple share link is intentionally disabled until a genuine iCloud URL is c
   assert.match(serviceSource, /const APPLE_BUFFALO_SHORTCUT_URL = ""/);
   assert.equal(createPlatformHarness({ userAgent: "desktop" }).appleShortcutUrl, null);
   assert.match(serviceSource, /hostname === "www\.icloud\.com"/);
-  assert.match(html, /id="apple-shortcut-share-link"[^>]*hidden/);
+  assert.match(html, /id="apple-shortcut-share-link"[^>]*hidden>Buffalo Vorlage kopieren<\/a>/);
+  assert.match(script, /appleShortcutShareLink\.hidden = true;[\s\S]*removeAttribute\("href"\)/);
+});
+
+test("configured Apple template uses the exact central URL without personal credentials", () => {
+  const shortcutUrl = "https://www.icloud.com/shortcuts/0123456789abcdef";
+  const configuredSource = serviceSource.replace(
+    'const APPLE_BUFFALO_SHORTCUT_URL = "";',
+    `const APPLE_BUFFALO_SHORTCUT_URL = "${shortcutUrl}";`,
+  );
+  assert.equal(
+    createPlatformHarness({ userAgent: "desktop" }, configuredSource).appleShortcutUrl,
+    shortcutUrl,
+  );
+  const shareRendering = script.match(/function renderShortcutSetupAccessState\(active\) \{([\s\S]*?)\n\}/)[1];
+  assert.match(shareRendering, /appleShortcutShareLink\.href = shareUrl/);
+  assert.doesNotMatch(shareRendering, /shortcutDeviceIdInput|shortcutTokenInput|searchParams|URLSearchParams/);
+  assert.doesNotMatch(script, /appleShortcutShareLink\.addEventListener/);
+});
+
+test("shortcut modal gives the Apple template primary priority without weakening rotation", () => {
+  const description = "Erstelle einen Kurzbefehl und starte den Buffalo Timer mit „Hey Siri, Buffalo“ über die Sprachsteuerung deines iPhones oder Apple Watch";
+  assert.match(html, new RegExp(description));
+  assert.doesNotMatch(html, /Erzeuge zuerst die einmaligen Zugangsdaten für deinen Apple-Kurzbefehl/);
+  assert.doesNotMatch(script, /Erzeuge einmalig die Zugangsdaten für deinen Apple-Kurzbefehl/);
+  assert.match(html, /class="shortcut-rotate-link" id="rotate-shortcut-access"[^>]*>Token erneut erzeugen<\/button>/);
+  assert.doesNotMatch(html, /class="[^"]*(?:primary-button|secondary-button)[^"]*" id="rotate-shortcut-access"/);
+  assert.match(html, /class="primary-button shortcut-share-link" id="apple-shortcut-share-link"/);
+  assert.ok(html.indexOf('id="shortcut-credentials"') < html.indexOf('id="rotate-shortcut-access"'));
+  assert.ok(html.indexOf('id="rotate-shortcut-access"') < html.indexOf('id="apple-shortcut-share-link"'));
+  assert.match(style, /\.shortcut-rotate-link \{[\s\S]*min-height: 44px;[\s\S]*background: transparent;[\s\S]*box-shadow: none;[\s\S]*text-decoration: underline;/);
+  assert.match(script, /rotateShortcutAccessButton\.addEventListener\("click", openShortcutRotationConfirmation\)/);
 });
 
 test("shortcut credentials use a private POST body and secret header", () => {
@@ -96,7 +128,8 @@ test("provisioning requires a verified Supabase user and links the existing devi
   assert.match(edgeFunction, /from\("app_profiles"\)/);
   assert.match(edgeFunction, /device_already_registered/);
   assert.match(migration, /owner_user_id uuid not null references auth\.users/);
-  assert.match(edgeFunction, /existing\.display_name !== profile\.display_name/);
+  assert.match(edgeFunction, /body\.action === "status"[\s\S]*status: existing\?\.enabled && existing\.token_hash/);
+  assert.doesNotMatch(edgeFunction, /sync_shortcut_device/);
   assert.doesNotMatch(serviceSource, /randomUUID/);
 });
 

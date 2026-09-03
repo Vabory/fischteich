@@ -327,6 +327,6 @@ test("cron invokes the private worker every ten seconds through Vault", () => {
 test("no private VAPID or worker secrets are present in browser files", () => {
   const browserSources = [pushServiceSource, serviceWorkerSource, script, html].join("\n");
   assert.doesNotMatch(browserSources, /VAPID_PRIVATE|VAPID_SUBJECT|WORKER_SECRET/);
-  assert.match(html, /pwa-service\.js\?v=1[\s\S]*push-service\.js\?v=2[\s\S]*script\.js\?v=65/);
+  assert.match(html, /pwa-service\.js\?v=1[\s\S]*push-service\.js\?v=2[\s\S]*script\.js\?v=67/);
   assert.match(html, /id="toggle-buffalo-push"[^>]*role="switch"/);
 });

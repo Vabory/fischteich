@@ -200,15 +200,6 @@ async function handleManagementAction(
   }
 
   if (body.action === "status") {
-    if (existing && existing.display_name !== profile.display_name) {
-      diagnostic.step = "sync_shortcut_device";
-      const { error: syncError } = await service
-        .from("buffalo_shortcut_devices")
-        .update({ display_name: profile.display_name, updated_at: new Date().toISOString() })
-        .eq("device_id", deviceId)
-        .eq("owner_user_id", authData.user.id);
-      if (syncError) throw syncError;
-    }
     diagnostic.step = "response";
     return json({
       ok: true,
@@ -229,7 +220,17 @@ async function handleManagementAction(
     return json({ ok: true, status: "revoked" });
   }
 
-  if (body.action !== "provision") return json({ ok: false, error: "invalid_action" }, 400);
+  if (!['provision', 'rotate'].includes(body.action as string)) {
+    return json({ ok: false, error: "invalid_action" }, 400);
+  }
+
+  if (body.action === "provision" && existing?.enabled && existing.token_hash) {
+    diagnostic.step = "response";
+    return json({ ok: true, status: "already_provisioned" });
+  }
+  if (body.action === "rotate" && (!existing?.enabled || !existing.token_hash)) {
+    return json({ ok: false, error: "not_configured" }, 409);
+  }
 
   diagnostic.step = "generate_token";
   const token = createAccessToken();
@@ -248,7 +249,9 @@ async function handleManagementAction(
     rate_window_started_at: null,
     rate_window_request_count: 0,
   };
-  diagnostic.step = "provision_shortcut_device";
+  diagnostic.step = body.action === "rotate"
+    ? "rotate_shortcut_device"
+    : "provision_shortcut_device";
   const writeQuery = existing
     ? service.from("buffalo_shortcut_devices").update(deviceValues)
       .eq("device_id", deviceId)
@@ -267,7 +270,7 @@ async function handleManagementAction(
   diagnostic.step = "response";
   return json({
     ok: true,
-    status: existing ? "rotated" : "created",
+    status: body.action === "rotate" ? "rotated" : "created",
     deviceId,
     token,
     endpoint: `${supabaseUrl.replace(/\/$/u, "")}/functions/v1/buffalo-shortcut`,

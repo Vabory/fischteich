@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260903.2">
+    <meta name="fischteich-build" content="20260903.4">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=107">
+    <link rel="stylesheet" href="./style.css?v=109">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -25,9 +25,9 @@
     <script src="./buffalo-service.js?v=2" defer></script>
     <script src="./pwa-service.js?v=1" defer></script>
     <script src="./push-service.js?v=2" defer></script>
-    <script src="./shortcut-service.js?v=2" defer></script>
+    <script src="./shortcut-service.js?v=3" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=65" defer></script>
+    <script src="./script.js?v=67" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -578,11 +578,7 @@
         <button class="settings-close-button" id="close-shortcut-setup" type="button" aria-label="Schnellzugriff schließen">×</button>
         <h2 id="shortcut-setup-title">Buffalo Schnellzugriff</h2>
         <div id="shortcut-setup-intro">
-          <p id="shortcut-setup-description"></p>
-          <div class="shortcut-setup-notes" id="shortcut-apple-notes" hidden>
-            <p>Der Kurzbefehl wird auf dem iPhone erstellt und kann danach mit „Hey Siri, Buffalo“ sowie auf der Apple Watch laufen.</p>
-            <a class="secondary-button shortcut-share-link" id="apple-shortcut-share-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Vorlage in Kurzbefehle öffnen</a>
-          </div>
+          <p id="shortcut-setup-description">Erstelle einen Kurzbefehl und starte den Buffalo Timer mit „Hey Siri, Buffalo“ über die Sprachsteuerung deines iPhones oder Apple Watch</p>
           <div class="shortcut-setup-notes" id="shortcut-android-notes" hidden>
             <p>Android bietet für PWAs keine universelle direkte Assistant-/Gemini-Aktion. Die Daten unten sind für eine HTTP-Automation vorgesehen.</p>
           </div>
@@ -598,7 +594,20 @@
           <div class="shortcut-copy-row"><input id="shortcut-token" type="text" readonly><button type="button" data-copy-shortcut="shortcut-token">Kopieren</button></div>
           <p class="shortcut-inline-feedback" id="shortcut-inline-feedback" aria-live="polite"></p>
         </div>
+        <button class="shortcut-rotate-link" id="rotate-shortcut-access" type="button" hidden>Token erneut erzeugen</button>
+        <a class="primary-button shortcut-share-link" id="apple-shortcut-share-link" target="_blank" rel="noopener noreferrer" hidden>Buffalo Vorlage kopieren</a>
         <p class="shortcut-setup-error" id="shortcut-setup-error" aria-live="polite" hidden>Schnellzugriff konnte nicht eingerichtet werden.</p>
+      </section>
+    </div>
+
+    <div class="modal-backdrop shortcut-rotate-backdrop" id="shortcut-rotate-modal" role="dialog" aria-modal="true" aria-labelledby="shortcut-rotate-title" hidden>
+      <section class="modal-card">
+        <h2 id="shortcut-rotate-title">Neuen Shortcut-Token erzeugen?</h2>
+        <p>Dein bisheriger Buffalo-Kurzbefehl funktioniert danach nicht mehr. Du musst den neuen Token anschließend im Kurzbefehl eintragen.</p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-shortcut-rotate" type="button">Abbrechen</button>
+          <button class="primary-button" id="confirm-shortcut-rotate" type="button">Token neu erzeugen</button>
+        </div>
       </section>
     </div>
 

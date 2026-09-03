@@ -109,6 +109,10 @@ function provisionBuffaloShortcut() {
   return requestShortcutManagement("provision");
 }
 
+function rotateBuffaloShortcut() {
+  return requestShortcutManagement("rotate");
+}
+
 function revokeBuffaloShortcut() {
   return requestShortcutManagement("revoke");
 }
@@ -120,5 +124,6 @@ window.buffaloShortcutService = Object.freeze({
   getPlatform: () => detectShortcutPlatform(window.navigator),
   getStatus: getBuffaloShortcutStatus,
   provision: provisionBuffaloShortcut,
+  rotate: rotateBuffaloShortcut,
   revoke: revokeBuffaloShortcut,
 });

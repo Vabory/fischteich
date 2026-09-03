@@ -281,11 +281,12 @@ test("diagnostics enumerate the provision stages and never log request objects o
     "load_shortcut_device",
     "generate_token",
     "hash_token",
-    "provision_shortcut_device",
     "response",
   ]) {
     assert.match(edgeSource, new RegExp(`diagnostic\\.step = "${step}"`));
   }
+  assert.match(edgeSource, /"provision_shortcut_device"/);
+  assert.match(edgeSource, /"rotate_shortcut_device"/);
   assert.match(edgeSource, /KNOWN_DIAGNOSTIC_ACTIONS/);
   assert.match(edgeSource, /diagnostic\.action = getDiagnosticAction\(body\.action\)/);
   assert.doesNotMatch(edgeSource, /console\.error\([^)]*(?:request|headers|accessJwt|serviceRoleKey|tokenHash|token)[,)]/s);

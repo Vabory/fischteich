@@ -1,7 +1,6 @@
 "use strict";
 
 const BUFFALO_PUSH_PREFERENCE_KEY = "fischteich-buffalo-push-v1";
-const BUFFALO_PUSH_SERVICE_WORKER_URL = "./service-worker.js?v=1";
 const BUFFALO_PUSH_SERVICE_WORKER_SCOPE = "./";
 
 let buffaloPushPublicKey = null;
@@ -58,10 +57,8 @@ async function registerBuffaloServiceWorker() {
   if (!isBuffaloPushSupported()) {
     throw new Error("Web Push wird in diesem Browser oder App-Kontext nicht unterstützt.");
   }
-  const registration = await navigator.serviceWorker.register(
-    BUFFALO_PUSH_SERVICE_WORKER_URL,
-    { scope: BUFFALO_PUSH_SERVICE_WORKER_SCOPE, updateViaCache: "none" },
-  );
+  const registration = await window.fischteichPwa?.registerServiceWorker();
+  if (!registration) throw new Error("Der Fischteich Service Worker ist nicht verfügbar.");
   await navigator.serviceWorker.ready;
   return registration;
 }

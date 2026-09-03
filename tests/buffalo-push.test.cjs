@@ -32,6 +32,7 @@ function createPushHarness({ permission = "default", supported = true, subscript
   const values = new Map();
   const rpcCalls = [];
   const registerCalls = [];
+  let sharedRegistrationCalls = 0;
   const browserOperationOrder = [];
   let requestPermissionCalls = 0;
   const registration = {
@@ -71,6 +72,13 @@ function createPushHarness({ permission = "default", supported = true, subscript
       setItem(key, value) { values.set(key, String(value)); },
     },
     atob(value) { return Buffer.from(value, "base64").toString("binary"); },
+    fischteichPwa: {
+      async registerServiceWorker() {
+        browserOperationOrder.push("shared-service-worker-registration");
+        sharedRegistrationCalls += 1;
+        return registration;
+      },
+    },
   };
   if (!supported) delete window.PushManager;
   const navigator = supported ? { serviceWorker } : {};
@@ -107,6 +115,7 @@ function createPushHarness({ permission = "default", supported = true, subscript
     Notification,
     getRequestPermissionCalls: () => requestPermissionCalls,
     getSubscription: () => subscription,
+    getSharedRegistrationCalls: () => sharedRegistrationCalls,
   };
 }
 
@@ -123,16 +132,17 @@ test("does not request notification permission during initialization or health r
   assert.doesNotMatch(script, /initializeBuffaloPush[\s\S]{0,500}requestPermission/);
 });
 
-test("requests permission only through explicit enable and registers the service worker", async () => {
+test("requests permission only through explicit enable and reuses the shared service worker", async () => {
   const harness = createPushHarness({ permission: "default" });
   const state = await harness.service.enable();
   assert.equal(harness.getRequestPermissionCalls(), 1);
   assert.deepEqual(harness.browserOperationOrder.slice(0, 2), [
     "permission-request",
-    "service-worker-register",
+    "shared-service-worker-registration",
   ]);
-  assert.equal(harness.registerCalls[0].url, "./service-worker.js?v=1");
-  assert.equal(harness.registerCalls[0].options.updateViaCache, "none");
+  assert.equal(harness.getSharedRegistrationCalls(), 1);
+  assert.equal(harness.registerCalls.length, 0);
+  assert.doesNotMatch(pushServiceSource, /navigator\.serviceWorker\.register/);
   assert.equal(state.active, true);
 });
 
@@ -164,6 +174,17 @@ test("health repair recreates a lost subscription without another prompt", async
   assert.equal(state.active, true);
   assert.equal(harness.getRequestPermissionCalls(), 0);
   assert.ok(harness.getSubscription());
+});
+
+test("health repair reuses an existing subscription on the shared registration", async () => {
+  const subscription = createSubscription();
+  const harness = createPushHarness({ permission: "granted", subscription });
+  harness.values.set(harness.service.preferenceKey, "enabled");
+  const state = await harness.service.repair();
+  assert.equal(state.active, true);
+  assert.equal(harness.getSubscription(), subscription);
+  assert.equal(harness.getSharedRegistrationCalls(), 1);
+  assert.equal(harness.registerCalls.length, 0);
 });
 
 function createServiceWorkerHarness() {
@@ -306,6 +327,6 @@ test("cron invokes the private worker every ten seconds through Vault", () => {
 test("no private VAPID or worker secrets are present in browser files", () => {
   const browserSources = [pushServiceSource, serviceWorkerSource, script, html].join("\n");
   assert.doesNotMatch(browserSources, /VAPID_PRIVATE|VAPID_SUBJECT|WORKER_SECRET/);
-  assert.match(html, /push-service\.js\?v=1[\s\S]*script\.js\?v=64/);
+  assert.match(html, /pwa-service\.js\?v=1[\s\S]*push-service\.js\?v=2[\s\S]*script\.js\?v=65/);
   assert.match(html, /id="toggle-buffalo-push"[^>]*role="switch"/);
 });

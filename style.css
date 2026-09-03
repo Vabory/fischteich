@@ -2704,6 +2704,47 @@ button.is-release-pressed {
   color: var(--muted);
 }
 
+.app-update-backdrop {
+  z-index: 60;
+}
+
+.app-update-card {
+  width: min(100%, 340px);
+  padding: 24px 22px 22px;
+  border-color: rgb(91 215 255 / 30%);
+  background:
+    radial-gradient(circle at 50% 0, rgb(36 145 204 / 16%), transparent 58%),
+    linear-gradient(145deg, rgb(14 23 48 / 99%), rgb(5 9 25 / 99%));
+  box-shadow:
+    0 0 34px rgb(52 197 255 / 10%),
+    0 22px 70px rgb(0 0 0 / 52%);
+}
+
+.app-update-kicker {
+  display: block;
+  margin-bottom: 9px;
+  color: #73ddff;
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.17em;
+}
+
+.app-update-card h2 {
+  margin-bottom: 8px;
+  font-size: clamp(1.25rem, 6vw, 1.5rem);
+}
+
+.app-update-card p {
+  margin-bottom: 20px;
+  font-size: 0.82rem;
+}
+
+.app-update-actions button {
+  min-height: 48px;
+  padding-inline: 12px;
+  font-size: 0.78rem;
+}
+
 .settings-card {
   position: relative;
   max-height: min(92dvh, 720px);

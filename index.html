@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260903.4">
+    <meta name="fischteich-build" content="20260904.1">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=109">
+    <link rel="stylesheet" href="./style.css?v=110">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -25,9 +25,9 @@
     <script src="./buffalo-service.js?v=2" defer></script>
     <script src="./pwa-service.js?v=1" defer></script>
     <script src="./push-service.js?v=2" defer></script>
-    <script src="./shortcut-service.js?v=3" defer></script>
+    <script src="./shortcut-service.js?v=4" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=67" defer></script>
+    <script src="./script.js?v=68" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -582,20 +582,31 @@
           <div class="shortcut-setup-notes" id="shortcut-android-notes" hidden>
             <p>Android bietet für PWAs keine universelle direkte Assistant-/Gemini-Aktion. Die Daten unten sind für eine HTTP-Automation vorgesehen.</p>
           </div>
-          <button class="primary-button shortcut-create-button" id="create-shortcut-access" type="button">Sicheren Zugang erzeugen</button>
         </div>
-        <div class="shortcut-credentials" id="shortcut-credentials" hidden>
-          <p class="shortcut-secret-warning">Der Token wird nur jetzt angezeigt. Behandle ihn wie ein Passwort und übernimm ihn direkt in deinen Kurzbefehl.</p>
-          <label for="shortcut-endpoint">POST-Endpunkt</label>
-          <div class="shortcut-copy-row"><input id="shortcut-endpoint" type="text" readonly><button type="button" data-copy-shortcut="shortcut-endpoint">Kopieren</button></div>
+        <p class="shortcut-access-status" id="shortcut-access-status" aria-live="polite">Status wird geprüft …</p>
+        <div class="shortcut-credentials" id="shortcut-credentials">
           <label for="shortcut-device-id">deviceId</label>
           <div class="shortcut-copy-row"><input id="shortcut-device-id" type="text" readonly><button type="button" data-copy-shortcut="shortcut-device-id">Kopieren</button></div>
-          <label for="shortcut-token">Header-Token</label>
-          <div class="shortcut-copy-row"><input id="shortcut-token" type="text" readonly><button type="button" data-copy-shortcut="shortcut-token">Kopieren</button></div>
+          <div class="shortcut-token-details" id="shortcut-token-details" hidden>
+            <label for="shortcut-token">Shortcut-Token</label>
+            <div class="shortcut-copy-row" id="shortcut-token-row">
+              <input id="shortcut-token" type="password" placeholder="••••••••••••••••" readonly>
+              <button id="copy-shortcut-token" type="button" data-copy-shortcut="shortcut-token" hidden>Kopieren</button>
+            </div>
+            <div class="shortcut-token-actions" id="shortcut-token-actions">
+              <button class="shortcut-token-action" id="reveal-shortcut-token" type="button">Token anzeigen</button>
+              <button class="shortcut-token-action" id="hide-shortcut-token" type="button" hidden>Token ausblenden</button>
+            </div>
+            <p class="shortcut-legacy-note" id="shortcut-legacy-note" hidden>Dieser bestehende Token wurde noch nach dem alten Verfahren gespeichert und kann nicht erneut angezeigt werden.</p>
+          </div>
+          <label for="shortcut-endpoint">POST-Endpunkt</label>
+          <div class="shortcut-copy-row"><input id="shortcut-endpoint" type="text" readonly><button type="button" data-copy-shortcut="shortcut-endpoint">Kopieren</button></div>
+          <p class="shortcut-secret-warning" id="shortcut-secret-warning" hidden>Diese Daten werden für die Einrichtung der Buffalo-Vorlage benötigt.</p>
           <p class="shortcut-inline-feedback" id="shortcut-inline-feedback" aria-live="polite"></p>
         </div>
+        <button class="primary-button shortcut-create-button" id="create-shortcut-access" type="button">Sicheren Zugang erzeugen</button>
         <button class="shortcut-rotate-link" id="rotate-shortcut-access" type="button" hidden>Token erneut erzeugen</button>
-        <a class="primary-button shortcut-share-link" id="apple-shortcut-share-link" target="_blank" rel="noopener noreferrer" hidden>Buffalo Vorlage kopieren</a>
+        <a class="primary-button shortcut-share-link" id="apple-shortcut-share-link" target="_blank" rel="noopener noreferrer" hidden>Buffalo Vorlage öffnen</a>
         <p class="shortcut-setup-error" id="shortcut-setup-error" aria-live="polite" hidden>Schnellzugriff konnte nicht eingerichtet werden.</p>
       </section>
     </div>

@@ -3012,7 +3012,15 @@ button.is-release-pressed {
   text-decoration: none;
 }
 
-.shortcut-create-button { width: 100%; min-height: 48px; }
+.shortcut-share-link.is-disabled {
+  background: rgb(255 255 255 / 10%);
+  box-shadow: none;
+  color: rgb(221 228 241 / 48%);
+  cursor: default;
+  pointer-events: none;
+}
+
+.shortcut-create-button { width: 100%; min-height: 48px; margin-top: 11px; }
 
 .shortcut-rotate-link {
   display: block;
@@ -3039,8 +3047,49 @@ button.is-release-pressed {
 
 .shortcut-credentials {
   display: grid;
-  margin-top: 18px;
+  margin-top: 12px;
   gap: 7px;
+}
+
+.shortcut-access-status {
+  margin: 0 !important;
+  color: rgb(218 226 242 / 78%) !important;
+  font-size: 0.74rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.shortcut-access-status.is-active { color: #8de6c1 !important; }
+
+.shortcut-token-details {
+  display: grid;
+  margin-top: 4px;
+  gap: 7px;
+}
+
+.shortcut-token-actions {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+.shortcut-token-action {
+  min-height: 44px;
+  padding: 8px 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgb(221 228 241 / 78%);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.shortcut-legacy-note {
+  margin: 1px 0 3px !important;
+  color: #ffd08a !important;
+  font-size: 0.7rem;
+  line-height: 1.4;
 }
 
 .shortcut-secret-warning {

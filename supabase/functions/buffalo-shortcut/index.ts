@@ -12,7 +12,8 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const MAX_BODY_BYTES = 4096;
 const DIAGNOSTIC_TEXT_LIMIT = 500;
 const REDACTED = "[redacted]";
-const KNOWN_DIAGNOSTIC_ACTIONS = new Set(["status", "provision", "rotate", "revoke", "start"]);
+const TOKEN_ENCRYPTION_VERSION = "v1";
+const KNOWN_DIAGNOSTIC_ACTIONS = new Set(["status", "provision", "reveal", "rotate", "revoke", "start"]);
 
 type ShortcutRequest = {
   action?: unknown;
@@ -25,6 +26,7 @@ type ShortcutDevice = {
   owner_user_id: string;
   display_name: string;
   token_hash: string | null;
+  token_ciphertext: string | null;
   enabled: boolean;
 };
 
@@ -76,6 +78,7 @@ function redactDiagnosticText(value: unknown, context: DiagnosticContext): strin
   return result
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/gu, REDACTED)
     .replace(/\b(?:sb_secret|sb_publishable)_[A-Za-z0-9_-]+\b/gu, REDACTED)
+    .replace(/\bv1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{79}\b/gu, REDACTED)
     .replace(/\b[0-9a-f]{64}\b/giu, REDACTED)
     .replace(/\b[A-Za-z0-9_-]{43}\b/gu, REDACTED)
     .slice(0, DIAGNOSTIC_TEXT_LIMIT);
@@ -108,6 +111,71 @@ function base64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function decodeBase64Url(value: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]+$/u.test(value)) throw new Error("Invalid encrypted token encoding");
+  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function getTokenEncryptionKey(diagnostic: DiagnosticContext): Promise<CryptoKey> {
+  const encodedKey = readRequiredEnvironment("BUFFALO_SHORTCUT_TOKEN_ENCRYPTION_KEY");
+  rememberSensitive(diagnostic, encodedKey);
+  const keyBytes = decodeBase64Url(
+    encodedKey.replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, ""),
+  );
+  if (keyBytes.byteLength !== 32) throw new Error("Invalid shortcut token encryption key");
+  return await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+function getTokenEncryptionAdditionalData(ownerUserId: string, deviceId: string): Uint8Array {
+  return new TextEncoder().encode(
+    `fischteich:buffalo-shortcut-token:${TOKEN_ENCRYPTION_VERSION}:${ownerUserId}:${deviceId}`,
+  );
+}
+
+async function encryptShortcutToken(
+  token: string,
+  ownerUserId: string,
+  deviceId: string,
+  diagnostic: DiagnosticContext,
+): Promise<string> {
+  const key = await getTokenEncryptionKey(diagnostic);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({
+    name: "AES-GCM",
+    iv,
+    additionalData: getTokenEncryptionAdditionalData(ownerUserId, deviceId),
+  }, key, new TextEncoder().encode(token));
+  return `${TOKEN_ENCRYPTION_VERSION}.${base64Url(iv)}.${base64Url(new Uint8Array(ciphertext))}`;
+}
+
+async function decryptShortcutToken(
+  envelope: string,
+  ownerUserId: string,
+  deviceId: string,
+  diagnostic: DiagnosticContext,
+): Promise<string> {
+  rememberSensitive(diagnostic, envelope);
+  const [version, encodedIv, encodedCiphertext, extraPart] = envelope.split(".");
+  if (version !== TOKEN_ENCRYPTION_VERSION || !encodedIv || !encodedCiphertext || extraPart) {
+    throw new Error("Invalid encrypted shortcut token");
+  }
+  const iv = decodeBase64Url(encodedIv);
+  const ciphertext = decodeBase64Url(encodedCiphertext);
+  if (iv.byteLength !== 12) throw new Error("Invalid encrypted shortcut token");
+  const key = await getTokenEncryptionKey(diagnostic);
+  const plaintext = await crypto.subtle.decrypt({
+    name: "AES-GCM",
+    iv,
+    additionalData: getTokenEncryptionAdditionalData(ownerUserId, deviceId),
+  }, key, ciphertext);
+  const token = new TextDecoder().decode(plaintext);
+  rememberSensitive(diagnostic, token);
+  return token;
 }
 
 function createAccessToken(): string {
@@ -188,7 +256,7 @@ async function handleManagementAction(
   diagnostic.step = "load_shortcut_device";
   const { data: existing, error: existingError } = await service
     .from("buffalo_shortcut_devices")
-    .select("device_id,owner_user_id,display_name,token_hash,enabled")
+    .select("device_id,owner_user_id,display_name,token_hash,token_ciphertext,enabled")
     .eq("device_id", deviceId)
     .maybeSingle();
   if (existingError) throw existingError;
@@ -200,11 +268,38 @@ async function handleManagementAction(
   }
 
   if (body.action === "status") {
+    const active = Boolean(existing?.enabled && existing.token_hash);
     diagnostic.step = "response";
     return json({
       ok: true,
-      status: existing?.enabled && existing.token_hash ? "active" : "not_configured",
+      status: active ? "active" : "not_configured",
+      tokenRevealAvailable: active && Boolean(existing?.token_ciphertext),
     });
+  }
+
+  if (body.action === "reveal") {
+    if (!existing?.enabled || !existing.token_hash) {
+      return json({ ok: false, error: "not_configured" }, 409);
+    }
+    if (!existing.token_ciphertext) {
+      return json({ ok: false, error: "token_not_revealable" }, 409);
+    }
+    diagnostic.step = "decrypt_token";
+    const token = await decryptShortcutToken(
+      existing.token_ciphertext,
+      authData.user.id,
+      deviceId,
+      diagnostic,
+    );
+    if (!TOKEN_PATTERN.test(token)) throw new Error("Invalid decrypted shortcut token");
+    diagnostic.step = "verify_revealed_token";
+    const revealedTokenHash = await sha256Hex(token);
+    rememberSensitive(diagnostic, revealedTokenHash);
+    if (!constantTimeEqual(revealedTokenHash, existing.token_hash)) {
+      throw new Error("Revealed shortcut token does not match its hash");
+    }
+    diagnostic.step = "response";
+    return json({ ok: true, status: "revealed", deviceId, token });
   }
 
   if (body.action === "revoke") {
@@ -212,7 +307,12 @@ async function handleManagementAction(
     diagnostic.step = "revoke_shortcut_device";
     const { error } = await service
       .from("buffalo_shortcut_devices")
-      .update({ enabled: false, token_hash: null, updated_at: new Date().toISOString() })
+      .update({
+        enabled: false,
+        token_hash: null,
+        token_ciphertext: null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("device_id", deviceId)
       .eq("owner_user_id", authData.user.id);
     if (error) throw error;
@@ -238,12 +338,21 @@ async function handleManagementAction(
   diagnostic.step = "hash_token";
   const tokenHash = await sha256Hex(token);
   rememberSensitive(diagnostic, tokenHash);
+  diagnostic.step = "encrypt_token";
+  const tokenCiphertext = await encryptShortcutToken(
+    token,
+    authData.user.id,
+    deviceId,
+    diagnostic,
+  );
+  rememberSensitive(diagnostic, tokenCiphertext);
   const now = new Date().toISOString();
   const deviceValues = {
     device_id: deviceId,
     owner_user_id: authData.user.id,
     display_name: profile.display_name,
     token_hash: tokenHash,
+    token_ciphertext: tokenCiphertext,
     enabled: true,
     updated_at: now,
     rate_window_started_at: null,

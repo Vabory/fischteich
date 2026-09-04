@@ -13,6 +13,9 @@ const script = read("script.js");
 const html = read("index.html");
 const style = read("style.css");
 const migration = read("supabase/migrations/20260902000000_create_buffalo_shortcut_access.sql");
+const tokenCiphertextMigration = read(
+  "supabase/migrations/20260904000000_add_buffalo_shortcut_token_ciphertext.sql",
+);
 const serviceRoleGrantMigration = read(
   "supabase/migrations/20260902020000_grant_buffalo_shortcut_service_role_tables.sql",
 );
@@ -81,8 +84,9 @@ test("Apple share link is intentionally disabled until a genuine iCloud URL is c
   assert.match(serviceSource, /const APPLE_BUFFALO_SHORTCUT_URL = ""/);
   assert.equal(createPlatformHarness({ userAgent: "desktop" }).appleShortcutUrl, null);
   assert.match(serviceSource, /hostname === "www\.icloud\.com"/);
-  assert.match(html, /id="apple-shortcut-share-link"[^>]*hidden>Buffalo Vorlage kopieren<\/a>/);
-  assert.match(script, /appleShortcutShareLink\.hidden = true;[\s\S]*removeAttribute\("href"\)/);
+  assert.match(html, /id="apple-shortcut-share-link"[^>]*hidden>Buffalo Vorlage öffnen<\/a>/);
+  assert.match(script, /appleShortcutShareLink\.classList\.toggle\("is-disabled", !shareUrl\)/);
+  assert.match(script, /appleShortcutShareLink\.removeAttribute\("href"\)/);
 });
 
 test("configured Apple template uses the exact central URL without personal credentials", () => {
@@ -95,9 +99,10 @@ test("configured Apple template uses the exact central URL without personal cred
     createPlatformHarness({ userAgent: "desktop" }, configuredSource).appleShortcutUrl,
     shortcutUrl,
   );
-  const shareRendering = script.match(/function renderShortcutSetupAccessState\(active\) \{([\s\S]*?)\n\}/)[1];
+  const shareRendering = script.match(/function renderAppleShortcutTemplateAction\(\) \{([\s\S]*?)\n\}/)[1];
   assert.match(shareRendering, /appleShortcutShareLink\.href = shareUrl/);
   assert.doesNotMatch(shareRendering, /shortcutDeviceIdInput|shortcutTokenInput|searchParams|URLSearchParams/);
+  assert.doesNotMatch(shareRendering, /buffaloShortcutAccessActive|tokenRevealAvailable|provision|rotate/);
   assert.doesNotMatch(script, /appleShortcutShareLink\.addEventListener/);
 });
 
@@ -113,6 +118,7 @@ test("shortcut modal gives the Apple template primary priority without weakening
   assert.ok(html.indexOf('id="rotate-shortcut-access"') < html.indexOf('id="apple-shortcut-share-link"'));
   assert.match(style, /\.shortcut-rotate-link \{[\s\S]*min-height: 44px;[\s\S]*background: transparent;[\s\S]*box-shadow: none;[\s\S]*text-decoration: underline;/);
   assert.match(script, /rotateShortcutAccessButton\.addEventListener\("click", openShortcutRotationConfirmation\)/);
+  assert.match(script, /renderAppleShortcutTemplateAction[\s\S]*showAppleTemplate = state\.buffaloShortcutPlatform === "ios"/);
 });
 
 test("shortcut credentials use a private POST body and secret header", () => {
@@ -128,25 +134,35 @@ test("provisioning requires a verified Supabase user and links the existing devi
   assert.match(edgeFunction, /from\("app_profiles"\)/);
   assert.match(edgeFunction, /device_already_registered/);
   assert.match(migration, /owner_user_id uuid not null references auth\.users/);
-  assert.match(edgeFunction, /body\.action === "status"[\s\S]*status: existing\?\.enabled && existing\.token_hash/);
+  assert.match(edgeFunction, /body\.action === "status"[\s\S]*tokenRevealAvailable: active && Boolean\(existing\?\.token_ciphertext\)/);
+  const statusBlock = edgeFunction.slice(
+    edgeFunction.indexOf('if (body.action === "status")'),
+    edgeFunction.indexOf('if (body.action === "reveal")'),
+  );
+  assert.doesNotMatch(statusBlock, /encryptShortcutToken|decryptShortcutToken|token:/);
   assert.doesNotMatch(edgeFunction, /sync_shortcut_device/);
   assert.doesNotMatch(serviceSource, /randomUUID/);
 });
 
-test("tokens are strong, one-time setup values and only hashes reach the database", () => {
+test("tokens remain strongly hashed for start and are reversibly encrypted only on the server", () => {
   assert.match(edgeFunction, /new Uint8Array\(32\)/);
   assert.match(edgeFunction, /crypto\.getRandomValues/);
   assert.match(edgeFunction, /crypto\.subtle\.digest\("SHA-256"/);
   assert.match(migration, /token_hash text/);
-  assert.doesNotMatch(migration, /access_token|token_plaintext|shortcut_access_token/);
+  assert.match(tokenCiphertextMigration, /add column token_ciphertext text/);
+  assert.match(tokenCiphertextMigration, /AES-256-GCM encrypted shortcut token envelope/);
+  assert.doesNotMatch(`${migration}\n${tokenCiphertextMigration}`, /token_plaintext|shortcut_access_token/);
+  assert.match(edgeFunction, /crypto\.subtle\.encrypt\(\{[\s\S]*name: "AES-GCM"/);
+  assert.match(edgeFunction, /BUFFALO_SHORTCUT_TOKEN_ENCRYPTION_KEY/);
+  assert.match(edgeFunction, /additionalData: getTokenEncryptionAdditionalData/);
   assert.doesNotMatch(serviceSource, /localStorage.*token|sessionStorage.*token/is);
-  assert.match(script, /clearShortcutCredentials[\s\S]*shortcutTokenInput\.value = ""/);
+  assert.match(script, /hideRevealedShortcutToken[\s\S]*shortcutTokenInput\.value = ""/);
 });
 
 test("rotation invalidates the previous hash and revocation removes it", () => {
   assert.match(edgeFunction, /const token = createAccessToken\(\)/);
   assert.match(edgeFunction, /token_hash: tokenHash/);
-  assert.match(edgeFunction, /enabled: false, token_hash: null/);
+  assert.match(edgeFunction, /enabled: false,[\s\S]*token_hash: null,[\s\S]*token_ciphertext: null/);
   assert.match(edgeFunction, /rate_window_request_count: 0/);
 });
 
@@ -191,6 +207,8 @@ test("shortcut uses the existing Buffalo RPC and therefore the existing outbox g
 test("shortcut tables and RPC stay private", () => {
   assert.match(migration, /alter table public\.buffalo_shortcut_devices enable row level security/);
   assert.match(migration, /revoke all on table public\.buffalo_shortcut_devices from public, anon, authenticated/);
+  assert.match(tokenCiphertextMigration, /alter table public\.buffalo_shortcut_devices[\s\S]*add column token_ciphertext text/);
+  assert.doesNotMatch(tokenCiphertextMigration, /grant .* to (?:anon|authenticated)/i);
   assert.match(migration, /grant execute on function public\.start_buffalo_event_from_shortcut[\s\S]*to service_role/);
   assert.doesNotMatch(migration, /to anon|to authenticated/);
 });
@@ -215,7 +233,7 @@ test("service role receives only the direct table privileges required by buffalo
 
 test("no service-role, worker, VAPID or shortcut token secret is shipped to the browser", () => {
   const browserSources = [serviceSource, script, html].join("\n");
-  assert.doesNotMatch(browserSources, /SUPABASE_SERVICE_ROLE_KEY|BUFFALO_PUSH_WORKER_SECRET|VAPID_PRIVATE/);
+  assert.doesNotMatch(browserSources, /SUPABASE_SERVICE_ROLE_KEY|BUFFALO_PUSH_WORKER_SECRET|VAPID_PRIVATE|BUFFALO_SHORTCUT_TOKEN_ENCRYPTION_KEY/);
   assert.doesNotMatch(edgeFunction, /BUFFALO_PUSH_WORKER_SECRET|VAPID_PRIVATE/);
   assert.match(edgeFunction, /Deno\.env\.get\(name\)/);
 });
@@ -231,5 +249,5 @@ test("responses are structured and never include token hashes or internal errors
   assert.match(edgeFunction, /eventId: result\.id/);
   assert.match(edgeFunction, /endsAt: result\.ends_at/);
   assert.match(edgeFunction, /error: "internal_error"/);
-  assert.doesNotMatch(edgeFunction, /error\.message|String\(error\)|token_hash:\s*registered/);
+  assert.doesNotMatch(edgeFunction, /error\.message|String\(error\)|token_hash:\s*registered|token_ciphertext:\s*existing/);
 });

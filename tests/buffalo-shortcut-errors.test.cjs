@@ -18,6 +18,7 @@ const DISPLAY_NAME = "Fabian";
 const TARGET_NAME = "Tobi";
 const SHORTCUT_TOKEN = "c".repeat(43);
 const SHORTCUT_TOKEN_HASH = createHash("sha256").update(SHORTCUT_TOKEN).digest("hex");
+const ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
 
 function thenable(result) {
   return {
@@ -96,7 +97,13 @@ function createHarness({
   };
   const createClient = () => service;
   const Deno = {
-    env: { get: (name) => name === "SUPABASE_URL" ? "https://project.supabase.co" : SERVICE_ROLE_KEY },
+    env: {
+      get(name) {
+        if (name === "SUPABASE_URL") return "https://project.supabase.co";
+        if (name === "BUFFALO_SHORTCUT_TOKEN_ENCRYPTION_KEY") return ENCRYPTION_KEY;
+        return SERVICE_ROLE_KEY;
+      },
+    },
     serve(handler) { servedHandler = handler; },
   };
   const context = vm.createContext({
@@ -106,6 +113,7 @@ function createHarness({
     Response,
     Headers,
     TextEncoder,
+    TextDecoder,
     Uint8Array,
     Set,
     Date,
@@ -119,6 +127,7 @@ function createHarness({
     Error,
     crypto: webcrypto,
     btoa: (value) => Buffer.from(value, "binary").toString("base64"),
+    atob: (value) => Buffer.from(value, "base64").toString("binary"),
     console: {
       error(message, details) { errorLogs.push({ message, details }); },
     },
@@ -161,7 +170,7 @@ function createHarness({
   };
 }
 
-test("provision succeeds with a valid authenticated user and stores only the token hash", async () => {
+test("provision stores a token hash and encrypted reveal representation", async () => {
   const harness = createHarness();
   const response = await harness.provision();
   const body = await response.json();
@@ -175,6 +184,8 @@ test("provision succeeds with a valid authenticated user and stores only the tok
   assert.equal(stored.owner_user_id, USER_ID);
   assert.match(stored.token_hash, /^[0-9a-f]{64}$/);
   assert.notEqual(stored.token_hash, body.token);
+  assert.match(stored.token_ciphertext, /^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{79}$/);
+  assert.equal(stored.token_ciphertext.includes(body.token), false);
   assert.equal(harness.errorLogs.length, 0);
 });
 
@@ -183,8 +194,8 @@ test("database errors return a generic response and log only redacted diagnostic
     databaseError: (values) => ({
       code: "23514",
       message: `constraint failed for ${ACCESS_JWT} and device ${DEVICE_ID}`,
-      details: `user ${USER_ID} named ${DISPLAY_NAME} rejected hash ${values.token_hash}`,
-      hint: `configuration ${SERVICE_ROLE_KEY}`,
+      details: `user ${USER_ID} named ${DISPLAY_NAME} rejected hash ${values.token_hash} ciphertext ${values.token_ciphertext}`,
+      hint: `configuration ${SERVICE_ROLE_KEY} encryption ${ENCRYPTION_KEY}`,
       status: 400,
     }),
   });
@@ -202,10 +213,12 @@ test("database errors return a generic response and log only redacted diagnostic
   assert.match(harness.errorLogs[0].details.diagnosticId, /^[a-z0-9]+-[a-z0-9]+$/);
   assert.doesNotMatch(serializedLog, new RegExp(ACCESS_JWT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(serializedLog, new RegExp(SERVICE_ROLE_KEY));
+  assert.doesNotMatch(serializedLog, new RegExp(ENCRYPTION_KEY.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(serializedLog, new RegExp(DEVICE_ID, "i"));
   assert.doesNotMatch(serializedLog, new RegExp(USER_ID, "i"));
   assert.doesNotMatch(serializedLog, new RegExp(DISPLAY_NAME, "i"));
   assert.doesNotMatch(serializedLog, /[0-9a-f]{64}/i);
+  assert.doesNotMatch(serializedLog, /v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{79}/);
   assert.doesNotMatch(JSON.stringify(body), /constraint|23514|token|jwt|service-role/i);
 });
 
@@ -281,6 +294,9 @@ test("diagnostics enumerate the provision stages and never log request objects o
     "load_shortcut_device",
     "generate_token",
     "hash_token",
+    "encrypt_token",
+    "decrypt_token",
+    "verify_revealed_token",
     "response",
   ]) {
     assert.match(edgeSource, new RegExp(`diagnostic\\.step = "${step}"`));

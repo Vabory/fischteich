@@ -158,21 +158,22 @@ function createShortcutHarness({ initiallyMissingSession = false } = {}) {
   };
 }
 
-test("status, provision, rotate and revoke repair identity and send the persisted Bearer JWT", async () => {
+test("status, provision, reveal, rotate and revoke repair identity and send the persisted Bearer JWT", async () => {
   const harness = createShortcutHarness();
   await harness.service.getStatus();
   await harness.service.provision();
+  await harness.service.reveal();
   await harness.service.rotate();
   await harness.service.revoke();
 
   assert.deepEqual(harness.requests.map((request) => JSON.parse(request.options.body).action), [
-    "status", "provision", "rotate", "revoke",
+    "status", "provision", "reveal", "rotate", "revoke",
   ]);
   for (const request of harness.requests) {
     assert.equal(request.options.headers.authorization, "Bearer valid-management-jwt");
     assert.equal(JSON.parse(request.options.body).deviceId, DEVICE_ID);
   }
-  assert.deepEqual(harness.ensureProfileCalls, ["Fabian", "Fabian", "Fabian", "Fabian"]);
+  assert.deepEqual(harness.ensureProfileCalls, ["Fabian", "Fabian", "Fabian", "Fabian", "Fabian"]);
   assert.equal(harness.getEnsureAnonymousCalls(), 0);
 });
 

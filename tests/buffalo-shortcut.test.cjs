@@ -80,9 +80,10 @@ test("settings expose exactly one platform panel through non-security-critical d
   assert.doesNotMatch(edgeFunction, /userAgent|userAgentData|maxTouchPoints/);
 });
 
-test("Apple share link is intentionally disabled until a genuine iCloud URL is configured", () => {
-  assert.match(serviceSource, /const APPLE_BUFFALO_SHORTCUT_URL = ""/);
-  assert.equal(createPlatformHarness({ userAgent: "desktop" }).appleShortcutUrl, null);
+test("Apple share link uses the final genuine iCloud URL", () => {
+  const shortcutUrl = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
+  assert.match(serviceSource, new RegExp(`const APPLE_BUFFALO_SHORTCUT_URL = "${shortcutUrl}"`));
+  assert.equal(createPlatformHarness({ userAgent: "desktop" }).appleShortcutUrl, shortcutUrl);
   assert.match(serviceSource, /hostname === "www\.icloud\.com"/);
   assert.match(html, /id="apple-shortcut-share-link"[^>]*hidden>Buffalo Vorlage öffnen<\/a>/);
   assert.match(script, /appleShortcutShareLink\.classList\.toggle\("is-disabled", !shareUrl\)/);
@@ -90,15 +91,8 @@ test("Apple share link is intentionally disabled until a genuine iCloud URL is c
 });
 
 test("configured Apple template uses the exact central URL without personal credentials", () => {
-  const shortcutUrl = "https://www.icloud.com/shortcuts/0123456789abcdef";
-  const configuredSource = serviceSource.replace(
-    'const APPLE_BUFFALO_SHORTCUT_URL = "";',
-    `const APPLE_BUFFALO_SHORTCUT_URL = "${shortcutUrl}";`,
-  );
-  assert.equal(
-    createPlatformHarness({ userAgent: "desktop" }, configuredSource).appleShortcutUrl,
-    shortcutUrl,
-  );
+  const shortcutUrl = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
+  assert.equal(createPlatformHarness({ userAgent: "desktop" }).appleShortcutUrl, shortcutUrl);
   const shareRendering = script.match(/function renderAppleShortcutTemplateAction\(\) \{([\s\S]*?)\n\}/)[1];
   assert.match(shareRendering, /appleShortcutShareLink\.href = shareUrl/);
   assert.doesNotMatch(shareRendering, /shortcutDeviceIdInput|shortcutTokenInput|searchParams|URLSearchParams/);

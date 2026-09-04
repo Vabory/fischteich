@@ -1,9 +1,7 @@
 "use strict";
 
-// Add a real https://www.icloud.com/shortcuts/... share URL here after the
-// universal shortcut has been created and reviewed. An empty value is treated
-// as intentionally unconfigured and is never rendered as a working link.
-const APPLE_BUFFALO_SHORTCUT_URL = "";
+// Official reviewed share URL for the universal Buffalo shortcut template.
+const APPLE_BUFFALO_SHORTCUT_URL = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
 const BUFFALO_SHORTCUT_ENDPOINT = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/buffalo-shortcut`;
 
 function detectShortcutPlatform(navigatorLike = window.navigator) {

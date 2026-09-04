@@ -320,7 +320,7 @@ test("get_active_buffalo_event has no schema-qualified SQL special expressions",
 });
 
 test("loads versioned assets and the Buffalo service before the UI bundle", () => {
-  assert.match(html, /style\.css\?v=110/);
+  assert.match(html, /style\.css\?v=111/);
   assert.match(html, /buffalo-service\.js\?v=2[\s\S]*script\.js\?v=68/);
 });
 

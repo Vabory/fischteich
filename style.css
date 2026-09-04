@@ -99,6 +99,14 @@ button:focus-visible {
 .menu-screen {
   --menu-bg-center-to-bottom-shift: max(0px, calc(108.0891vw - 50dvh));
   --menu-secondary-button-size: clamp(58px, 17vw, 74px);
+  --menu-secondary-left-inset: max(18px, calc(env(safe-area-inset-left) + 10px));
+  --menu-secondary-right-inset: max(18px, calc(env(safe-area-inset-right) + 10px));
+  --menu-secondary-outer-inset: max(
+    var(--menu-secondary-left-inset),
+    var(--menu-secondary-right-inset)
+  );
+  --menu-upper-card-gap: 8px;
+  --menu-lower-card-gap: 6px;
 
   display: block;
   padding: 0;
@@ -418,7 +426,7 @@ h2 {
 .active-tournament-card {
   width: 100%;
   min-height: 65px;
-  margin-top: 8px;
+  margin-top: var(--menu-upper-card-gap);
   margin-left: 50%;
   padding: 8px 12px;
   align-items: center;
@@ -496,7 +504,7 @@ h2 {
 .buffalo-live-card {
   width: 100%;
   min-height: 54px;
-  margin: clamp(-17px, -4vw, -12px) auto 0;
+  margin: var(--menu-upper-card-gap) auto 0;
   padding: 7px 10px;
   align-items: center;
   border: 1px solid rgb(255 200 83 / 38%);
@@ -521,10 +529,13 @@ h2 {
       100vw
       - var(--menu-secondary-button-size)
       - var(--menu-secondary-button-size)
-      - 52px
+      - var(--menu-secondary-outer-inset)
+      - var(--menu-secondary-outer-inset)
+      - var(--menu-upper-card-gap)
+      - var(--menu-upper-card-gap)
     )
   );
-  margin-top: 7px;
+  margin-top: var(--menu-lower-card-gap);
 }
 
 .buffalo-live-copy,
@@ -572,12 +583,12 @@ h2 {
 
   position: absolute;
   z-index: 2;
-  right: max(18px, calc(env(safe-area-inset-right) + 10px));
+  right: var(--menu-secondary-right-inset);
   bottom: calc(
     var(--menu-lower-base-bottom)
     - var(--menu-lower-effective-shift)
   );
-  left: max(18px, calc(env(safe-area-inset-left) + 10px));
+  left: var(--menu-secondary-left-inset);
   display: flex;
   width: auto;
   margin-inline: 0;
@@ -587,12 +598,17 @@ h2 {
 
 .menu-secondary-actions button {
   width: var(--menu-secondary-button-size);
-  min-height: 0;
+  height: var(--menu-secondary-button-size);
+  min-width: var(--menu-secondary-button-size);
+  min-height: var(--menu-secondary-button-size);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
+  box-sizing: border-box;
+  display: grid;
   line-height: 0;
+  place-items: center;
   transition: transform 110ms ease-out;
 }
 
@@ -604,6 +620,10 @@ h2 {
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
+}
+
+#open-past-tournaments img {
+  width: 93%;
 }
 
 .menu-secondary-actions button:active,
@@ -5391,8 +5411,8 @@ button.is-release-pressed {
 
 /* The current tournament remains secondary to the four main actions, but visibly live. */
 .active-tournament-card {
-  min-height: 70px;
-  padding: 9px 13px;
+  min-height: 64px;
+  padding: 7px 12px;
   border-radius: 15px;
   box-shadow: 0 9px 24px rgb(0 0 0 / 28%), 0 0 18px rgb(73 211 137 / 7%);
 }

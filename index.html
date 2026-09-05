@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260904.3">
+    <meta name="fischteich-build" content="20260905.2">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=111">
+    <link rel="stylesheet" href="./style.css?v=113">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -26,8 +26,9 @@
     <script src="./pwa-service.js?v=1" defer></script>
     <script src="./push-service.js?v=2" defer></script>
     <script src="./shortcut-service.js?v=5" defer></script>
+    <script src="./dice-service.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=68" defer></script>
+    <script src="./script.js?v=70" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -151,6 +152,67 @@
             <img src="./assets/button-rage-cage-verteilung.png?v=1" alt="" width="2172" height="724" draggable="false">
           </button>
         </nav>
+      </section>
+
+      <section class="screen trottl-menu-screen" id="trottl-menu-screen" aria-labelledby="trottl-menu-title" hidden>
+        <img
+          class="sidemenu-background"
+          src="./assets/sidemenu-background.png?v=2"
+          alt=""
+          width="854"
+          height="1842"
+          draggable="false"
+          aria-hidden="true"
+        >
+        <button class="close-button navigation-back-button" id="close-trottl-menu" type="button" aria-label="Zurück zum Hauptmenü">←</button>
+        <main class="trottl-menu-shell">
+          <header class="trottl-menu-header">
+            <p class="eyebrow">3er Trottl</p>
+            <h1 id="trottl-menu-title">Spielmodus wählen</h1>
+          </header>
+          <nav class="trottl-menu-actions" aria-label="3er-Trottl-Modus auswählen">
+            <button class="trottl-menu-entry" id="open-fischteich-dice" type="button">
+              <span class="trottl-menu-icon" aria-hidden="true">⚄</span>
+              <span class="trottl-menu-label">Fischteich Würfel</span>
+              <span class="trottl-menu-arrow" aria-hidden="true">›</span>
+            </button>
+            <button class="trottl-menu-entry" id="open-trottl-classic" type="button">
+              <span class="trottl-menu-icon" aria-hidden="true">♟</span>
+              <span class="trottl-menu-label">3er Trottl Klassik</span>
+              <span class="trottl-menu-arrow" aria-hidden="true">›</span>
+            </button>
+            <button class="trottl-menu-entry" id="open-trottl-deluxe" type="button">
+              <span class="trottl-menu-icon" aria-hidden="true">✦</span>
+              <span class="trottl-menu-label">3er Trottl Deluxe</span>
+              <span class="trottl-menu-arrow" aria-hidden="true">›</span>
+            </button>
+          </nav>
+          <p class="trottl-menu-feedback" id="trottl-menu-feedback" aria-live="polite"></p>
+        </main>
+      </section>
+
+      <section class="screen trottl-dice-screen" id="fischteich-dice-screen" aria-labelledby="fischteich-dice-title" hidden>
+        <img
+          class="sidemenu-background"
+          src="./assets/sidemenu-background.png?v=2"
+          alt=""
+          width="854"
+          height="1842"
+          draggable="false"
+          aria-hidden="true"
+        >
+        <button class="close-button navigation-back-button" id="close-fischteich-dice" type="button" aria-label="Zurück zum 3er-Trottl-Menü">←</button>
+        <main class="trottl-dice-shell" id="fischteich-dice-container">
+          <header class="trottl-dice-header">
+            <p class="eyebrow">3er Trottl</p>
+            <h1 id="fischteich-dice-title">Fischteich Würfel</h1>
+          </header>
+          <div class="fischteich-dice-stage">
+            <div class="fischteich-dice-mount" id="fischteich-dice-mount"></div>
+            <p class="fischteich-dice-instruction">Würfel antippen</p>
+            <p class="visually-hidden" id="fischteich-dice-status" aria-live="polite"></p>
+          </div>
+        </main>
       </section>
 
       <section class="screen choice-screen" id="team-choice-screen" aria-labelledby="team-choice-title" hidden>

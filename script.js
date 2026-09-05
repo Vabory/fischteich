@@ -98,6 +98,13 @@ const UI_CLEARANCE = 6;
 const screens = Array.from(document.querySelectorAll(".screen"));
 const menuScreen = document.querySelector("#menu-screen");
 const teamsMenuScreen = document.querySelector("#teams-menu-screen");
+const trottlMenuScreen = document.querySelector("#trottl-menu-screen");
+const fischteichDiceScreen = document.querySelector("#fischteich-dice-screen");
+const trottlMenuFeedback = document.querySelector("#trottl-menu-feedback");
+const fischteichDice = window.FischteichDice.mount({
+  mountPoint: document.querySelector("#fischteich-dice-mount"),
+  status: document.querySelector("#fischteich-dice-status"),
+});
 const gameScreen = document.querySelector("#game-screen");
 const participantScreen = document.querySelector("#participant-screen");
 const manualTeamScreen = document.querySelector("#manual-team-screen");
@@ -739,6 +746,25 @@ function showTeamsMenu({ focusSelector = null } = {}) {
   if (focusSelector) {
     document.querySelector(focusSelector)?.focus();
   }
+}
+
+function showTrottlMenu({ focusSelector = null } = {}) {
+  trottlMenuFeedback.textContent = "";
+  showScreen(trottlMenuScreen);
+
+  if (focusSelector) {
+    document.querySelector(focusSelector)?.focus();
+  }
+}
+
+function showFischteichDiceScreen() {
+  trottlMenuFeedback.textContent = "";
+  showScreen(fischteichDiceScreen);
+  document.querySelector("#close-fischteich-dice").focus();
+}
+
+function showTrottlPlaceholder(label) {
+  trottlMenuFeedback.textContent = `${label} ist noch nicht verfügbar.`;
 }
 
 function updateMarkerSize() {
@@ -4560,6 +4586,18 @@ function startRoulette() {
 
 document.querySelector("#start-two-teams").addEventListener("click", () => showTeamsMenu());
 document.querySelector("#close-teams-menu").addEventListener("click", showMenu);
+document.querySelector("#open-dice-game").addEventListener("click", () => showTrottlMenu());
+document.querySelector("#close-trottl-menu").addEventListener("click", showMenu);
+document.querySelector("#open-fischteich-dice").addEventListener("click", showFischteichDiceScreen);
+document.querySelector("#close-fischteich-dice").addEventListener("click", () => {
+  showTrottlMenu({ focusSelector: "#open-fischteich-dice" });
+});
+document.querySelector("#open-trottl-classic").addEventListener("click", () => {
+  showTrottlPlaceholder("3er Trottl Klassik");
+});
+document.querySelector("#open-trottl-deluxe").addEventListener("click", () => {
+  showTrottlPlaceholder("3er Trottl Deluxe");
+});
 document.querySelector("#start-finger-selection").addEventListener("click", () => {
   state.gameReturnTarget = "teams-menu";
   state.teamAssignmentMode = "teams";
@@ -4922,6 +4960,10 @@ document.addEventListener("keydown", (event) => {
       closeManualTeamScreen();
     } else if (!participantScreen.hidden) {
       closeParticipantSelection();
+    } else if (!fischteichDiceScreen.hidden) {
+      showTrottlMenu({ focusSelector: "#open-fischteich-dice" });
+    } else if (!trottlMenuScreen.hidden) {
+      showMenu();
     } else if (!teamsMenuScreen.hidden) {
       showMenu();
     }

@@ -127,7 +127,9 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
-.teams-menu-screen {
+.teams-menu-screen,
+.trottl-menu-screen,
+.trottl-dice-screen {
   display: block;
   padding: 0;
   background: var(--ink);
@@ -231,6 +233,251 @@ button:focus-visible {
 
 .teams-menu-actions button:active {
   transform: scale(0.975);
+}
+
+.trottl-menu-shell {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  padding:
+    max(calc(env(safe-area-inset-top) + 58px), 76px)
+    max(calc(env(safe-area-inset-right) + 24px), 24px)
+    max(calc(env(safe-area-inset-bottom) + 24px), 32px)
+    max(calc(env(safe-area-inset-left) + 24px), 24px);
+  align-items: center;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.trottl-menu-header {
+  width: min(83vw, 326px);
+  margin-top: clamp(24px, 5dvh, 48px);
+  text-align: center;
+}
+
+.trottl-menu-header h1,
+.trottl-dice-header h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 7.2vw, 2.25rem);
+  line-height: 1.05;
+}
+
+.trottl-menu-actions {
+  display: grid;
+  width: min(83vw, 326px);
+  margin-top: clamp(38px, 7dvh, 62px);
+  grid-auto-rows: clamp(74px, 9.8dvh, 78px);
+  gap: 10px;
+}
+
+.trottl-menu-entry {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 17px;
+  align-items: center;
+  border: 1px solid rgb(93 187 255 / 42%);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgb(11 31 63 / 94%), rgb(18 10 42 / 94%));
+  box-shadow: 0 10px 24px rgb(0 0 0 / 32%), inset 0 0 18px rgb(91 186 255 / 7%);
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
+  gap: 10px;
+  text-align: left;
+  transition: border-color 110ms ease-out, transform 110ms ease-out;
+}
+
+.trottl-menu-entry:active,
+.trottl-menu-entry.is-release-pressed {
+  border-color: rgb(128 216 255 / 78%);
+  transform: scale(0.975);
+}
+
+.trottl-menu-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 7%);
+  color: #9eeaff;
+  font-size: 1.45rem;
+  line-height: 1;
+  place-items: center;
+}
+
+.trottl-menu-label {
+  min-width: 0;
+  font-size: clamp(0.92rem, 4vw, 1.05rem);
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.trottl-menu-arrow {
+  color: #78dcff;
+  font-size: 1.55rem;
+  line-height: 1;
+  text-align: right;
+}
+
+.trottl-menu-feedback {
+  width: min(83vw, 326px);
+  min-height: 1.35em;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.trottl-dice-shell {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  padding:
+    max(calc(env(safe-area-inset-top) + 56px), 72px)
+    max(calc(env(safe-area-inset-right) + 24px), 24px)
+    max(calc(env(safe-area-inset-bottom) + 28px), 32px)
+    max(calc(env(safe-area-inset-left) + 24px), 24px);
+  align-items: center;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.trottl-dice-header {
+  width: min(83vw, 326px);
+  margin-top: clamp(16px, 3.5dvh, 36px);
+  text-align: center;
+}
+
+.fischteich-dice-stage {
+  display: grid;
+  min-width: 0;
+  margin: auto 0;
+  padding-bottom: clamp(38px, 8dvh, 78px);
+  justify-items: center;
+}
+
+.fischteich-dice-mount {
+  --dice-size: clamp(148px, 43vw, 196px);
+  display: grid;
+  width: var(--dice-size);
+  height: var(--dice-size);
+  perspective: 900px;
+  place-items: center;
+}
+
+.fischteich-die {
+  display: block;
+  width: var(--dice-size);
+  height: var(--dice-size);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  animation: fischteich-die-idle 3.8s ease-in-out infinite;
+}
+
+.fischteich-die:focus-visible {
+  border-radius: 22%;
+  outline: 3px solid #9ce9ff;
+  outline-offset: 12px;
+}
+
+.fischteich-die:disabled {
+  opacity: 1;
+}
+
+.fischteich-die.is-rolling {
+  animation: none;
+  cursor: wait;
+}
+
+.fischteich-die.is-landing {
+  animation: fischteich-die-land 260ms ease-out both;
+}
+
+.fischteich-die-cube {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.fischteich-die.is-rolling .fischteich-die-cube {
+  will-change: transform;
+}
+
+.dice-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  padding: 17%;
+  border: 1px solid rgb(137 219 255 / 34%);
+  border-radius: 20%;
+  background:
+    radial-gradient(circle at 23% 17%, rgb(89 177 255 / 13%), transparent 38%),
+    linear-gradient(145deg, #111729 0%, #070a16 52%, #170b25 100%);
+  box-shadow:
+    inset 7px 7px 18px rgb(104 199 255 / 7%),
+    inset -8px -8px 20px rgb(255 82 190 / 7%),
+    0 0 18px rgb(71 176 255 / 9%);
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  backface-visibility: hidden;
+}
+
+.dice-face--front { transform: translateZ(calc(var(--dice-size) / 2)); }
+.dice-face--back { transform: rotateY(180deg) translateZ(calc(var(--dice-size) / 2)); }
+.dice-face--right { transform: rotateY(90deg) translateZ(calc(var(--dice-size) / 2)); }
+.dice-face--left { transform: rotateY(-90deg) translateZ(calc(var(--dice-size) / 2)); }
+.dice-face--top { transform: rotateX(90deg) translateZ(calc(var(--dice-size) / 2)); }
+.dice-face--bottom { transform: rotateX(-90deg) translateZ(calc(var(--dice-size) / 2)); }
+
+.dice-pip {
+  width: 52%;
+  aspect-ratio: 1;
+  align-self: center;
+  justify-self: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff 0 16%, #dff7ff 48%, #9ce8ff 100%);
+  box-shadow: 0 0 9px rgb(113 220 255 / 58%), inset 0 -2px 3px rgb(54 125 190 / 38%);
+}
+
+.dice-pip--top-left { grid-area: 1 / 1; }
+.dice-pip--top-right { grid-area: 1 / 3; }
+.dice-pip--middle-left { grid-area: 2 / 1; }
+.dice-pip--center { grid-area: 2 / 2; }
+.dice-pip--middle-right { grid-area: 2 / 3; }
+.dice-pip--bottom-left { grid-area: 3 / 1; }
+.dice-pip--bottom-right { grid-area: 3 / 3; }
+
+.fischteich-dice-instruction {
+  margin: clamp(38px, 7dvh, 58px) 0 0;
+  color: rgb(220 242 255 / 78%);
+  font-size: clamp(0.86rem, 3.8vw, 1rem);
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  text-align: center;
+}
+
+@keyframes fischteich-die-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes fischteich-die-land {
+  0% { transform: translateY(-2px) scale(1.025); }
+  58% { transform: translateY(3px) scale(0.975); }
+  100% { transform: translateY(0) scale(1); }
 }
 
 .menu-crest {
@@ -4058,6 +4305,11 @@ button.is-release-pressed {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .fischteich-die,
+  .fischteich-die.is-landing {
+    animation: none;
+  }
+
   .roulette-live-gold-toast.is-visible {
     animation: none;
     opacity: 1;

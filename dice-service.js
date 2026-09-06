@@ -25,6 +25,11 @@
     5: "dice-face--left",
     6: "dice-face--back",
   });
+  const ROLL_PHASES = Object.freeze({
+    mainEnd: 0.7,
+    slowdownEnd: 0.9,
+  });
+  const LANDING_DURATION = 130;
 
   function defaultRandom() {
     if (global.crypto?.getRandomValues) {
@@ -52,8 +57,23 @@
     return current + delta + (direction * turns * 360);
   }
 
-  function easeOutQuint(progress) {
-    return 1 - ((1 - progress) ** 5);
+  function controlledEase(progress) {
+    return progress + (Math.sin(progress * Math.PI) * 0.08);
+  }
+
+  function finalEase(progress) {
+    const incomingSlope = 0.85;
+    return ((incomingSlope - 2) * (progress ** 3))
+      + ((3 - (2 * incomingSlope)) * (progress ** 2))
+      + (incomingSlope * progress);
+  }
+
+  function interpolateRotation(from, to, progress) {
+    return {
+      x: from.x + ((to.x - from.x) * progress),
+      y: from.y + ((to.y - from.y) * progress),
+      z: from.z + ((to.z - from.z) * progress),
+    };
   }
 
   function createController({
@@ -61,10 +81,12 @@
     cube,
     status = null,
     onResult = null,
+    onRollSettled = onResult,
     random = defaultRandom,
     requestFrame = global.requestAnimationFrame.bind(global),
     now = () => global.performance.now(),
     reducedMotion = () => global.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
+    schedule = global.setTimeout.bind(global),
   }) {
     let rotation = { ...RESULT_ROTATIONS[1] };
     let rolling = false;
@@ -74,6 +96,13 @@
     function applyRotation(nextRotation) {
       rotation = nextRotation;
       cube.style.transform = `rotateX(${nextRotation.x}deg) rotateY(${nextRotation.y}deg) rotateZ(${nextRotation.z}deg)`;
+    }
+
+    function applyBodyMotion(progress, motion) {
+      const lift = -Math.sin(progress * Math.PI) * motion.lift;
+      const drift = Math.sin(progress * Math.PI * 2) * motion.drift;
+      const scale = 1 + (Math.sin(progress * Math.PI) * motion.scale);
+      button.style.transform = `translate3d(${drift}px, ${lift}px, 0) scale(${scale})`;
     }
 
     function setRolling(nextRolling) {
@@ -92,15 +121,34 @@
       const turnsY = 3 + Math.floor(random() * 3);
       const turnsZ = 1 + Math.floor(random() * 2);
       const duration = reducedMotion() ? 180 : 1300 + Math.floor(random() * 501);
+      const end = {
+        x: targetAngle(rotation.x, desired.x, turnsX, directionX),
+        y: targetAngle(rotation.y, desired.y, turnsY, directionY),
+        z: targetAngle(rotation.z, desired.z, turnsZ, directionZ),
+      };
+      const revealOffsetX = directionX * (52 + (random() * 12));
+      const revealOffsetY = directionY * (46 + (random() * 14));
 
       return {
         duration,
-        end: {
-          x: targetAngle(rotation.x, desired.x, turnsX, directionX),
-          y: targetAngle(rotation.y, desired.y, turnsY, directionY),
-          z: targetAngle(rotation.z, desired.z, turnsZ, directionZ),
+        end,
+        mainEnd: {
+          x: end.x - (directionX * (190 + (random() * 55))),
+          y: end.y - (directionY * (205 + (random() * 65))),
+          z: end.z - (directionZ * (62 + (random() * 24))),
         },
-        wobble: reducedMotion() ? 0 : 7 + (random() * 7),
+        revealStart: {
+          x: end.x - revealOffsetX,
+          y: end.y - revealOffsetY,
+          z: end.z - (directionZ * (10 + (random() * 8))),
+        },
+        motion: reducedMotion()
+          ? { lift: 0, drift: 0, scale: 0 }
+          : {
+              lift: 7 + (random() * 4),
+              drift: 2 + (random() * 2),
+              scale: 0.006 + (random() * 0.003),
+            },
       };
     }
 
@@ -119,13 +167,23 @@
       return new Promise((resolve) => {
         function frame(timestamp) {
           const progress = Math.min(1, Math.max(0, (timestamp - startedAt) / plan.duration));
-          const eased = easeOutQuint(progress);
-          const fadingWobble = Math.sin(progress * Math.PI) * plan.wobble;
-          applyRotation({
-            x: start.x + ((plan.end.x - start.x) * eased) + (Math.sin(progress * Math.PI * 5) * fadingWobble),
-            y: start.y + ((plan.end.y - start.y) * eased) + (Math.sin(progress * Math.PI * 4) * fadingWobble),
-            z: start.z + ((plan.end.z - start.z) * eased),
-          });
+          let nextRotation;
+
+          if (progress < ROLL_PHASES.mainEnd) {
+            const phaseProgress = progress / ROLL_PHASES.mainEnd;
+            nextRotation = interpolateRotation(start, plan.mainEnd, controlledEase(phaseProgress));
+          } else if (progress < ROLL_PHASES.slowdownEnd) {
+            const phaseProgress = (progress - ROLL_PHASES.mainEnd)
+              / (ROLL_PHASES.slowdownEnd - ROLL_PHASES.mainEnd);
+            nextRotation = interpolateRotation(plan.mainEnd, plan.revealStart, controlledEase(phaseProgress));
+          } else {
+            const phaseProgress = (progress - ROLL_PHASES.slowdownEnd)
+              / (1 - ROLL_PHASES.slowdownEnd);
+            nextRotation = interpolateRotation(plan.revealStart, plan.end, finalEase(phaseProgress));
+          }
+
+          applyRotation(nextRotation);
+          applyBodyMotion(progress, plan.motion);
 
           if (progress < 1) {
             requestFrame(frame);
@@ -133,17 +191,20 @@
           }
 
           applyRotation(plan.end);
+          button.style.transform = "translate3d(0px, 0px, 0) scale(1)";
           result = nextResult;
           pendingResult = null;
           button.dataset.result = String(result);
           delete button.dataset.pendingResult;
           button.setAttribute("aria-label", `Würfel zeigt ${result}. Erneut würfeln`);
           button.classList.add("is-landing");
-          setRolling(false);
           if (status) status.textContent = `Gewürfelt: ${result}`;
-          global.setTimeout(() => button.classList.remove("is-landing"), reducedMotion() ? 1 : 260);
-          onResult?.(result);
-          resolve(result);
+          schedule(() => {
+            button.classList.remove("is-landing");
+            setRolling(false);
+            onRollSettled?.(result);
+            resolve(result);
+          }, reducedMotion() ? 1 : LANDING_DURATION);
         }
 
         requestFrame(frame);
@@ -185,6 +246,15 @@
     cube.className = "fischteich-die-cube";
     cube.setAttribute("aria-hidden", "true");
 
+    const core = documentTarget.createElement("span");
+    core.className = "dice-core";
+    for (const faceClass of Object.values(FACE_CLASSES)) {
+      const coreFace = documentTarget.createElement("span");
+      coreFace.className = `dice-core-face ${faceClass.replace("dice-face", "dice-core-face")}`;
+      core.append(coreFace);
+    }
+    cube.append(core);
+
     for (let face = 1; face <= 6; face += 1) {
       const faceElement = documentTarget.createElement("span");
       faceElement.className = `dice-face ${FACE_CLASSES[face]}`;
@@ -201,11 +271,11 @@
     return { button, cube };
   }
 
-  function mount({ mountPoint, status = null, onResult = null }) {
+  function mount({ mountPoint, status = null, onResult = null, onRollSettled = onResult }) {
     if (!mountPoint) throw new TypeError("A dice mount point is required");
     const elements = createDieElement(mountPoint.ownerDocument ?? global.document);
     mountPoint.replaceChildren(elements.button);
-    return createController({ ...elements, status, onResult });
+    return createController({ ...elements, status, onRollSettled });
   }
 
   global.FischteichDice = Object.freeze({

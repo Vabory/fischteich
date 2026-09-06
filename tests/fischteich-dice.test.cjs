@@ -55,32 +55,51 @@ function loadService() {
   return windowTarget.FischteichDice;
 }
 
-function createHarness(random = () => 0.5) {
+function createHarness(random = () => 0.5, { prefersReducedMotion = true, onRollSettled = null } = {}) {
   const service = loadService();
   const button = new FakeButton();
   const cube = { style: {} };
   const status = { textContent: "" };
   const frames = [];
+  const timers = [];
   const controller = service.createController({
     button,
     cube,
     status,
     random,
     now: () => 0,
-    reducedMotion: () => true,
+    reducedMotion: () => prefersReducedMotion,
+    onRollSettled,
     requestFrame(callback) { frames.push(callback); return frames.length; },
+    schedule(callback, delay) { timers.push({ callback, delay }); return timers.length; },
   });
 
   async function finishRoll() {
-    while (frames.length > 0) frames.shift()(200);
+    while (frames.length > 0) frames.shift()(2000);
+    while (timers.length > 0) timers.shift().callback();
     await Promise.resolve();
   }
 
-  return { service, button, cube, status, controller, finishRoll };
+  function stepFrame(timestamp) {
+    assert.ok(frames.length > 0, "an animation frame is queued");
+    frames.shift()(timestamp);
+  }
+
+  function finishLanding() {
+    assert.equal(timers.length, 1, "one landing completion is queued");
+    timers.shift().callback();
+  }
+
+  return { service, button, cube, status, controller, frames, timers, finishRoll, stepFrame, finishLanding };
 }
 
 function normalize(angle) {
   return ((angle % 360) + 360) % 360;
+}
+
+function angularDistance(first, second) {
+  const delta = Math.abs(normalize(first) - normalize(second));
+  return Math.min(delta, 360 - delta);
 }
 
 test("the reusable die defines all faces, correct opposites and complete pip counts", () => {
@@ -133,6 +152,81 @@ test("a second touch is locked without generating or replacing a pending result"
   assert.equal(harness.button.disabled, false);
 });
 
+test("the result stays oblique until the final reveal phase", () => {
+  const harness = createHarness(() => 0.5, { prefersReducedMotion: false });
+  harness.controller.rollTo(1);
+  harness.stepFrame(900 * 1.55);
+  const atRevealStart = harness.controller.getRotation();
+  const target = harness.service.resultRotations[1];
+  assert.ok(angularDistance(atRevealStart.x, target.x) > 45);
+  assert.ok(angularDistance(atRevealStart.y, target.y) > 35);
+  assert.equal(harness.controller.getResult(), 1, "the committed result is unchanged during reveal");
+  assert.equal(harness.controller.getPendingResult(), 1);
+});
+
+test("roll settles exactly once after final rotation and landing", async () => {
+  const settled = [];
+  const harness = createHarness(() => 0.5, {
+    prefersReducedMotion: false,
+    onRollSettled: (result) => settled.push(result),
+  });
+  let resolved = false;
+  const completion = harness.controller.rollTo(5).then((result) => {
+    resolved = true;
+    return result;
+  });
+
+  harness.stepFrame(2000);
+  assert.equal(harness.controller.isRolling(), true);
+  assert.equal(harness.button.disabled, true);
+  assert.equal(harness.button.classList.contains("is-landing"), true);
+  assert.equal(harness.button.style.transform, "translate3d(0px, 0px, 0) scale(1)");
+  assert.deepEqual(settled, []);
+  assert.equal(resolved, false);
+  assert.equal(harness.timers[0].delay, 130);
+
+  harness.finishLanding();
+  assert.equal(await completion, 5);
+  assert.deepEqual(settled, [5]);
+  assert.equal(harness.controller.isRolling(), false);
+  assert.equal(harness.button.disabled, false);
+  assert.equal(harness.button.classList.contains("is-landing"), false);
+});
+
+test("body motion is subtle during rolling and resets without accumulation", async () => {
+  const harness = createHarness(() => 0.5, { prefersReducedMotion: false });
+  for (let result = 1; result <= 6; result += 1) {
+    const completion = harness.controller.rollTo(result);
+    harness.stepFrame(775);
+    assert.notEqual(harness.button.style.transform, "translate3d(0px, 0px, 0) scale(1)");
+    harness.stepFrame(2000);
+    harness.finishLanding();
+    assert.equal(await completion, result);
+    assert.equal(harness.button.style.transform, "translate3d(0px, 0px, 0) scale(1)");
+    const actual = harness.controller.getRotation();
+    const target = harness.service.resultRotations[result];
+    assert.equal(normalize(actual.x), normalize(target.x));
+    assert.equal(normalize(actual.y), normalize(target.y));
+    assert.equal(normalize(actual.z), normalize(target.z));
+  }
+});
+
+test("the die includes a pip-free six-sided inner core behind the outer faces", () => {
+  const { service } = createHarness();
+  class FakeElement {
+    constructor() { this.children = []; this.dataset = {}; }
+    append(child) { this.children.push(child); }
+    setAttribute() {}
+  }
+  const { cube } = service.createDieElement({ createElement: () => new FakeElement() });
+  assert.equal(cube.children.length, 7, "one core plus six outer faces");
+  const core = cube.children[0];
+  assert.equal(core.className, "dice-core");
+  assert.equal(core.children.length, 6);
+  assert.ok(core.children.every((face) => face.children.length === 0));
+  assert.ok(cube.children.slice(1).every((face) => face.children.length > 0));
+});
+
 test("multiple completed rolls remain possible", async () => {
   const harness = createHarness(() => 0.4);
   const first = harness.controller.rollTo(2);
@@ -148,13 +242,14 @@ test("the dice screen mounts only the standalone component and keeps central nav
   const html = read("index.html");
   const script = read("script.js");
   const css = read("style.css");
-  assert.match(html, /dice-service\.js\?v=1/);
+  assert.match(html, /dice-service\.js\?v=2/);
   assert.match(html, /id="fischteich-dice-mount"/);
   assert.match(html, />Würfel antippen</);
   assert.match(script, /window\.FischteichDice\.mount\(\{/);
   assert.match(script, /showScreen\(fischteichDiceScreen\)/);
   assert.match(script, /showTrottlMenu\(\{ focusSelector: "#open-fischteich-dice" \}\)/);
   assert.match(css, /transform-style:\s*preserve-3d/);
+  assert.match(css, /\.dice-core-face[\s\S]*background:\s*#02030a/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.fischteich-die/);
   assert.doesNotMatch(read("dice-service.js"), /supabase|fetch\(|WebSocket|player|game_table/i);
 });

@@ -401,7 +401,7 @@ button:focus-visible {
 }
 
 .fischteich-die.is-landing {
-  animation: fischteich-die-land 260ms ease-out both;
+  animation: fischteich-die-land 130ms ease-out both;
 }
 
 .fischteich-die-cube {
@@ -416,13 +416,38 @@ button:focus-visible {
   will-change: transform;
 }
 
+.dice-core {
+  --dice-core-size: 91%;
+  position: absolute;
+  inset: 4.5%;
+  display: block;
+  width: var(--dice-core-size);
+  height: var(--dice-core-size);
+  transform-style: preserve-3d;
+}
+
+.dice-core-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 12%;
+  background: #02030a;
+  backface-visibility: hidden;
+}
+
+.dice-core-face--front { transform: translateZ(calc(var(--dice-size) * 0.455)); }
+.dice-core-face--back { transform: rotateY(180deg) translateZ(calc(var(--dice-size) * 0.455)); }
+.dice-core-face--right { transform: rotateY(90deg) translateZ(calc(var(--dice-size) * 0.455)); }
+.dice-core-face--left { transform: rotateY(-90deg) translateZ(calc(var(--dice-size) * 0.455)); }
+.dice-core-face--top { transform: rotateX(90deg) translateZ(calc(var(--dice-size) * 0.455)); }
+.dice-core-face--bottom { transform: rotateX(-90deg) translateZ(calc(var(--dice-size) * 0.455)); }
+
 .dice-face {
   position: absolute;
   inset: 0;
   display: grid;
   padding: 17%;
   border: 1px solid rgb(137 219 255 / 34%);
-  border-radius: 20%;
+  border-radius: 15%;
   background:
     radial-gradient(circle at 23% 17%, rgb(89 177 255 / 13%), transparent 38%),
     linear-gradient(145deg, #111729 0%, #070a16 52%, #170b25 100%);
@@ -475,8 +500,9 @@ button:focus-visible {
 }
 
 @keyframes fischteich-die-land {
-  0% { transform: translateY(-2px) scale(1.025); }
-  58% { transform: translateY(3px) scale(0.975); }
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  34% { transform: translate3d(0, 1px, 0) scale(1.012); }
+  68% { transform: translate3d(0, 1px, 0) scale(0.99); }
   100% { transform: translateY(0) scale(1); }
 }
 

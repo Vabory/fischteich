@@ -115,6 +115,7 @@
       actionPayload: Object.freeze(actionPayload),
       reactionId: typeof value.reaction_id === "string" ? value.reaction_id : null,
       reactionStartAt: value.reaction_start_at ?? null,
+      reactionFallbackAt: value.reaction_fallback_at ?? null,
       reactionLoserSeat,
       reactionLockoutUntil: value.reaction_lockout_until ?? null,
     });
@@ -133,9 +134,6 @@
 
   function getEffectiveActionPhase(session, nowMs = getCorrectedNow()) {
     if (!session) return null;
-    if (session.actionPhase === "reaction_pending" && nowMs >= Date.parse(session.reactionStartAt ?? "")) {
-      return "reaction_active";
-    }
     if (
       session.actionPhase === "reaction_loser_lockout"
       && nowMs >= Date.parse(session.reactionLockoutUntil ?? "")
@@ -167,8 +165,42 @@
   }
 
   function getReactedSeats(session) {
-    const reactions = session?.actionPayload?.reactions;
-    return new Set(reactions && typeof reactions === "object" ? Object.keys(reactions).map(Number) : []);
+    const players = getReactionPlayers(session);
+    return new Set(Object.entries(players)
+      .filter(([, reaction]) => reaction.status === "reacted")
+      .map(([seat]) => Number(seat)));
+  }
+
+  function getReactionPlayers(session) {
+    const players = session?.actionPayload?.players;
+    return players && typeof players === "object" && !Array.isArray(players) ? players : Object.freeze({});
+  }
+
+  function getReactionPlayer(session, seatIndex) {
+    return getReactionPlayers(session)[seatIndex] ?? null;
+  }
+
+  function getReactionPenaltySeats(session) {
+    return new Set(Array.isArray(session?.actionPayload?.penalty_seats)
+      ? session.actionPayload.penalty_seats.map(Number)
+      : []);
+  }
+
+  function getReactionPenaltyAcks(session) {
+    return new Set(Array.isArray(session?.actionPayload?.penalty_acks)
+      ? session.actionPayload.penalty_acks.map(Number)
+      : []);
+  }
+
+  function getPersonalReactionRemainingMs(session, seatIndex, nowMs = getCorrectedNow()) {
+    const deadline = Date.parse(getReactionPlayer(session, seatIndex)?.deadline_at ?? "");
+    return Number.isFinite(deadline) ? Math.max(0, deadline - nowMs) : null;
+  }
+
+  function isPersonalReactionActive(session, seatIndex, nowMs = getCorrectedNow()) {
+    const reaction = getReactionPlayer(session, seatIndex);
+    const remainingMs = getPersonalReactionRemainingMs(session, seatIndex, nowMs);
+    return reaction?.status === "pending" && reaction.started_at && remainingMs !== null && remainingMs > 0;
   }
 
   function getRecoveryRollPresentation(session, nowMs = Date.now()) {
@@ -299,7 +331,7 @@
     const [sessionResponse, playersResponse, serverTimeResponse] = await Promise.all([
       supabaseClient
         .from("trottl_classic_sessions")
-        .select("id,mode,room_slot,status,host_user_id,player_count,created_at,started_at,current_turn_seat,roll_seq,roll_result,roll_phase,roll_started_at,roll_resolve_at,action_phase,action_actor_seat,action_target_seat,current_trottl_seat,action_payload,reaction_id,reaction_start_at,reaction_loser_seat,reaction_lockout_until")
+        .select("id,mode,room_slot,status,host_user_id,player_count,created_at,started_at,current_turn_seat,roll_seq,roll_result,roll_phase,roll_started_at,roll_resolve_at,action_phase,action_actor_seat,action_target_seat,current_trottl_seat,action_payload,reaction_id,reaction_start_at,reaction_fallback_at,reaction_loser_seat,reaction_lockout_until")
         .eq("id", sessionId)
         .maybeSingle(),
       supabaseClient
@@ -314,10 +346,26 @@
     if (playersResponse.error) throw playersResponse.error;
     if (serverTimeResponse.error) throw serverTimeResponse.error;
     updateServerClock(serverTimeResponse.data, clientStartedAt, clientReceivedAt);
-    const session = normalizeSession(sessionResponse.data);
+    let session = normalizeSession(sessionResponse.data);
     const players = (playersResponse.data ?? []).map(normalizePlayer);
     if (!session || players.some((player) => player === null)) {
       throw new Error("Invalid classic session response");
+    }
+    if (["reaction_pending", "reaction_active"].includes(session.actionPhase)) {
+      const { data: changed, error: syncError } = await supabaseClient.rpc("sync_trottl_classic_reaction", {
+        p_session_id: sessionId,
+      });
+      if (syncError) throw syncError;
+      if (changed === true) {
+        const refreshed = await supabaseClient
+          .from("trottl_classic_sessions")
+          .select("id,mode,room_slot,status,host_user_id,player_count,created_at,started_at,current_turn_seat,roll_seq,roll_result,roll_phase,roll_started_at,roll_resolve_at,action_phase,action_actor_seat,action_target_seat,current_trottl_seat,action_payload,reaction_id,reaction_start_at,reaction_fallback_at,reaction_loser_seat,reaction_lockout_until")
+          .eq("id", sessionId)
+          .maybeSingle();
+        if (refreshed.error) throw refreshed.error;
+        session = normalizeSession(refreshed.data);
+        if (!session) throw new Error("Invalid classic reaction response");
+      }
     }
     return Object.freeze({ session, players: Object.freeze(players), identity });
   }
@@ -413,6 +461,26 @@
     });
   }
 
+  async function startPersonalReaction(sessionId, rollSeq, reactionId, clientStartedAt) {
+    await ensureIdentity();
+    if (!Number.isSafeInteger(rollSeq) || rollSeq < 1) throw new RangeError("Valid roll sequence required");
+    const { data, error } = await supabaseClient.rpc("start_trottl_classic_personal_reaction", {
+      p_session_id: sessionId,
+      p_roll_seq: rollSeq,
+      p_reaction_id: reactionId,
+      p_client_started_at: clientStartedAt,
+    });
+    if (error) throw error;
+    return data === true;
+  }
+
+  async function refreshReaction(sessionId) {
+    await ensureIdentity();
+    const { error } = await supabaseClient.rpc("sync_trottl_classic_reaction", { p_session_id: sessionId });
+    if (error) throw error;
+    return loadSession(sessionId);
+  }
+
   function acknowledgeReactionLoser(sessionId, rollSeq, reactionId) {
     return runActionRpc("ack_trottl_classic_reaction_loser", sessionId, rollSeq, {
       p_reaction_id: reactionId,
@@ -492,6 +560,12 @@
     getFourTotal,
     getAcknowledgedSeats,
     getReactedSeats,
+    getReactionPlayers,
+    getReactionPlayer,
+    getReactionPenaltySeats,
+    getReactionPenaltyAcks,
+    getPersonalReactionRemainingMs,
+    isPersonalReactionActive,
     getRecoveryRollPresentation,
     getRollAction,
     nextSeat,
@@ -512,6 +586,8 @@
     resetFourSips,
     confirmFourSips,
     submitReaction,
+    startPersonalReaction,
+    refreshReaction,
     acknowledgeReactionLoser,
     acknowledgeShot,
     subscribeRooms,

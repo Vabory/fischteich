@@ -11,6 +11,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const migration = read("supabase/migrations/20260906000000_create_trottl_classic_lobbies.sql");
 const gameplayMigration = read("supabase/migrations/20260906010000_add_trottl_classic_gameplay.sql");
 const rulesMigration = read("supabase/migrations/20260906020000_add_trottl_classic_rules.sql");
+const polishMigration = read("supabase/migrations/20260906030000_polish_trottl_classic_reactions.sql");
 const html = read("index.html");
 const css = read("style.css");
 const script = read("script.js");
@@ -47,6 +48,7 @@ function createHarness() {
     action_payload: {},
     reaction_id: null,
     reaction_start_at: null,
+    reaction_fallback_at: null,
     reaction_loser_seat: null,
     reaction_lockout_until: null,
   };
@@ -105,7 +107,9 @@ function createHarness() {
         || name.startsWith("assign_trottl_classic_")
         || name.startsWith("reset_trottl_classic_")
         || name.startsWith("confirm_trottl_classic_")
-        || name === "react_trottl_classic") return { data: true, error: null };
+        || name === "react_trottl_classic"
+        || name === "start_trottl_classic_personal_reaction") return { data: true, error: null };
+      if (name === "sync_trottl_classic_reaction") return { data: false, error: null };
       throw new Error(`Unexpected RPC ${name}`);
     },
     from(table) {
@@ -405,6 +409,15 @@ test("next and previous seat helpers wrap across the global cycle", () => {
   assert.equal(service.previousSeat(0, 8), 7);
 });
 
+test("rules one and two target the requested player throughout the three-seat clockwise cycle", () => {
+  const { service } = createHarness();
+  assert.deepEqual(
+    [0, 1, 2].map((actor) => [service.nextSeat(actor, 3), service.previousSeat(actor, 3)]),
+    [[1, 2], [2, 0], [0, 1]],
+    "die one uses the next seat and die two uses the previous seat without changing turn order",
+  );
+});
+
 test("seat geometry supports balanced three through eight player views", () => {
   const { service } = createHarness();
   for (let playerCount = 3; playerCount <= 8; playerCount += 1) {
@@ -689,8 +702,8 @@ test("rules migration adds one explicit persistent action state machine", () => 
 });
 
 test("rules one and two resolve global left and right neighbors and require target acknowledgement", () => {
-  assert.match(rulesMigration, /when 1 then[\s\S]*action_actor_seat - 1 \+ v_session\.player_count[\s\S]*'left_neighbor'/i);
-  assert.match(rulesMigration, /when 2 then[\s\S]*action_actor_seat \+ 1[\s\S]*'right_neighbor'/i);
+  assert.match(polishMigration, /when 1 then[\s\S]*action_actor_seat \+ 1[\s\S]*'left_neighbor'/i);
+  assert.match(polishMigration, /when 2 then[\s\S]*action_actor_seat - 1 \+ v_session\.player_count[\s\S]*'right_neighbor'/i);
   assert.match(rulesMigration, /action_phase = 'awaiting_drink_ack'[\s\S]*v_member_seat <> v_session\.action_target_seat/i);
   assert.match(rulesMigration, /current_turn_seat = \(\(v_session\.action_actor_seat \+ 1\) % v_session\.player_count\)/i);
 });
@@ -725,6 +738,24 @@ test("rule five uses a shared future start, corrected client timestamps and an a
   assert.match(rulesMigration, /reaction_loser_lockout[\s\S]*reaction_lockout_until = v_now \+ pg_catalog\.make_interval\(secs => 0\.8\)/i);
   assert.match(rulesMigration, /clock_timestamp\(\) < v_session\.reaction_lockout_until/i);
   assert.match(rulesMigration, /v_member_seat is distinct from v_session\.reaction_loser_seat/i);
+});
+
+test("reaction polish replaces the shared start with persistent personal ten-second windows", () => {
+  assert.match(polishMigration, /add column reaction_fallback_at timestamptz/i);
+  assert.match(polishMigration, /'kind', 'personal_reaction'[\s\S]*'players'[\s\S]*'status', 'pending'/i);
+  assert.match(polishMigration, /create function public\.start_trottl_classic_personal_reaction[\s\S]*p_client_started_at timestamptz/i);
+  assert.match(polishMigration, /'started_at', p_client_started_at[\s\S]*'deadline_at', p_client_started_at \+ pg_catalog\.make_interval\(secs => 10\.0\)/i);
+  assert.match(polishMigration, /p_client_started_at > v_now \+ pg_catalog\.make_interval\(secs => 0\.25\)/i);
+  assert.match(polishMigration, /reaction_fallback_at = case when v_result = 5 then v_now \+ pg_catalog\.make_interval\(secs => 30\.0\)/i);
+  assert.match(polishMigration, /v_deadline \+ pg_catalog\.make_interval\(secs => 2\.0\)/i);
+  assert.match(polishMigration, /'status', 'timed_out'/i);
+  assert.match(polishMigration, /if v_timeout_count > 0 then[\s\S]*status' = 'timed_out'[\s\S]*else[\s\S]*order by \(entry\.value->>'duration_ms'\)::integer desc/i);
+  assert.match(polishMigration, /p_client_reacted_at < v_started_at[\s\S]*p_client_reacted_at > v_deadline_at/i);
+  assert.match(polishMigration, /'duration_ms', v_duration_ms/i);
+  assert.match(polishMigration, /reaction_lockout_until = p_now \+ pg_catalog\.make_interval\(secs => 0\.8\)/i);
+  assert.match(polishMigration, /jsonb_array_length\(v_penalty_acks\) >= pg_catalog\.jsonb_array_length\(v_penalty_seats\)/i);
+  assert.match(polishMigration, /grant execute on function public\.start_trottl_classic_personal_reaction/i);
+  assert.match(polishMigration, /grant execute on function public\.sync_trottl_classic_reaction/i);
 });
 
 test("rule six requires shot acknowledgement and leaves the same seat for a separate reroll", () => {
@@ -769,35 +800,70 @@ test("service action methods send only intent plus current action identity", asy
   await service.confirmFourSips(SESSION_ID, 7);
   await service.acknowledgeDrink(SESSION_ID, 7);
   await service.submitReaction(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001", "2026-09-06T10:02:00Z");
+  await service.startPersonalReaction(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001", "2026-09-06T10:01:50Z");
+  await service.refreshReaction(SESSION_ID);
   await service.acknowledgeReactionLoser(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001");
   await service.acknowledgeShot(SESSION_ID, 7);
   const gameplayCalls = rpcCalls.filter(({ name }) => name !== "get_trottl_classic_server_time");
   assert.deepEqual(gameplayCalls.map(({ name }) => name), [
     "choose_trottl_classic_trottl", "assign_trottl_classic_four", "reset_trottl_classic_four",
     "confirm_trottl_classic_four", "ack_trottl_classic_drink", "react_trottl_classic",
+    "start_trottl_classic_personal_reaction", "sync_trottl_classic_reaction",
     "ack_trottl_classic_reaction_loser", "ack_trottl_classic_shot",
   ]);
   assert.equal(gameplayCalls[0].parameters.p_roll_seq, 7);
   assert.equal(gameplayCalls[0].parameters.p_target_seat, 2);
   assert.equal(gameplayCalls[5].parameters.p_client_reacted_at, "2026-09-06T10:02:00Z");
+  assert.equal(gameplayCalls[6].parameters.p_client_started_at, "2026-09-06T10:01:50Z");
 });
 
-test("reaction phase boundaries use the synchronized server clock", () => {
+test("personal reaction helpers use persisted per-seat deadlines and the synchronized server clock", () => {
   const { service } = createHarness();
   const clientStart = Date.parse("2026-09-06T10:00:00.000Z");
   const clientEnd = clientStart + 200;
   assert.equal(service.updateServerClock("2026-09-06T10:00:05.100Z", clientStart, clientEnd), 5000);
   assert.equal(service.getCorrectedNow(clientStart), clientStart + 5000);
-  const pending = { actionPhase: "reaction_pending", reactionStartAt: "2026-09-06T10:00:06.000Z" };
-  assert.equal(service.getEffectiveActionPhase(pending, Date.parse("2026-09-06T10:00:05.999Z")), "reaction_pending");
-  assert.equal(service.getEffectiveActionPhase(pending, Date.parse("2026-09-06T10:00:06.000Z")), "reaction_active");
+  const pending = {
+    actionPhase: "reaction_pending",
+    actionPayload: { players: {
+      0: { status: "pending", started_at: "2026-09-06T10:00:05.000Z", deadline_at: "2026-09-06T10:00:15.000Z" },
+      1: { status: "reacted", duration_ms: 913 },
+      2: { status: "timed_out" },
+    }, penalty_seats: [2], penalty_acks: [] },
+  };
+  assert.equal(service.getEffectiveActionPhase(pending, Date.parse("2026-09-06T10:00:06.000Z")), "reaction_pending");
+  assert.equal(service.getPersonalReactionRemainingMs(pending, 0, Date.parse("2026-09-06T10:00:06.000Z")), 9000);
+  assert.equal(service.isPersonalReactionActive(pending, 0, Date.parse("2026-09-06T10:00:06.000Z")), true);
+  assert.deepEqual([...service.getReactedSeats(pending)], [1]);
+  assert.deepEqual([...service.getReactionPenaltySeats(pending)], [2]);
   const lockout = { actionPhase: "reaction_loser_lockout", reactionLockoutUntil: "2026-09-06T10:00:07.000Z" };
   assert.equal(service.getEffectiveActionPhase(lockout, Date.parse("2026-09-06T10:00:06.999Z")), "reaction_loser_lockout");
   assert.equal(service.getEffectiveActionPhase(lockout, Date.parse("2026-09-06T10:00:07.000Z")), "reaction_loser_ack");
 });
 
+test("personal reaction countdowns retain ten seconds from independent absolute starts", () => {
+  const { service } = createHarness();
+  const reaction = {
+    actionPhase: "reaction_pending",
+    actionPayload: { players: {
+      0: { status: "pending", started_at: "2026-09-06T10:00:00.000Z", deadline_at: "2026-09-06T10:00:10.000Z" },
+      1: { status: "pending", started_at: "2026-09-06T10:00:04.000Z", deadline_at: "2026-09-06T10:00:14.000Z" },
+    } },
+  };
+  assert.equal(service.getPersonalReactionRemainingMs(reaction, 0, Date.parse("2026-09-06T10:00:05.000Z")), 5000);
+  assert.equal(service.getPersonalReactionRemainingMs(reaction, 1, Date.parse("2026-09-06T10:00:05.000Z")), 9000);
+  assert.equal(
+    Date.parse(reaction.actionPayload.players[0].deadline_at) - Date.parse(reaction.actionPayload.players[0].started_at),
+    10000,
+  );
+  assert.equal(
+    Date.parse(reaction.actionPayload.players[1].deadline_at) - Date.parse(reaction.actionPayload.players[1].started_at),
+    10000,
+  );
+});
+
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=7[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=6[\s\S]*script\.js\?v=71/);
+  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=7[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -825,6 +891,8 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-player--drink-target/);
   assert.match(css, /\.trottl-classic-player--reaction-success/);
   assert.match(css, /\.trottl-classic-player--reaction-loser/);
+  assert.match(css, /\.trottl-classic-player-confirm/);
+  assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active[\s\S]*255 255 255/);
   assert.match(html, /id="trottl-classic-preview-panel" hidden/);
   assert.match(ui, /function renderGame\(snapshot, activeSeatIndex = service\.initialActiveSeatIndex\)/);
   assert.match(ui, /rollOnClick:\s*false/);
@@ -832,6 +900,12 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /service\.getRollAction/);
   assert.match(ui, /gameDice\.rollTo\(snapshot\.session\.rollResult\)/);
   assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)/);
+  assert.match(ui, /state\.animatingReactionCanStart = snapshot\.session\.rollResult === 5/);
+  assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)[\s\S]*notePersonalReactionPresentation\(snapshot, snapshot\.session\.rollSeq\)/);
+  assert.match(ui, /TIPPE AUF DEN BILDSCHIRM![\s\S]*remainingMs \/ 1000/);
+  assert.match(ui, /gameView\.addEventListener\("click", handleReactionTap\)/);
+  assert.match(ui, /function handleConfirmation\(\)/);
+  assert.doesNotMatch(ui, /phase === "awaiting_drink_ack" && seatIndex === ownSeat/);
   assert.match(ui, /localPlayerSeat\(snapshot\) === snapshot\.session\.currentTurnSeat/);
   assert.match(ui, /return !state\.preview[\s\S]*snapshot\.session\.rollPhase === "idle"/);
   assert.doesNotMatch(ui, /Math\.random/);
@@ -843,9 +917,10 @@ test("Klassik UI renders and submits every rule phase through direct table inter
   for (const phase of [
     "awaiting_drink_ack", "choosing_trottl", "distributing_four", "awaiting_four_acks",
     "reaction_pending", "reaction_active", "reaction_loser_lockout", "reaction_loser_ack", "shot_ack",
-  ]) assert.match(ui, new RegExp(`phase === "${phase}"`));
+  ]) assert.match(ui, new RegExp(`"${phase}"`));
   assert.match(ui, /seat\.addEventListener\("click"[\s\S]*handleSeatAction\(player\.seatIndex\)/);
-  assert.match(ui, /tableStage\.addEventListener\("click", handleReactionTap\)/);
+  assert.match(ui, /gameView\.addEventListener\("click", handleReactionTap\)/);
+  assert.match(ui, /confirmButton\.addEventListener\("click"[\s\S]*handleConfirmation\(\)/);
   assert.match(ui, /service\.acknowledgeDrink\(session\.id, session\.rollSeq\)/);
   assert.match(ui, /service\.chooseTrottl\(session\.id, session\.rollSeq, seatIndex\)/);
   assert.match(ui, /service\.assignFourSip\(session\.id, session\.rollSeq, seatIndex\)/);

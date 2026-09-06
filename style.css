@@ -1047,11 +1047,27 @@ button:focus-visible {
   --player-glow: rgb(255 65 100 / 42%);
 }
 
+.trottl-classic-player-confirm {
+  min-height: 25px;
+  margin-top: 3px;
+  padding: 3px 8px;
+  border-color: rgb(255 255 255 / 64%);
+  background: rgb(241 249 252 / 13%);
+  color: #fff;
+  font-size: 0.52rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
 .trottl-classic-table-stage.is-reaction-active .trottl-classic-table {
+  border-color: rgb(255 255 255 / 96%);
   box-shadow:
-    0 0 28px rgb(255 213 90 / 38%),
+    0 0 12px rgb(255 255 255 / 94%),
+    0 0 34px rgb(255 255 255 / 72%),
+    0 0 62px rgb(220 244 255 / 40%),
     0 20px 40px rgb(0 0 0 / 42%),
-    inset 0 0 40px rgb(255 204 72 / 15%);
+    inset 0 0 32px rgb(255 255 255 / 22%);
 }
 
 .trottl-classic-rule-controls {

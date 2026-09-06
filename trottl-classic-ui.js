@@ -17,6 +17,8 @@
     const tableStage = document.querySelector("#trottl-classic-table-stage");
     const seatLayer = document.querySelector("#trottl-classic-seat-layer");
     const situation = document.querySelector("#trottl-classic-situation");
+    const gameDiceMount = document.querySelector("#trottl-classic-dice-mount");
+    const gameDiceStatus = document.querySelector("#trottl-classic-dice-status");
     const previewPanel = document.querySelector("#trottl-classic-preview-panel");
     const previewCount = document.querySelector("#trottl-classic-preview-count");
     const previewPerspective = document.querySelector("#trottl-classic-preview-perspective");
@@ -39,13 +41,29 @@
       sessionRefreshPromise: null,
       sessionRefreshQueued: false,
       preview: previewEnabled ? preview.createState() : null,
+      diceSessionId: null,
+      handledRollSeq: null,
+      visuallySettledRollSeq: null,
+      rollRequestPending: false,
+      resolveTimer: null,
     };
+
+    const gameDice = global.FischteichDice.mount({
+      mountPoint: gameDiceMount,
+      status: gameDiceStatus,
+      onRollSettled: handleDiceSettled,
+      rollOnClick: false,
+    });
+    const gameDiceButton = gameDiceMount.querySelector(".fischteich-die");
 
     function describeError(error, fallback) {
       const message = String(error?.message ?? "");
       if (message.includes("GAME_ALREADY_STARTED")) return "Dieses Spiel läuft bereits.";
       if (message.includes("ROOM_FULL")) return "Dieser Raum ist bereits voll.";
       if (message.includes("ALREADY_IN_OTHER_ROOM")) return "Du bist bereits Mitglied im anderen Raum.";
+      if (message.includes("NOT_YOUR_TURN")) return "Du bist gerade nicht am Zug.";
+      if (message.includes("ROLL_IN_PROGRESS")) return "Der Würfel rollt bereits.";
+      if (message.includes("NOT_PLAYING")) return "Dieses Spiel läuft nicht mehr.";
       if (message.includes("LOCAL_IDENTITY_REQUIRED")) return "Bitte zuerst einen Fischteich-Namen festlegen.";
       if (message.includes("AUTH_REQUIRED") || error?.code === "42501") {
         return "Anmeldung noch nicht bereit. Bitte erneut versuchen.";
@@ -146,10 +164,131 @@
         (player) => player.seatIndex === activeSeatIndex,
       );
       tableStage.dataset.playerCount = String(snapshot.players.length);
+      const isRolling = !state.preview && snapshot.session.rollPhase === "rolling";
       situation.textContent = activePlayer
-        ? `${activePlayer.displayName.toLocaleUpperCase("de-AT")} IST AM ZUG`
+        ? `${activePlayer.displayName.toLocaleUpperCase("de-AT")} ${isRolling ? "WÜRFELT" : "IST AM ZUG"}`
         : "SPIEL LÄUFT";
       seatLayer.replaceChildren(...relativeSeats.map((seat) => createGameSeat(seat, snapshot, activeSeatIndex)));
+    }
+
+    function clearResolveTimer() {
+      if (state.resolveTimer !== null) global.clearTimeout(state.resolveTimer);
+      state.resolveTimer = null;
+    }
+
+    function resetDiceTracking(sessionId) {
+      if (state.diceSessionId === sessionId) return;
+      clearResolveTimer();
+      state.diceSessionId = sessionId;
+      state.handledRollSeq = null;
+      state.visuallySettledRollSeq = null;
+      state.rollRequestPending = false;
+    }
+
+    function localPlayerSeat(snapshot) {
+      return snapshot.players.find((player) => player.userId === snapshot.identity.userId)?.seatIndex ?? null;
+    }
+
+    function canLocalPlayerRoll(snapshot) {
+      return !state.preview
+        && snapshot.session.status === "playing"
+        && snapshot.session.rollPhase === "idle"
+        && localPlayerSeat(snapshot) === snapshot.session.currentTurnSeat
+        && !state.rollRequestPending
+        && !gameDice.isRolling();
+    }
+
+    function scheduleRollResolution(snapshot) {
+      clearResolveTimer();
+      if (state.preview || snapshot.session.rollPhase !== "rolling") return;
+      const delay = Math.max(0, Date.parse(snapshot.session.rollResolveAt) - Date.now() + 30);
+      const sessionId = snapshot.session.id;
+      const rollSeq = snapshot.session.rollSeq;
+      state.resolveTimer = global.setTimeout(() => {
+        state.resolveTimer = null;
+        void resolveCurrentRoll(sessionId, rollSeq);
+      }, delay);
+    }
+
+    function syncGameDice(snapshot) {
+      if (state.preview) {
+        clearResolveTimer();
+        if (!gameDice.isRolling()) gameDice.setResultInstant(1);
+        gameDiceButton.disabled = true;
+        gameDiceButton.classList.remove("is-ready");
+        gameDiceButton.setAttribute("aria-label", "Würfelvorschau");
+        return;
+      }
+
+      resetDiceTracking(snapshot.session.id);
+      const presentation = service.getRollPresentation(
+        snapshot.session,
+        state.handledRollSeq,
+        Date.now(),
+      );
+      if (presentation === "animate" && !gameDice.isRolling()) {
+        state.handledRollSeq = snapshot.session.rollSeq;
+        state.visuallySettledRollSeq = null;
+        gameDice.rollTo(snapshot.session.rollResult);
+      } else if (presentation === "instant") {
+        state.handledRollSeq = snapshot.session.rollSeq;
+        state.visuallySettledRollSeq = snapshot.session.rollSeq;
+        if (!gameDice.isRolling()) gameDice.setResultInstant(snapshot.session.rollResult);
+      }
+
+      scheduleRollResolution(snapshot);
+      const canRoll = canLocalPlayerRoll(snapshot);
+      gameDiceButton.disabled = !canRoll;
+      gameDiceButton.classList.toggle("is-ready", canRoll);
+      gameDiceButton.setAttribute(
+        "aria-label",
+        canRoll
+          ? `Würfel zeigt ${gameDice.getResult()}. Würfeln`
+          : `Würfel zeigt ${gameDice.getPendingResult() ?? gameDice.getResult()}`,
+      );
+    }
+
+    function handleDiceSettled() {
+      const snapshot = state.snapshot;
+      if (!snapshot || state.preview) return;
+      if (snapshot.session.rollSeq === state.handledRollSeq) {
+        state.visuallySettledRollSeq = snapshot.session.rollSeq;
+      }
+      syncGameDice(snapshot);
+    }
+
+    async function resolveCurrentRoll(sessionId, rollSeq) {
+      if (state.preview || state.snapshot?.session.id !== sessionId) return;
+      try {
+        const result = await service.resolveRoll(sessionId, rollSeq);
+        if (state.snapshot?.session.id !== sessionId) return;
+        state.snapshot = result.snapshot;
+        renderSession();
+      } catch (error) {
+        console.warn("3er-Trottl-Wurf konnte nicht aufgelöst werden.", error);
+        void refreshSession();
+      }
+    }
+
+    async function requestRoll() {
+      const snapshot = state.snapshot;
+      if (!snapshot || !canLocalPlayerRoll(snapshot)) return;
+      state.rollRequestPending = true;
+      syncGameDice(snapshot);
+      try {
+        const nextSnapshot = await service.rollSession(snapshot.session.id);
+        if (state.snapshot?.session.id !== snapshot.session.id) return;
+        state.snapshot = nextSnapshot;
+        sessionFeedback.textContent = "";
+        renderSession();
+      } catch (error) {
+        console.warn("3er-Trottl-Würfelwurf wurde abgelehnt.", error);
+        sessionFeedback.textContent = describeError(error, "Würfeln fehlgeschlagen. Bitte erneut versuchen.");
+        void refreshSession();
+      } finally {
+        state.rollRequestPending = false;
+        if (state.snapshot) renderSession();
+      }
     }
 
     function syncPreviewControls() {
@@ -190,7 +329,10 @@
       lobbyView.hidden = isPlaying;
       gameView.hidden = !isPlaying;
       previewPanel.hidden = !previewEnabled || !state.preview;
-      if (isPlaying) renderGame(snapshot, state.preview?.activeSeatIndex);
+      if (isPlaying) {
+        renderGame(snapshot, state.preview?.activeSeatIndex ?? snapshot.session.currentTurnSeat);
+        syncGameDice(snapshot);
+      }
       else renderLobby(snapshot);
     }
 
@@ -265,6 +407,7 @@
       if (previewEnabled) return openPreview();
       await stopSessionRealtime();
       state.snapshot = null;
+      clearResolveTimer();
       roomFeedback.textContent = feedback;
       showScreen(roomScreen);
       ensureRoomRealtime();
@@ -276,6 +419,7 @@
       await Promise.all([stopRoomRealtime(), stopSessionRealtime()]);
       state.preview = state.preview ?? preview.createState();
       state.snapshot = preview.createSnapshot(state.preview);
+      resetDiceTracking(state.snapshot.session.id);
       sessionFeedback.textContent = "";
       showScreen(sessionScreen);
       syncPreviewControls();
@@ -285,6 +429,7 @@
 
     async function openSnapshot(snapshot) {
       await stopRoomRealtime();
+      resetDiceTracking(snapshot.session.id);
       state.snapshot = snapshot;
       sessionFeedback.textContent = "";
       showScreen(sessionScreen);
@@ -384,6 +529,7 @@
 
     async function returnToTrottlMenu() {
       await stopRoomRealtime();
+      clearResolveTimer();
       showTrottlMenu({ focusSelector: "#open-trottl-classic" });
     }
 
@@ -404,6 +550,7 @@
     }
 
     async function suspend() {
+      clearResolveTimer();
       await Promise.all([stopRoomRealtime(), stopSessionRealtime()]);
     }
 
@@ -425,6 +572,7 @@
     sessionBackButton.addEventListener("click", () => void leaveCurrentSession());
     leaveButton.addEventListener("click", () => void leaveCurrentSession());
     startButton.addEventListener("click", () => void startGame());
+    gameDiceButton.addEventListener("click", () => void requestRoll());
     if (previewEnabled) {
       for (let playerCount = preview.minPlayers; playerCount <= preview.maxPlayers; playerCount += 1) {
         const button = document.createElement("button");

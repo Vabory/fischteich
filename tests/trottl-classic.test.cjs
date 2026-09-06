@@ -9,10 +9,12 @@ const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const migration = read("supabase/migrations/20260906000000_create_trottl_classic_lobbies.sql");
+const gameplayMigration = read("supabase/migrations/20260906010000_add_trottl_classic_gameplay.sql");
 const html = read("index.html");
 const css = read("style.css");
 const script = read("script.js");
 const ui = read("trottl-classic-ui.js");
+const serviceSource = read("trottl-classic-service.js");
 const previewSource = read("trottl-classic-preview.js");
 
 const USER_ID = "10000000-0000-4000-8000-000000000001";
@@ -31,6 +33,12 @@ function createHarness() {
     player_count: 1,
     created_at: "2026-09-06T10:00:00Z",
     started_at: null,
+    current_turn_seat: null,
+    roll_seq: 0,
+    roll_result: null,
+    roll_phase: "idle",
+    roll_started_at: null,
+    roll_resolve_at: null,
   };
   const playerRows = [{
     session_id: SESSION_ID,
@@ -52,8 +60,28 @@ function createHarness() {
       if (name === "leave_trottl_classic_session") return { data: "lobby", error: null };
       if (name === "start_trottl_classic_session") {
         sessionRow.status = "playing";
+        sessionRow.player_count = 3;
         sessionRow.started_at = "2026-09-06T10:01:00Z";
+        sessionRow.current_turn_seat = 0;
         return { data: SESSION_ID, error: null };
+      }
+      if (name === "roll_trottl_classic_die") {
+        sessionRow.roll_seq += 1;
+        sessionRow.roll_result = 4;
+        sessionRow.roll_phase = "rolling";
+        sessionRow.roll_started_at = "2026-09-06T10:01:01.000Z";
+        sessionRow.roll_resolve_at = "2026-09-06T10:01:03.600Z";
+        return { data: sessionRow.roll_seq, error: null };
+      }
+      if (name === "resolve_trottl_classic_roll") {
+        const resolved = parameters.p_roll_seq === sessionRow.roll_seq && sessionRow.roll_phase === "rolling";
+        if (resolved) {
+          sessionRow.current_turn_seat = (sessionRow.current_turn_seat + 1) % sessionRow.player_count;
+          sessionRow.roll_phase = "idle";
+          sessionRow.roll_started_at = null;
+          sessionRow.roll_resolve_at = null;
+        }
+        return { data: resolved, error: null };
       }
       throw new Error(`Unexpected RPC ${name}`);
     },
@@ -103,7 +131,7 @@ function createHarness() {
     RangeError,
     TypeError,
   });
-  return { service: windowTarget.trottlClassicService, rpcCalls, channels, removedChannels };
+  return { service: windowTarget.trottlClassicService, rpcCalls, channels, removedChannels, sessionRow };
 }
 
 function createPlayers(count) {
@@ -187,6 +215,48 @@ test("start and leave use narrow server-authoritative RPCs", async () => {
   ]);
 });
 
+test("gameplay starts on global seat zero and advances only through RPC state", async () => {
+  const { service, rpcCalls } = createHarness();
+  const started = await service.startSession(SESSION_ID);
+  assert.equal(started.session.currentTurnSeat, 0);
+  assert.equal(started.session.rollSeq, 0);
+  assert.equal(started.session.rollPhase, "idle");
+
+  const rolling = await service.rollSession(SESSION_ID);
+  assert.equal(rolling.session.currentTurnSeat, 0);
+  assert.equal(rolling.session.rollSeq, 1);
+  assert.equal(rolling.session.rollResult, 4);
+  assert.equal(rolling.session.rollPhase, "rolling");
+
+  const resolved = await service.resolveRoll(SESSION_ID, 1);
+  assert.equal(resolved.resolved, true);
+  assert.equal(resolved.snapshot.session.currentTurnSeat, 1);
+  assert.equal(resolved.snapshot.session.rollSeq, 1);
+  assert.equal(resolved.snapshot.session.rollResult, 4);
+  assert.equal(resolved.snapshot.session.rollPhase, "idle");
+  assert.deepEqual(rpcCalls.map(({ name }) => name), [
+    "start_trottl_classic_session",
+    "roll_trottl_classic_die",
+    "resolve_trottl_classic_roll",
+  ]);
+});
+
+test("roll presentation deduplicates realtime and reconstructs stale rolls instantly", () => {
+  const { service } = createHarness();
+  const now = Date.parse("2026-09-06T10:01:01.100Z");
+  const rolling = {
+    rollSeq: 12,
+    rollResult: 4,
+    rollPhase: "rolling",
+    rollResolveAt: "2026-09-06T10:01:03.600Z",
+  };
+  assert.equal(service.getRollPresentation(rolling, 11, now), "animate");
+  assert.equal(service.getRollPresentation(rolling, 12, now), "duplicate");
+  assert.equal(service.getRollPresentation(rolling, 11, Date.parse("2026-09-06T10:01:03.500Z")), "instant");
+  assert.equal(service.getRollPresentation({ ...rolling, rollPhase: "idle", rollResolveAt: null }, null, now), "instant");
+  assert.equal(service.getRollPresentation({ rollSeq: 0, rollResult: null }, null, now), "none");
+});
+
 test("session realtime watches session and membership and cleans up once", async () => {
   const { service, channels, removedChannels } = createHarness();
   const unsubscribe = service.subscribeSession(SESSION_ID, () => undefined);
@@ -223,8 +293,22 @@ test("relative seats place every nonzero own seat at the bottom without changing
   assert.deepEqual(players.map((player) => player.seatIndex), [0, 1, 2, 3, 4, 5, 6, 7]);
 });
 
+test("the active turn remains the same global player across local perspectives", () => {
+  const { service } = createHarness();
+  const players = createPlayers(8);
+  const activeSeat = 2;
+  const tobiView = service.getRelativeSeats(players, "user-0");
+  const maxView = service.getRelativeSeats(players, "user-4");
+  const tobiActive = tobiView.find(({ player }) => player.seatIndex === activeSeat);
+  const maxActive = maxView.find(({ player }) => player.seatIndex === activeSeat);
+  assert.equal(tobiActive.player.userId, "user-2");
+  assert.equal(maxActive.player.userId, "user-2");
+  assert.notEqual(tobiActive.relativeIndex, maxActive.relativeIndex);
+});
+
 test("next and previous seat helpers wrap across the global cycle", () => {
   const { service } = createHarness();
+  assert.deepEqual([0, 1, 2].map((seat) => service.nextSeat(seat, 3)), [1, 2, 0]);
   assert.equal(service.nextSeat(0, 8), 1);
   assert.equal(service.nextSeat(7, 8), 0);
   assert.equal(service.previousSeat(1, 8), 0);
@@ -424,8 +508,38 @@ test("database migration owns leave, host transfer, session close and start vali
   assert.match(migration, /alter publication supabase_realtime add table public\.trottl_classic_players/i);
 });
 
+test("gameplay migration stores an authoritative locked roll and turn state", () => {
+  for (const column of [
+    "current_turn_seat smallint",
+    "roll_seq bigint not null default 0",
+    "roll_result smallint",
+    "roll_phase text not null default 'idle'",
+    "roll_started_at timestamptz",
+    "roll_resolve_at timestamptz",
+  ]) assert.match(gameplayMigration, new RegExp(column, "i"));
+  assert.match(gameplayMigration, /current_turn_seat = 0[\s\S]*roll_seq = 0[\s\S]*roll_phase = 'idle'/i);
+  assert.match(gameplayMigration, /create function public\.roll_trottl_classic_die\(p_session_id uuid\)[\s\S]*for update/i);
+  assert.match(gameplayMigration, /player\.user_id = v_user_id[\s\S]*v_member_seat <> v_session\.current_turn_seat[\s\S]*NOT_YOUR_TURN/i);
+  assert.match(gameplayMigration, /v_session\.roll_phase <> 'idle'[\s\S]*ROLL_IN_PROGRESS/i);
+  assert.match(gameplayMigration, /v_result := \(1 \+ pg_catalog\.floor\(pg_catalog\.random\(\) \* 6\)\)::smallint/i);
+  assert.equal((gameplayMigration.match(/v_result :=/g) ?? []).length, 1);
+  assert.match(gameplayMigration, /roll_seq = session\.roll_seq \+ 1[\s\S]*roll_result = v_result[\s\S]*roll_phase = 'rolling'/i);
+  assert.match(gameplayMigration, /roll_resolve_at = v_now \+ pg_catalog\.make_interval\(secs => 2\.6\)/i);
+});
+
+test("gameplay migration resolves turns atomically and exposes only guarded RPCs", () => {
+  assert.match(gameplayMigration, /create function public\.resolve_trottl_classic_roll\(p_session_id uuid, p_roll_seq bigint\)[\s\S]*for update/i);
+  assert.match(gameplayMigration, /v_session\.roll_seq <> p_roll_seq[\s\S]*clock_timestamp\(\) < v_session\.roll_resolve_at[\s\S]*return false/i);
+  assert.match(gameplayMigration, /current_turn_seat = \(\(session\.current_turn_seat \+ 1\) % session\.player_count\)::smallint/i);
+  assert.match(gameplayMigration, /revoke all on function public\.roll_trottl_classic_die\(uuid\) from public, anon, authenticated/i);
+  assert.match(gameplayMigration, /revoke all on function public\.resolve_trottl_classic_roll\(uuid, bigint\) from public, anon, authenticated/i);
+  assert.match(gameplayMigration, /grant execute on function public\.roll_trottl_classic_die\(uuid\) to authenticated/i);
+  assert.match(gameplayMigration, /grant execute on function public\.resolve_trottl_classic_roll\(uuid, bigint\) to authenticated/i);
+  assert.doesNotMatch(gameplayMigration, /grant update on table public\.trottl_classic_sessions/i);
+});
+
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=4[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=3[\s\S]*script\.js\?v=71/);
+  assert.match(html, /trottl-classic-service\.js\?v=5[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=4[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -435,6 +549,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /id="trottl-classic-game-view"/);
   assert.match(html, /id="trottl-classic-situation"/);
   assert.match(html, /class="trottl-classic-dice-zone"/);
+  assert.match(html, /id="trottl-classic-dice-mount"/);
   assert.match(html, /id="trottl-classic-seat-layer"/);
   assert.match(ui, /service\.getRelativeSeats\(snapshot\.players, snapshot\.identity\.userId\)/);
   assert.match(ui, /service\.getSeatPosition\(relativeIndex, snapshot\.players\.length\)/);
@@ -449,6 +564,14 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-player--selectable/);
   assert.match(html, /id="trottl-classic-preview-panel" hidden/);
   assert.match(ui, /function renderGame\(snapshot, activeSeatIndex = service\.initialActiveSeatIndex\)/);
+  assert.match(ui, /rollOnClick:\s*false/);
+  assert.match(ui, /service\.rollSession\(snapshot\.session\.id\)/);
+  assert.match(ui, /service\.getRollPresentation/);
+  assert.match(ui, /gameDice\.rollTo\(snapshot\.session\.rollResult\)/);
+  assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)/);
+  assert.match(ui, /localPlayerSeat\(snapshot\) === snapshot\.session\.currentTurnSeat/);
+  assert.match(ui, /return !state\.preview[\s\S]*snapshot\.session\.rollPhase === "idle"/);
+  assert.doesNotMatch(ui, /Math\.random/);
   assert.match(ui, /if \(previewEnabled\) return openPreview\(\)/);
   assert.match(previewSource, /const TROTTL_CLASSIC_PREVIEW_ENABLED = false/);
 });

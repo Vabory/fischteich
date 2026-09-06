@@ -82,6 +82,7 @@
     status = null,
     onResult = null,
     onRollSettled = onResult,
+    rollOnClick = true,
     random = defaultRandom,
     requestFrame = global.requestAnimationFrame.bind(global),
     now = () => global.performance.now(),
@@ -221,7 +222,21 @@
       rollRandom();
     }
 
-    button.addEventListener("click", handleClick);
+    function setResultInstant(nextResult) {
+      validateResult(nextResult);
+      if (rolling) return false;
+      result = nextResult;
+      pendingResult = null;
+      applyRotation({ ...RESULT_ROTATIONS[nextResult] });
+      button.style.transform = "translate3d(0px, 0px, 0) scale(1)";
+      button.dataset.result = String(result);
+      delete button.dataset.pendingResult;
+      button.setAttribute("aria-label", `Würfel zeigt ${result}`);
+      if (status) status.textContent = `Gewürfelt: ${result}`;
+      return true;
+    }
+
+    if (rollOnClick) button.addEventListener("click", handleClick);
     button.dataset.result = "1";
     button.setAttribute("aria-label", "Würfel zeigt 1. Würfeln");
     button.setAttribute("aria-busy", "false");
@@ -230,11 +245,14 @@
     return Object.freeze({
       rollRandom,
       rollTo,
+      setResultInstant,
       isRolling: () => rolling,
       getResult: () => result,
       getPendingResult: () => pendingResult,
       getRotation: () => ({ ...rotation }),
-      destroy: () => button.removeEventListener("click", handleClick),
+      destroy: () => {
+        if (rollOnClick) button.removeEventListener("click", handleClick);
+      },
     });
   }
 
@@ -271,11 +289,11 @@
     return { button, cube };
   }
 
-  function mount({ mountPoint, status = null, onResult = null, onRollSettled = onResult }) {
+  function mount({ mountPoint, status = null, onResult = null, onRollSettled = onResult, rollOnClick = true }) {
     if (!mountPoint) throw new TypeError("A dice mount point is required");
     const elements = createDieElement(mountPoint.ownerDocument ?? global.document);
     mountPoint.replaceChildren(elements.button);
-    return createController({ ...elements, status, onRollSettled });
+    return createController({ ...elements, status, onRollSettled, rollOnClick });
   }
 
   global.FischteichDice = Object.freeze({

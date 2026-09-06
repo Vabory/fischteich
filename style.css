@@ -895,19 +895,37 @@ button:focus-visible {
 
 .trottl-classic-dice-zone {
   position: absolute;
+  z-index: 3;
   top: 50%;
   left: 50%;
+  display: grid;
   width: clamp(112px, 34vw, 146px);
   aspect-ratio: 1;
   border: 1px dashed rgb(198 229 241 / 7%);
   border-radius: 26%;
   transform: translate(-50%, -50%);
+  place-items: center;
+}
+
+.trottl-classic-dice-mount {
+  --dice-size: clamp(82px, 24vw, 108px);
+  display: grid;
+  width: var(--dice-size);
+  height: var(--dice-size);
+  perspective: 900px;
+  place-items: center;
+}
+
+.trottl-classic-dice-mount .fischteich-die.is-ready {
+  cursor: pointer;
+  animation: trottl-classic-dice-ready 2.1s ease-in-out infinite;
 }
 
 .trottl-classic-seat-layer {
   position: absolute;
   z-index: 2;
   inset: 0;
+  pointer-events: none;
 }
 
 .trottl-classic-game-seat {
@@ -931,6 +949,7 @@ button:focus-visible {
   gap: 7px;
   transform: translate(-50%, -50%);
   transform-origin: center;
+  pointer-events: auto;
 }
 
 .trottl-classic-game-avatar {
@@ -1032,6 +1051,11 @@ button:focus-visible {
 @keyframes fischteich-die-idle {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
+}
+
+@keyframes trottl-classic-dice-ready {
+  0%, 100% { filter: drop-shadow(0 0 0 rgb(134 224 255 / 0%)); transform: translateY(0); }
+  50% { filter: drop-shadow(0 0 9px rgb(134 224 255 / 24%)); transform: translateY(-3px); }
 }
 
 @keyframes fischteich-die-land {

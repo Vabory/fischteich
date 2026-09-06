@@ -55,7 +55,7 @@ function loadService() {
   return windowTarget.FischteichDice;
 }
 
-function createHarness(random = () => 0.5, { prefersReducedMotion = true, onRollSettled = null } = {}) {
+function createHarness(random = () => 0.5, { prefersReducedMotion = true, onRollSettled = null, rollOnClick = true } = {}) {
   const service = loadService();
   const button = new FakeButton();
   const cube = { style: {} };
@@ -70,6 +70,7 @@ function createHarness(random = () => 0.5, { prefersReducedMotion = true, onRoll
     now: () => 0,
     reducedMotion: () => prefersReducedMotion,
     onRollSettled,
+    rollOnClick,
     requestFrame(callback) { frames.push(callback); return frames.length; },
     schedule(callback, delay) { timers.push({ callback, delay }); return timers.length; },
   });
@@ -238,11 +239,37 @@ test("multiple completed rolls remain possible", async () => {
   assert.equal(harness.controller.getResult(), 5);
 });
 
+test("an authoritative result can be restored instantly without changing the roll animation", () => {
+  const settled = [];
+  const harness = createHarness(() => 0.4, { onRollSettled: (result) => settled.push(result) });
+  assert.equal(harness.controller.setResultInstant(6), true);
+  assert.equal(harness.controller.getResult(), 6);
+  assert.equal(harness.button.dataset.result, "6");
+  const rotation = harness.controller.getRotation();
+  assert.equal(rotation.x, harness.service.resultRotations[6].x);
+  assert.equal(rotation.y, harness.service.resultRotations[6].y);
+  assert.equal(rotation.z, harness.service.resultRotations[6].z);
+  assert.deepEqual(settled, []);
+  harness.controller.rollTo(2);
+  assert.equal(harness.controller.setResultInstant(4), false, "an active animation is never overwritten");
+});
+
+test("network-controlled dice can disable local random click handling", async () => {
+  const harness = createHarness(() => 0.4, { rollOnClick: false });
+  assert.equal(harness.button.listeners.has("click"), false);
+  const completion = harness.controller.rollTo(3);
+  await harness.finishRoll();
+  assert.equal(await completion, 3);
+  assert.equal(harness.controller.getResult(), 3);
+  const standalone = createHarness();
+  assert.equal(standalone.button.listeners.has("click"), true, "standalone behavior remains the default");
+});
+
 test("the dice screen mounts only the standalone component and keeps central navigation", () => {
   const html = read("index.html");
   const script = read("script.js");
   const css = read("style.css");
-  assert.match(html, /dice-service\.js\?v=2/);
+  assert.match(html, /dice-service\.js\?v=3/);
   assert.match(html, /id="fischteich-dice-mount"/);
   assert.match(html, />Würfel antippen</);
   assert.match(script, /window\.FischteichDice\.mount\(\{/);

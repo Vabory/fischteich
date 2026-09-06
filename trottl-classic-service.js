@@ -6,6 +6,7 @@
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 8;
   const INITIAL_ACTIVE_SEAT_INDEX = 0;
+  const MIN_FULL_ROLL_WINDOW_MS = 2100;
   const SEAT_LAYOUTS = Object.freeze({
     3: freezeSeatLayout([[0, 1], [0.72, -0.54], [-0.72, -0.54]]),
     4: freezeSeatLayout([[0, 1], [0.78, 0], [0, -1], [-0.78, 0]]),
@@ -55,7 +56,17 @@
       || typeof value.host_user_id !== "string"
     ) return null;
     const playerCount = Number(value.player_count);
+    const currentTurnSeat = value.current_turn_seat === null ? null : Number(value.current_turn_seat);
+    const rollSeq = Number(value.roll_seq);
+    const rollResult = value.roll_result === null ? null : Number(value.roll_result);
+    const rollPhase = value.roll_phase;
     if (!Number.isInteger(playerCount) || playerCount < 1 || playerCount > MAX_PLAYERS) return null;
+    if (currentTurnSeat !== null && (!Number.isInteger(currentTurnSeat) || currentTurnSeat < 0 || currentTurnSeat >= MAX_PLAYERS)) return null;
+    if (value.status === "playing" && currentTurnSeat === null) return null;
+    if (!Number.isSafeInteger(rollSeq) || rollSeq < 0) return null;
+    if (rollResult !== null && (!Number.isInteger(rollResult) || rollResult < 1 || rollResult > 6)) return null;
+    if (!["idle", "rolling"].includes(rollPhase)) return null;
+    if (rollPhase === "rolling" && (rollResult === null || !value.roll_started_at || !value.roll_resolve_at)) return null;
     return Object.freeze({
       id: value.id,
       mode: MODE,
@@ -65,7 +76,22 @@
       playerCount,
       createdAt: value.created_at,
       startedAt: value.started_at ?? null,
+      currentTurnSeat,
+      rollSeq,
+      rollResult,
+      rollPhase,
+      rollStartedAt: value.roll_started_at ?? null,
+      rollResolveAt: value.roll_resolve_at ?? null,
     });
+  }
+
+  function getRollPresentation(session, handledRollSeq, nowMs = Date.now()) {
+    if (!session || session.rollSeq < 1 || session.rollResult === null) return "none";
+    if (session.rollSeq === handledRollSeq) return "duplicate";
+    const remainingMs = Date.parse(session.rollResolveAt ?? "") - nowMs;
+    return session.rollPhase === "rolling" && remainingMs >= MIN_FULL_ROLL_WINDOW_MS
+      ? "animate"
+      : "instant";
   }
 
   function normalizePlayer(value) {
@@ -177,7 +203,7 @@
     const [sessionResponse, playersResponse] = await Promise.all([
       supabaseClient
         .from("trottl_classic_sessions")
-        .select("id,mode,room_slot,status,host_user_id,player_count,created_at,started_at")
+        .select("id,mode,room_slot,status,host_user_id,player_count,created_at,started_at,current_turn_seat,roll_seq,roll_result,roll_phase,roll_started_at,roll_resolve_at")
         .eq("id", sessionId)
         .maybeSingle(),
       supabaseClient
@@ -224,6 +250,28 @@
     if (error) throw error;
     if (data !== sessionId) throw new Error("Start returned an unexpected session id");
     return loadSession(sessionId);
+  }
+
+  async function rollSession(sessionId) {
+    await ensureIdentity();
+    const { data, error } = await supabaseClient.rpc("roll_trottl_classic_die", {
+      p_session_id: sessionId,
+    });
+    if (error) throw error;
+    const rollSeq = Number(data);
+    if (!Number.isSafeInteger(rollSeq) || rollSeq < 1) throw new Error("Roll returned an invalid sequence");
+    return loadSession(sessionId);
+  }
+
+  async function resolveRoll(sessionId, rollSeq) {
+    await ensureIdentity();
+    if (!Number.isSafeInteger(rollSeq) || rollSeq < 1) throw new RangeError("Valid roll sequence required");
+    const { data, error } = await supabaseClient.rpc("resolve_trottl_classic_roll", {
+      p_session_id: sessionId,
+      p_roll_seq: rollSeq,
+    });
+    if (error) throw error;
+    return Object.freeze({ resolved: data === true, snapshot: await loadSession(sessionId) });
   }
 
   function removeRealtimeChannel(channel) {
@@ -282,10 +330,12 @@
     minPlayers: MIN_PLAYERS,
     maxPlayers: MAX_PLAYERS,
     initialActiveSeatIndex: INITIAL_ACTIVE_SEAT_INDEX,
+    minFullRollWindowMs: MIN_FULL_ROLL_WINDOW_MS,
     seatLayouts: SEAT_LAYOUTS,
     normalizeRooms,
     normalizeSession,
     normalizePlayer,
+    getRollPresentation,
     nextSeat,
     previousSeat,
     getRelativeSeats,
@@ -296,6 +346,8 @@
     joinRoom,
     leaveSession,
     startSession,
+    rollSession,
+    resolveRoll,
     subscribeRooms,
     subscribeSession,
   });

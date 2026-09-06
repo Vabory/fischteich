@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260906.7">
+    <meta name="fischteich-build" content="20260906.8">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=118">
+    <link rel="stylesheet" href="./style.css?v=119">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -26,10 +26,10 @@
     <script src="./pwa-service.js?v=1" defer></script>
     <script src="./push-service.js?v=2" defer></script>
     <script src="./shortcut-service.js?v=5" defer></script>
-    <script src="./dice-service.js?v=2" defer></script>
-    <script src="./trottl-classic-service.js?v=4" defer></script>
+    <script src="./dice-service.js?v=3" defer></script>
+    <script src="./trottl-classic-service.js?v=5" defer></script>
     <script src="./trottl-classic-preview.js?v=1" defer></script>
-    <script src="./trottl-classic-ui.js?v=3" defer></script>
+    <script src="./trottl-classic-ui.js?v=4" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=71" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -274,7 +274,10 @@
             <div class="trottl-classic-table-stage" id="trottl-classic-table-stage">
               <div class="trottl-classic-table" aria-hidden="true">
                 <div class="trottl-classic-table-rail"></div>
-                <div class="trottl-classic-dice-zone"></div>
+              </div>
+              <div class="trottl-classic-dice-zone">
+                <div class="trottl-classic-dice-mount" id="trottl-classic-dice-mount"></div>
+                <p class="visually-hidden" id="trottl-classic-dice-status" aria-live="polite"></p>
               </div>
               <div class="trottl-classic-seat-layer" id="trottl-classic-seat-layer"></div>
             </div>

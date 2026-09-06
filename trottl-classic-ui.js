@@ -19,6 +19,10 @@
     const situation = document.querySelector("#trottl-classic-situation");
     const gameDiceMount = document.querySelector("#trottl-classic-dice-mount");
     const gameDiceStatus = document.querySelector("#trottl-classic-dice-status");
+    const ruleControls = document.querySelector("#trottl-classic-rule-controls");
+    const fourResetButton = document.querySelector("#trottl-classic-four-reset");
+    const fourConfirmButton = document.querySelector("#trottl-classic-four-confirm");
+    const gameFeedback = document.querySelector("#trottl-classic-game-feedback");
     const previewPanel = document.querySelector("#trottl-classic-preview-panel");
     const previewCount = document.querySelector("#trottl-classic-preview-count");
     const previewPerspective = document.querySelector("#trottl-classic-preview-perspective");
@@ -48,6 +52,8 @@
       deferredLiveRollSeq: null,
       rollRequestPending: false,
       resolveTimer: null,
+      actionBoundaryTimer: null,
+      actionRequestPending: false,
     };
 
     const gameDice = global.FischteichDice.mount({
@@ -65,6 +71,15 @@
       if (message.includes("ALREADY_IN_OTHER_ROOM")) return "Du bist bereits Mitglied im anderen Raum.";
       if (message.includes("NOT_YOUR_TURN")) return "Du bist gerade nicht am Zug.";
       if (message.includes("ROLL_IN_PROGRESS")) return "Der Würfel rollt bereits.";
+      if (message.includes("ACTION_REQUIRED")) return "Zuerst die aktuelle Aktion abschließen.";
+      if (message.includes("NOT_ACTION_ACTOR")) return "Diese Aktion gehört dem Würfler.";
+      if (message.includes("NOT_ACTION_TARGET")) return "Nur der betroffene Spieler darf bestätigen.";
+      if (message.includes("INVALID_TARGET")) return "Dieses Spielerfeld ist kein gültiges Ziel.";
+      if (message.includes("STALE_ACTION")) return "Diese Aktion ist bereits abgelaufen.";
+      if (message.includes("FOUR_COMPLETE")) return "Alle vier Schlücke sind bereits verteilt.";
+      if (message.includes("FOUR_REQUIRES_EXACTLY_FOUR")) return "Bitte genau vier Schlücke verteilen.";
+      if (message.includes("REACTION_TOO_EARLY")) return "Die Reaktionsrunde hat noch nicht begonnen.";
+      if (message.includes("REACTION_LOCKOUT")) return "Bestätigung ist nach der kurzen Sperre möglich.";
       if (message.includes("NOT_PLAYING")) return "Dieses Spiel läuft nicht mehr.";
       if (message.includes("LOCAL_IDENTITY_REQUIRED")) return "Bitte zuerst einen Fischteich-Namen festlegen.";
       if (message.includes("AUTH_REQUIRED") || error?.code === "42501") {
@@ -123,7 +138,49 @@
       leaveButton.disabled = state.busy;
     }
 
-    function createGameSeat(relativeSeat, snapshot, activeSeatIndex) {
+    function playerAtSeat(snapshot, seatIndex) {
+      return snapshot.players.find((player) => player.seatIndex === seatIndex) ?? null;
+    }
+
+    function playerName(snapshot, seatIndex) {
+      return playerAtSeat(snapshot, seatIndex)?.displayName.toLocaleUpperCase("de-AT") ?? "SPIELER";
+    }
+
+    function getRuleView(snapshot) {
+      const phase = service.getEffectiveActionPhase(snapshot.session);
+      return Object.freeze({
+        phase,
+        localSeat: localPlayerSeat(snapshot),
+        allocations: service.getFourAllocations(snapshot.session),
+        acknowledgedSeats: service.getAcknowledgedSeats(snapshot.session),
+        reactedSeats: service.getReactedSeats(snapshot.session),
+      });
+    }
+
+    function isSeatActionable(seatIndex, snapshot, ruleView) {
+      if (state.preview || state.actionRequestPending || gameDice.isRolling()) return false;
+      const session = snapshot.session;
+      if (ruleView.phase === "choosing_trottl" || ruleView.phase === "distributing_four") {
+        return ruleView.localSeat === session.actionActorSeat && seatIndex !== session.actionActorSeat;
+      }
+      if (ruleView.phase === "awaiting_drink_ack") {
+        return ruleView.localSeat === session.actionTargetSeat && seatIndex === ruleView.localSeat;
+      }
+      if (ruleView.phase === "awaiting_four_acks") {
+        return seatIndex === ruleView.localSeat
+          && Number(ruleView.allocations[seatIndex] ?? 0) > 0
+          && !ruleView.acknowledgedSeats.has(seatIndex);
+      }
+      if (ruleView.phase === "shot_ack") {
+        return seatIndex === ruleView.localSeat && ruleView.localSeat === session.actionActorSeat;
+      }
+      if (ruleView.phase === "reaction_loser_ack") {
+        return seatIndex === ruleView.localSeat && ruleView.localSeat === session.reactionLoserSeat;
+      }
+      return false;
+    }
+
+    function createGameSeat(relativeSeat, snapshot, activeSeatIndex, ruleView) {
       const { player, relativeIndex } = relativeSeat;
       const position = service.getSeatPosition(relativeIndex, snapshot.players.length);
       const seat = document.createElement("article");
@@ -133,10 +190,21 @@
       const badges = document.createElement("span");
       const isSelf = player.userId === snapshot.identity.userId;
       const isActive = player.seatIndex === activeSeatIndex;
+      const allocation = Number(ruleView.allocations[player.seatIndex] ?? 0);
+      const isActionable = isSeatActionable(player.seatIndex, snapshot, ruleView);
 
       seat.className = "trottl-classic-game-seat trottl-classic-player--normal";
       if (isSelf) seat.classList.add("trottl-classic-player--self");
       if (isActive) seat.classList.add("trottl-classic-player--active");
+      if (isActionable) seat.classList.add("trottl-classic-player--selectable");
+      if (allocation > 0) seat.classList.add("trottl-classic-player--selected");
+      if (player.seatIndex === snapshot.session.currentTrottlSeat) seat.classList.add("trottl-classic-player--trottl");
+      if (
+        player.seatIndex === snapshot.session.actionTargetSeat
+        || (ruleView.phase === "awaiting_four_acks" && allocation > 0 && !ruleView.acknowledgedSeats.has(player.seatIndex))
+      ) seat.classList.add("trottl-classic-player--drink-target");
+      if (ruleView.reactedSeats.has(player.seatIndex)) seat.classList.add("trottl-classic-player--reaction-success");
+      if (player.seatIndex === snapshot.session.reactionLoserSeat) seat.classList.add("trottl-classic-player--reaction-loser");
       seat.dataset.globalSeat = String(player.seatIndex);
       seat.dataset.relativeSeat = String(relativeIndex);
       seat.style.setProperty("--seat-x", position.x.toFixed(6));
@@ -157,22 +225,109 @@
         selfBadge.textContent = "DU";
         badges.append(selfBadge);
       }
+      if (player.seatIndex === snapshot.session.currentTrottlSeat) {
+        const trottlBadge = document.createElement("small");
+        trottlBadge.textContent = "TROTTL";
+        badges.append(trottlBadge);
+      }
+      if (allocation > 0) {
+        const allocationBadge = document.createElement("small");
+        allocationBadge.textContent = `${allocation} ${allocation === 1 ? "SCHLUCK" : "SCHLÜCKE"}`;
+        badges.append(allocationBadge);
+      }
+      if (ruleView.acknowledgedSeats.has(player.seatIndex)) {
+        const ackBadge = document.createElement("small");
+        ackBadge.textContent = "BESTÄTIGT";
+        badges.append(ackBadge);
+      }
       content.append(name, badges);
       seat.append(avatar, content);
+      if (isActionable) {
+        seat.addEventListener("click", (event) => {
+          event.stopPropagation();
+          void handleSeatAction(player.seatIndex);
+        });
+      }
       return seat;
+    }
+
+    function describeSituation(snapshot, ruleView) {
+      const session = snapshot.session;
+      const actorName = playerName(snapshot, session.actionActorSeat ?? session.currentTurnSeat);
+      if (session.rollPhase === "rolling" || ruleView.phase === "rolling") return `${actorName} WÜRFELT`;
+      if (ruleView.phase === "awaiting_roll") return `${playerName(snapshot, session.currentTurnSeat)} IST AM ZUG`;
+      if (ruleView.phase === "awaiting_reroll") return `${playerName(snapshot, session.currentTurnSeat)} IST NOCHMAL AM ZUG`;
+      if (ruleView.phase === "awaiting_drink_ack") {
+        const targetName = playerName(snapshot, session.actionTargetSeat);
+        return session.actionPayload.kind === "trottl_drink"
+          ? `${targetName} ALS 3ER TROTTL TRINKT 1 SCHLUCK`
+          : `${targetName} TRINKT 1 SCHLUCK`;
+      }
+      if (ruleView.phase === "choosing_trottl") return `${actorName} WÄHLT DEN 3ER TROTTL`;
+      if (ruleView.phase === "distributing_four") {
+        return `${actorName} VERTEILT 4 SCHLÜCKE · ${4 - service.getFourTotal(session)} OFFEN`;
+      }
+      if (ruleView.phase === "awaiting_four_acks") {
+        return Object.entries(ruleView.allocations)
+          .map(([seat, amount]) => `${playerName(snapshot, Number(seat))} ${amount}`)
+          .join(" · ");
+      }
+      if (ruleView.phase === "reaction_pending") return "FINGER AUF DIE NASE – BEREIT";
+      if (ruleView.phase === "reaction_active") return "FINGER AUF DIE NASE!";
+      if (ruleView.phase === "reaction_loser_lockout") {
+        return `${playerName(snapshot, session.reactionLoserSeat)} WAR ZU LANGSAM`;
+      }
+      if (ruleView.phase === "reaction_loser_ack") {
+        return `${playerName(snapshot, session.reactionLoserSeat)} WAR ZU LANGSAM – 1 SCHLUCK`;
+      }
+      if (ruleView.phase === "shot_ack") return `SHOT FÜR ${actorName}`;
+      return "SPIEL LÄUFT";
+    }
+
+    function clearActionBoundaryTimer() {
+      if (state.actionBoundaryTimer !== null) global.clearTimeout(state.actionBoundaryTimer);
+      state.actionBoundaryTimer = null;
+    }
+
+    function scheduleActionBoundary(snapshot, ruleView) {
+      clearActionBoundaryTimer();
+      const boundary = ruleView.phase === "reaction_pending"
+        ? Date.parse(snapshot.session.reactionStartAt ?? "")
+        : ruleView.phase === "reaction_loser_lockout"
+          ? Date.parse(snapshot.session.reactionLockoutUntil ?? "")
+          : NaN;
+      if (!Number.isFinite(boundary)) return;
+      const delay = Math.max(0, boundary - service.getCorrectedNow() + 20);
+      state.actionBoundaryTimer = global.setTimeout(() => {
+        state.actionBoundaryTimer = null;
+        renderSession("passive");
+      }, delay);
+    }
+
+    function renderRuleControls(snapshot, ruleView) {
+      const mayDistribute = ruleView.phase === "distributing_four"
+        && ruleView.localSeat === snapshot.session.actionActorSeat;
+      const total = service.getFourTotal(snapshot.session);
+      fourResetButton.hidden = !mayDistribute;
+      fourResetButton.disabled = state.actionRequestPending || total === 0;
+      fourConfirmButton.hidden = !mayDistribute || total !== 4;
+      fourConfirmButton.disabled = state.actionRequestPending;
+      ruleControls.classList.toggle("has-actions", mayDistribute);
     }
 
     function renderGame(snapshot, activeSeatIndex = service.initialActiveSeatIndex) {
       const relativeSeats = service.getRelativeSeats(snapshot.players, snapshot.identity.userId);
-      const activePlayer = snapshot.players.find(
-        (player) => player.seatIndex === activeSeatIndex,
-      );
+      const ruleView = getRuleView(snapshot);
       tableStage.dataset.playerCount = String(snapshot.players.length);
-      const isRolling = !state.preview && snapshot.session.rollPhase === "rolling";
-      situation.textContent = activePlayer
-        ? `${activePlayer.displayName.toLocaleUpperCase("de-AT")} ${isRolling ? "WÜRFELT" : "IST AM ZUG"}`
-        : "SPIEL LÄUFT";
-      seatLayer.replaceChildren(...relativeSeats.map((seat) => createGameSeat(seat, snapshot, activeSeatIndex)));
+      tableStage.classList.toggle("is-reaction-active", ruleView.phase === "reaction_active");
+      situation.textContent = state.preview
+        ? `${playerName(snapshot, activeSeatIndex)} IST AM ZUG`
+        : describeSituation(snapshot, ruleView);
+      seatLayer.replaceChildren(...relativeSeats.map(
+        (seat) => createGameSeat(seat, snapshot, activeSeatIndex, ruleView),
+      ));
+      renderRuleControls(snapshot, ruleView);
+      scheduleActionBoundary(snapshot, ruleView);
     }
 
     function clearResolveTimer() {
@@ -198,6 +353,7 @@
       return !state.preview
         && snapshot.session.status === "playing"
         && snapshot.session.rollPhase === "idle"
+        && ["awaiting_roll", "awaiting_reroll"].includes(snapshot.session.actionPhase)
         && localPlayerSeat(snapshot) === snapshot.session.currentTurnSeat
         && !state.rollRequestPending
         && !gameDice.isRolling();
@@ -206,7 +362,7 @@
     function scheduleRollResolution(snapshot) {
       clearResolveTimer();
       if (state.preview || snapshot.session.rollPhase !== "rolling") return;
-      const delay = Math.max(0, Date.parse(snapshot.session.rollResolveAt) - Date.now() + 30);
+      const delay = Math.max(0, Date.parse(snapshot.session.rollResolveAt) - service.getCorrectedNow() + 30);
       const sessionId = snapshot.session.id;
       const rollSeq = snapshot.session.rollSeq;
       state.resolveTimer = global.setTimeout(() => {
@@ -233,7 +389,7 @@
           lastSettledRollSeq: state.lastSettledRollSeq,
         },
         rollSource,
-        Date.now(),
+        service.getCorrectedNow(),
       );
       if (action === "animate") {
         if (gameDice.isRolling()) {
@@ -272,7 +428,7 @@
       }
       const deferredIsCurrent = state.deferredLiveRollSeq === snapshot.session.rollSeq;
       state.deferredLiveRollSeq = null;
-      syncGameDice(snapshot, deferredIsCurrent ? "live" : "passive");
+      renderSession(deferredIsCurrent ? "live" : "passive");
     }
 
     async function resolveCurrentRoll(sessionId, rollSeq) {
@@ -292,6 +448,7 @@
       const snapshot = state.snapshot;
       if (!snapshot || !canLocalPlayerRoll(snapshot)) return;
       state.rollRequestPending = true;
+      gameFeedback.textContent = "";
       syncGameDice(snapshot, "passive");
       try {
         const nextSnapshot = await service.rollSession(snapshot.session.id);
@@ -307,6 +464,91 @@
         state.rollRequestPending = false;
         if (state.snapshot) renderSession("passive");
       }
+    }
+
+    async function executeRuleAction(action) {
+      if (state.preview || state.actionRequestPending || !state.snapshot) return;
+      const sessionId = state.snapshot.session.id;
+      state.actionRequestPending = true;
+      gameFeedback.textContent = "";
+      renderSession("passive");
+      try {
+        const snapshot = await action();
+        if (state.snapshot?.session.id !== sessionId) return;
+        state.snapshot = snapshot;
+        renderSession("passive");
+      } catch (error) {
+        console.warn("3er-Trottl-Aktion wurde abgelehnt.", error);
+        gameFeedback.textContent = describeError(error, "Aktion fehlgeschlagen. Bitte erneut versuchen.");
+        void refreshSession({ rollSource: "recovery" });
+      } finally {
+        state.actionRequestPending = false;
+        if (state.snapshot?.session.id === sessionId) renderSession("passive");
+      }
+    }
+
+    function handleSeatAction(seatIndex) {
+      const snapshot = state.snapshot;
+      if (!snapshot || state.preview) return;
+      const session = snapshot.session;
+      const phase = service.getEffectiveActionPhase(session);
+      const ownSeat = localPlayerSeat(snapshot);
+      if (gameDice.isRolling()) return;
+      if (phase === "awaiting_drink_ack" && seatIndex === ownSeat && ownSeat === session.actionTargetSeat) {
+        return executeRuleAction(() => service.acknowledgeDrink(session.id, session.rollSeq));
+      }
+      if (phase === "choosing_trottl" && ownSeat === session.actionActorSeat && seatIndex !== ownSeat) {
+        return executeRuleAction(() => service.chooseTrottl(session.id, session.rollSeq, seatIndex));
+      }
+      if (
+        phase === "distributing_four"
+        && ownSeat === session.actionActorSeat
+        && seatIndex !== ownSeat
+        && service.getFourTotal(session) < 4
+      ) return executeRuleAction(() => service.assignFourSip(session.id, session.rollSeq, seatIndex));
+      if (
+        phase === "awaiting_four_acks"
+        && seatIndex === ownSeat
+        && Number(service.getFourAllocations(session)[ownSeat] ?? 0) > 0
+        && !service.getAcknowledgedSeats(session).has(ownSeat)
+      ) return executeRuleAction(() => service.acknowledgeDrink(session.id, session.rollSeq));
+      if (phase === "shot_ack" && seatIndex === ownSeat && ownSeat === session.actionActorSeat) {
+        return executeRuleAction(() => service.acknowledgeShot(session.id, session.rollSeq));
+      }
+      if (phase === "reaction_loser_ack" && seatIndex === ownSeat && ownSeat === session.reactionLoserSeat) {
+        return executeRuleAction(
+          () => service.acknowledgeReactionLoser(session.id, session.rollSeq, session.reactionId),
+        );
+      }
+      return undefined;
+    }
+
+    function handleReactionTap() {
+      const snapshot = state.snapshot;
+      if (!snapshot || state.preview || state.actionRequestPending) return;
+      const session = snapshot.session;
+      const ownSeat = localPlayerSeat(snapshot);
+      if (
+        service.getEffectiveActionPhase(session) !== "reaction_active"
+        || session.reactionLoserSeat !== null
+        || service.getReactedSeats(session).has(ownSeat)
+      ) return;
+      const clientReactedAt = new Date(service.getCorrectedNow()).toISOString();
+      void executeRuleAction(
+        () => service.submitReaction(session.id, session.rollSeq, session.reactionId, clientReactedAt),
+      );
+    }
+
+    function resetFourSips() {
+      const session = state.snapshot?.session;
+      if (!session || service.getEffectiveActionPhase(session) !== "distributing_four") return;
+      void executeRuleAction(() => service.resetFourSips(session.id, session.rollSeq));
+    }
+
+    function confirmFourSips() {
+      const session = state.snapshot?.session;
+      if (!session || service.getEffectiveActionPhase(session) !== "distributing_four") return;
+      void executeRuleAction(() => service.confirmFourSips(session.id, session.rollSeq));
     }
 
     function syncPreviewControls() {
@@ -428,6 +670,7 @@
       await stopSessionRealtime();
       state.snapshot = null;
       clearResolveTimer();
+      clearActionBoundaryTimer();
       roomFeedback.textContent = feedback;
       showScreen(roomScreen);
       ensureRoomRealtime();
@@ -578,6 +821,7 @@
 
     async function suspend() {
       clearResolveTimer();
+      clearActionBoundaryTimer();
       await Promise.all([stopRoomRealtime(), stopSessionRealtime()]);
     }
 
@@ -600,6 +844,9 @@
     leaveButton.addEventListener("click", () => void leaveCurrentSession());
     startButton.addEventListener("click", () => void startGame());
     gameDiceButton.addEventListener("click", () => void requestRoll());
+    tableStage.addEventListener("click", handleReactionTap);
+    fourResetButton.addEventListener("click", resetFourSips);
+    fourConfirmButton.addEventListener("click", confirmFourSips);
     if (previewEnabled) {
       for (let playerCount = preview.minPlayers; playerCount <= preview.maxPlayers; playerCount += 1) {
         const button = document.createElement("button");

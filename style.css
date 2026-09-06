@@ -748,7 +748,7 @@ button:focus-visible {
   width: min(100%, 440px);
   min-height: 0;
   flex: 1;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: clamp(10px, 2dvh, 16px);
 }
 
@@ -1032,10 +1032,48 @@ button:focus-visible {
 
 /* Reserved state hooks for the rule and reaction steps that follow. */
 .trottl-classic-player--selectable { cursor: pointer; }
-.trottl-classic-player--selected { --player-border: rgb(255 232 174 / 66%); }
-.trottl-classic-player--trottl { --player-border: rgb(224 197 255 / 62%); }
-.trottl-classic-player--reaction-success { --player-border: rgb(158 240 197 / 68%); }
-.trottl-classic-player--reaction-loser { --player-border: rgb(255 175 190 / 68%); }
+.trottl-classic-player--selected,
+.trottl-classic-player--drink-target {
+  --player-border: rgb(255 217 112 / 84%);
+  --player-glow: rgb(255 194 72 / 42%);
+}
+.trottl-classic-player--trottl { --player-border: rgb(224 197 255 / 76%); }
+.trottl-classic-player--reaction-success {
+  --player-border: rgb(102 238 168 / 86%);
+  --player-glow: rgb(66 224 144 / 36%);
+}
+.trottl-classic-player--reaction-loser {
+  --player-border: rgb(255 103 130 / 90%);
+  --player-glow: rgb(255 65 100 / 42%);
+}
+
+.trottl-classic-table-stage.is-reaction-active .trottl-classic-table {
+  box-shadow:
+    0 0 28px rgb(255 213 90 / 38%),
+    0 20px 40px rgb(0 0 0 / 42%),
+    inset 0 0 40px rgb(255 204 72 / 15%);
+}
+
+.trottl-classic-rule-controls {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.trottl-classic-rule-controls button {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 0.68rem;
+}
+
+.trottl-classic-rule-controls p {
+  margin: 0;
+  color: #ffd5df;
+  font-size: 0.68rem;
+  text-align: center;
+}
 
 @media (max-height: 720px) {
   .trottl-classic-screen.is-playing .trottl-classic-session-shell {

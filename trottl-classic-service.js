@@ -7,6 +7,20 @@
   const MAX_PLAYERS = 8;
   const INITIAL_ACTIVE_SEAT_INDEX = 0;
   const MIN_FULL_ROLL_WINDOW_MS = 2100;
+  const ACTION_PHASES = Object.freeze([
+    "awaiting_roll",
+    "awaiting_reroll",
+    "rolling",
+    "awaiting_drink_ack",
+    "choosing_trottl",
+    "distributing_four",
+    "awaiting_four_acks",
+    "reaction_pending",
+    "reaction_active",
+    "reaction_loser_lockout",
+    "reaction_loser_ack",
+    "shot_ack",
+  ]);
   const SEAT_LAYOUTS = Object.freeze({
     3: freezeSeatLayout([[0, 1], [0.72, -0.54], [-0.72, -0.54]]),
     4: freezeSeatLayout([[0, 1], [0.78, 0], [0, -1], [-0.78, 0]]),
@@ -17,6 +31,7 @@
   });
   let channelSequence = 0;
   let realtimeCleanup = Promise.resolve();
+  let serverClockOffsetMs = 0;
 
   function freezeSeatLayout(coordinates) {
     return Object.freeze(coordinates.map(([x, y]) => Object.freeze({ x, y })));
@@ -60,6 +75,11 @@
     const rollSeq = Number(value.roll_seq);
     const rollResult = value.roll_result === null ? null : Number(value.roll_result);
     const rollPhase = value.roll_phase;
+    const actionPhase = value.action_phase;
+    const actionActorSeat = value.action_actor_seat === null ? null : Number(value.action_actor_seat);
+    const actionTargetSeat = value.action_target_seat === null ? null : Number(value.action_target_seat);
+    const currentTrottlSeat = value.current_trottl_seat === null ? null : Number(value.current_trottl_seat);
+    const reactionLoserSeat = value.reaction_loser_seat === null ? null : Number(value.reaction_loser_seat);
     if (!Number.isInteger(playerCount) || playerCount < 1 || playerCount > MAX_PLAYERS) return null;
     if (currentTurnSeat !== null && (!Number.isInteger(currentTurnSeat) || currentTurnSeat < 0 || currentTurnSeat >= MAX_PLAYERS)) return null;
     if (value.status === "playing" && currentTurnSeat === null) return null;
@@ -67,6 +87,12 @@
     if (rollResult !== null && (!Number.isInteger(rollResult) || rollResult < 1 || rollResult > 6)) return null;
     if (!["idle", "rolling"].includes(rollPhase)) return null;
     if (rollPhase === "rolling" && (rollResult === null || !value.roll_started_at || !value.roll_resolve_at)) return null;
+    if (!ACTION_PHASES.includes(actionPhase)) return null;
+    if (![actionActorSeat, actionTargetSeat, currentTrottlSeat, reactionLoserSeat].every(
+      (seat) => seat === null || (Number.isInteger(seat) && seat >= 0 && seat < MAX_PLAYERS),
+    )) return null;
+    const actionPayload = value.action_payload;
+    if (!actionPayload || typeof actionPayload !== "object" || Array.isArray(actionPayload)) return null;
     return Object.freeze({
       id: value.id,
       mode: MODE,
@@ -82,7 +108,67 @@
       rollPhase,
       rollStartedAt: value.roll_started_at ?? null,
       rollResolveAt: value.roll_resolve_at ?? null,
+      actionPhase,
+      actionActorSeat,
+      actionTargetSeat,
+      currentTrottlSeat,
+      actionPayload: Object.freeze(actionPayload),
+      reactionId: typeof value.reaction_id === "string" ? value.reaction_id : null,
+      reactionStartAt: value.reaction_start_at ?? null,
+      reactionLoserSeat,
+      reactionLockoutUntil: value.reaction_lockout_until ?? null,
     });
+  }
+
+  function updateServerClock(serverNow, clientStartedAt, clientReceivedAt) {
+    const parsedServerNow = Date.parse(serverNow);
+    if (!Number.isFinite(parsedServerNow) || clientReceivedAt < clientStartedAt) return serverClockOffsetMs;
+    serverClockOffsetMs = parsedServerNow - ((clientStartedAt + clientReceivedAt) / 2);
+    return serverClockOffsetMs;
+  }
+
+  function getCorrectedNow(nowMs = Date.now()) {
+    return nowMs + serverClockOffsetMs;
+  }
+
+  function getEffectiveActionPhase(session, nowMs = getCorrectedNow()) {
+    if (!session) return null;
+    if (session.actionPhase === "reaction_pending" && nowMs >= Date.parse(session.reactionStartAt ?? "")) {
+      return "reaction_active";
+    }
+    if (
+      session.actionPhase === "reaction_loser_lockout"
+      && nowMs >= Date.parse(session.reactionLockoutUntil ?? "")
+    ) return "reaction_loser_ack";
+    return session.actionPhase;
+  }
+
+  function getFourAllocations(session) {
+    const source = session?.actionPayload?.allocations;
+    if (!source || typeof source !== "object" || Array.isArray(source)) return Object.freeze({});
+    const allocations = {};
+    for (const [seat, amount] of Object.entries(source)) {
+      const normalizedSeat = Number(seat);
+      const normalizedAmount = Number(amount);
+      if (Number.isInteger(normalizedSeat) && normalizedSeat >= 0 && normalizedSeat < MAX_PLAYERS
+        && Number.isInteger(normalizedAmount) && normalizedAmount > 0 && normalizedAmount <= 4) {
+        allocations[normalizedSeat] = normalizedAmount;
+      }
+    }
+    return Object.freeze(allocations);
+  }
+
+  function getFourTotal(session) {
+    return Object.values(getFourAllocations(session)).reduce((total, amount) => total + amount, 0);
+  }
+
+  function getAcknowledgedSeats(session) {
+    return new Set(Array.isArray(session?.actionPayload?.acks) ? session.actionPayload.acks.map(Number) : []);
+  }
+
+  function getReactedSeats(session) {
+    const reactions = session?.actionPayload?.reactions;
+    return new Set(reactions && typeof reactions === "object" ? Object.keys(reactions).map(Number) : []);
   }
 
   function getRecoveryRollPresentation(session, nowMs = Date.now()) {
@@ -209,10 +295,11 @@
 
   async function loadSession(sessionId) {
     const identity = await ensureIdentity();
-    const [sessionResponse, playersResponse] = await Promise.all([
+    const clientStartedAt = Date.now();
+    const [sessionResponse, playersResponse, serverTimeResponse] = await Promise.all([
       supabaseClient
         .from("trottl_classic_sessions")
-        .select("id,mode,room_slot,status,host_user_id,player_count,created_at,started_at,current_turn_seat,roll_seq,roll_result,roll_phase,roll_started_at,roll_resolve_at")
+        .select("id,mode,room_slot,status,host_user_id,player_count,created_at,started_at,current_turn_seat,roll_seq,roll_result,roll_phase,roll_started_at,roll_resolve_at,action_phase,action_actor_seat,action_target_seat,current_trottl_seat,action_payload,reaction_id,reaction_start_at,reaction_loser_seat,reaction_lockout_until")
         .eq("id", sessionId)
         .maybeSingle(),
       supabaseClient
@@ -220,9 +307,13 @@
         .select("session_id,user_id,display_name_snapshot,seat_index,joined_at")
         .eq("session_id", sessionId)
         .order("seat_index", { ascending: true }),
+      supabaseClient.rpc("get_trottl_classic_server_time", { p_session_id: sessionId }),
     ]);
+    const clientReceivedAt = Date.now();
     if (sessionResponse.error) throw sessionResponse.error;
     if (playersResponse.error) throw playersResponse.error;
+    if (serverTimeResponse.error) throw serverTimeResponse.error;
+    updateServerClock(serverTimeResponse.data, clientStartedAt, clientReceivedAt);
     const session = normalizeSession(sessionResponse.data);
     const players = (playersResponse.data ?? []).map(normalizePlayer);
     if (!session || players.some((player) => player === null)) {
@@ -283,6 +374,55 @@
     return Object.freeze({ resolved: data === true, snapshot: await loadSession(sessionId) });
   }
 
+  async function runActionRpc(name, sessionId, rollSeq, parameters = {}) {
+    await ensureIdentity();
+    if (!Number.isSafeInteger(rollSeq) || rollSeq < 1) throw new RangeError("Valid roll sequence required");
+    const { error } = await supabaseClient.rpc(name, {
+      p_session_id: sessionId,
+      p_roll_seq: rollSeq,
+      ...parameters,
+    });
+    if (error) throw error;
+    return loadSession(sessionId);
+  }
+
+  function acknowledgeDrink(sessionId, rollSeq) {
+    return runActionRpc("ack_trottl_classic_drink", sessionId, rollSeq);
+  }
+
+  function chooseTrottl(sessionId, rollSeq, targetSeat) {
+    return runActionRpc("choose_trottl_classic_trottl", sessionId, rollSeq, { p_target_seat: targetSeat });
+  }
+
+  function assignFourSip(sessionId, rollSeq, targetSeat) {
+    return runActionRpc("assign_trottl_classic_four", sessionId, rollSeq, { p_target_seat: targetSeat });
+  }
+
+  function resetFourSips(sessionId, rollSeq) {
+    return runActionRpc("reset_trottl_classic_four", sessionId, rollSeq);
+  }
+
+  function confirmFourSips(sessionId, rollSeq) {
+    return runActionRpc("confirm_trottl_classic_four", sessionId, rollSeq);
+  }
+
+  function submitReaction(sessionId, rollSeq, reactionId, clientReactedAt) {
+    return runActionRpc("react_trottl_classic", sessionId, rollSeq, {
+      p_reaction_id: reactionId,
+      p_client_reacted_at: clientReactedAt,
+    });
+  }
+
+  function acknowledgeReactionLoser(sessionId, rollSeq, reactionId) {
+    return runActionRpc("ack_trottl_classic_reaction_loser", sessionId, rollSeq, {
+      p_reaction_id: reactionId,
+    });
+  }
+
+  function acknowledgeShot(sessionId, rollSeq) {
+    return runActionRpc("ack_trottl_classic_shot", sessionId, rollSeq);
+  }
+
   function removeRealtimeChannel(channel) {
     realtimeCleanup = realtimeCleanup
       .catch(() => undefined)
@@ -340,10 +480,18 @@
     maxPlayers: MAX_PLAYERS,
     initialActiveSeatIndex: INITIAL_ACTIVE_SEAT_INDEX,
     minFullRollWindowMs: MIN_FULL_ROLL_WINDOW_MS,
+    actionPhases: ACTION_PHASES,
     seatLayouts: SEAT_LAYOUTS,
     normalizeRooms,
     normalizeSession,
     normalizePlayer,
+    updateServerClock,
+    getCorrectedNow,
+    getEffectiveActionPhase,
+    getFourAllocations,
+    getFourTotal,
+    getAcknowledgedSeats,
+    getReactedSeats,
     getRecoveryRollPresentation,
     getRollAction,
     nextSeat,
@@ -358,6 +506,14 @@
     startSession,
     rollSession,
     resolveRoll,
+    acknowledgeDrink,
+    chooseTrottl,
+    assignFourSip,
+    resetFourSips,
+    confirmFourSips,
+    submitReaction,
+    acknowledgeReactionLoser,
+    acknowledgeShot,
     subscribeRooms,
     subscribeSession,
   });

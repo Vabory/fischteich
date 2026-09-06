@@ -10,6 +10,7 @@ const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const migration = read("supabase/migrations/20260906000000_create_trottl_classic_lobbies.sql");
 const gameplayMigration = read("supabase/migrations/20260906010000_add_trottl_classic_gameplay.sql");
+const rulesMigration = read("supabase/migrations/20260906020000_add_trottl_classic_rules.sql");
 const html = read("index.html");
 const css = read("style.css");
 const script = read("script.js");
@@ -39,6 +40,15 @@ function createHarness() {
     roll_phase: "idle",
     roll_started_at: null,
     roll_resolve_at: null,
+    action_phase: "awaiting_roll",
+    action_actor_seat: null,
+    action_target_seat: null,
+    current_trottl_seat: null,
+    action_payload: {},
+    reaction_id: null,
+    reaction_start_at: null,
+    reaction_loser_seat: null,
+    reaction_lockout_until: null,
   };
   const playerRows = [{
     session_id: SESSION_ID,
@@ -56,6 +66,9 @@ function createHarness() {
     async rpc(name, parameters) {
       rpcCalls.push({ name, parameters });
       if (name === "get_trottl_classic_rooms") return { data: roomRows, error: null };
+      if (name === "get_trottl_classic_server_time") {
+        return { data: new Date().toISOString(), error: null };
+      }
       if (name === "join_trottl_classic_room") return { data: SESSION_ID, error: null };
       if (name === "leave_trottl_classic_session") return { data: "lobby", error: null };
       if (name === "start_trottl_classic_session") {
@@ -63,6 +76,7 @@ function createHarness() {
         sessionRow.player_count = 3;
         sessionRow.started_at = "2026-09-06T10:01:00Z";
         sessionRow.current_turn_seat = 0;
+        sessionRow.action_phase = "awaiting_roll";
         return { data: SESSION_ID, error: null };
       }
       if (name === "roll_trottl_classic_die") {
@@ -71,18 +85,27 @@ function createHarness() {
         sessionRow.roll_phase = "rolling";
         sessionRow.roll_started_at = "2026-09-06T10:01:01.000Z";
         sessionRow.roll_resolve_at = "2026-09-06T10:01:03.600Z";
+        sessionRow.action_phase = "rolling";
+        sessionRow.action_actor_seat = sessionRow.current_turn_seat;
         return { data: sessionRow.roll_seq, error: null };
       }
       if (name === "resolve_trottl_classic_roll") {
         const resolved = parameters.p_roll_seq === sessionRow.roll_seq && sessionRow.roll_phase === "rolling";
         if (resolved) {
-          sessionRow.current_turn_seat = (sessionRow.current_turn_seat + 1) % sessionRow.player_count;
           sessionRow.roll_phase = "idle";
           sessionRow.roll_started_at = null;
           sessionRow.roll_resolve_at = null;
+          sessionRow.action_phase = "distributing_four";
+          sessionRow.action_payload = { kind: "four_sips", allocations: {}, acks: [] };
         }
         return { data: resolved, error: null };
       }
+      if (name.startsWith("ack_trottl_classic_")
+        || name.startsWith("choose_trottl_classic_")
+        || name.startsWith("assign_trottl_classic_")
+        || name.startsWith("reset_trottl_classic_")
+        || name.startsWith("confirm_trottl_classic_")
+        || name === "react_trottl_classic") return { data: true, error: null };
       throw new Error(`Unexpected RPC ${name}`);
     },
     from(table) {
@@ -209,32 +232,35 @@ test("start and leave use narrow server-authoritative RPCs", async () => {
   const started = await service.startSession(SESSION_ID);
   assert.equal(started.session.status, "playing");
   await service.leaveSession(SESSION_ID);
-  assert.deepEqual(rpcCalls.map((call) => call.name), [
+  assert.deepEqual(rpcCalls.map((call) => call.name).filter((name) => name !== "get_trottl_classic_server_time"), [
     "start_trottl_classic_session",
     "leave_trottl_classic_session",
   ]);
 });
 
-test("gameplay starts on global seat zero and advances only through RPC state", async () => {
+test("gameplay starts on global seat zero and resolves a roll into its rule state", async () => {
   const { service, rpcCalls } = createHarness();
   const started = await service.startSession(SESSION_ID);
   assert.equal(started.session.currentTurnSeat, 0);
   assert.equal(started.session.rollSeq, 0);
   assert.equal(started.session.rollPhase, "idle");
+  assert.equal(started.session.actionPhase, "awaiting_roll");
 
   const rolling = await service.rollSession(SESSION_ID);
   assert.equal(rolling.session.currentTurnSeat, 0);
   assert.equal(rolling.session.rollSeq, 1);
   assert.equal(rolling.session.rollResult, 4);
   assert.equal(rolling.session.rollPhase, "rolling");
+  assert.equal(rolling.session.actionPhase, "rolling");
 
   const resolved = await service.resolveRoll(SESSION_ID, 1);
   assert.equal(resolved.resolved, true);
-  assert.equal(resolved.snapshot.session.currentTurnSeat, 1);
+  assert.equal(resolved.snapshot.session.currentTurnSeat, 0);
   assert.equal(resolved.snapshot.session.rollSeq, 1);
   assert.equal(resolved.snapshot.session.rollResult, 4);
   assert.equal(resolved.snapshot.session.rollPhase, "idle");
-  assert.deepEqual(rpcCalls.map(({ name }) => name), [
+  assert.equal(resolved.snapshot.session.actionPhase, "distributing_four");
+  assert.deepEqual(rpcCalls.map(({ name }) => name).filter((name) => name !== "get_trottl_classic_server_time"), [
     "start_trottl_classic_session",
     "roll_trottl_classic_die",
     "resolve_trottl_classic_roll",
@@ -647,8 +673,131 @@ test("gameplay migration resolves turns atomically and exposes only guarded RPCs
   assert.doesNotMatch(gameplayMigration, /grant update on table public\.trottl_classic_sessions/i);
 });
 
+test("rules migration adds one explicit persistent action state machine", () => {
+  for (const column of [
+    "action_phase", "action_actor_seat", "action_target_seat", "current_trottl_seat",
+    "action_payload", "reaction_id", "reaction_start_at", "reaction_loser_seat", "reaction_lockout_until",
+  ]) assert.match(rulesMigration, new RegExp(`add column ${column}`));
+  for (const phase of [
+    "awaiting_roll", "awaiting_reroll", "rolling", "awaiting_drink_ack", "choosing_trottl",
+    "distributing_four", "awaiting_four_acks", "reaction_pending", "reaction_active",
+    "reaction_loser_lockout", "reaction_loser_ack", "shot_ack",
+  ]) assert.match(rulesMigration, new RegExp(`'${phase}'`));
+  assert.match(rulesMigration, /create function public\.resolve_trottl_classic_rule_locked[\s\S]*for update/i);
+  assert.match(rulesMigration, /roll_phase = 'idle'[\s\S]*action_phase = v_phase/i);
+  assert.match(rulesMigration, /roll_phase <> 'idle'[\s\S]*action_phase not in \('awaiting_roll', 'awaiting_reroll'\)/i);
+});
+
+test("rules one and two resolve global left and right neighbors and require target acknowledgement", () => {
+  assert.match(rulesMigration, /when 1 then[\s\S]*action_actor_seat - 1 \+ v_session\.player_count[\s\S]*'left_neighbor'/i);
+  assert.match(rulesMigration, /when 2 then[\s\S]*action_actor_seat \+ 1[\s\S]*'right_neighbor'/i);
+  assert.match(rulesMigration, /action_phase = 'awaiting_drink_ack'[\s\S]*v_member_seat <> v_session\.action_target_seat/i);
+  assert.match(rulesMigration, /current_turn_seat = \(\(v_session\.action_actor_seat \+ 1\) % v_session\.player_count\)/i);
+});
+
+test("rule three persists, assigns and replaces the Trottl without allowing self-selection", () => {
+  assert.match(rulesMigration, /when 3 then[\s\S]*current_trottl_seat is null[\s\S]*current_trottl_seat = v_session\.action_actor_seat[\s\S]*choosing_trottl/i);
+  assert.match(rulesMigration, /'trottl_drink'/i);
+  assert.match(rulesMigration, /create function public\.choose_trottl_classic_trottl[\s\S]*action_phase <> 'choosing_trottl'/i);
+  assert.match(rulesMigration, /p_target_seat = v_member_seat or not exists/i);
+  assert.match(rulesMigration, /set current_trottl_seat = p_target_seat/i);
+  assert.doesNotMatch(rulesMigration, /set current_trottl_seat = null[\s\S]*action_phase = 'awaiting_roll'/i);
+});
+
+test("rule four enforces four server-side assignments, reset, confirmation and per-target acknowledgements", () => {
+  assert.match(rulesMigration, /when 4 then[\s\S]*'distributing_four'[\s\S]*'allocations'[\s\S]*'acks'/i);
+  assert.match(rulesMigration, /create function public\.assign_trottl_classic_four[\s\S]*p_target_seat = v_member_seat or not exists/i);
+  assert.match(rulesMigration, /if v_total >= 4 then[\s\S]*TROTTL_CLASSIC_FOUR_COMPLETE/i);
+  assert.match(rulesMigration, /v_target_total := coalesce[\s\S]*\+ 1/i);
+  assert.match(rulesMigration, /create function public\.reset_trottl_classic_four[\s\S]*'allocations', '\{\}'::jsonb/i);
+  assert.match(rulesMigration, /create function public\.confirm_trottl_classic_four[\s\S]*if v_total <> 4[\s\S]*awaiting_four_acks/i);
+  assert.match(rulesMigration, /v_allocated := coalesce[\s\S]*if v_allocated < 1/i);
+  assert.match(rulesMigration, /jsonb_build_array\(v_member_seat\)[\s\S]*v_ack_count >= v_required/i);
+});
+
+test("rule five uses a shared future start, corrected client timestamps and an atomic loser lockout", () => {
+  assert.match(rulesMigration, /reaction_start_at = case when v_result = 5 then v_now \+ pg_catalog\.make_interval\(secs => 4\.0\)/i);
+  assert.match(rulesMigration, /p_now \+ pg_catalog\.make_interval\(secs => 1\.4\)/i);
+  assert.match(rulesMigration, /p_client_reacted_at < v_session\.reaction_start_at/i);
+  assert.match(rulesMigration, /p_client_reacted_at > v_now \+ pg_catalog\.make_interval\(secs => 0\.25\)/i);
+  assert.match(rulesMigration, /p_client_reacted_at < v_now - pg_catalog\.make_interval\(secs => 10\.0\)/i);
+  assert.match(rulesMigration, /if v_reaction_count >= v_session\.player_count - 1[\s\S]*not \(\(v_reactions->'reactions'\) \? player\.seat_index::text\)/i);
+  assert.match(rulesMigration, /reaction_loser_lockout[\s\S]*reaction_lockout_until = v_now \+ pg_catalog\.make_interval\(secs => 0\.8\)/i);
+  assert.match(rulesMigration, /clock_timestamp\(\) < v_session\.reaction_lockout_until/i);
+  assert.match(rulesMigration, /v_member_seat is distinct from v_session\.reaction_loser_seat/i);
+});
+
+test("rule six requires shot acknowledgement and leaves the same seat for a separate reroll", () => {
+  assert.match(rulesMigration, /when 6 then[\s\S]*v_phase := 'shot_ack'[\s\S]*v_target := v_session\.action_actor_seat/i);
+  assert.match(rulesMigration, /create function public\.ack_trottl_classic_shot[\s\S]*action_phase <> 'shot_ack'/i);
+  assert.match(rulesMigration, /set action_phase = 'awaiting_reroll'/i);
+  assert.doesNotMatch(rulesMigration, /ack_trottl_classic_shot[\s\S]*roll_seq = session\.roll_seq \+ 1/i);
+});
+
+test("every gameplay mutation is stale-protected, row-locked and unavailable as a direct table write", () => {
+  for (const rpc of [
+    "ack_trottl_classic_drink", "choose_trottl_classic_trottl", "assign_trottl_classic_four",
+    "reset_trottl_classic_four", "confirm_trottl_classic_four", "react_trottl_classic",
+    "ack_trottl_classic_reaction_loser", "ack_trottl_classic_shot",
+  ]) {
+    assert.match(rulesMigration, new RegExp(`create function public\\.${rpc}[\\s\\S]*p_roll_seq bigint`, "i"));
+    assert.match(rulesMigration, new RegExp(`revoke all on function public\\.${rpc}`, "i"));
+    assert.match(rulesMigration, new RegExp(`grant execute on function public\\.${rpc}`, "i"));
+  }
+  assert.doesNotMatch(rulesMigration, /grant (insert|update|delete) on table public\.trottl_classic_sessions/i);
+});
+
+test("action snapshots and server clock offset survive the normal reconnect loader", async () => {
+  const { service, sessionRow } = createHarness();
+  sessionRow.action_phase = "awaiting_four_acks";
+  sessionRow.action_actor_seat = 0;
+  sessionRow.action_payload = { kind: "four_sips", allocations: { 1: 3, 2: 1 }, acks: [2] };
+  sessionRow.current_trottl_seat = 2;
+  const snapshot = await service.loadSession(SESSION_ID);
+  assert.equal(snapshot.session.actionPhase, "awaiting_four_acks");
+  assert.equal(snapshot.session.currentTrottlSeat, 2);
+  assert.deepEqual({ ...service.getFourAllocations(snapshot.session) }, { 1: 3, 2: 1 });
+  assert.deepEqual([...service.getAcknowledgedSeats(snapshot.session)], [2]);
+  assert.ok(Number.isFinite(service.getCorrectedNow()));
+});
+
+test("service action methods send only intent plus current action identity", async () => {
+  const { service, rpcCalls } = createHarness();
+  await service.chooseTrottl(SESSION_ID, 7, 2);
+  await service.assignFourSip(SESSION_ID, 7, 1);
+  await service.resetFourSips(SESSION_ID, 7);
+  await service.confirmFourSips(SESSION_ID, 7);
+  await service.acknowledgeDrink(SESSION_ID, 7);
+  await service.submitReaction(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001", "2026-09-06T10:02:00Z");
+  await service.acknowledgeReactionLoser(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001");
+  await service.acknowledgeShot(SESSION_ID, 7);
+  const gameplayCalls = rpcCalls.filter(({ name }) => name !== "get_trottl_classic_server_time");
+  assert.deepEqual(gameplayCalls.map(({ name }) => name), [
+    "choose_trottl_classic_trottl", "assign_trottl_classic_four", "reset_trottl_classic_four",
+    "confirm_trottl_classic_four", "ack_trottl_classic_drink", "react_trottl_classic",
+    "ack_trottl_classic_reaction_loser", "ack_trottl_classic_shot",
+  ]);
+  assert.equal(gameplayCalls[0].parameters.p_roll_seq, 7);
+  assert.equal(gameplayCalls[0].parameters.p_target_seat, 2);
+  assert.equal(gameplayCalls[5].parameters.p_client_reacted_at, "2026-09-06T10:02:00Z");
+});
+
+test("reaction phase boundaries use the synchronized server clock", () => {
+  const { service } = createHarness();
+  const clientStart = Date.parse("2026-09-06T10:00:00.000Z");
+  const clientEnd = clientStart + 200;
+  assert.equal(service.updateServerClock("2026-09-06T10:00:05.100Z", clientStart, clientEnd), 5000);
+  assert.equal(service.getCorrectedNow(clientStart), clientStart + 5000);
+  const pending = { actionPhase: "reaction_pending", reactionStartAt: "2026-09-06T10:00:06.000Z" };
+  assert.equal(service.getEffectiveActionPhase(pending, Date.parse("2026-09-06T10:00:05.999Z")), "reaction_pending");
+  assert.equal(service.getEffectiveActionPhase(pending, Date.parse("2026-09-06T10:00:06.000Z")), "reaction_active");
+  const lockout = { actionPhase: "reaction_loser_lockout", reactionLockoutUntil: "2026-09-06T10:00:07.000Z" };
+  assert.equal(service.getEffectiveActionPhase(lockout, Date.parse("2026-09-06T10:00:06.999Z")), "reaction_loser_lockout");
+  assert.equal(service.getEffectiveActionPhase(lockout, Date.parse("2026-09-06T10:00:07.000Z")), "reaction_loser_ack");
+});
+
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=6[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=5[\s\S]*script\.js\?v=71/);
+  assert.match(html, /trottl-classic-service\.js\?v=7[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=6[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -660,6 +809,8 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /class="trottl-classic-dice-zone"/);
   assert.match(html, /id="trottl-classic-dice-mount"/);
   assert.match(html, /id="trottl-classic-seat-layer"/);
+  assert.match(html, /id="trottl-classic-four-reset"/);
+  assert.match(html, /id="trottl-classic-four-confirm"/);
   assert.match(ui, /service\.getRelativeSeats\(snapshot\.players, snapshot\.identity\.userId\)/);
   assert.match(ui, /service\.getSeatPosition\(relativeIndex, snapshot\.players\.length\)/);
   assert.match(ui, /player\.seatIndex === activeSeatIndex/);
@@ -671,6 +822,9 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-player--self[\s\S]*scale\(1\.07\)/);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);
+  assert.match(css, /\.trottl-classic-player--drink-target/);
+  assert.match(css, /\.trottl-classic-player--reaction-success/);
+  assert.match(css, /\.trottl-classic-player--reaction-loser/);
   assert.match(html, /id="trottl-classic-preview-panel" hidden/);
   assert.match(ui, /function renderGame\(snapshot, activeSeatIndex = service\.initialActiveSeatIndex\)/);
   assert.match(ui, /rollOnClick:\s*false/);
@@ -683,6 +837,27 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.doesNotMatch(ui, /Math\.random/);
   assert.match(ui, /if \(previewEnabled\) return openPreview\(\)/);
   assert.match(previewSource, /const TROTTL_CLASSIC_PREVIEW_ENABLED = false/);
+});
+
+test("Klassik UI renders and submits every rule phase through direct table interactions", () => {
+  for (const phase of [
+    "awaiting_drink_ack", "choosing_trottl", "distributing_four", "awaiting_four_acks",
+    "reaction_pending", "reaction_active", "reaction_loser_lockout", "reaction_loser_ack", "shot_ack",
+  ]) assert.match(ui, new RegExp(`phase === "${phase}"`));
+  assert.match(ui, /seat\.addEventListener\("click"[\s\S]*handleSeatAction\(player\.seatIndex\)/);
+  assert.match(ui, /tableStage\.addEventListener\("click", handleReactionTap\)/);
+  assert.match(ui, /service\.acknowledgeDrink\(session\.id, session\.rollSeq\)/);
+  assert.match(ui, /service\.chooseTrottl\(session\.id, session\.rollSeq, seatIndex\)/);
+  assert.match(ui, /service\.assignFourSip\(session\.id, session\.rollSeq, seatIndex\)/);
+  assert.match(ui, /service\.resetFourSips\(session\.id, session\.rollSeq\)/);
+  assert.match(ui, /service\.confirmFourSips\(session\.id, session\.rollSeq\)/);
+  assert.match(ui, /service\.submitReaction\(session\.id, session\.rollSeq, session\.reactionId, clientReactedAt\)/);
+  assert.match(ui, /service\.acknowledgeReactionLoser\(session\.id, session\.rollSeq, session\.reactionId\)/);
+  assert.match(ui, /service\.acknowledgeShot\(session\.id, session\.rollSeq\)/);
+  assert.match(ui, /new Date\(service\.getCorrectedNow\(\)\)\.toISOString\(\)/);
+  assert.match(ui, /fourConfirmButton\.hidden = !mayDistribute \|\| total !== 4/);
+  assert.match(ui, /renderSession\(deferredIsCurrent \? "live" : "passive"\)/);
+  assert.doesNotMatch(ui, /Math\.random/);
 });
 
 test("roller, realtime spectators and recovery snapshots share one guarded roll consumer", () => {

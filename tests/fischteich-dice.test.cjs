@@ -250,6 +250,19 @@ test("the dice screen mounts only the standalone component and keeps central nav
   assert.match(script, /showTrottlMenu\(\{ focusSelector: "#open-fischteich-dice" \}\)/);
   assert.match(css, /transform-style:\s*preserve-3d/);
   assert.match(css, /\.dice-core-face[\s\S]*background:\s*#02030a/);
+  assert.match(css, /\.fischteich-die::before[\s\S]*radial-gradient/);
+  assert.match(css, /\.fischteich-die::after[\s\S]*rgb\(57 171 255 \/ 13%\)[\s\S]*rgb\(255 66 181 \/ 11%\)/);
+  assert.match(css, /\.fischteich-die\.is-landing::before[\s\S]*130ms/);
+  assert.match(css, /\.fischteich-die\.is-landing::after[\s\S]*130ms/);
+  assert.match(css, /\.fischteich-die\.is-rolling\s*\{[^}]*animation:\s*none/s);
+  for (const transform of [
+    /\.dice-face--front\s*\{\s*transform:\s*translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,
+    /\.dice-face--back\s*\{\s*transform:\s*rotateY\(180deg\) translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,
+    /\.dice-face--right\s*\{\s*transform:\s*rotateY\(90deg\) translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,
+    /\.dice-face--left\s*\{\s*transform:\s*rotateY\(-90deg\) translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,
+    /\.dice-face--top\s*\{\s*transform:\s*rotateX\(90deg\) translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,
+    /\.dice-face--bottom\s*\{\s*transform:\s*rotateX\(-90deg\) translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,
+  ]) assert.match(css, transform);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.fischteich-die/);
   assert.doesNotMatch(read("dice-service.js"), /supabase|fetch\(|WebSocket|player|game_table/i);
 });

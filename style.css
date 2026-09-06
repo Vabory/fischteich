@@ -373,6 +373,8 @@ button:focus-visible {
 }
 
 .fischteich-die {
+  position: relative;
+  isolation: isolate;
   display: block;
   width: var(--dice-size);
   height: var(--dice-size);
@@ -404,8 +406,52 @@ button:focus-visible {
   animation: fischteich-die-land 130ms ease-out both;
 }
 
+.fischteich-die::before,
+.fischteich-die::after {
+  position: absolute;
+  z-index: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.fischteich-die::before {
+  right: 9%;
+  bottom: -14%;
+  left: 9%;
+  height: 24%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgb(0 0 0 / 58%) 0%, rgb(2 5 18 / 32%) 46%, transparent 74%);
+  opacity: 0.72;
+  transform: scale(0.92);
+  transition: opacity 140ms ease, transform 180ms ease;
+}
+
+.fischteich-die::after {
+  inset: -7%;
+  border-radius: 24%;
+  background:
+    radial-gradient(circle at 20% 50%, rgb(57 171 255 / 13%), transparent 48%),
+    radial-gradient(circle at 80% 50%, rgb(255 66 181 / 11%), transparent 48%);
+  opacity: 0.46;
+  transform: scale(1);
+}
+
+.fischteich-die.is-rolling::before {
+  opacity: 0.5;
+  transform: scale(1.04);
+}
+
+.fischteich-die.is-landing::before {
+  animation: fischteich-die-shadow-lock 130ms ease-out both;
+}
+
+.fischteich-die.is-landing::after {
+  animation: fischteich-die-ambient-lock 130ms ease-out both;
+}
+
 .fischteich-die-cube {
   position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
@@ -449,12 +495,15 @@ button:focus-visible {
   border: 1px solid rgb(137 219 255 / 34%);
   border-radius: 15%;
   background:
-    radial-gradient(circle at 23% 17%, rgb(89 177 255 / 13%), transparent 38%),
-    linear-gradient(145deg, #111729 0%, #070a16 52%, #170b25 100%);
+    radial-gradient(circle at 24% 15%, rgb(151 219 255 / 15%), transparent 34%),
+    linear-gradient(90deg, rgb(48 157 255 / 8%) 0%, transparent 22%, transparent 78%, rgb(255 66 181 / 7%) 100%),
+    linear-gradient(145deg, #151d31 0%, #080b18 44%, #070812 68%, #190d26 100%);
   box-shadow:
-    inset 7px 7px 18px rgb(104 199 255 / 7%),
-    inset -8px -8px 20px rgb(255 82 190 / 7%),
-    0 0 18px rgb(71 176 255 / 9%);
+    inset 1px 1px 0 rgb(225 247 255 / 12%),
+    inset 9px 0 20px rgb(63 169 255 / 8%),
+    inset -9px 0 20px rgb(255 67 181 / 7%),
+    inset 0 -12px 22px rgb(0 0 8 / 24%),
+    0 0 16px rgb(73 174 255 / 8%);
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
   backface-visibility: hidden;
@@ -473,8 +522,13 @@ button:focus-visible {
   align-self: center;
   justify-self: center;
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, #fff 0 16%, #dff7ff 48%, #9ce8ff 100%);
-  box-shadow: 0 0 9px rgb(113 220 255 / 58%), inset 0 -2px 3px rgb(54 125 190 / 38%);
+  background: radial-gradient(circle at 34% 28%, #fff 0 12%, #eefcff 28%, #c9f0ff 62%, #82caeb 100%);
+  box-shadow:
+    0 0 0 2px rgb(1 3 10 / 56%),
+    0 1px 2px rgb(0 0 5 / 72%),
+    0 0 7px rgb(109 216 255 / 42%),
+    inset 1px 1px 2px rgb(255 255 255 / 78%),
+    inset -2px -3px 4px rgb(37 98 148 / 46%);
 }
 
 .dice-pip--top-left { grid-area: 1 / 1; }
@@ -504,6 +558,17 @@ button:focus-visible {
   34% { transform: translate3d(0, 1px, 0) scale(1.012); }
   68% { transform: translate3d(0, 1px, 0) scale(0.99); }
   100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes fischteich-die-shadow-lock {
+  0% { opacity: 0.5; transform: scale(1.04); }
+  38% { opacity: 0.86; transform: scale(0.88); }
+  100% { opacity: 0.72; transform: scale(0.92); }
+}
+
+@keyframes fischteich-die-ambient-lock {
+  0%, 100% { opacity: 0.46; transform: scale(1); }
+  38% { opacity: 0.64; transform: scale(1.014); }
 }
 
 .menu-crest {
@@ -4332,8 +4397,15 @@ button.is-release-pressed {
 
 @media (prefers-reduced-motion: reduce) {
   .fischteich-die,
-  .fischteich-die.is-landing {
+  .fischteich-die.is-landing,
+  .fischteich-die.is-landing::before,
+  .fischteich-die.is-landing::after {
     animation: none;
+  }
+
+  .fischteich-die::before,
+  .fischteich-die::after {
+    transition: none;
   }
 
   .roulette-live-gold-toast.is-visible {

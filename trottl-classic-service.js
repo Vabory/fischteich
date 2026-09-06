@@ -6,8 +6,20 @@
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 8;
   const INITIAL_ACTIVE_SEAT_INDEX = 0;
+  const SEAT_LAYOUTS = Object.freeze({
+    3: freezeSeatLayout([[0, 1], [0.72, -0.54], [-0.72, -0.54]]),
+    4: freezeSeatLayout([[0, 1], [0.78, 0], [0, -1], [-0.78, 0]]),
+    5: freezeSeatLayout([[0, 1], [0.74, 0.45], [0.65, -0.62], [-0.65, -0.62], [-0.74, 0.45]]),
+    6: freezeSeatLayout([[0, 1], [0.73, 0.48], [0.73, -0.54], [0, -1], [-0.73, -0.54], [-0.73, 0.48]]),
+    7: freezeSeatLayout([[0, 1], [0.72, 0.5], [1, -0.04], [0.68, -0.72], [-0.68, -0.72], [-1, -0.04], [-0.72, 0.5]]),
+    8: freezeSeatLayout([[0, 1], [0.72, 0.5], [1, 0], [0.72, -0.58], [0, -1], [-0.72, -0.58], [-1, 0], [-0.72, 0.5]]),
+  });
   let channelSequence = 0;
   let realtimeCleanup = Promise.resolve();
+
+  function freezeSeatLayout(coordinates) {
+    return Object.freeze(coordinates.map(([x, y]) => Object.freeze({ x, y })));
+  }
 
   function normalizeRoom(value, slot) {
     const row = value && Number(value.room_slot) === slot ? value : null;
@@ -126,13 +138,13 @@
     if (!Number.isInteger(relativeIndex) || relativeIndex < 0 || relativeIndex >= playerCount) {
       throw new RangeError("Relative seat is outside the player cycle");
     }
-    const angle = (Math.PI / 2) - ((relativeIndex * Math.PI * 2) / playerCount);
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    return Object.freeze({
-      x: Math.abs(x) < 1e-10 ? 0 : x,
-      y: Math.abs(y) < 1e-10 ? 0 : y,
-    });
+    const layout = SEAT_LAYOUTS[playerCount];
+    if (layout) return layout[relativeIndex];
+
+    // A running session can temporarily render fewer than three memberships
+    // after an explicit leave. Keep that recovery state deterministic without
+    // adding it to the deliberately designed 3–8 player layouts.
+    return Object.freeze({ x: 0, y: relativeIndex === 0 ? 1 : -1 });
   }
 
   async function ensureIdentity() {
@@ -270,6 +282,7 @@
     minPlayers: MIN_PLAYERS,
     maxPlayers: MAX_PLAYERS,
     initialActiveSeatIndex: INITIAL_ACTIVE_SEAT_INDEX,
+    seatLayouts: SEAT_LAYOUTS,
     normalizeRooms,
     normalizeSession,
     normalizePlayer,

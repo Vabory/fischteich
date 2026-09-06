@@ -241,8 +241,56 @@ test("seat geometry supports balanced three through eight player views", () => {
     assert.equal(positions[0].x, 0);
     assert.equal(positions[0].y, 1);
     assert.ok(positions[1].x > 0, `${playerCount} players place the successor on the right`);
+    assert.ok(positions.at(-1).x < 0, `${playerCount} players place the predecessor on the left`);
+    assert.equal(service.seatLayouts[playerCount].length, playerCount);
     assert.equal(new Set(positions.map(({ x, y }) => `${x.toFixed(5)}:${y.toFixed(5)}`)).size, playerCount);
+    assert.ok(
+      positions.every(({ x, y }) => Math.abs(x) >= 0.7 || Math.abs(y) >= 0.5),
+      `${playerCount} players keep the central dice zone clear`,
+    );
   }
+});
+
+test("designed layouts use the requested top-center poker structures", () => {
+  const { service } = createHarness();
+  for (const playerCount of [4, 6, 8]) {
+    const topCenter = service.getSeatPosition(playerCount / 2, playerCount);
+    assert.equal(topCenter.x, 0);
+    assert.equal(topCenter.y, -1);
+    assert.equal(50 + (topCenter.y * 42), 8, "top-center stays inside the table stage below the situation row");
+  }
+  const sevenTopRight = service.getSeatPosition(3, 7);
+  const sevenTopLeft = service.getSeatPosition(4, 7);
+  assert.equal(sevenTopRight.x, -sevenTopLeft.x);
+  assert.equal(sevenTopRight.y, sevenTopLeft.y);
+  assert.notEqual(sevenTopRight.x, 0);
+});
+
+test("eight-player lower neighbors leave the self seat visibly more space", () => {
+  const { service } = createHarness();
+  const own = service.getSeatPosition(0, 8);
+  const successor = service.getSeatPosition(1, 8);
+  const predecessor = service.getSeatPosition(7, 8);
+  const previousUniformEllipseNeighborY = Math.SQRT1_2;
+  assert.equal(successor.y, predecessor.y);
+  assert.ok(own.y - successor.y > own.y - previousUniformEllipseNeighborY);
+  assert.ok(successor.y <= 0.5);
+  assert.ok(predecessor.y <= 0.5);
+});
+
+test("perspective and active state cannot mutate the shared position sets", () => {
+  const { service } = createHarness();
+  const players = createPlayers(8);
+  const before = JSON.stringify(service.seatLayouts);
+  service.getRelativeSeats(players, "user-0");
+  service.getRelativeSeats(players, "user-4");
+  for (let activeSeatIndex = 0; activeSeatIndex < 8; activeSeatIndex += 1) {
+    service.getSeatPosition(activeSeatIndex, 8);
+  }
+  assert.equal(JSON.stringify(service.seatLayouts), before);
+  assert.ok(Object.isFrozen(service.seatLayouts));
+  assert.ok(Object.values(service.seatLayouts).every(Object.isFrozen));
+  assert.deepEqual(players.map((player) => player.seatIndex), [0, 1, 2, 3, 4, 5, 6, 7]);
 });
 
 test("reconnect reconstructs the identical perspective from global membership", () => {
@@ -337,7 +385,7 @@ test("database migration owns leave, host transfer, session close and start vali
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=2[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=3[\s\S]*script\.js\?v=71/);
+  assert.match(html, /trottl-classic-service\.js\?v=3[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=3[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

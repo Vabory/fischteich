@@ -724,6 +724,230 @@ button:focus-visible {
   min-height: 50px;
 }
 
+.trottl-classic-lobby-view {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  flex-direction: column;
+}
+
+.trottl-classic-screen.is-playing .trottl-classic-session-shell {
+  padding:
+    max(calc(env(safe-area-inset-top) + 54px), 70px)
+    max(calc(env(safe-area-inset-right) + 12px), 12px)
+    max(calc(env(safe-area-inset-bottom) + 12px), 18px)
+    max(calc(env(safe-area-inset-left) + 12px), 12px);
+  overflow: hidden;
+}
+
+.trottl-classic-game-view {
+  display: grid;
+  width: min(100%, 440px);
+  min-height: 0;
+  flex: 1;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(10px, 2dvh, 16px);
+}
+
+.trottl-classic-situation {
+  display: grid;
+  width: min(78vw, 310px);
+  min-height: 42px;
+  margin: 0 auto;
+  padding: 8px 15px;
+  border: 1px solid rgb(170 214 236 / 22%);
+  border-radius: 14px;
+  background: rgb(5 11 25 / 76%);
+  box-shadow: 0 9px 24px rgb(0 0 0 / 25%);
+  color: #eaf8ff;
+  font-size: clamp(0.72rem, 3.1vw, 0.86rem);
+  font-weight: 850;
+  letter-spacing: 0.075em;
+  line-height: 1.2;
+  place-items: center;
+  text-align: center;
+}
+
+.trottl-classic-table-stage {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+}
+
+.trottl-classic-table {
+  position: absolute;
+  z-index: 1;
+  top: 10%;
+  right: 17%;
+  bottom: 10%;
+  left: 17%;
+  overflow: hidden;
+  border: 2px solid rgb(181 220 237 / 28%);
+  border-radius: 48% / 18%;
+  background:
+    radial-gradient(ellipse at center, rgb(18 36 48 / 96%), rgb(6 16 27 / 98%) 62%, #050912 100%);
+  box-shadow:
+    -8px 0 22px rgb(50 164 255 / 12%),
+    8px 0 22px rgb(255 68 180 / 10%),
+    0 20px 40px rgb(0 0 0 / 42%),
+    inset 0 0 40px rgb(0 0 0 / 38%);
+}
+
+.trottl-classic-table::before {
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgb(219 239 247 / 13%);
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgb(58 173 255 / 7%), transparent 30%, transparent 70%, rgb(255 72 184 / 6%));
+  content: "";
+}
+
+.trottl-classic-table-rail {
+  position: absolute;
+  inset: 9px;
+  border: 1px solid rgb(164 207 224 / 10%);
+  border-radius: inherit;
+}
+
+.trottl-classic-dice-zone {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(112px, 34vw, 146px);
+  aspect-ratio: 1;
+  border: 1px dashed rgb(198 229 241 / 7%);
+  border-radius: 26%;
+  transform: translate(-50%, -50%);
+}
+
+.trottl-classic-seat-layer {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+}
+
+.trottl-classic-game-seat {
+  --player-border: rgb(216 232 239 / 30%);
+  --player-background: rgb(7 13 24 / 94%);
+  --player-glow: rgb(214 235 244 / 8%);
+
+  position: absolute;
+  top: var(--seat-top);
+  left: var(--seat-left);
+  display: grid;
+  width: clamp(88px, 25vw, 108px);
+  min-height: 50px;
+  padding: 7px 8px;
+  align-items: center;
+  border: 1px solid var(--player-border);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 5%), transparent 54%), var(--player-background);
+  box-shadow: 0 8px 18px rgb(0 0 0 / 38%), 0 0 13px var(--player-glow);
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 7px;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+}
+
+.trottl-classic-game-avatar {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgb(222 237 242 / 22%);
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgb(221 236 242 / 18%), rgb(89 109 121 / 13%));
+}
+
+.trottl-classic-game-avatar::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 8px;
+  border-radius: 55% 45% 45% 55%;
+  background: rgb(213 229 236 / 72%);
+  content: "";
+  transform: translate(-58%, -50%);
+}
+
+.trottl-classic-game-avatar::after {
+  position: absolute;
+  top: 50%;
+  left: 66%;
+  width: 7px;
+  height: 7px;
+  border: 4px solid transparent;
+  border-right: 0;
+  border-left-color: rgb(213 229 236 / 62%);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.trottl-classic-game-seat-content {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.trottl-classic-game-seat-content strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f0f7fa;
+  font-size: clamp(0.68rem, 2.9vw, 0.82rem);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trottl-classic-game-badges {
+  display: flex;
+  min-height: 13px;
+  gap: 4px;
+}
+
+.trottl-classic-game-badges small {
+  color: #dcebf1;
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.trottl-classic-player--self {
+  --player-border: rgb(235 246 250 / 56%);
+  --player-background: rgb(12 20 32 / 97%);
+  --player-glow: rgb(221 239 247 / 17%);
+  z-index: 2;
+  transform: translate(-50%, -50%) scale(1.07);
+}
+
+.trottl-classic-player--active {
+  --player-border: rgb(244 250 252 / 72%);
+  --player-glow: rgb(222 244 252 / 28%);
+  box-shadow: 0 8px 18px rgb(0 0 0 / 40%), 0 0 17px var(--player-glow), inset 0 0 12px rgb(255 255 255 / 6%);
+}
+
+/* Reserved state hooks for the rule and reaction steps that follow. */
+.trottl-classic-player--selectable { cursor: pointer; }
+.trottl-classic-player--selected { --player-border: rgb(255 232 174 / 66%); }
+.trottl-classic-player--trottl { --player-border: rgb(224 197 255 / 62%); }
+.trottl-classic-player--reaction-success { --player-border: rgb(158 240 197 / 68%); }
+.trottl-classic-player--reaction-loser { --player-border: rgb(255 175 190 / 68%); }
+
+@media (max-height: 720px) {
+  .trottl-classic-screen.is-playing .trottl-classic-session-shell {
+    padding-top: max(calc(env(safe-area-inset-top) + 48px), 62px);
+    padding-bottom: max(calc(env(safe-area-inset-bottom) + 8px), 12px);
+  }
+
+  .trottl-classic-game-view { gap: 7px; }
+  .trottl-classic-situation { min-height: 36px; padding-block: 6px; }
+  .trottl-classic-game-seat { min-height: 46px; padding: 6px; }
+}
+
 @keyframes fischteich-die-idle {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }

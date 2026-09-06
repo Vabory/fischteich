@@ -105,6 +105,16 @@ function createHarness() {
   return { service: windowTarget.trottlClassicService, rpcCalls, channels, removedChannels };
 }
 
+function createPlayers(count) {
+  return Array.from({ length: count }, (_, seatIndex) => Object.freeze({
+    sessionId: SESSION_ID,
+    userId: `user-${seatIndex}`,
+    displayName: ["Tobi", "Marcel", "Kat", "Simon", "Max", "Julia", "Flo", "Pat"][seatIndex],
+    seatIndex,
+    joinedAt: "2026-09-06T10:00:00Z",
+  }));
+}
+
 test("room summaries always expose exactly the two isolated fixed slots", async () => {
   const { service } = createHarness();
   const rooms = await service.loadRooms();
@@ -163,6 +173,64 @@ test("session realtime watches session and membership and cleans up once", async
   assert.equal(removedChannels.length, 1);
 });
 
+test("relative seats rotate only the local view for own seat zero", () => {
+  const { service } = createHarness();
+  const players = createPlayers(5);
+  const before = players.map((player) => player.seatIndex);
+  const relative = service.getRelativeSeats(players, "user-0");
+  assert.deepEqual(Array.from(relative, (entry) => entry.player.seatIndex), [0, 1, 2, 3, 4]);
+  assert.deepEqual(Array.from(relative, (entry) => entry.relativeIndex), [0, 1, 2, 3, 4]);
+  assert.deepEqual(players.map((player) => player.seatIndex), before);
+});
+
+test("relative seats place every nonzero own seat at the bottom without changing neighbors", () => {
+  const { service } = createHarness();
+  const players = createPlayers(8);
+  const tobiView = service.getRelativeSeats(players, "user-0");
+  const marcelView = service.getRelativeSeats(players, "user-1");
+  assert.equal(tobiView[0].player.displayName, "Tobi");
+  assert.equal(marcelView[0].player.displayName, "Marcel");
+  assert.equal(tobiView[1].player.displayName, "Marcel");
+  assert.equal(marcelView[1].player.displayName, "Kat");
+  assert.equal(tobiView.at(-1).player.displayName, "Pat");
+  assert.equal(marcelView.at(-1).player.displayName, "Tobi");
+  assert.deepEqual(players.map((player) => player.seatIndex), [0, 1, 2, 3, 4, 5, 6, 7]);
+});
+
+test("next and previous seat helpers wrap across the global cycle", () => {
+  const { service } = createHarness();
+  assert.equal(service.nextSeat(0, 8), 1);
+  assert.equal(service.nextSeat(7, 8), 0);
+  assert.equal(service.previousSeat(1, 8), 0);
+  assert.equal(service.previousSeat(0, 8), 7);
+});
+
+test("seat geometry supports balanced three through eight player views", () => {
+  const { service } = createHarness();
+  for (let playerCount = 3; playerCount <= 8; playerCount += 1) {
+    const relative = service.getRelativeSeats(createPlayers(playerCount), `user-${playerCount - 1}`);
+    assert.equal(relative.length, playerCount);
+    assert.equal(relative[0].player.seatIndex, playerCount - 1);
+    const positions = relative.map(({ relativeIndex }) => service.getSeatPosition(relativeIndex, playerCount));
+    assert.equal(positions[0].x, 0);
+    assert.equal(positions[0].y, 1);
+    assert.ok(positions[1].x > 0, `${playerCount} players place the successor on the right`);
+    assert.equal(new Set(positions.map(({ x, y }) => `${x.toFixed(5)}:${y.toFixed(5)}`)).size, playerCount);
+  }
+});
+
+test("reconnect reconstructs the identical perspective from global membership", () => {
+  const { service, rpcCalls } = createHarness();
+  const players = createPlayers(7);
+  const firstView = service.getRelativeSeats(players, "user-4");
+  const reloadedView = service.getRelativeSeats(createPlayers(7), "user-4");
+  assert.deepEqual(
+    Array.from(firstView, (entry) => [entry.player.seatIndex, entry.relativeIndex]),
+    Array.from(reloadedView, (entry) => [entry.player.seatIndex, entry.relativeIndex]),
+  );
+  assert.equal(rpcCalls.length, 0, "view rotation never writes to Supabase");
+});
+
 test("database migration serializes joins and enforces membership invariants", () => {
   assert.match(migration, /room_slot in \(1, 2\)/i);
   assert.match(migration, /unique index trottl_classic_one_active_session_per_slot_idx[\s\S]*status in \('lobby', 'playing'\)/i);
@@ -193,19 +261,29 @@ test("database migration owns leave, host transfer, session close and start vali
   assert.match(migration, /alter publication supabase_realtime add table public\.trottl_classic_players/i);
 });
 
-test("Klassik UI provides two rooms, lobby controls and only a playing placeholder", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=1[\s\S]*script\.js\?v=71/);
+test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
+  assert.match(html, /trottl-classic-service\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=2[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
   assert.match(html, /id="trottl-classic-player-list"/);
   assert.match(html, /id="trottl-classic-start"/);
   assert.match(html, /id="trottl-classic-leave"/);
-  assert.match(ui, /session\.status === "playing" \? "Spiel gestartet" : "Lobby"/);
+  assert.match(html, /id="trottl-classic-game-view"/);
+  assert.match(html, /id="trottl-classic-situation"/);
+  assert.match(html, /class="trottl-classic-dice-zone"/);
+  assert.match(html, /id="trottl-classic-seat-layer"/);
+  assert.match(ui, /service\.getRelativeSeats\(snapshot\.players, snapshot\.identity\.userId\)/);
+  assert.match(ui, /service\.getSeatPosition\(relativeIndex, snapshot\.players\.length\)/);
+  assert.match(ui, /player\.seatIndex === service\.initialActiveSeatIndex/);
   assert.match(ui, /players\.length < service\.minPlayers/);
   assert.match(ui, /session\.hostUserId === identity\.userId/);
   assert.doesNotMatch(html, /Pokertisch|Situationserklärer|Reaktionsspiel/);
   assert.match(css, /\.trottl-classic-player-list li[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
+  assert.match(css, /\.trottl-classic-table\s*\{[\s\S]*border-radius:\s*48% \/ 18%/);
+  assert.match(css, /\.trottl-classic-player--self[\s\S]*scale\(1\.07\)/);
+  assert.match(css, /\.trottl-classic-player--active/);
+  assert.match(css, /\.trottl-classic-player--selectable/);
 });
 
 test("navigation, reconnect and lifecycle cleanup are wired without touching the die", () => {

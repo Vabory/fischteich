@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260906.3">
+    <meta name="fischteich-build" content="20260906.4">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=116">
+    <link rel="stylesheet" href="./style.css?v=117">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -27,8 +27,8 @@
     <script src="./push-service.js?v=2" defer></script>
     <script src="./shortcut-service.js?v=5" defer></script>
     <script src="./dice-service.js?v=2" defer></script>
-    <script src="./trottl-classic-service.js?v=1" defer></script>
-    <script src="./trottl-classic-ui.js?v=1" defer></script>
+    <script src="./trottl-classic-service.js?v=2" defer></script>
+    <script src="./trottl-classic-ui.js?v=2" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=71" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -237,20 +237,32 @@
         <img class="sidemenu-background" src="./assets/sidemenu-background.png?v=2" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
         <button class="close-button navigation-back-button" id="close-trottl-classic-session" type="button" aria-label="Raum verlassen">←</button>
         <main class="trottl-classic-shell trottl-classic-session-shell">
-          <header class="trottl-classic-header">
+          <header class="trottl-classic-header" id="trottl-classic-session-header">
             <p class="eyebrow">3er Trottl Klassik</p>
             <h1 id="trottl-classic-session-title"><span id="trottl-classic-session-room">RAUM</span></h1>
             <p class="trottl-classic-session-state" id="trottl-classic-session-state">Lobby</p>
           </header>
-          <section class="trottl-classic-player-panel" aria-labelledby="trottl-classic-player-title">
-            <h2 id="trottl-classic-player-title">Spieler</h2>
-            <ol class="trottl-classic-player-list" id="trottl-classic-player-list"></ol>
-          </section>
-          <p class="trottl-classic-feedback" id="trottl-classic-session-feedback" aria-live="polite"></p>
-          <div class="trottl-classic-actions">
-            <button class="primary-button" id="trottl-classic-start" type="button" hidden>Spiel starten</button>
-            <button class="secondary-button" id="trottl-classic-leave" type="button">Raum verlassen</button>
+          <div class="trottl-classic-lobby-view" id="trottl-classic-lobby-view">
+            <section class="trottl-classic-player-panel" aria-labelledby="trottl-classic-player-title">
+              <h2 id="trottl-classic-player-title">Spieler</h2>
+              <ol class="trottl-classic-player-list" id="trottl-classic-player-list"></ol>
+            </section>
+            <p class="trottl-classic-feedback" id="trottl-classic-session-feedback" aria-live="polite"></p>
+            <div class="trottl-classic-actions">
+              <button class="primary-button" id="trottl-classic-start" type="button" hidden>Spiel starten</button>
+              <button class="secondary-button" id="trottl-classic-leave" type="button">Raum verlassen</button>
+            </div>
           </div>
+          <section class="trottl-classic-game-view" id="trottl-classic-game-view" aria-label="3er Trottl Klassik Spieltisch" hidden>
+            <div class="trottl-classic-situation" id="trottl-classic-situation" aria-live="polite">SPIEL LÄUFT</div>
+            <div class="trottl-classic-table-stage" id="trottl-classic-table-stage">
+              <div class="trottl-classic-table" aria-hidden="true">
+                <div class="trottl-classic-table-rail"></div>
+                <div class="trottl-classic-dice-zone"></div>
+              </div>
+              <div class="trottl-classic-seat-layer" id="trottl-classic-seat-layer"></div>
+            </div>
+          </section>
         </main>
       </section>
 

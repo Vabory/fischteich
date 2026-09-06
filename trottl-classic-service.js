@@ -5,6 +5,7 @@
   const ROOM_SLOTS = Object.freeze([1, 2]);
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 8;
+  const INITIAL_ACTIVE_SEAT_INDEX = 0;
   let channelSequence = 0;
   let realtimeCleanup = Promise.resolve();
 
@@ -72,6 +73,65 @@
       displayName: value.display_name_snapshot,
       seatIndex,
       joinedAt: value.joined_at,
+    });
+  }
+
+  function validatePlayerCount(playerCount) {
+    if (!Number.isInteger(playerCount) || playerCount < MIN_PLAYERS || playerCount > MAX_PLAYERS) {
+      throw new RangeError(`Player count must be between ${MIN_PLAYERS} and ${MAX_PLAYERS}`);
+    }
+  }
+
+  function validateRenderablePlayerCount(playerCount) {
+    if (!Number.isInteger(playerCount) || playerCount < 1 || playerCount > MAX_PLAYERS) {
+      throw new RangeError(`Renderable player count must be between 1 and ${MAX_PLAYERS}`);
+    }
+  }
+
+  function nextSeat(currentSeat, playerCount) {
+    validatePlayerCount(playerCount);
+    if (!Number.isInteger(currentSeat) || currentSeat < 0 || currentSeat >= playerCount) {
+      throw new RangeError("Current seat is outside the player cycle");
+    }
+    return (currentSeat + 1) % playerCount;
+  }
+
+  function previousSeat(currentSeat, playerCount) {
+    validatePlayerCount(playerCount);
+    if (!Number.isInteger(currentSeat) || currentSeat < 0 || currentSeat >= playerCount) {
+      throw new RangeError("Current seat is outside the player cycle");
+    }
+    return (currentSeat - 1 + playerCount) % playerCount;
+  }
+
+  function getRelativeSeats(players, ownUserId) {
+    if (!Array.isArray(players)) throw new TypeError("Players must be an array");
+    validateRenderablePlayerCount(players.length);
+    if (typeof ownUserId !== "string" || !ownUserId) throw new TypeError("Own user id is required");
+
+    // Sort a copy: Supabase's global seat_index remains the single source of
+    // truth and is never rewritten to represent a device-specific view.
+    const globalOrder = [...players].sort((first, second) => first.seatIndex - second.seatIndex);
+    const ownOrderIndex = globalOrder.findIndex((player) => player.userId === ownUserId);
+    if (ownOrderIndex < 0) throw new Error("Local player is not part of this session");
+
+    return Object.freeze(globalOrder.map((player, globalOrderIndex) => Object.freeze({
+      player,
+      relativeIndex: (globalOrderIndex - ownOrderIndex + globalOrder.length) % globalOrder.length,
+    })).sort((first, second) => first.relativeIndex - second.relativeIndex));
+  }
+
+  function getSeatPosition(relativeIndex, playerCount) {
+    validateRenderablePlayerCount(playerCount);
+    if (!Number.isInteger(relativeIndex) || relativeIndex < 0 || relativeIndex >= playerCount) {
+      throw new RangeError("Relative seat is outside the player cycle");
+    }
+    const angle = (Math.PI / 2) - ((relativeIndex * Math.PI * 2) / playerCount);
+    const x = Math.cos(angle);
+    const y = Math.sin(angle);
+    return Object.freeze({
+      x: Math.abs(x) < 1e-10 ? 0 : x,
+      y: Math.abs(y) < 1e-10 ? 0 : y,
     });
   }
 
@@ -209,9 +269,14 @@
     roomSlots: ROOM_SLOTS,
     minPlayers: MIN_PLAYERS,
     maxPlayers: MAX_PLAYERS,
+    initialActiveSeatIndex: INITIAL_ACTIVE_SEAT_INDEX,
     normalizeRooms,
     normalizeSession,
     normalizePlayer,
+    nextSeat,
+    previousSeat,
+    getRelativeSeats,
+    getSeatPosition,
     ensureIdentity,
     loadRooms,
     loadSession,

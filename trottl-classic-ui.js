@@ -9,6 +9,12 @@
     const roomFeedback = document.querySelector("#trottl-classic-room-feedback");
     const sessionRoom = document.querySelector("#trottl-classic-session-room");
     const sessionState = document.querySelector("#trottl-classic-session-state");
+    const sessionHeader = document.querySelector("#trottl-classic-session-header");
+    const lobbyView = document.querySelector("#trottl-classic-lobby-view");
+    const gameView = document.querySelector("#trottl-classic-game-view");
+    const tableStage = document.querySelector("#trottl-classic-table-stage");
+    const seatLayer = document.querySelector("#trottl-classic-seat-layer");
+    const situation = document.querySelector("#trottl-classic-situation");
     const playerList = document.querySelector("#trottl-classic-player-list");
     const sessionFeedback = document.querySelector("#trottl-classic-session-feedback");
     const startButton = document.querySelector("#trottl-classic-start");
@@ -63,13 +69,11 @@
       }
     }
 
-    function renderSession() {
-      const snapshot = state.snapshot;
-      if (!snapshot) return;
+    function renderLobby(snapshot) {
       const { session, players, identity } = snapshot;
       const isHost = session.hostUserId === identity.userId;
       sessionRoom.textContent = `RAUM ${session.roomSlot}`;
-      sessionState.textContent = session.status === "playing" ? "Spiel gestartet" : "Lobby";
+      sessionState.textContent = "Lobby";
       playerList.replaceChildren();
       for (const player of players) {
         const item = document.createElement("li");
@@ -90,6 +94,67 @@
         ? `Noch ${service.minPlayers - players.length} Spieler benötigt`
         : "Spiel starten";
       leaveButton.disabled = state.busy;
+    }
+
+    function createGameSeat(relativeSeat, snapshot) {
+      const { player, relativeIndex } = relativeSeat;
+      const position = service.getSeatPosition(relativeIndex, snapshot.players.length);
+      const seat = document.createElement("article");
+      const avatar = document.createElement("span");
+      const content = document.createElement("span");
+      const name = document.createElement("strong");
+      const badges = document.createElement("span");
+      const isSelf = player.userId === snapshot.identity.userId;
+      const isActive = player.seatIndex === service.initialActiveSeatIndex;
+
+      seat.className = "trottl-classic-game-seat trottl-classic-player--normal";
+      if (isSelf) seat.classList.add("trottl-classic-player--self");
+      if (isActive) seat.classList.add("trottl-classic-player--active");
+      seat.dataset.globalSeat = String(player.seatIndex);
+      seat.dataset.relativeSeat = String(relativeIndex);
+      seat.style.setProperty("--seat-x", position.x.toFixed(6));
+      seat.style.setProperty("--seat-y", position.y.toFixed(6));
+      seat.style.setProperty("--seat-left", `${(50 + (position.x * 36)).toFixed(3)}%`);
+      seat.style.setProperty("--seat-top", `${(50 + (position.y * 42)).toFixed(3)}%`);
+      seat.setAttribute("aria-label", `${player.displayName}${isSelf ? ", du" : ""}${isActive ? ", am Zug" : ""}`);
+
+      avatar.className = "trottl-classic-game-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      content.className = "trottl-classic-game-seat-content";
+      name.textContent = player.displayName;
+      badges.className = "trottl-classic-game-badges";
+      if (isSelf) {
+        const selfBadge = document.createElement("small");
+        selfBadge.textContent = "DU";
+        badges.append(selfBadge);
+      }
+      content.append(name, badges);
+      seat.append(avatar, content);
+      return seat;
+    }
+
+    function renderGame(snapshot) {
+      const relativeSeats = service.getRelativeSeats(snapshot.players, snapshot.identity.userId);
+      const activePlayer = snapshot.players.find(
+        (player) => player.seatIndex === service.initialActiveSeatIndex,
+      );
+      tableStage.dataset.playerCount = String(snapshot.players.length);
+      situation.textContent = activePlayer
+        ? `${activePlayer.displayName.toLocaleUpperCase("de-AT")} IST AM ZUG`
+        : "SPIEL LÄUFT";
+      seatLayer.replaceChildren(...relativeSeats.map((seat) => createGameSeat(seat, snapshot)));
+    }
+
+    function renderSession() {
+      const snapshot = state.snapshot;
+      if (!snapshot) return;
+      const isPlaying = snapshot.session.status === "playing";
+      sessionScreen.classList.toggle("is-playing", isPlaying);
+      sessionHeader.hidden = isPlaying;
+      lobbyView.hidden = isPlaying;
+      gameView.hidden = !isPlaying;
+      if (isPlaying) renderGame(snapshot);
+      else renderLobby(snapshot);
     }
 
     async function stopRoomRealtime() {
@@ -124,6 +189,9 @@
         (status) => {
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             sessionFeedback.textContent = "Live-Verbindung unterbrochen. Verbindung wird erneut geprüft.";
+            if (state.snapshot?.session.status === "playing") {
+              situation.textContent = "VERBINDUNG WIRD GEPRÜFT";
+            }
           }
         },
       );
@@ -244,6 +312,7 @@
       if (state.busy || !state.snapshot) return;
       state.busy = true;
       sessionFeedback.textContent = "Raum wird verlassen …";
+      if (state.snapshot.session.status === "playing") situation.textContent = "RAUM WIRD VERLASSEN";
       renderSession();
       const sessionId = state.snapshot.session.id;
       try {

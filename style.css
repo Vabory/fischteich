@@ -129,7 +129,8 @@ button:focus-visible {
 
 .teams-menu-screen,
 .trottl-menu-screen,
-.trottl-dice-screen {
+.trottl-dice-screen,
+.trottl-classic-screen {
   display: block;
   padding: 0;
   background: var(--ink);
@@ -546,6 +547,181 @@ button:focus-visible {
   font-weight: 750;
   letter-spacing: 0.035em;
   text-align: center;
+}
+
+.trottl-classic-shell {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  padding:
+    max(calc(env(safe-area-inset-top) + 60px), 78px)
+    max(calc(env(safe-area-inset-right) + 22px), 22px)
+    max(calc(env(safe-area-inset-bottom) + 24px), 30px)
+    max(calc(env(safe-area-inset-left) + 22px), 22px);
+  align-items: center;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.trottl-classic-header {
+  width: min(86vw, 360px);
+  text-align: center;
+}
+
+.trottl-classic-header h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 7.5vw, 2.3rem);
+  line-height: 1.05;
+}
+
+.trottl-classic-room-list {
+  display: grid;
+  width: min(86vw, 360px);
+  margin-top: clamp(42px, 8dvh, 72px);
+  gap: 16px;
+}
+
+.trottl-classic-room {
+  display: grid;
+  min-height: 112px;
+  padding: 20px 22px;
+  border: 1px solid rgb(102 198 255 / 44%);
+  border-radius: 20px;
+  background:
+    linear-gradient(105deg, rgb(52 165 255 / 9%), transparent 40%, rgb(255 75 183 / 7%)),
+    linear-gradient(145deg, rgb(10 29 58 / 96%), rgb(20 10 42 / 96%));
+  box-shadow: 0 14px 30px rgb(0 0 0 / 34%), inset 0 0 22px rgb(106 205 255 / 6%);
+  color: var(--text);
+  gap: 4px;
+  text-align: left;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.trottl-classic-room strong {
+  color: #f1f9ff;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+}
+
+.trottl-classic-room > span:not(.trottl-classic-room-status) {
+  color: rgb(222 241 255 / 78%);
+  font-size: 0.92rem;
+}
+
+.trottl-classic-room-status {
+  margin-top: 5px;
+  color: #8ee4ff;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trottl-classic-room:active:not(:disabled) {
+  border-color: rgb(142 226 255 / 82%);
+  transform: scale(0.98);
+}
+
+.trottl-classic-room:disabled {
+  opacity: 0.58;
+}
+
+.trottl-classic-feedback {
+  width: min(86vw, 360px);
+  min-height: 1.4em;
+  margin: 18px 0 0;
+  color: #b9d8eb;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.trottl-classic-session-state {
+  margin: 8px 0 0;
+  color: #91e5ff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trottl-classic-player-panel {
+  width: min(86vw, 360px);
+  margin-top: clamp(24px, 4.5dvh, 38px);
+  padding: 18px;
+  border: 1px solid rgb(121 194 236 / 28%);
+  border-radius: 20px;
+  background: rgb(5 12 29 / 82%);
+  box-shadow: 0 14px 32px rgb(0 0 0 / 30%);
+}
+
+.trottl-classic-player-panel h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.trottl-classic-player-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 7px;
+  list-style: none;
+  counter-reset: classic-player;
+}
+
+.trottl-classic-player-list li {
+  display: grid;
+  min-height: 42px;
+  padding: 8px 11px;
+  align-items: center;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 5%);
+  counter-increment: classic-player;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.trottl-classic-player-list li::before {
+  color: rgb(159 217 245 / 68%);
+  content: counter(classic-player) ".";
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.trottl-classic-player-list span {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trottl-classic-player-list small {
+  padding: 3px 7px;
+  border: 1px solid rgb(117 216 255 / 25%);
+  border-radius: 999px;
+  color: #9ce9ff;
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trottl-classic-actions {
+  display: grid;
+  width: min(86vw, 360px);
+  margin-top: auto;
+  padding-top: 18px;
+  gap: 10px;
+}
+
+.trottl-classic-actions button {
+  width: 100%;
+  min-height: 50px;
 }
 
 @keyframes fischteich-die-idle {

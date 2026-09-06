@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260906.2">
+    <meta name="fischteich-build" content="20260906.3">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=115">
+    <link rel="stylesheet" href="./style.css?v=116">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -27,8 +27,10 @@
     <script src="./push-service.js?v=2" defer></script>
     <script src="./shortcut-service.js?v=5" defer></script>
     <script src="./dice-service.js?v=2" defer></script>
+    <script src="./trottl-classic-service.js?v=1" defer></script>
+    <script src="./trottl-classic-ui.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=70" defer></script>
+    <script src="./script.js?v=71" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -211,6 +213,43 @@
             <div class="fischteich-dice-mount" id="fischteich-dice-mount"></div>
             <p class="fischteich-dice-instruction">Würfel antippen</p>
             <p class="visually-hidden" id="fischteich-dice-status" aria-live="polite"></p>
+          </div>
+        </main>
+      </section>
+
+      <section class="screen trottl-classic-screen" id="trottl-classic-rooms-screen" aria-labelledby="trottl-classic-rooms-title" hidden>
+        <img class="sidemenu-background" src="./assets/sidemenu-background.png?v=2" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
+        <button class="close-button navigation-back-button" id="close-trottl-classic-rooms" type="button" aria-label="Zurück zum 3er-Trottl-Menü">←</button>
+        <main class="trottl-classic-shell">
+          <header class="trottl-classic-header">
+            <p class="eyebrow">3er Trottl Klassik</p>
+            <h1 id="trottl-classic-rooms-title">Raum wählen</h1>
+          </header>
+          <div class="trottl-classic-room-list" id="trottl-classic-room-list" aria-label="Verfügbare Räume">
+            <button class="trottl-classic-room" type="button" data-room-slot="1" disabled><strong>RAUM 1</strong><span>Wird geladen …</span></button>
+            <button class="trottl-classic-room" type="button" data-room-slot="2" disabled><strong>RAUM 2</strong><span>Wird geladen …</span></button>
+          </div>
+          <p class="trottl-classic-feedback" id="trottl-classic-room-feedback" aria-live="polite"></p>
+        </main>
+      </section>
+
+      <section class="screen trottl-classic-screen" id="trottl-classic-session-screen" aria-labelledby="trottl-classic-session-title" hidden>
+        <img class="sidemenu-background" src="./assets/sidemenu-background.png?v=2" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
+        <button class="close-button navigation-back-button" id="close-trottl-classic-session" type="button" aria-label="Raum verlassen">←</button>
+        <main class="trottl-classic-shell trottl-classic-session-shell">
+          <header class="trottl-classic-header">
+            <p class="eyebrow">3er Trottl Klassik</p>
+            <h1 id="trottl-classic-session-title"><span id="trottl-classic-session-room">RAUM</span></h1>
+            <p class="trottl-classic-session-state" id="trottl-classic-session-state">Lobby</p>
+          </header>
+          <section class="trottl-classic-player-panel" aria-labelledby="trottl-classic-player-title">
+            <h2 id="trottl-classic-player-title">Spieler</h2>
+            <ol class="trottl-classic-player-list" id="trottl-classic-player-list"></ol>
+          </section>
+          <p class="trottl-classic-feedback" id="trottl-classic-session-feedback" aria-live="polite"></p>
+          <div class="trottl-classic-actions">
+            <button class="primary-button" id="trottl-classic-start" type="button" hidden>Spiel starten</button>
+            <button class="secondary-button" id="trottl-classic-leave" type="button">Raum verlassen</button>
           </div>
         </main>
       </section>

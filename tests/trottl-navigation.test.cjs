@@ -33,20 +33,21 @@ test("Fischteich Würfel has its own screen and returns to the Trottl menu", () 
   assert.match(script, /#close-fischteich-dice"\)\.addEventListener[\s\S]*showTrottlMenu\(\{ focusSelector: "#open-fischteich-dice" \}\)/);
 });
 
-test("Klassik and Deluxe are harmless inline placeholders", () => {
+test("Klassik opens its room selection while Deluxe remains a harmless placeholder", () => {
   const placeholderFunction = script.slice(
     script.indexOf("function showTrottlPlaceholder("),
     script.indexOf("function updateMarkerSize("),
   );
   assert.match(placeholderFunction, /textContent = `\$\{label\} ist noch nicht verfügbar\.`/);
   assert.doesNotMatch(placeholderFunction, /showScreen|fetch|supabase|startGame/);
-  assert.match(script, /showTrottlPlaceholder\("3er Trottl Klassik"\)/);
+  assert.match(script, /#open-trottl-classic"\)\.addEventListener[\s\S]*trottlClassic\.openRooms\(\)/);
   assert.match(script, /showTrottlPlaceholder\("3er Trottl Deluxe"\)/);
 });
 
 test("Trottl screens reuse central navigation, Escape order and iOS safe areas", () => {
   assert.match(script, /const screens = Array\.from\(document\.querySelectorAll\("\.screen"\)\)/);
   assert.match(script, /!fischteichDiceScreen\.hidden[\s\S]*showTrottlMenu/);
+  assert.match(script, /trottlClassic\.isSessionScreenActive\(\)[\s\S]*trottlClassic\.goBack\(\)/);
   assert.match(script, /!trottlMenuScreen\.hidden[\s\S]*showMenu/);
   assert.match(css, /\.trottl-menu-shell\s*\{[\s\S]*env\(safe-area-inset-top\)[\s\S]*env\(safe-area-inset-right\)[\s\S]*env\(safe-area-inset-bottom\)[\s\S]*env\(safe-area-inset-left\)/);
   assert.match(css, /\.trottl-menu-actions\s*\{[\s\S]*width:\s*min\(83vw, 326px\)[\s\S]*grid-auto-rows:\s*clamp\(74px, 9\.8dvh, 78px\)/);

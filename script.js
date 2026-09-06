@@ -479,6 +479,11 @@ function showScreen(screen) {
   }
 }
 
+const trottlClassic = window.TrottlClassicUI.create({
+  showScreen,
+  showTrottlMenu,
+});
+
 function showMenu() {
   stopRoulette();
   state.rouletteInitializationRun += 1;
@@ -4593,7 +4598,7 @@ document.querySelector("#close-fischteich-dice").addEventListener("click", () =>
   showTrottlMenu({ focusSelector: "#open-fischteich-dice" });
 });
 document.querySelector("#open-trottl-classic").addEventListener("click", () => {
-  showTrottlPlaceholder("3er Trottl Klassik");
+  void trottlClassic.openRooms();
 });
 document.querySelector("#open-trottl-deluxe").addEventListener("click", () => {
   showTrottlPlaceholder("3er Trottl Deluxe");
@@ -4906,7 +4911,10 @@ window.addEventListener("resize", () => {
 document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") void refreshBuffaloTimer();
+  if (document.visibilityState === "visible") {
+    void refreshBuffaloTimer();
+    trottlClassic.refresh();
+  }
 });
 window.addEventListener("storage", (event) => {
   if (event.key === window.buffaloService?.storageKey) void refreshBuffaloTimer();
@@ -4917,9 +4925,13 @@ window.addEventListener("pagehide", () => {
     state.buffaloRealtimeUnsubscribe = null;
     void unsubscribe();
   }
+  void trottlClassic.suspend();
 });
 window.addEventListener("pageshow", (event) => {
-  if (event.persisted) initializeBuffaloTimer();
+  if (event.persisted) {
+    initializeBuffaloTimer();
+    trottlClassic.refresh();
+  }
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -4960,6 +4972,8 @@ document.addEventListener("keydown", (event) => {
       closeManualTeamScreen();
     } else if (!participantScreen.hidden) {
       closeParticipantSelection();
+    } else if (trottlClassic.isSessionScreenActive() || trottlClassic.isRoomScreenActive()) {
+      void trottlClassic.goBack();
     } else if (!fischteichDiceScreen.hidden) {
       showTrottlMenu({ focusSelector: "#open-fischteich-dice" });
     } else if (!trottlMenuScreen.hidden) {
@@ -4976,4 +4990,4 @@ initializeLocalIdentity();
 initializeBuffaloTimer();
 void initializeBuffaloPush();
 subscribeToAppAuthState((auth) => renderSettingsAdmin(auth));
-void initializeAppAuth();
+void initializeAppAuth().then(() => trottlClassic.restoreMembership());

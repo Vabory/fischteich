@@ -266,6 +266,46 @@ test("designed layouts use the requested top-center poker structures", () => {
   assert.notEqual(sevenTopRight.x, 0);
 });
 
+test("six through eight player side chains follow the oval instead of columns", () => {
+  const { service } = createHarness();
+  const six = service.seatLayouts[6];
+  assert.equal(six.filter(({ x }) => x > 0).length, 2);
+  assert.equal(six.filter(({ x }) => x < 0).length, 2);
+  assert.equal(six.filter(({ x, y }) => x === 0 && y === -1).length, 1);
+  assert.ok(Math.abs(six[1].x) > Math.abs(six[2].x), "lower six-player seats sit farther out than upper seats");
+  assert.ok(six[1].y > six[2].y);
+
+  const seven = service.seatLayouts[7];
+  assert.equal(seven.filter(({ x }) => x > 0).length, 3);
+  assert.equal(seven.filter(({ x }) => x < 0).length, 3);
+  assert.equal(seven.slice(1).filter(({ x }) => x === 0).length, 0);
+  assert.ok(Math.abs(seven[3].x) < Math.abs(seven[1].x));
+  assert.ok(Math.abs(seven[1].x) < Math.abs(seven[2].x));
+  assert.ok(seven[1].y > seven[2].y && seven[2].y > seven[3].y);
+
+  const eight = service.seatLayouts[8];
+  assert.equal(eight.filter(({ x }) => x > 0).length, 3);
+  assert.equal(eight.filter(({ x }) => x < 0).length, 3);
+  assert.equal(eight.filter(({ x, y }) => x === 0 && y === -1).length, 1);
+  assert.ok(Math.abs(eight[3].x) < Math.abs(eight[1].x));
+  assert.ok(Math.abs(eight[1].x) < Math.abs(eight[2].x));
+});
+
+test("three through five player layouts keep their intentional poker structures", () => {
+  const { service } = createHarness();
+  const expectedSides = new Map([[3, 1], [4, 1], [5, 2]]);
+  for (const [playerCount, sideCount] of expectedSides) {
+    const layout = service.seatLayouts[playerCount];
+    assert.equal(layout.filter(({ x }) => x > 0).length, sideCount);
+    assert.equal(layout.filter(({ x }) => x < 0).length, sideCount);
+    assert.equal(layout[0].x, 0);
+    assert.equal(layout[0].y, 1);
+  }
+  assert.equal(service.seatLayouts[4].filter(({ x, y }) => x === 0 && y === -1).length, 1);
+  assert.equal(service.seatLayouts[3].slice(1).filter(({ x }) => x === 0).length, 0);
+  assert.equal(service.seatLayouts[5].slice(1).filter(({ x }) => x === 0).length, 0);
+});
+
 test("eight-player lower neighbors leave the self seat visibly more space", () => {
   const { service } = createHarness();
   const own = service.getSeatPosition(0, 8);
@@ -385,7 +425,7 @@ test("database migration owns leave, host transfer, session close and start vali
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=3[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=3[\s\S]*script\.js\?v=71/);
+  assert.match(html, /trottl-classic-service\.js\?v=4[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=3[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

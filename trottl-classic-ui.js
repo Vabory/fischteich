@@ -40,10 +40,12 @@
       roomRefreshQueued: false,
       sessionRefreshPromise: null,
       sessionRefreshQueued: false,
+      sessionRefreshQueuedSource: null,
       preview: previewEnabled ? preview.createState() : null,
       diceSessionId: null,
-      handledRollSeq: null,
-      visuallySettledRollSeq: null,
+      animatingRollSeq: null,
+      lastSettledRollSeq: 0,
+      deferredLiveRollSeq: null,
       rollRequestPending: false,
       resolveTimer: null,
     };
@@ -139,7 +141,9 @@
       seat.dataset.relativeSeat = String(relativeIndex);
       seat.style.setProperty("--seat-x", position.x.toFixed(6));
       seat.style.setProperty("--seat-y", position.y.toFixed(6));
-      seat.style.setProperty("--seat-left", `${(50 + (position.x * 36)).toFixed(3)}%`);
+      // The fixed geometry is authored from bottom-center around the table.
+      // Mirror only its screen X mapping so global +1 proceeds clockwise.
+      seat.style.setProperty("--seat-left", `${(50 - (position.x * 36)).toFixed(3)}%`);
       seat.style.setProperty("--seat-top", `${(50 + (position.y * 42)).toFixed(3)}%`);
       seat.setAttribute("aria-label", `${player.displayName}${isSelf ? ", du" : ""}${isActive ? ", am Zug" : ""}`);
 
@@ -180,8 +184,9 @@
       if (state.diceSessionId === sessionId) return;
       clearResolveTimer();
       state.diceSessionId = sessionId;
-      state.handledRollSeq = null;
-      state.visuallySettledRollSeq = null;
+      state.animatingRollSeq = null;
+      state.lastSettledRollSeq = 0;
+      state.deferredLiveRollSeq = null;
       state.rollRequestPending = false;
     }
 
@@ -210,7 +215,7 @@
       }, delay);
     }
 
-    function syncGameDice(snapshot) {
+    function syncGameDice(snapshot, rollSource = "passive") {
       if (state.preview) {
         clearResolveTimer();
         if (!gameDice.isRolling()) gameDice.setResultInstant(1);
@@ -221,19 +226,28 @@
       }
 
       resetDiceTracking(snapshot.session.id);
-      const presentation = service.getRollPresentation(
+      const action = service.getRollAction(
         snapshot.session,
-        state.handledRollSeq,
+        {
+          animatingRollSeq: state.animatingRollSeq,
+          lastSettledRollSeq: state.lastSettledRollSeq,
+        },
+        rollSource,
         Date.now(),
       );
-      if (presentation === "animate" && !gameDice.isRolling()) {
-        state.handledRollSeq = snapshot.session.rollSeq;
-        state.visuallySettledRollSeq = null;
-        gameDice.rollTo(snapshot.session.rollResult);
-      } else if (presentation === "instant") {
-        state.handledRollSeq = snapshot.session.rollSeq;
-        state.visuallySettledRollSeq = snapshot.session.rollSeq;
-        if (!gameDice.isRolling()) gameDice.setResultInstant(snapshot.session.rollResult);
+      if (action === "animate") {
+        if (gameDice.isRolling()) {
+          state.deferredLiveRollSeq = snapshot.session.rollSeq;
+        } else {
+          state.animatingRollSeq = snapshot.session.rollSeq;
+          state.deferredLiveRollSeq = null;
+          const completion = gameDice.rollTo(snapshot.session.rollResult);
+          if (!completion) state.animatingRollSeq = null;
+        }
+      } else if (action === "instant" && !gameDice.isRolling()) {
+        state.lastSettledRollSeq = Math.max(state.lastSettledRollSeq, snapshot.session.rollSeq);
+        state.deferredLiveRollSeq = null;
+        gameDice.setResultInstant(snapshot.session.rollResult);
       }
 
       scheduleRollResolution(snapshot);
@@ -251,10 +265,14 @@
     function handleDiceSettled() {
       const snapshot = state.snapshot;
       if (!snapshot || state.preview) return;
-      if (snapshot.session.rollSeq === state.handledRollSeq) {
-        state.visuallySettledRollSeq = snapshot.session.rollSeq;
+      const settledRollSeq = state.animatingRollSeq;
+      state.animatingRollSeq = null;
+      if (settledRollSeq !== null) {
+        state.lastSettledRollSeq = Math.max(state.lastSettledRollSeq, settledRollSeq);
       }
-      syncGameDice(snapshot);
+      const deferredIsCurrent = state.deferredLiveRollSeq === snapshot.session.rollSeq;
+      state.deferredLiveRollSeq = null;
+      syncGameDice(snapshot, deferredIsCurrent ? "live" : "passive");
     }
 
     async function resolveCurrentRoll(sessionId, rollSeq) {
@@ -263,10 +281,10 @@
         const result = await service.resolveRoll(sessionId, rollSeq);
         if (state.snapshot?.session.id !== sessionId) return;
         state.snapshot = result.snapshot;
-        renderSession();
+        renderSession("passive");
       } catch (error) {
         console.warn("3er-Trottl-Wurf konnte nicht aufgelöst werden.", error);
-        void refreshSession();
+        void refreshSession({ rollSource: "live" });
       }
     }
 
@@ -274,20 +292,20 @@
       const snapshot = state.snapshot;
       if (!snapshot || !canLocalPlayerRoll(snapshot)) return;
       state.rollRequestPending = true;
-      syncGameDice(snapshot);
+      syncGameDice(snapshot, "passive");
       try {
         const nextSnapshot = await service.rollSession(snapshot.session.id);
         if (state.snapshot?.session.id !== snapshot.session.id) return;
         state.snapshot = nextSnapshot;
         sessionFeedback.textContent = "";
-        renderSession();
+        renderSession("live");
       } catch (error) {
         console.warn("3er-Trottl-Würfelwurf wurde abgelehnt.", error);
         sessionFeedback.textContent = describeError(error, "Würfeln fehlgeschlagen. Bitte erneut versuchen.");
-        void refreshSession();
+        void refreshSession({ rollSource: "live" });
       } finally {
         state.rollRequestPending = false;
-        if (state.snapshot) renderSession();
+        if (state.snapshot) renderSession("passive");
       }
     }
 
@@ -320,7 +338,7 @@
       renderSession();
     }
 
-    function renderSession() {
+    function renderSession(rollSource = "passive") {
       const snapshot = state.snapshot;
       if (!snapshot) return;
       const isPlaying = snapshot.session.status === "playing";
@@ -331,7 +349,7 @@
       previewPanel.hidden = !previewEnabled || !state.preview;
       if (isPlaying) {
         renderGame(snapshot, state.preview?.activeSeatIndex ?? snapshot.session.currentTurnSeat);
-        syncGameDice(snapshot);
+        syncGameDice(snapshot, rollSource);
       }
       else renderLobby(snapshot);
     }
@@ -364,7 +382,9 @@
       if (state.sessionUnsubscribe) return;
       state.sessionUnsubscribe = service.subscribeSession(
         sessionId,
-        () => void refreshSession(),
+        () => void refreshSession({
+          rollSource: document.visibilityState === "hidden" ? "recovery" : "live",
+        }),
         (status) => {
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             sessionFeedback.textContent = "Live-Verbindung unterbrochen. Verbindung wird erneut geprüft.";
@@ -423,7 +443,7 @@
       sessionFeedback.textContent = "";
       showScreen(sessionScreen);
       syncPreviewControls();
-      renderSession();
+      renderSession("recovery");
       sessionBackButton.focus({ preventScroll: true });
     }
 
@@ -433,7 +453,7 @@
       state.snapshot = snapshot;
       sessionFeedback.textContent = "";
       showScreen(sessionScreen);
-      renderSession();
+      renderSession("recovery");
       ensureSessionRealtime(snapshot.session.id);
       sessionBackButton.focus({ preventScroll: true });
     }
@@ -455,10 +475,15 @@
       }
     }
 
-    async function refreshSession() {
+    function mergeRollSource(first, second) {
+      return first === "live" || second === "live" ? "live" : "recovery";
+    }
+
+    async function refreshSession({ rollSource = "recovery" } = {}) {
       if (!state.snapshot) return null;
       if (state.sessionRefreshPromise) {
         state.sessionRefreshQueued = true;
+        state.sessionRefreshQueuedSource = mergeRollSource(state.sessionRefreshQueuedSource, rollSource);
         return state.sessionRefreshPromise;
       }
       const sessionId = state.snapshot.session.id;
@@ -467,7 +492,7 @@
           if (state.snapshot?.session.id !== sessionId) return snapshot;
           state.snapshot = snapshot;
           sessionFeedback.textContent = "";
-          renderSession();
+          renderSession(rollSource);
           return snapshot;
         })
         .catch((error) => {
@@ -479,7 +504,9 @@
           state.sessionRefreshPromise = null;
           if (state.sessionRefreshQueued) {
             state.sessionRefreshQueued = false;
-            void refreshSession();
+            const queuedRollSource = state.sessionRefreshQueuedSource ?? "recovery";
+            state.sessionRefreshQueuedSource = null;
+            void refreshSession({ rollSource: queuedRollSource });
           }
         });
       return state.sessionRefreshPromise;
@@ -564,7 +591,7 @@
         void refreshRooms();
       } else if (!sessionScreen.hidden && state.snapshot) {
         ensureSessionRealtime(state.snapshot.session.id);
-        void refreshSession();
+        void refreshSession({ rollSource: "recovery" });
       }
     }
 

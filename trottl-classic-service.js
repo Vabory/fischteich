@@ -85,13 +85,22 @@
     });
   }
 
-  function getRollPresentation(session, handledRollSeq, nowMs = Date.now()) {
+  function getRecoveryRollPresentation(session, nowMs = Date.now()) {
     if (!session || session.rollSeq < 1 || session.rollResult === null) return "none";
-    if (session.rollSeq === handledRollSeq) return "duplicate";
     const remainingMs = Date.parse(session.rollResolveAt ?? "") - nowMs;
     return session.rollPhase === "rolling" && remainingMs >= MIN_FULL_ROLL_WINDOW_MS
       ? "animate"
       : "instant";
+  }
+
+  function getRollAction(session, localState, source = "passive", nowMs = Date.now()) {
+    if (!session || session.rollSeq < 1 || session.rollResult === null) return "none";
+    const animatingRollSeq = Number(localState?.animatingRollSeq ?? 0);
+    const lastSettledRollSeq = Number(localState?.lastSettledRollSeq ?? 0);
+    if (session.rollSeq === animatingRollSeq || session.rollSeq <= lastSettledRollSeq) return "ignore";
+    if (source === "live") return "animate";
+    if (source === "recovery") return getRecoveryRollPresentation(session, nowMs);
+    return "none";
   }
 
   function normalizePlayer(value) {
@@ -335,7 +344,8 @@
     normalizeRooms,
     normalizeSession,
     normalizePlayer,
-    getRollPresentation,
+    getRecoveryRollPresentation,
+    getRollAction,
     nextSeat,
     previousSeat,
     getRelativeSeats,

@@ -241,7 +241,7 @@ test("gameplay starts on global seat zero and advances only through RPC state", 
   ]);
 });
 
-test("roll presentation deduplicates realtime and reconstructs stale rolls instantly", () => {
+test("live roll actions always animate while recovery retains the time threshold", () => {
   const { service } = createHarness();
   const now = Date.parse("2026-09-06T10:01:01.100Z");
   const rolling = {
@@ -250,11 +250,75 @@ test("roll presentation deduplicates realtime and reconstructs stale rolls insta
     rollPhase: "rolling",
     rollResolveAt: "2026-09-06T10:01:03.600Z",
   };
-  assert.equal(service.getRollPresentation(rolling, 11, now), "animate");
-  assert.equal(service.getRollPresentation(rolling, 12, now), "duplicate");
-  assert.equal(service.getRollPresentation(rolling, 11, Date.parse("2026-09-06T10:01:03.500Z")), "instant");
-  assert.equal(service.getRollPresentation({ ...rolling, rollPhase: "idle", rollResolveAt: null }, null, now), "instant");
-  assert.equal(service.getRollPresentation({ rollSeq: 0, rollResult: null }, null, now), "none");
+  const unseen = { animatingRollSeq: null, lastSettledRollSeq: 11 };
+  assert.equal(service.getRollAction(rolling, unseen, "live", now), "animate");
+  assert.equal(
+    service.getRollAction(rolling, unseen, "live", Date.parse("2026-09-06T10:01:03.500Z")),
+    "animate",
+    "normal live latency must never select the instant recovery path",
+  );
+  assert.equal(service.getRollAction(rolling, unseen, "recovery", now), "animate");
+  assert.equal(
+    service.getRollAction(rolling, unseen, "recovery", Date.parse("2026-09-06T10:01:03.500Z")),
+    "instant",
+  );
+  assert.equal(
+    service.getRollAction({ ...rolling, rollPhase: "idle", rollResolveAt: null }, unseen, "recovery", now),
+    "instant",
+  );
+  assert.equal(service.getRollAction({ rollSeq: 0, rollResult: null }, unseen, "live", now), "none");
+});
+
+test("animating and settled roll sequences suppress every duplicate snapshot", () => {
+  const { service } = createHarness();
+  const roll = {
+    rollSeq: 12,
+    rollResult: 6,
+    rollPhase: "rolling",
+    rollResolveAt: "2026-09-06T10:01:03.600Z",
+  };
+  const now = Date.parse("2026-09-06T10:01:03.500Z");
+  assert.equal(
+    service.getRollAction(roll, { animatingRollSeq: 12, lastSettledRollSeq: 11 }, "live", now),
+    "ignore",
+  );
+  assert.equal(
+    service.getRollAction(roll, { animatingRollSeq: 12, lastSettledRollSeq: 11 }, "recovery", now),
+    "ignore",
+    "a recovery snapshot cannot turn an active animation into an instant result",
+  );
+  assert.equal(
+    service.getRollAction(roll, { animatingRollSeq: null, lastSettledRollSeq: 12 }, "live", now),
+    "ignore",
+  );
+  assert.equal(
+    service.getRollAction({ ...roll, rollSeq: 13, rollResult: 2 }, { animatingRollSeq: null, lastSettledRollSeq: 12 }, "live", now),
+    "animate",
+    "the next authoritative sequence animates after settlement",
+  );
+});
+
+test("one unseen live sequence yields exactly one animation action with the server result unchanged", () => {
+  const { service } = createHarness();
+  const local = { animatingRollSeq: null, lastSettledRollSeq: 20 };
+  const roll = {
+    rollSeq: 21,
+    rollResult: 5,
+    rollPhase: "rolling",
+    rollResolveAt: "2026-09-06T10:01:03.600Z",
+  };
+  const rollToCalls = [];
+  for (let delivery = 0; delivery < 3; delivery += 1) {
+    const action = service.getRollAction(roll, local, delivery === 1 ? "recovery" : "live");
+    if (action === "animate") {
+      local.animatingRollSeq = roll.rollSeq;
+      rollToCalls.push(roll.rollResult);
+    }
+  }
+  assert.deepEqual(rollToCalls, [5]);
+  local.lastSettledRollSeq = local.animatingRollSeq;
+  local.animatingRollSeq = null;
+  assert.equal(service.getRollAction(roll, local, "live"), "ignore");
 });
 
 test("session realtime watches session and membership and cleans up once", async () => {
@@ -324,14 +388,59 @@ test("seat geometry supports balanced three through eight player views", () => {
     const positions = relative.map(({ relativeIndex }) => service.getSeatPosition(relativeIndex, playerCount));
     assert.equal(positions[0].x, 0);
     assert.equal(positions[0].y, 1);
-    assert.ok(positions[1].x > 0, `${playerCount} players place the successor on the right`);
-    assert.ok(positions.at(-1).x < 0, `${playerCount} players place the predecessor on the left`);
+    assert.ok(positions[1].x > 0, `${playerCount} players retain the authored successor geometry`);
+    assert.ok(positions.at(-1).x < 0, `${playerCount} players retain the authored predecessor geometry`);
+    assert.ok(-positions[1].x < 0, `${playerCount} players render global +1 clockwise from bottom`);
+    assert.ok(-positions.at(-1).x > 0, `${playerCount} players render global -1 counterclockwise from bottom`);
     assert.equal(service.seatLayouts[playerCount].length, playerCount);
     assert.equal(new Set(positions.map(({ x, y }) => `${x.toFixed(5)}:${y.toFixed(5)}`)).size, playerCount);
     assert.ok(
       positions.every(({ x, y }) => Math.abs(x) >= 0.7 || Math.abs(y) >= 0.5),
       `${playerCount} players keep the central dice zone clear`,
     );
+  }
+});
+
+test("three-player clockwise order stays cyclic from every personal perspective", () => {
+  const { service } = createHarness();
+  const players = createPlayers(3).map((player, index) => Object.freeze({
+    ...player,
+    displayName: ["Fabian", "Julian", "Kat"][index],
+  }));
+  for (const ownSeat of [0, 1, 2]) {
+    const view = service.getRelativeSeats(players, `user-${ownSeat}`);
+    assert.equal(view[0].player.seatIndex, ownSeat);
+    assert.deepEqual(
+      Array.from(view, ({ player }) => player.seatIndex),
+      [ownSeat, (ownSeat + 1) % 3, (ownSeat + 2) % 3],
+    );
+    const own = service.getSeatPosition(view[0].relativeIndex, 3);
+    const next = service.getSeatPosition(view[1].relativeIndex, 3);
+    const previous = service.getSeatPosition(view[2].relativeIndex, 3);
+    assert.deepEqual([own.x, own.y], [0, 1]);
+    assert.ok(-next.x < 0, "global +1 is clockwise on screen from bottom-center");
+    assert.ok(-previous.x > 0, "global -1 is counterclockwise on screen from bottom-center");
+  }
+  assert.deepEqual(players.map(({ seatIndex }) => seatIndex), [0, 1, 2]);
+});
+
+test("clockwise global cycle is preserved for every perspective from three through eight players", () => {
+  const { service } = createHarness();
+  for (let playerCount = 3; playerCount <= 8; playerCount += 1) {
+    const players = createPlayers(playerCount);
+    for (let ownSeat = 0; ownSeat < playerCount; ownSeat += 1) {
+      const view = service.getRelativeSeats(players, `user-${ownSeat}`);
+      assert.equal(view[0].player.seatIndex, ownSeat);
+      assert.equal(view[1].player.seatIndex, service.nextSeat(ownSeat, playerCount));
+      assert.equal(view.at(-1).player.seatIndex, service.previousSeat(ownSeat, playerCount));
+      assert.ok(-service.getSeatPosition(1, playerCount).x < 0);
+      assert.ok(-service.getSeatPosition(playerCount - 1, playerCount).x > 0);
+      assert.deepEqual(
+        Array.from(view, ({ player }) => player.seatIndex),
+        Array.from({ length: playerCount }, (_, offset) => (ownSeat + offset) % playerCount),
+      );
+    }
+    assert.deepEqual(players.map(({ seatIndex }) => seatIndex), Array.from({ length: playerCount }, (_, index) => index));
   }
 });
 
@@ -539,7 +648,7 @@ test("gameplay migration resolves turns atomically and exposes only guarded RPCs
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=5[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=4[\s\S]*script\.js\?v=71/);
+  assert.match(html, /trottl-classic-service\.js\?v=6[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=5[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -566,7 +675,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /function renderGame\(snapshot, activeSeatIndex = service\.initialActiveSeatIndex\)/);
   assert.match(ui, /rollOnClick:\s*false/);
   assert.match(ui, /service\.rollSession\(snapshot\.session\.id\)/);
-  assert.match(ui, /service\.getRollPresentation/);
+  assert.match(ui, /service\.getRollAction/);
   assert.match(ui, /gameDice\.rollTo\(snapshot\.session\.rollResult\)/);
   assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)/);
   assert.match(ui, /localPlayerSeat\(snapshot\) === snapshot\.session\.currentTurnSeat/);
@@ -574,6 +683,21 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.doesNotMatch(ui, /Math\.random/);
   assert.match(ui, /if \(previewEnabled\) return openPreview\(\)/);
   assert.match(previewSource, /const TROTTL_CLASSIC_PREVIEW_ENABLED = false/);
+});
+
+test("roller, realtime spectators and recovery snapshots share one guarded roll consumer", () => {
+  assert.match(ui, /function syncGameDice\(snapshot, rollSource = "passive"\)/);
+  assert.match(ui, /renderSession\("live"\)/, "the roller's authoritative RPC snapshot uses the live consumer");
+  assert.match(ui, /subscribeSession\([\s\S]*document\.visibilityState === "hidden" \? "recovery" : "live"/);
+  assert.match(ui, /function openSnapshot\([\s\S]*renderSession\("recovery"\)/);
+  assert.match(ui, /function resume\([\s\S]*refreshSession\(\{ rollSource: "recovery" \}\)/);
+  assert.match(ui, /animatingRollSeq:\s*state\.animatingRollSeq/);
+  assert.match(ui, /lastSettledRollSeq:\s*state\.lastSettledRollSeq/);
+  assert.match(ui, /const settledRollSeq = state\.animatingRollSeq[\s\S]*state\.lastSettledRollSeq = Math\.max/);
+  assert.match(ui, /action === "instant" && !gameDice\.isRolling\(\)/);
+  assert.match(ui, /state\.rollRequestPending = true[\s\S]*state\.rollRequestPending = false/);
+  assert.match(ui, /sessionRefreshQueuedSource = mergeRollSource/);
+  assert.doesNotMatch(ui, /handledRollSeq|visuallySettledRollSeq|getRollPresentation/);
 });
 
 test("navigation, reconnect and lifecycle cleanup are wired without touching the die", () => {

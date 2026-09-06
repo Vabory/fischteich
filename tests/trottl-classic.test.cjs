@@ -13,6 +13,7 @@ const html = read("index.html");
 const css = read("style.css");
 const script = read("script.js");
 const ui = read("trottl-classic-ui.js");
+const previewSource = read("trottl-classic-preview.js");
 
 const USER_ID = "10000000-0000-4000-8000-000000000001";
 const SESSION_ID = "20000000-0000-4000-8000-000000000001";
@@ -113,6 +114,31 @@ function createPlayers(count) {
     seatIndex,
     joinedAt: "2026-09-06T10:00:00Z",
   }));
+}
+
+function createPreviewHarness() {
+  let databaseAccesses = 0;
+  const windowTarget = { window: null };
+  windowTarget.window = windowTarget;
+  const context = {
+    window: windowTarget,
+    console,
+    Error,
+    Number,
+    Object,
+    RangeError,
+  };
+  Object.defineProperty(context, "supabaseClient", {
+    get() {
+      databaseAccesses += 1;
+      throw new Error("Preview touched Supabase");
+    },
+  });
+  vm.runInNewContext(previewSource, context);
+  return {
+    preview: windowTarget.trottlClassicPreview,
+    getDatabaseAccesses: () => databaseAccesses,
+  };
 }
 
 test("room summaries always expose exactly the two isolated fixed slots", async () => {
@@ -231,6 +257,55 @@ test("reconnect reconstructs the identical perspective from global membership", 
   assert.equal(rpcCalls.length, 0, "view rotation never writes to Supabase");
 });
 
+test("preview creates isolated local groups with three through eight unique seats", () => {
+  const { preview } = createPreviewHarness();
+  const threePlayers = preview.createFakePlayers(3);
+  const eightPlayers = preview.createFakePlayers(8);
+  assert.equal(threePlayers.length, 3);
+  assert.equal(eightPlayers.length, 8);
+  assert.deepEqual(Array.from(eightPlayers, (player) => player.seatIndex), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(new Set(eightPlayers.map((player) => player.userId)).size, 8);
+  assert.ok(eightPlayers.every((player) => player.userId.startsWith("local-preview:player-")));
+});
+
+test("preview perspectives use the production relative-seat calculation without mutation", () => {
+  const { service } = createHarness();
+  const { preview } = createPreviewHarness();
+  const players = preview.createFakePlayers(8);
+  const globalSeats = players.map((player) => player.seatIndex);
+  const fabian = service.getRelativeSeats(players, players[0].userId);
+  const kat = service.getRelativeSeats(players, players[2].userId);
+  assert.equal(fabian[0].player.displayName, "Fabian");
+  assert.equal(kat[0].player.displayName, "Kat");
+  assert.deepEqual(players.map((player) => player.seatIndex), globalSeats);
+});
+
+test("all preview player counts feed the existing table geometry", () => {
+  const { service } = createHarness();
+  const { preview } = createPreviewHarness();
+  for (let playerCount = 3; playerCount <= 8; playerCount += 1) {
+    const snapshot = preview.createSnapshot({ playerCount, perspectiveSeatIndex: playerCount - 1 });
+    const relative = service.getRelativeSeats(snapshot.players, snapshot.identity.userId);
+    assert.equal(relative.length, playerCount);
+    assert.equal(relative[0].relativeIndex, 0);
+    const ownPosition = service.getSeatPosition(relative[0].relativeIndex, playerCount);
+    assert.equal(ownPosition.x, 0);
+    assert.equal(ownPosition.y, 1);
+  }
+});
+
+test("preview active selection is local state and never accesses Supabase", () => {
+  const { preview, getDatabaseAccesses } = createPreviewHarness();
+  assert.equal(preview.enabled, false);
+  const first = preview.createState({ playerCount: 8, perspectiveSeatIndex: 0, activeSeatIndex: 0 });
+  const changed = preview.createState({ ...first, activeSeatIndex: 6 });
+  assert.equal(first.activeSeatIndex, 0);
+  assert.equal(changed.activeSeatIndex, 6);
+  assert.equal(changed.perspectiveSeatIndex, 0);
+  assert.equal(getDatabaseAccesses(), 0);
+  assert.doesNotMatch(previewSource, /\.rpc\(|\.from\(|\.channel\(|supabase/i);
+});
+
 test("database migration serializes joins and enforces membership invariants", () => {
   assert.match(migration, /room_slot in \(1, 2\)/i);
   assert.match(migration, /unique index trottl_classic_one_active_session_per_slot_idx[\s\S]*status in \('lobby', 'playing'\)/i);
@@ -262,7 +337,7 @@ test("database migration owns leave, host transfer, session close and start vali
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=2[\s\S]*script\.js\?v=71/);
+  assert.match(html, /trottl-classic-service\.js\?v=2[\s\S]*trottl-classic-preview\.js\?v=1[\s\S]*trottl-classic-ui\.js\?v=3[\s\S]*script\.js\?v=71/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -275,7 +350,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /id="trottl-classic-seat-layer"/);
   assert.match(ui, /service\.getRelativeSeats\(snapshot\.players, snapshot\.identity\.userId\)/);
   assert.match(ui, /service\.getSeatPosition\(relativeIndex, snapshot\.players\.length\)/);
-  assert.match(ui, /player\.seatIndex === service\.initialActiveSeatIndex/);
+  assert.match(ui, /player\.seatIndex === activeSeatIndex/);
   assert.match(ui, /players\.length < service\.minPlayers/);
   assert.match(ui, /session\.hostUserId === identity\.userId/);
   assert.doesNotMatch(html, /Pokertisch|Situationserklärer|Reaktionsspiel/);
@@ -284,6 +359,10 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-player--self[\s\S]*scale\(1\.07\)/);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);
+  assert.match(html, /id="trottl-classic-preview-panel" hidden/);
+  assert.match(ui, /function renderGame\(snapshot, activeSeatIndex = service\.initialActiveSeatIndex\)/);
+  assert.match(ui, /if \(previewEnabled\) return openPreview\(\)/);
+  assert.match(previewSource, /const TROTTL_CLASSIC_PREVIEW_ENABLED = false/);
 });
 
 test("navigation, reconnect and lifecycle cleanup are wired without touching the die", () => {

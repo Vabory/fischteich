@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260906.4">
+    <meta name="fischteich-build" content="20260906.5">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=117">
+    <link rel="stylesheet" href="./style.css?v=118">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -28,7 +28,8 @@
     <script src="./shortcut-service.js?v=5" defer></script>
     <script src="./dice-service.js?v=2" defer></script>
     <script src="./trottl-classic-service.js?v=2" defer></script>
-    <script src="./trottl-classic-ui.js?v=2" defer></script>
+    <script src="./trottl-classic-preview.js?v=1" defer></script>
+    <script src="./trottl-classic-ui.js?v=3" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=71" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -254,6 +255,21 @@
             </div>
           </div>
           <section class="trottl-classic-game-view" id="trottl-classic-game-view" aria-label="3er Trottl Klassik Spieltisch" hidden>
+            <details class="trottl-classic-preview-panel" id="trottl-classic-preview-panel" hidden>
+              <summary>DEV</summary>
+              <div class="trottl-classic-preview-controls">
+                <fieldset>
+                  <legend>Spieler</legend>
+                  <div class="trottl-classic-preview-count" id="trottl-classic-preview-count"></div>
+                </fieldset>
+                <label>Perspektive
+                  <select id="trottl-classic-preview-perspective"></select>
+                </label>
+                <label>Aktiv
+                  <select id="trottl-classic-preview-active"></select>
+                </label>
+              </div>
+            </details>
             <div class="trottl-classic-situation" id="trottl-classic-situation" aria-live="polite">SPIEL LÄUFT</div>
             <div class="trottl-classic-table-stage" id="trottl-classic-table-stage">
               <div class="trottl-classic-table" aria-hidden="true">

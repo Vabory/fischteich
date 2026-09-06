@@ -3,6 +3,8 @@
 (function installTrottlClassicUi(global) {
   function create({ showScreen, showTrottlMenu }) {
     const service = global.trottlClassicService;
+    const preview = global.trottlClassicPreview;
+    const previewEnabled = preview?.enabled === true;
     const roomScreen = document.querySelector("#trottl-classic-rooms-screen");
     const sessionScreen = document.querySelector("#trottl-classic-session-screen");
     const roomList = document.querySelector("#trottl-classic-room-list");
@@ -15,6 +17,10 @@
     const tableStage = document.querySelector("#trottl-classic-table-stage");
     const seatLayer = document.querySelector("#trottl-classic-seat-layer");
     const situation = document.querySelector("#trottl-classic-situation");
+    const previewPanel = document.querySelector("#trottl-classic-preview-panel");
+    const previewCount = document.querySelector("#trottl-classic-preview-count");
+    const previewPerspective = document.querySelector("#trottl-classic-preview-perspective");
+    const previewActive = document.querySelector("#trottl-classic-preview-active");
     const playerList = document.querySelector("#trottl-classic-player-list");
     const sessionFeedback = document.querySelector("#trottl-classic-session-feedback");
     const startButton = document.querySelector("#trottl-classic-start");
@@ -32,6 +38,7 @@
       roomRefreshQueued: false,
       sessionRefreshPromise: null,
       sessionRefreshQueued: false,
+      preview: previewEnabled ? preview.createState() : null,
     };
 
     function describeError(error, fallback) {
@@ -96,7 +103,7 @@
       leaveButton.disabled = state.busy;
     }
 
-    function createGameSeat(relativeSeat, snapshot) {
+    function createGameSeat(relativeSeat, snapshot, activeSeatIndex) {
       const { player, relativeIndex } = relativeSeat;
       const position = service.getSeatPosition(relativeIndex, snapshot.players.length);
       const seat = document.createElement("article");
@@ -105,7 +112,7 @@
       const name = document.createElement("strong");
       const badges = document.createElement("span");
       const isSelf = player.userId === snapshot.identity.userId;
-      const isActive = player.seatIndex === service.initialActiveSeatIndex;
+      const isActive = player.seatIndex === activeSeatIndex;
 
       seat.className = "trottl-classic-game-seat trottl-classic-player--normal";
       if (isSelf) seat.classList.add("trottl-classic-player--self");
@@ -133,16 +140,45 @@
       return seat;
     }
 
-    function renderGame(snapshot) {
+    function renderGame(snapshot, activeSeatIndex = service.initialActiveSeatIndex) {
       const relativeSeats = service.getRelativeSeats(snapshot.players, snapshot.identity.userId);
       const activePlayer = snapshot.players.find(
-        (player) => player.seatIndex === service.initialActiveSeatIndex,
+        (player) => player.seatIndex === activeSeatIndex,
       );
       tableStage.dataset.playerCount = String(snapshot.players.length);
       situation.textContent = activePlayer
         ? `${activePlayer.displayName.toLocaleUpperCase("de-AT")} IST AM ZUG`
         : "SPIEL LÄUFT";
-      seatLayer.replaceChildren(...relativeSeats.map((seat) => createGameSeat(seat, snapshot)));
+      seatLayer.replaceChildren(...relativeSeats.map((seat) => createGameSeat(seat, snapshot, activeSeatIndex)));
+    }
+
+    function syncPreviewControls() {
+      if (!previewEnabled || !state.preview || !state.snapshot) return;
+      for (const button of previewCount.querySelectorAll("button")) {
+        button.classList.toggle("is-active", Number(button.dataset.playerCount) === state.preview.playerCount);
+        button.setAttribute("aria-pressed", String(Number(button.dataset.playerCount) === state.preview.playerCount));
+      }
+      const options = state.snapshot.players.map((player) => {
+        const option = document.createElement("option");
+        option.value = String(player.seatIndex);
+        option.textContent = player.displayName;
+        return option;
+      });
+      previewPerspective.replaceChildren(...options);
+      previewPerspective.value = String(state.preview.perspectiveSeatIndex);
+      previewActive.replaceChildren(...options.map((option) => option.cloneNode(true)));
+      previewActive.value = String(state.preview.activeSeatIndex);
+    }
+
+    function updatePreview(patch) {
+      if (!previewEnabled || !state.preview) return;
+      const next = { ...state.preview, ...patch };
+      next.perspectiveSeatIndex = Math.min(next.perspectiveSeatIndex, next.playerCount - 1);
+      next.activeSeatIndex = Math.min(next.activeSeatIndex, next.playerCount - 1);
+      state.preview = preview.createState(next);
+      state.snapshot = preview.createSnapshot(state.preview);
+      syncPreviewControls();
+      renderSession();
     }
 
     function renderSession() {
@@ -153,7 +189,8 @@
       sessionHeader.hidden = isPlaying;
       lobbyView.hidden = isPlaying;
       gameView.hidden = !isPlaying;
-      if (isPlaying) renderGame(snapshot);
+      previewPanel.hidden = !previewEnabled || !state.preview;
+      if (isPlaying) renderGame(snapshot, state.preview?.activeSeatIndex);
       else renderLobby(snapshot);
     }
 
@@ -225,6 +262,7 @@
     }
 
     async function openRooms({ feedback = "" } = {}) {
+      if (previewEnabled) return openPreview();
       await stopSessionRealtime();
       state.snapshot = null;
       roomFeedback.textContent = feedback;
@@ -232,6 +270,17 @@
       ensureRoomRealtime();
       await refreshRooms();
       roomBackButton.focus({ preventScroll: true });
+    }
+
+    async function openPreview() {
+      await Promise.all([stopRoomRealtime(), stopSessionRealtime()]);
+      state.preview = state.preview ?? preview.createState();
+      state.snapshot = preview.createSnapshot(state.preview);
+      sessionFeedback.textContent = "";
+      showScreen(sessionScreen);
+      syncPreviewControls();
+      renderSession();
+      sessionBackButton.focus({ preventScroll: true });
     }
 
     async function openSnapshot(snapshot) {
@@ -310,6 +359,11 @@
 
     async function leaveCurrentSession() {
       if (state.busy || !state.snapshot) return;
+      if (previewEnabled && state.preview) {
+        state.snapshot = null;
+        await returnToTrottlMenu();
+        return;
+      }
       state.busy = true;
       sessionFeedback.textContent = "Raum wird verlassen …";
       if (state.snapshot.session.status === "playing") situation.textContent = "RAUM WIRD VERLASSEN";
@@ -334,6 +388,7 @@
     }
 
     async function restoreMembership() {
+      if (previewEnabled) return false;
       if (typeof getLocalIdentity !== "function" || !getLocalIdentity()) return false;
       try {
         const rooms = await service.loadRooms();
@@ -353,6 +408,10 @@
     }
 
     function resume() {
+      if (previewEnabled && !sessionScreen.hidden && state.snapshot) {
+        renderSession();
+        return;
+      }
       if (!roomScreen.hidden) {
         ensureRoomRealtime();
         void refreshRooms();
@@ -366,6 +425,22 @@
     sessionBackButton.addEventListener("click", () => void leaveCurrentSession());
     leaveButton.addEventListener("click", () => void leaveCurrentSession());
     startButton.addEventListener("click", () => void startGame());
+    if (previewEnabled) {
+      for (let playerCount = preview.minPlayers; playerCount <= preview.maxPlayers; playerCount += 1) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = String(playerCount);
+        button.dataset.playerCount = String(playerCount);
+        button.addEventListener("click", () => updatePreview({ playerCount }));
+        previewCount.append(button);
+      }
+      previewPerspective.addEventListener("change", () => {
+        updatePreview({ perspectiveSeatIndex: Number(previewPerspective.value) });
+      });
+      previewActive.addEventListener("change", () => {
+        updatePreview({ activeSeatIndex: Number(previewActive.value) });
+      });
+    }
 
     return Object.freeze({
       openRooms: () => openRooms(),

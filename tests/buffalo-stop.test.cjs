@@ -89,7 +89,7 @@ test("creator-only stop UI confirms, disables duplicate submission, and waits fo
   );
   assert.match(html, /id="buffalo-stop-modal"[^>]*role="dialog"[^>]*hidden/);
   assert.match(html, /Buffalo Timer wirklich stoppen\?/);
-  assert.match(script, /identity\?\.deviceId === event\.caller\.deviceId/);
+  assert.match(script, /localIdentity\?\.deviceId === event\.caller\.deviceId/);
   assert.match(script, /state\.buffaloStopping[\s\S]*confirmBuffaloStopButton\.disabled = true/i);
   assert.match(script, /await window\.buffaloService\.stopEvent\(event\.id\)/);
   assert.match(script, /await refreshBuffaloTimer\(\)/);

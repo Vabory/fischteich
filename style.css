@@ -1401,7 +1401,7 @@ h2 {
 .buffalo-live-carousel {
   width: 100%;
   margin: var(--menu-upper-card-gap) auto 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .active-tournament-card:not([hidden]) + .buffalo-live-carousel {
@@ -1423,18 +1423,23 @@ h2 {
 .buffalo-live-track {
   display: flex;
   width: 100%;
-  overflow-x: auto;
+  max-width: 100%;
+  overflow-x: scroll;
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .buffalo-live-track::-webkit-scrollbar { display: none; }
 
 .buffalo-live-card {
   flex: 0 0 100%;
-  min-width: 0;
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
   min-height: 54px;
   padding: 7px 10px;
   align-items: center;
@@ -1449,6 +1454,7 @@ h2 {
   -webkit-backdrop-filter: blur(8px);
   scroll-snap-align: start;
   scroll-snap-stop: always;
+  cursor: pointer;
 }
 
 .buffalo-live-card:not([hidden]) {
@@ -1506,19 +1512,6 @@ h2 {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.025em;
-}
-
-.buffalo-live-stop {
-  grid-column: 1 / -1;
-  justify-self: start;
-  min-height: 28px;
-  padding: 5px 8px;
-  border: 1px solid rgb(255 143 118 / 25%);
-  border-radius: 9px;
-  background: rgb(111 35 39 / 25%);
-  color: #ffc0b5;
-  font-size: 0.62rem;
-  font-weight: 800;
 }
 
 .menu-secondary-actions {
@@ -4351,6 +4344,10 @@ button.is-release-pressed {
   width: min(100%, 360px);
   border-color: rgb(255 143 118 / 24%);
   text-align: center;
+}
+
+.buffalo-stop-backdrop {
+  z-index: 40;
 }
 
 .buffalo-stop-modal-card h2 { color: #ffc0b5; }

@@ -445,6 +445,7 @@ const state = {
   buffaloSelection: null,
   buffaloEvents: [],
   buffaloCarouselIndex: 0,
+  buffaloCarouselGesture: null,
   buffaloAddingAnother: false,
   buffaloStopEventId: null,
   buffaloTimerInterval: null,
@@ -790,11 +791,13 @@ function renderBuffaloPageIndicator() {
 }
 
 function renderBuffaloCollection() {
-  const identity = typeof getLocalIdentity === "function" ? getLocalIdentity() : null;
   buffaloLiveTrack.replaceChildren(...state.buffaloEvents.map((event) => {
     const card = document.createElement("article");
     card.className = "buffalo-live-card";
     card.dataset.buffaloEventId = event.id;
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `Aktive Buffalo Timer öffnen: ${event.selection.displayName}`);
     const copy = document.createElement("span");
     copy.className = "buffalo-live-copy";
     const kicker = document.createElement("span");
@@ -808,14 +811,6 @@ function renderBuffaloCollection() {
     countdown.dataset.buffaloCountdownId = event.id;
     countdown.textContent = formatBuffaloCountdown(window.buffaloService.getRemainingMilliseconds(event));
     card.append(copy, countdown);
-    if (identity?.deviceId === event.caller.deviceId) {
-      const stop = document.createElement("button");
-      stop.type = "button";
-      stop.className = "buffalo-live-stop";
-      stop.dataset.buffaloStopId = event.id;
-      stop.textContent = "Timer stoppen";
-      card.append(stop);
-    }
     return card;
   }));
   buffaloLivePages.replaceChildren(...state.buffaloEvents.map((_, index) => {
@@ -4822,12 +4817,50 @@ document.querySelector("#start-roulette").addEventListener("click", openRoulette
 openBuffaloTimerButton.addEventListener("click", openBuffaloTimerModal);
 cancelBuffaloStopButton.addEventListener("click", () => closeBuffaloStopConfirmation());
 confirmBuffaloStopButton.addEventListener("click", () => void confirmBuffaloStop());
-for (const container of [buffaloLiveTrack, buffaloModalActiveList]) {
-  container.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-buffalo-stop-id]");
-    if (button) openBuffaloStopConfirmation(button.dataset.buffaloStopId);
-  });
-}
+buffaloModalActiveList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-buffalo-stop-id]");
+  if (button) openBuffaloStopConfirmation(button.dataset.buffaloStopId);
+});
+buffaloLiveTrack.addEventListener("pointerdown", (event) => {
+  if (event.isPrimary === false || (event.button !== undefined && event.button !== 0)) return;
+  const card = event.target.closest("[data-buffalo-event-id]");
+  if (!card) return;
+  state.buffaloCarouselGesture = {
+    pointerId: event.pointerId,
+    eventId: card.dataset.buffaloEventId,
+    startX: event.clientX,
+    startY: event.clientY,
+    startScrollLeft: buffaloLiveTrack.scrollLeft,
+    dragged: false,
+  };
+});
+buffaloLiveTrack.addEventListener("pointermove", (event) => {
+  const gesture = state.buffaloCarouselGesture;
+  if (!gesture || gesture.pointerId !== event.pointerId) return;
+  if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > 10
+    || Math.abs(buffaloLiveTrack.scrollLeft - gesture.startScrollLeft) > 4) {
+    gesture.dragged = true;
+  }
+}, { passive: true });
+buffaloLiveTrack.addEventListener("pointerup", (event) => {
+  const gesture = state.buffaloCarouselGesture;
+  state.buffaloCarouselGesture = null;
+  if (!gesture || gesture.pointerId !== event.pointerId || gesture.dragged
+    || Math.abs(buffaloLiveTrack.scrollLeft - gesture.startScrollLeft) > 4) return;
+  if (state.buffaloEvents.some((item) => item.id === gesture.eventId)) openBuffaloTimerModal();
+});
+buffaloLiveTrack.addEventListener("pointercancel", () => {
+  state.buffaloCarouselGesture = null;
+});
+buffaloLiveTrack.addEventListener("click", (event) => {
+  if (event.detail === 0 && event.target.closest("[data-buffalo-event-id]")) openBuffaloTimerModal();
+});
+buffaloLiveTrack.addEventListener("keydown", (event) => {
+  if ((event.key === "Enter" || event.key === " ") && event.target.closest("[data-buffalo-event-id]")) {
+    event.preventDefault();
+    openBuffaloTimerModal();
+  }
+});
 buffaloLiveTrack.addEventListener("scroll", () => {
   const width = buffaloLiveTrack.clientWidth;
   if (!width) return;

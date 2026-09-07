@@ -95,3 +95,49 @@ test("Realtime, five-event limit, and stopped-event push gate remain present", (
   assert.match(migration, /if v_active_count >= 5[\s\S]*'limit_reached'/);
   assert.match(worker, /can_send_buffalo_push_delivery[\s\S]*if \(!await canSendDelivery/);
 });
+
+test("the overlapping secondary-nav rectangle passes hit testing through only in its empty center", () => {
+  const navRule = css.match(/\.menu-secondary-actions\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const buttonRule = css.match(/\.menu-secondary-actions button\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(navRule, /position:\s*absolute/);
+  assert.match(navRule, /left:\s*var\(--menu-secondary-left-inset\)/);
+  assert.match(navRule, /right:\s*var\(--menu-secondary-right-inset\)/);
+  assert.match(navRule, /pointer-events:\s*none/);
+  assert.match(buttonRule, /pointer-events:\s*auto/);
+});
+
+test("DOM order explains why the transparent nav won hit testing at equal stacking level", () => {
+  assert.ok(html.indexOf('id="buffalo-live-status"') < html.indexOf('class="menu-secondary-actions"'));
+  assert.match(css, /\.menu-card\s*\{[^}]*z-index:\s*2/s);
+  assert.match(css, /\.menu-secondary-actions\s*\{[^}]*z-index:\s*2/s);
+});
+
+test("tournament mode moves Buffalo down without expanding the tournament hit box", () => {
+  assert.match(css, /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-carousel\s*\{[^}]*margin-top:\s*var\(--menu-lower-card-gap\)/s);
+  assert.match(css, /\.active-tournament-card\s*\{[^}]*min-height:\s*65px/s);
+  assert.doesNotMatch(css, /\.active-tournament-card(?:::before|::after)/);
+});
+
+test("dynamic slide replacement retains interaction through stable-parent delegation", () => {
+  assert.match(collectionRenderer, /buffaloLiveTrack\.replaceChildren/);
+  assert.match(script, /buffaloLiveTrack\.addEventListener\("pointerdown"/);
+  assert.match(script, /buffaloLiveTrack\.addEventListener\("pointerup"/);
+  assert.doesNotMatch(collectionRenderer, /addEventListener/);
+});
+
+test("countdown ticks update only time text and never rebuild the track", () => {
+  const timerRenderer = script.slice(
+    script.indexOf("function renderBuffaloTimer"),
+    script.indexOf("function startBuffaloTimerUi"),
+  );
+  assert.match(timerRenderer, /querySelectorAll\("\[data-buffalo-countdown-id\]"\)/);
+  assert.match(timerRenderer, /countdown\.textContent = formatBuffaloCountdown/);
+  assert.doesNotMatch(timerRenderer, /renderBuffaloCollection|replaceChildren|innerHTML/);
+});
+
+test("slide sizing structurally produces horizontal over-width for every additional timer", () => {
+  // Node has no browser layout engine, so scrollWidth itself is verified on-device.
+  // This locks the flex invariant that makes N slides occupy N viewport widths.
+  assert.match(css, /\.buffalo-live-track\s*\{[^}]*display:\s*flex[^}]*width:\s*100%/s);
+  assert.match(css, /\.buffalo-live-card\s*\{[^}]*flex:\s*0 0 100%[^}]*width:\s*100%/s);
+});

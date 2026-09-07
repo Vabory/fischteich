@@ -12,9 +12,9 @@ const css = read("style.css");
 const script = read("script.js");
 
 const secondaryButtonRule = css.match(/\.menu-secondary-actions button\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-const buffaloRule = css.match(/\.buffalo-live-card\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+const buffaloRule = css.match(/\.buffalo-live-carousel\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 const activeBuffaloRule = css.match(
-  /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-card\s*\{([\s\S]*?)\n\}/,
+  /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-carousel\s*\{([\s\S]*?)\n\}/,
 )?.[1] ?? "";
 const setActiveTournament = script.slice(
   script.indexOf("function setActiveTournament("),
@@ -51,11 +51,11 @@ test("the tournament card visibility remains the only source of truth for Buffal
   assert.match(setActiveTournament, /activeTournamentCard\.hidden = true/);
   assert.match(setActiveTournament, /activeTournamentCard\.hidden = false/);
   assert.doesNotMatch(setActiveTournament, /buffalo|device|auth/i);
-  assert.match(css, /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-card/);
+  assert.match(css, /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-carousel/);
   assert.doesNotMatch(script, /buffalo-(?:top|bottom)/);
 });
 
 test("layout switching cannot restart or replace the Buffalo countdown", () => {
-  assert.equal((html.match(/id="buffalo-live-countdown"/g) ?? []).length, 1);
+  assert.equal((html.match(/id="buffalo-live-track"/g) ?? []).length, 1);
   assert.doesNotMatch(setActiveTournament, /buffaloLive|initializeBuffalo|refreshBuffalo|countdown/i);
 });

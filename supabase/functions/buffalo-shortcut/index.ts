@@ -442,7 +442,10 @@ async function handleStartAction(
   if (result.outcome === "rate_limited") {
     return json({ ok: false, error: "rate_limited" }, 429);
   }
-  if (!['created', 'already_active'].includes(result.outcome)) throw new Error("Unexpected RPC result");
+  if (result.outcome === "limit_reached") {
+    return json({ ok: false, status: "limit_reached", error: "limit_reached", maxActive: result.max_active ?? 5 }, 409);
+  }
+  if (result.outcome !== "created") throw new Error("Unexpected RPC result");
 
   diagnostic.step = "response";
   return json({

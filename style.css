@@ -1398,28 +1398,13 @@ h2 {
   outline-offset: 2px;
 }
 
-.buffalo-live-card {
+.buffalo-live-carousel {
   width: 100%;
-  min-height: 54px;
   margin: var(--menu-upper-card-gap) auto 0;
-  padding: 7px 10px;
-  align-items: center;
-  border: 1px solid rgb(255 200 83 / 38%);
-  border-radius: 14px;
-  background: rgb(13 8 16 / 90%);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 24%), inset 0 0 18px rgb(255 193 60 / 5%);
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  text-align: left;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
 }
 
-.buffalo-live-card:not([hidden]) {
-  display: grid;
-}
-
-.active-tournament-card:not([hidden]) + .buffalo-live-card {
+.active-tournament-card:not([hidden]) + .buffalo-live-carousel {
   width: min(
     100%,
     calc(
@@ -1434,6 +1419,59 @@ h2 {
   );
   margin-top: var(--menu-lower-card-gap);
 }
+
+.buffalo-live-track {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.buffalo-live-track::-webkit-scrollbar { display: none; }
+
+.buffalo-live-card {
+  flex: 0 0 100%;
+  min-width: 0;
+  min-height: 54px;
+  padding: 7px 10px;
+  align-items: center;
+  border: 1px solid rgb(255 200 83 / 38%);
+  border-radius: 14px;
+  background: rgb(13 8 16 / 90%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 24%), inset 0 0 18px rgb(255 193 60 / 5%);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  text-align: left;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.buffalo-live-card:not([hidden]) {
+  display: grid;
+}
+
+.buffalo-live-pages {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  min-height: 8px;
+  padding-top: 4px;
+}
+
+.buffalo-live-page {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgb(255 231 172 / 30%);
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.buffalo-live-page.is-active { background: #f5bc50; transform: scale(1.15); }
 
 .buffalo-live-copy,
 .buffalo-live-copy span,
@@ -1468,6 +1506,19 @@ h2 {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.025em;
+}
+
+.buffalo-live-stop {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid rgb(255 143 118 / 25%);
+  border-radius: 9px;
+  background: rgb(111 35 39 / 25%);
+  color: #ffc0b5;
+  font-size: 0.62rem;
+  font-weight: 800;
 }
 
 .menu-secondary-actions {
@@ -4229,19 +4280,28 @@ button.is-release-pressed {
 }
 
 .buffalo-modal-active:not([hidden]) {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 3px 10px;
+  display: block;
 }
 
 .buffalo-modal-active span {
-  grid-column: 1 / -1;
+  display: block;
   color: #f4bd55;
   font-size: 0.68rem;
   font-weight: 850;
   letter-spacing: 0.055em;
   text-transform: uppercase;
+}
+
+.buffalo-modal-active-list { display: grid; gap: 5px; margin-top: 7px; }
+
+.buffalo-modal-active-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 10px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 4%);
 }
 
 .buffalo-modal-active strong {
@@ -4257,6 +4317,53 @@ button.is-release-pressed {
   font-size: 1.16rem;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+
+.buffalo-stop-button {
+  min-height: 38px;
+  margin-top: 7px;
+  padding: 8px 12px;
+  border: 1px solid rgb(255 143 118 / 30%);
+  border-radius: 11px;
+  background: rgb(111 35 39 / 28%);
+  color: #ffc0b5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  grid-column: 1 / -1;
+}
+
+.buffalo-limit-hint {
+  margin: 8px 0 0;
+  color: #ff8f9f;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+#add-buffalo-timer:disabled { cursor: default; filter: grayscale(0.55); opacity: 0.45; }
+
+.buffalo-stop-button:disabled,
+.buffalo-stop-confirm:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.buffalo-stop-modal-card {
+  width: min(100%, 360px);
+  border-color: rgb(255 143 118 / 24%);
+  text-align: center;
+}
+
+.buffalo-stop-modal-card h2 { color: #ffc0b5; }
+.buffalo-stop-modal-card p { color: rgb(239 243 255 / 72%); line-height: 1.45; }
+
+.buffalo-stop-confirm {
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 20px;
+  border-radius: 18px;
+  background: #913c49;
+  box-shadow: 0 9px 24px rgb(145 60 73 / 22%);
+  font-weight: 800;
 }
 
 .buffalo-modal-feedback {

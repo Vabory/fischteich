@@ -23,6 +23,7 @@ const edgeFunction = read("supabase/functions/buffalo-shortcut/index.ts");
 const edgeConfig = read("supabase/config.toml");
 const buffaloService = read("buffalo-service.js");
 const pushMigration = read("supabase/migrations/20260901020000_create_buffalo_push_infrastructure.sql");
+const multiTimerMigration = read("supabase/migrations/20260907000000_add_buffalo_early_stop.sql");
 
 function createPlatformHarness(navigator, source = serviceSource) {
   const window = { navigator };
@@ -187,14 +188,17 @@ test("rate limiting is atomic and capped at ten authenticated attempts per minut
   assert.match(edgeFunction, /error: "rate_limited" \}, 429/);
 });
 
-test("shortcut uses the existing Buffalo RPC and therefore the existing outbox guarantees", () => {
+test("shortcut uses the shared start primitive and returns the explicit five-timer limit", () => {
   assert.match(migration, /from public\.start_buffalo_event\(/);
   assert.doesNotMatch(migration, /insert into public\.buffalo_events/i);
   assert.doesNotMatch(migration, /insert into public\.buffalo_push_jobs/i);
   assert.match(pushMigration, /unique \(event_id, job_type\)/i);
   assert.match(pushMigration, /\(v_event\.id, 'start', v_event\.started_at\)/);
   assert.match(pushMigration, /\(v_event\.id, 'end', v_event\.ends_at\)/);
-  assert.match(migration, /'already_active'/);
+  assert.match(multiTimerMigration, /start_buffalo_event_for_owner\(/);
+  assert.match(multiTimerMigration, /v_event\.status/);
+  assert.match(edgeFunction, /result\.outcome === "limit_reached"/);
+  assert.match(edgeFunction, /maxActive: result\.max_active \?\? 5/);
   assert.match(buffaloService, /rpc\("start_buffalo_event"/);
 });
 

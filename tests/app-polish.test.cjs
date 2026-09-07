@@ -12,10 +12,10 @@ const css = read("style.css");
 const script = read("script.js");
 const service = read("roulette-service.js");
 
-assert.match(html, /style\.css\?v=122/);
+assert.match(html, /style\.css\?v=124/);
 assert.match(html, /roulette-service\.js\?v=6/);
 assert.match(html, /button-release\.js\?v=1/);
-assert.match(html, /script\.js\?v=71/);
+assert.match(html, /script\.js\?v=73/);
 
 assert.match(html, /<p class="settings-app-version" id="settings-app-version"><\/p>/);
 assert.equal((script.match(/const FISCHTEICH_APP_VERSION = "1\.0"/g) ?? []).length, 1);
@@ -118,7 +118,7 @@ assert.match(script, /memberCount\.textContent = `\(\$\{getManualTeamMemberCount
 assert.match(script, /memberCount\.className = "tournament-builder-member-count"/);
 assert.match(css, /\.manual-team-card-footer\s*\{[^}]*display:\s*flex[^}]*align-items:\s*center[^}]*gap:\s*8px/s);
 assert.match(css, /\.manual-team-card-footer \.tournament-builder-member-count\s*\{[^}]*position:\s*static[^}]*height:\s*38px[^}]*align-items:\s*center/s);
-assert.match(css, /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-card\s*\{[^}]*--menu-secondary-button-size[^}]*margin-top:\s*var\(--menu-lower-card-gap\)/s);
+assert.match(css, /\.active-tournament-card:not\(\[hidden\]\) \+ \.buffalo-live-carousel\s*\{[^}]*--menu-secondary-button-size[^}]*margin-top:\s*var\(--menu-lower-card-gap\)/s);
 
 (async () => {
   const result = await serviceContext.window.rouletteService.getRouletteLeaderboard();

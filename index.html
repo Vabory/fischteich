@@ -10,19 +10,19 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260907.1">
+    <meta name="fischteich-build" content="20260907.3">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=122">
+    <link rel="stylesheet" href="./style.css?v=124">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
     <script src="./auth.js?v=3" defer></script>
     <script src="./roulette-service.js?v=6" defer></script>
-    <script src="./buffalo-service.js?v=2" defer></script>
+    <script src="./buffalo-service.js?v=4" defer></script>
     <script src="./pwa-service.js?v=1" defer></script>
     <script src="./push-service.js?v=2" defer></script>
     <script src="./shortcut-service.js?v=5" defer></script>
@@ -31,7 +31,7 @@
     <script src="./trottl-classic-preview.js?v=2" defer></script>
     <script src="./trottl-classic-ui.js?v=7" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=71" defer></script>
+    <script src="./script.js?v=73" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -95,12 +95,9 @@
             <span class="active-tournament-arrow" aria-hidden="true">›</span>
           </button>
 
-          <section class="buffalo-live-card" id="buffalo-live-status" aria-label="Laufender Buffalo Timer" aria-live="polite" hidden>
-            <span class="buffalo-live-copy">
-              <span class="buffalo-live-kicker">BUFFALO TIMER</span>
-              <strong id="buffalo-live-name">—</strong>
-            </span>
-            <time class="buffalo-live-countdown" id="buffalo-live-countdown">03:00</time>
+          <section class="buffalo-live-carousel" id="buffalo-live-status" aria-label="Laufende Buffalo Timer" aria-live="polite" hidden>
+            <div class="buffalo-live-track" id="buffalo-live-track"></div>
+            <div class="buffalo-live-pages" id="buffalo-live-pages" aria-label="Timer-Seiten"></div>
           </section>
         </main>
 
@@ -1055,17 +1052,29 @@
       <div class="modal-card roulette-stats-modal-card buffalo-timer-modal-card">
         <h2 id="buffalo-timer-title">Buffalo Timer</h2>
         <a class="buffalo-rules-link" href="https://ris-buffalo.eu/" target="_blank" rel="noopener noreferrer external">Buffalo Regelwerk ↗</a>
-        <section class="buffalo-modal-active" id="buffalo-modal-active" aria-label="Aktiver Buffalo Timer" hidden>
-          <span>Buffalo Timer läuft bereits</span>
-          <strong id="buffalo-modal-active-name">—</strong>
-          <time id="buffalo-modal-active-countdown">03:00</time>
+        <section class="buffalo-modal-active" id="buffalo-modal-active" aria-label="Aktive Buffalo Timer" hidden>
+          <span>AKTIVE BUFFALO TIMER</span>
+          <div class="buffalo-modal-active-list" id="buffalo-modal-active-list"></div>
         </section>
+        <p class="buffalo-limit-hint" id="buffalo-limit-hint" hidden>Maximale Timer-Anzahl erreicht</p>
         <p class="buffalo-modal-feedback" id="buffalo-modal-feedback" aria-live="polite" hidden></p>
         <p class="buffalo-selection-hint" id="buffalo-selection-hint">Wer wurde erwischt?</p>
         <div class="buffalo-person-grid" id="buffalo-person-grid" role="group" aria-labelledby="buffalo-selection-hint"></div>
         <div class="modal-actions buffalo-timer-actions">
           <button class="secondary-button" id="cancel-buffalo-timer" type="button">Abbrechen</button>
+          <button class="primary-button" id="add-buffalo-timer" type="button" hidden>Weiterer Timer</button>
           <button class="primary-button" id="start-buffalo-timer" type="button" disabled>Timer starten!</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="buffalo-stop-modal" role="dialog" aria-modal="true" aria-labelledby="buffalo-stop-title" hidden>
+      <div class="modal-card buffalo-stop-modal-card">
+        <h2 id="buffalo-stop-title">Buffalo Timer wirklich stoppen?</h2>
+        <p>Der laufende Timer wird für alle beendet. Es wird keine Abschluss-Benachrichtigung versendet.</p>
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancel-buffalo-stop" type="button">Abbrechen</button>
+          <button class="buffalo-stop-confirm" id="confirm-buffalo-stop" type="button">Timer stoppen</button>
         </div>
       </div>
     </div>

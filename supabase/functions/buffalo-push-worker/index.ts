@@ -87,6 +87,19 @@ async function completeDelivery(
   return data === true;
 }
 
+async function canSendDelivery(
+  supabase: ReturnType<typeof createClient>,
+  deliveryId: number,
+  claimToken: string,
+) {
+  const { data, error } = await supabase.rpc("can_send_buffalo_push_delivery", {
+    p_delivery_id: deliveryId,
+    p_claim_token: claimToken,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 async function processDelivery(
   supabase: ReturnType<typeof createClient>,
   delivery: PushDelivery,
@@ -98,6 +111,10 @@ async function processDelivery(
   let failureReason: string | null = null;
 
   try {
+    if (!await canSendDelivery(supabase, delivery.delivery_id, claimToken)) {
+      return { success: false, permanentFailure: false, skipped: true };
+    }
+
     const subscription = {
       endpoint: delivery.endpoint,
       keys: { p256dh: delivery.p256dh, auth: delivery.auth },
@@ -136,7 +153,7 @@ async function processDelivery(
     permanentFailure,
     failureReason,
   );
-  return { success, permanentFailure };
+  return { success, permanentFailure, skipped: false };
 }
 
 async function handleRequest(request: Request): Promise<Response> {

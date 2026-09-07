@@ -4242,10 +4242,12 @@ button.is-release-pressed {
 
 .buffalo-timer-modal-card {
   width: min(100%, 390px);
-  max-height: min(94dvh, 650px);
+  max-height: min(94dvh, 720px);
   padding: 17px 14px 14px;
   border-color: rgb(255 203 87 / 28%);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background:
     radial-gradient(circle at 50% 0, rgb(124 78 22 / 18%), transparent 42%),
     linear-gradient(145deg, rgb(16 18 38 / 99%), rgb(6 7 18 / 99%));

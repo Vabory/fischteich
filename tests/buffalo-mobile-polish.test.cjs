@@ -141,3 +141,30 @@ test("slide sizing structurally produces horizontal over-width for every additio
   assert.match(css, /\.buffalo-live-track\s*\{[^}]*display:\s*flex[^}]*width:\s*100%/s);
   assert.match(css, /\.buffalo-live-card\s*\{[^}]*flex:\s*0 0 100%[^}]*width:\s*100%/s);
 });
+
+test("five-timer modal gets more height without shrinking its contents", () => {
+  const modalRule = css.match(/\.buffalo-timer-modal-card\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(modalRule, /max-height:\s*min\(94dvh, 720px\)/);
+  assert.match(modalRule, /padding:\s*17px 14px 14px/);
+  assert.doesNotMatch(modalRule, /(?:font-size|min-height):/);
+  assert.match(css, /\.buffalo-modal-active-row\s*\{[^}]*padding:\s*7px 8px/s);
+  assert.match(css, /\.buffalo-stop-button\s*\{[^}]*min-height:\s*38px/s);
+});
+
+test("short viewports retain a safe whole-modal scroll fallback", () => {
+  const modalRule = css.match(/\.buffalo-timer-modal-card\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(modalRule, /overflow-x:\s*hidden/);
+  assert.match(modalRule, /overflow-y:\s*auto/);
+  assert.match(modalRule, /-webkit-overflow-scrolling:\s*touch/);
+  assert.match(css, /\.buffalo-timer-backdrop\s*\{[^}]*env\(safe-area-inset-bottom\)/s);
+});
+
+test("modal growth is content-driven for one through four timers", () => {
+  const modalRule = css.match(/\.buffalo-timer-modal-card\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.doesNotMatch(modalRule, /(?:^|\s)(?:height|min-height):/);
+});
+
+test("stop confirmation keeps its higher semantic overlay layer", () => {
+  assert.match(css, /\.roulette-stats-backdrop\s*\{\s*z-index:\s*30/);
+  assert.match(css, /\.buffalo-stop-backdrop\s*\{\s*z-index:\s*40/);
+});

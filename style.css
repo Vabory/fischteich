@@ -5003,6 +5003,7 @@ button.is-release-pressed {
 
 /* Turnier erstellen: eigenständiger, mobiler Draft-Wizard. */
 .tournament-create-screen {
+  --tournament-wizard-action: #2889ae;
   background:
     radial-gradient(circle at 50% -4%, rgb(46 82 173 / 38%), transparent 42%),
     radial-gradient(circle at 100% 82%, rgb(241 90 154 / 12%), transparent 38%),
@@ -5194,8 +5195,8 @@ button.is-release-pressed {
 
 .tournament-type-card.is-selected {
   border-color: rgb(241 90 154 / 72%);
-  background: linear-gradient(145deg, rgb(40 37 88 / 94%), rgb(35 15 48 / 92%));
-  box-shadow: inset 0 0 0 1px rgb(241 90 154 / 34%), 0 10px 28px rgb(241 90 154 / 10%);
+  background: linear-gradient(145deg, #322554, #2d1438);
+  box-shadow: inset 0 0 0 1px rgb(241 90 154 / 34%), 0 10px 28px rgb(241 90 154 / 14%);
 }
 
 .tournament-card {
@@ -5451,7 +5452,7 @@ button.is-release-pressed {
 }
 
 .tournament-toggle[aria-checked="true"] {
-  background: linear-gradient(90deg, #3d8eb9, var(--pink));
+  background: linear-gradient(90deg, #489fc5, var(--pink));
 }
 
 .tournament-toggle[aria-checked="true"]::after {
@@ -5592,7 +5593,7 @@ button.is-release-pressed {
 }
 
 #tournament-step-next {
-  background: var(--tournament-action);
+  background: var(--tournament-wizard-action);
   box-shadow: 0 9px 24px rgb(104 217 255 / 24%);
 }
 

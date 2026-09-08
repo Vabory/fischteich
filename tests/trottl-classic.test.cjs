@@ -18,6 +18,7 @@ const script = read("script.js");
 const ui = read("trottl-classic-ui.js");
 const serviceSource = read("trottl-classic-service.js");
 const previewSource = read("trottl-classic-preview.js");
+const shotGlass = read("assets/trottl-classic/shot-glass.svg");
 
 const USER_ID = "10000000-0000-4000-8000-000000000001";
 const SESSION_ID = "20000000-0000-4000-8000-000000000001";
@@ -863,7 +864,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=10[\s\S]*script\.js\?v=78/);
+  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=11[\s\S]*script\.js\?v=78/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -912,6 +913,18 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-sip-markers i\.is-assigned/);
   assert.match(css, /\.trottl-classic-situation\.is-four-distribution \.trottl-classic-event-meta/);
   assert.match(css, /\.trottl-classic-rule-controls\.has-actions[\s\S]*min-height:\s*44px/);
+  for (const effectClass of [
+    "action-impact", "selectable-impact", "trottl-impact", "allocation-impact", "success-impact", "penalty-impact",
+  ]) assert.match(css, new RegExp(`\\.trottl-classic-player--${effectClass}`));
+  assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active \.trottl-classic-table::after[\s\S]*trottl-classic-reaction-rim 1\.1s/);
+  assert.match(css, /\.trottl-classic-situation\.is-reaction-urgent/);
+  assert.match(css, /\.trottl-classic-situation\.is-shot-event \.trottl-classic-event-action::before[\s\S]*assets\/trottl-classic\/shot-glass\.svg/);
+  assert.match(css, /\.trottl-classic-dice-mount\.is-reroll-ready::after/);
+  assert.match(css, /\.trottl-classic-player-confirm:active[\s\S]*scale:\s*0\.96/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*trottl-classic-player--action-impact[\s\S]*trottl-classic-table::after/);
+  assert.match(shotGlass, /<svg[^>]*viewBox="0 0 24 24"/);
+  assert.match(shotGlass, /fill="none"/);
+  assert.doesNotMatch(shotGlass, /<script|<image|(?:href|src)=|data:/i);
   assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*78px/);
   assert.match(css, /\.trottl-classic-event-main\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
   assert.match(css, /@keyframes trottl-classic-event-enter/);
@@ -1037,9 +1050,26 @@ test("Klassik player cards apply semantic state priority and stable status text"
   assert.ok(acknowledgedLoser.classes.includes("trottl-classic-player--reaction-loser"));
   assert.ok(acknowledgedLoser.classes.includes("trottl-classic-player--penalty-confirmed"));
   assert.ok(present({ isContextMuted: true }).classes.includes("trottl-classic-player--context-muted"));
+  const effects = present({
+    isActionImpact: true,
+    isSelectableImpact: true,
+    isTrottlImpact: true,
+    isAllocationImpact: true,
+    isReactionSuccessImpact: true,
+    isPenaltyImpact: true,
+  });
+  for (const effectClass of [
+    "action-impact", "selectable-impact", "trottl-impact", "allocation-impact", "success-impact", "penalty-impact",
+  ]) assert.ok(effects.classes.includes(`trottl-classic-player--${effectClass}`));
   assert.match(ui, /phase === "awaiting_four_acks"[\s\S]*allocation === 0/);
   assert.match(ui, /\["choosing_trottl", "distributing_four"\][\s\S]*actionActorSeat/);
   assert.match(ui, /penaltyAcks\.has\(player\.seatIndex\)/);
+  assert.match(ui, /function collectVisualEffects\(snapshot, ruleView\)/);
+  assert.match(ui, /state\.visualRollSeq !== session\.rollSeq \|\| state\.visualPhase !== ruleView\.phase/);
+  assert.match(ui, /Number\(seat\) === ruleView\.localSeat[\s\S]*status === "reacted"/);
+  assert.match(ui, /tableStage\.classList\.toggle\("is-reaction-active", ruleView\.localReactionActive\)/);
+  assert.match(ui, /situation\.classList\.toggle\("is-shot-event", ruleView\.phase === "shot_ack"\)/);
+  assert.match(ui, /"is-reroll-ready"[\s\S]*ruleView\.phase === "awaiting_reroll"/);
 
   const stateOrder = [
     ".trottl-classic-player--self {",

@@ -109,6 +109,12 @@
       isPenaltyAcknowledged = false,
       isShotTarget = false,
       isContextMuted = false,
+      isActionImpact = false,
+      isSelectableImpact = false,
+      isTrottlImpact = false,
+      isAllocationImpact = false,
+      isReactionSuccessImpact = false,
+      isPenaltyImpact = false,
       allocation = 0,
       reactionStatus = "",
       reactionDurationMs = null,
@@ -128,6 +134,12 @@
     if (isReactionLoser) classes.push("trottl-classic-player--reaction-loser");
     if (isPenaltyAcknowledged) classes.push("trottl-classic-player--penalty-confirmed");
     if (isContextMuted) classes.push("trottl-classic-player--context-muted");
+    if (isActionImpact) classes.push("trottl-classic-player--action-impact");
+    if (isSelectableImpact) classes.push("trottl-classic-player--selectable-impact");
+    if (isTrottlImpact) classes.push("trottl-classic-player--trottl-impact");
+    if (isAllocationImpact) classes.push("trottl-classic-player--allocation-impact");
+    if (isReactionSuccessImpact) classes.push("trottl-classic-player--success-impact");
+    if (isPenaltyImpact) classes.push("trottl-classic-player--penalty-impact");
 
     let status = "";
     if (isPenaltyAcknowledged) {
@@ -217,6 +229,15 @@
       reactionStartPending: false,
       queuedReactionAt: null,
       animatingReactionCanStart: false,
+      hasRenderedGame: false,
+      visualSessionId: null,
+      visualRollSeq: null,
+      visualPhase: null,
+      visualTrottlSeat: null,
+      visualAllocations: Object.freeze({}),
+      visualReactionStatuses: Object.freeze({}),
+      visualPenaltySeats: new Set(),
+      visualFourTotal: 0,
     };
 
     const gameDice = global.FischteichDice.mount({
@@ -358,7 +379,7 @@
       return false;
     }
 
-    function createGameSeat(relativeSeat, snapshot, activeSeatIndex, ruleView) {
+    function createGameSeat(relativeSeat, snapshot, activeSeatIndex, ruleView, effects) {
       const { player, relativeIndex } = relativeSeat;
       const position = service.getSeatPosition(relativeIndex, snapshot.players.length);
       const seat = document.createElement("article");
@@ -411,6 +432,12 @@
         isPenaltyAcknowledged,
         isShotTarget,
         isContextMuted,
+        isActionImpact: effects.actionImpactSeat === player.seatIndex,
+        isSelectableImpact: effects.selectableImpact && isSelectable,
+        isTrottlImpact: effects.trottlImpactSeat === player.seatIndex && !isDrinkTarget,
+        isAllocationImpact: effects.allocationImpactSeats.has(player.seatIndex),
+        isReactionSuccessImpact: effects.successImpactSeats.has(player.seatIndex),
+        isPenaltyImpact: effects.penaltyImpactSeats.has(player.seatIndex),
         allocation,
         reactionStatus: reaction?.status,
         reactionDurationMs: Number(reaction?.duration_ms),
@@ -547,6 +574,7 @@
       clearReactionCountdownTimer();
       if (state.preview || !ruleView.localReactionActive) {
         situation.style.removeProperty("--reaction-progress");
+        situation.classList.remove("is-reaction-urgent");
         return;
       }
       const update = () => {
@@ -562,6 +590,7 @@
         situationAction.textContent = `${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
         situationAction.hidden = false;
         situation.style.setProperty("--reaction-progress", `${Math.min(100, (remainingMs / 10000) * 100).toFixed(1)}%`);
+        situation.classList.toggle("is-reaction-urgent", remainingMs <= 3000);
         state.reactionCountdownTimer = global.setTimeout(update, 100);
       };
       update();
@@ -598,17 +627,89 @@
       ruleControls.classList.toggle("has-actions", mayDistribute);
     }
 
+    function collectVisualEffects(snapshot, ruleView) {
+      const session = snapshot.session;
+      const canAnimate = state.hasRenderedGame && state.visualSessionId === session.id;
+      const phaseEntered = canAnimate
+        && (state.visualRollSeq !== session.rollSeq || state.visualPhase !== ruleView.phase);
+      const allocations = Object.freeze({ ...ruleView.allocations });
+      const reactionStatuses = Object.freeze(Object.fromEntries(snapshot.players.map((player) => [
+        player.seatIndex,
+        service.getReactionPlayer(session, player.seatIndex)?.status ?? "",
+      ])));
+      const allocationImpactSeats = new Set();
+      const successImpactSeats = new Set();
+      const penaltyImpactSeats = new Set();
+
+      if (canAnimate && state.visualRollSeq === session.rollSeq && ruleView.phase === "distributing_four") {
+        for (const [seat, amount] of Object.entries(allocations)) {
+          if (Number(amount) > Number(state.visualAllocations[seat] ?? 0)) allocationImpactSeats.add(Number(seat));
+        }
+      }
+      if (canAnimate) {
+        for (const [seat, status] of Object.entries(reactionStatuses)) {
+          if (Number(seat) === ruleView.localSeat
+            && status === "reacted"
+            && state.visualReactionStatuses[seat] !== "reacted") successImpactSeats.add(Number(seat));
+        }
+        for (const seat of ruleView.penaltySeats) {
+          if (!state.visualPenaltySeats.has(seat)) penaltyImpactSeats.add(seat);
+        }
+      }
+
+      const fourTotal = service.getFourTotal(session);
+      const effects = Object.freeze({
+        actionImpactSeat: phaseEntered && ruleView.phase === "awaiting_drink_ack"
+          ? session.actionTargetSeat
+          : phaseEntered && ruleView.phase === "shot_ack"
+            ? session.actionActorSeat
+            : null,
+        selectableImpact: phaseEntered && ruleView.phase === "choosing_trottl",
+        trottlImpactSeat: canAnimate
+          && state.visualTrottlSeat !== session.currentTrottlSeat
+          && session.currentTrottlSeat !== null
+          ? session.currentTrottlSeat
+          : null,
+        allocationImpactSeats,
+        successImpactSeats,
+        penaltyImpactSeats,
+        fourCompleteImpact: canAnimate
+          && ruleView.phase === "distributing_four"
+          && fourTotal === 4
+          && state.visualFourTotal !== 4,
+      });
+
+      state.hasRenderedGame = true;
+      state.visualSessionId = session.id;
+      state.visualRollSeq = session.rollSeq;
+      state.visualPhase = ruleView.phase;
+      state.visualTrottlSeat = session.currentTrottlSeat;
+      state.visualAllocations = allocations;
+      state.visualReactionStatuses = reactionStatuses;
+      state.visualPenaltySeats = new Set(ruleView.penaltySeats);
+      state.visualFourTotal = fourTotal;
+      return effects;
+    }
+
     function renderGame(snapshot, activeSeatIndex = service.initialActiveSeatIndex) {
       const relativeSeats = service.getRelativeSeats(snapshot.players, snapshot.identity.userId);
       const ruleView = getRuleView(snapshot);
+      const effects = collectVisualEffects(snapshot, ruleView);
       tableStage.dataset.playerCount = String(snapshot.players.length);
       tableStage.classList.toggle("is-reaction-active", ruleView.localReactionActive);
       situation.classList.toggle("is-reaction-prompt", ruleView.localReactionActive);
+      situation.classList.toggle("is-shot-event", ruleView.phase === "shot_ack");
+      situation.classList.toggle("is-four-complete-impact", effects.fourCompleteImpact);
+      gameDiceMount.classList.toggle(
+        "is-reroll-ready",
+        ruleView.phase === "awaiting_reroll" && ruleView.localSeat === activeSeatIndex,
+      );
       renderSituation(describeSituation(snapshot, ruleView, activeSeatIndex));
       seatLayer.replaceChildren(...relativeSeats.map(
-        (seat) => createGameSeat(seat, snapshot, activeSeatIndex, ruleView),
+        (seat) => createGameSeat(seat, snapshot, activeSeatIndex, ruleView, effects),
       ));
       renderRuleControls(snapshot, ruleView);
+      fourConfirmButton.classList.toggle("is-ready-impact", effects.fourCompleteImpact);
       scheduleActionBoundary(snapshot, ruleView);
       renderReactionCountdown(snapshot, ruleView);
     }
@@ -630,6 +731,15 @@
       state.personalReactionIntent = null;
       state.reactionStartPending = false;
       state.queuedReactionAt = null;
+      state.hasRenderedGame = false;
+      state.visualSessionId = sessionId;
+      state.visualRollSeq = null;
+      state.visualPhase = null;
+      state.visualTrottlSeat = null;
+      state.visualAllocations = Object.freeze({});
+      state.visualReactionStatuses = Object.freeze({});
+      state.visualPenaltySeats = new Set();
+      state.visualFourTotal = 0;
     }
 
     function localPlayerSeat(snapshot) {

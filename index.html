@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260908.7">
+    <meta name="fischteich-build" content="20260908.8">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=133">
+    <link rel="stylesheet" href="./style.css?v=134">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -29,7 +29,7 @@
     <script src="./dice-service.js?v=3" defer></script>
     <script src="./trottl-classic-service.js?v=8" defer></script>
     <script src="./trottl-classic-preview.js?v=2" defer></script>
-    <script src="./trottl-classic-ui.js?v=7" defer></script>
+    <script src="./trottl-classic-ui.js?v=8" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=78" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -267,7 +267,15 @@
                 </label>
               </div>
             </details>
-            <div class="trottl-classic-situation" id="trottl-classic-situation" aria-live="polite">SPIEL LÄUFT</div>
+            <div class="trottl-classic-situation" id="trottl-classic-situation" role="status" aria-live="polite" aria-atomic="true">
+              <div class="trottl-classic-event-main">
+                <span class="trottl-classic-event-player" id="trottl-classic-event-player"></span>
+                <span class="trottl-classic-event-copy" id="trottl-classic-event-copy">SPIEL LÄUFT</span>
+                <span class="trottl-classic-event-roll" id="trottl-classic-event-roll" hidden></span>
+              </div>
+              <p class="trottl-classic-event-action" id="trottl-classic-event-action" hidden></p>
+              <p class="trottl-classic-event-meta" id="trottl-classic-event-meta" hidden></p>
+            </div>
             <div class="trottl-classic-table-stage" id="trottl-classic-table-stage">
               <div class="trottl-classic-table" aria-hidden="true">
                 <div class="trottl-classic-table-rail"></div>

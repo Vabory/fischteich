@@ -1,6 +1,76 @@
 "use strict";
 
 (function installTrottlClassicUi(global) {
+  function createEventPresentation(context) {
+    const {
+      phase,
+      rollPhase,
+      rollResult,
+      actorName = "SPIELER",
+      currentPlayerName = "SPIELER",
+      targetName = "SPIELER",
+      actionKind = "",
+      localIsCurrent = false,
+      localReactionActive = false,
+      localReactionStatus = "",
+      localRemainingMs = null,
+      remainingSips = 0,
+      allocationSummary = "",
+      penaltyNames = [],
+    } = context;
+    const result = Number(rollResult);
+    const view = (player, copy, roll = "", action = "", meta = "", key = phase) => Object.freeze({
+      player, copy, roll, action, meta, key,
+    });
+    const rolled = (roll, action, meta = "") => view(
+      actorName,
+      "HAT EINE",
+      String(roll),
+      action,
+      meta,
+      `${phase}:${roll}:${action}:${meta}`,
+    );
+
+    if (rollPhase === "rolling" || phase === "rolling") return view(actorName, "WÜRFELT");
+    if (phase === "awaiting_roll") {
+      return view(currentPlayerName, "IST AM ZUG", "", localIsCurrent ? "Tippe auf den Würfel" : "Warte auf den Wurf");
+    }
+    if (phase === "awaiting_reroll") {
+      return view(currentPlayerName, "IST NOCHMAL AM ZUG", "", localIsCurrent ? "Tippe auf den Würfel" : "Warte auf den Wurf");
+    }
+    if (phase === "awaiting_drink_ack") {
+      return rolled(result, `${targetName} trinkt 1 Schluck`);
+    }
+    if (phase === "choosing_trottl") {
+      return rolled(3, actionKind === "replace_trottl" ? "Wähle einen neuen 3er Trottl" : "Wähle den 3er Trottl");
+    }
+    if (phase === "distributing_four") {
+      return rolled(4, "Verteile 4 Schlücke", remainingSips === 0 ? "Alle 4 verteilt" : `Noch ${remainingSips} übrig`);
+    }
+    if (phase === "awaiting_four_acks") {
+      return view("", "4 SCHLÜCKE VERTEILT", "", allocationSummary, "", `${phase}:${allocationSummary}`);
+    }
+    if (phase === "reaction_pending" || phase === "reaction_active") {
+      if (localReactionActive) {
+        const countdown = Number.isFinite(localRemainingMs)
+          ? `${(Math.max(0, localRemainingMs) / 1000).toFixed(1).replace(".", ",")} s`
+          : "";
+        return view("", "TIPPE AUF DEN BILDSCHIRM!", "", countdown, "", `${phase}:active`);
+      }
+      if (localReactionStatus === "reacted") return view("", "BESTÄTIGT", "", "Warte auf die anderen");
+      if (localReactionStatus === "timed_out" || localRemainingMs === 0) {
+        return view("", "ZU LANGSAM", "", "Warte auf die anderen");
+      }
+      return view("", "MACH DICH BEREIT", "", "Die Reaktion startet gleich");
+    }
+    if (phase === "reaction_loser_lockout" || phase === "reaction_loser_ack") {
+      if (penaltyNames.length === 1) return view(penaltyNames[0], "WAR ZU LANGSAM", "", "1 Schluck");
+      return view("", "ZU LANGSAM", "", penaltyNames.join(" · "));
+    }
+    if (phase === "shot_ack") return rolled(6, "Trink einen Shot");
+    return view("", "SPIEL LÄUFT");
+  }
+
   function create({ showScreen, showTrottlMenu }) {
     const service = global.trottlClassicService;
     const preview = global.trottlClassicPreview;
@@ -17,6 +87,11 @@
     const tableStage = document.querySelector("#trottl-classic-table-stage");
     const seatLayer = document.querySelector("#trottl-classic-seat-layer");
     const situation = document.querySelector("#trottl-classic-situation");
+    const situationPlayer = document.querySelector("#trottl-classic-event-player");
+    const situationCopy = document.querySelector("#trottl-classic-event-copy");
+    const situationRoll = document.querySelector("#trottl-classic-event-roll");
+    const situationAction = document.querySelector("#trottl-classic-event-action");
+    const situationMeta = document.querySelector("#trottl-classic-event-meta");
     const gameDiceMount = document.querySelector("#trottl-classic-dice-mount");
     const gameDiceStatus = document.querySelector("#trottl-classic-dice-status");
     const ruleControls = document.querySelector("#trottl-classic-rule-controls");
@@ -304,45 +379,46 @@
       return seat;
     }
 
-    function describeSituation(snapshot, ruleView) {
+    function describeSituation(snapshot, ruleView, activeSeatIndex = snapshot.session.currentTurnSeat) {
       const session = snapshot.session;
       const actorName = playerName(snapshot, session.actionActorSeat ?? session.currentTurnSeat);
-      if (session.rollPhase === "rolling" || ruleView.phase === "rolling") return `${actorName} WÜRFELT`;
-      if (ruleView.phase === "awaiting_roll") return `${playerName(snapshot, session.currentTurnSeat)} IST AM ZUG`;
-      if (ruleView.phase === "awaiting_reroll") return `${playerName(snapshot, session.currentTurnSeat)} IST NOCHMAL AM ZUG`;
-      if (ruleView.phase === "awaiting_drink_ack") {
-        const targetName = playerName(snapshot, session.actionTargetSeat);
-        return session.actionPayload.kind === "trottl_drink"
-          ? `${targetName} ALS 3ER TROTTL TRINKT 1 SCHLUCK`
-          : `${targetName} TRINKT 1 SCHLUCK`;
-      }
-      if (ruleView.phase === "choosing_trottl") return `${actorName} WÄHLT DEN 3ER TROTTL`;
-      if (ruleView.phase === "distributing_four") {
-        return `${actorName} VERTEILT 4 SCHLÜCKE · ${4 - service.getFourTotal(session)} OFFEN`;
-      }
-      if (ruleView.phase === "awaiting_four_acks") {
-        return Object.entries(ruleView.allocations)
-          .map(([seat, amount]) => `${playerName(snapshot, Number(seat))} ${amount}`)
-          .join(" · ");
-      }
-      if (["reaction_pending", "reaction_active"].includes(ruleView.phase)) {
-        if (ruleView.localReactionActive) return "TIPPE AUF DEN BILDSCHIRM!";
-        if (ruleView.localReaction?.status === "reacted") return "BESTÄTIGT – WARTE AUF DIE ANDEREN";
-        if (ruleView.localReaction?.status === "timed_out" || ruleView.localRemainingMs === 0) {
-          return "ZU LANGSAM – WARTE AUF DIE ANDEREN";
-        }
-        return "REAKTION WIRD VORBEREITET";
-      }
-      if (ruleView.phase === "reaction_loser_lockout") {
-        const names = [...ruleView.penaltySeats].map((seat) => playerName(snapshot, seat)).join(" · ");
-        return `${names} ${ruleView.penaltySeats.size === 1 ? "WAR" : "WAREN"} ZU LANGSAM`;
-      }
-      if (ruleView.phase === "reaction_loser_ack") {
-        const names = [...ruleView.penaltySeats].map((seat) => playerName(snapshot, seat)).join(" · ");
-        return `${names} ${ruleView.penaltySeats.size === 1 ? "TRINKT" : "TRINKEN"} JE 1 SCHLUCK`;
-      }
-      if (ruleView.phase === "shot_ack") return `SHOT FÜR ${actorName}`;
-      return "SPIEL LÄUFT";
+      const allocationSummary = Object.entries(ruleView.allocations)
+        .filter(([, amount]) => Number(amount) > 0)
+        .map(([seat, amount]) => `${playerAtSeat(snapshot, Number(seat))?.displayName ?? "Spieler"} ${amount}`)
+        .join(" · ");
+      return createEventPresentation({
+        phase: ruleView.phase,
+        rollPhase: session.rollPhase,
+        rollResult: session.rollResult,
+        actorName,
+        currentPlayerName: playerName(snapshot, activeSeatIndex),
+        targetName: playerName(snapshot, session.actionTargetSeat),
+        actionKind: session.actionPayload.kind,
+        localIsCurrent: ruleView.localSeat === activeSeatIndex,
+        localReactionActive: ruleView.localReactionActive,
+        localReactionStatus: ruleView.localReaction?.status,
+        localRemainingMs: ruleView.localRemainingMs,
+        remainingSips: Math.max(0, 4 - service.getFourTotal(session)),
+        allocationSummary,
+        penaltyNames: [...ruleView.penaltySeats].map((seat) => playerName(snapshot, seat)),
+      });
+    }
+
+    function renderSituation(presentation) {
+      const setPart = (element, value) => {
+        element.textContent = value;
+        element.hidden = !value;
+      };
+      setPart(situationPlayer, presentation.player);
+      setPart(situationCopy, presentation.copy);
+      setPart(situationRoll, presentation.roll);
+      setPart(situationAction, presentation.action);
+      setPart(situationMeta, presentation.meta);
+      if (situation.dataset.eventKey === presentation.key) return;
+      situation.dataset.eventKey = presentation.key;
+      situation.classList.remove("is-changing");
+      void situation.offsetWidth;
+      situation.classList.add("is-changing");
     }
 
     function clearActionBoundaryTimer() {
@@ -368,7 +444,8 @@
           renderSession("passive");
           return;
         }
-        situation.textContent = `TIPPE AUF DEN BILDSCHIRM! · ${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
+        situationAction.textContent = `${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
+        situationAction.hidden = false;
         state.reactionCountdownTimer = global.setTimeout(update, 100);
       };
       update();
@@ -410,9 +487,7 @@
       const ruleView = getRuleView(snapshot);
       tableStage.dataset.playerCount = String(snapshot.players.length);
       tableStage.classList.toggle("is-reaction-active", ruleView.localReactionActive);
-      situation.textContent = state.preview
-        ? `${playerName(snapshot, activeSeatIndex)} IST AM ZUG`
-        : describeSituation(snapshot, ruleView);
+      renderSituation(describeSituation(snapshot, ruleView, activeSeatIndex));
       seatLayer.replaceChildren(...relativeSeats.map(
         (seat) => createGameSeat(seat, snapshot, activeSeatIndex, ruleView),
       ));
@@ -1039,5 +1114,5 @@
     });
   }
 
-  global.TrottlClassicUI = Object.freeze({ create });
+  global.TrottlClassicUI = Object.freeze({ create, createEventPresentation });
 })(window);

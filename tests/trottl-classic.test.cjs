@@ -863,7 +863,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=7[\s\S]*script\.js\?v=78/);
+  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=8[\s\S]*script\.js\?v=78/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -872,6 +872,11 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /id="trottl-classic-leave"/);
   assert.match(html, /id="trottl-classic-game-view"/);
   assert.match(html, /id="trottl-classic-situation"/);
+  assert.match(html, /id="trottl-classic-event-player"/);
+  assert.match(html, /id="trottl-classic-event-copy"/);
+  assert.match(html, /id="trottl-classic-event-roll"/);
+  assert.match(html, /id="trottl-classic-event-action"/);
+  assert.match(html, /id="trottl-classic-event-meta"/);
   assert.match(html, /class="trottl-classic-dice-zone"/);
   assert.match(html, /id="trottl-classic-dice-mount"/);
   assert.match(html, /id="trottl-classic-seat-layer"/);
@@ -893,6 +898,11 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-player--reaction-loser/);
   assert.match(css, /\.trottl-classic-player-confirm/);
   assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active[\s\S]*255 255 255/);
+  assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*78px/);
+  assert.match(css, /\.trottl-classic-event-main\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
+  assert.match(css, /@keyframes trottl-classic-event-enter/);
+  assert.match(css, /@media \(max-width: 360px\)[\s\S]*\.trottl-classic-event-main/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.trottl-classic-situation\.is-changing/);
   assert.match(html, /id="trottl-classic-preview-panel" hidden/);
   assert.match(ui, /function renderGame\(snapshot, activeSeatIndex = service\.initialActiveSeatIndex\)/);
   assert.match(ui, /rollOnClick:\s*false/);
@@ -902,7 +912,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)/);
   assert.match(ui, /state\.animatingReactionCanStart = snapshot\.session\.rollResult === 5/);
   assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)[\s\S]*notePersonalReactionPresentation\(snapshot, snapshot\.session\.rollSeq\)/);
-  assert.match(ui, /TIPPE AUF DEN BILDSCHIRM![\s\S]*remainingMs \/ 1000/);
+  assert.match(ui, /TIPPE AUF DEN BILDSCHIRM![\s\S]*remainingMs[\s\S]*\/ 1000/);
   assert.match(ui, /gameView\.addEventListener\("click", handleReactionTap\)/);
   assert.match(ui, /function handleConfirmation\(\)/);
   assert.doesNotMatch(ui, /phase === "awaiting_drink_ack" && seatIndex === ownSeat/);
@@ -911,6 +921,55 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.doesNotMatch(ui, /Math\.random/);
   assert.match(ui, /if \(previewEnabled\) return openPreview\(\)/);
   assert.match(previewSource, /const TROTTL_CLASSIC_PREVIEW_ENABLED = false/);
+});
+
+test("Klassik event presentation separates headline, action and contextual meta for every phase", () => {
+  const context = vm.createContext({ window: {} });
+  vm.runInContext(ui, context, { filename: "trottl-classic-ui.js" });
+  const present = (value) => JSON.parse(JSON.stringify(context.window.TrottlClassicUI.createEventPresentation(value)));
+
+  assert.deepEqual(present({ phase: "awaiting_roll", currentPlayerName: "ERLING HAARLAND", localIsCurrent: true }), {
+    player: "ERLING HAARLAND", copy: "IST AM ZUG", roll: "", action: "Tippe auf den Würfel", meta: "", key: "awaiting_roll",
+  });
+  assert.equal(present({ phase: "awaiting_roll", currentPlayerName: "KAT" }).action, "Warte auf den Wurf");
+  assert.deepEqual(present({ phase: "rolling", rollPhase: "rolling", actorName: "FABIAN" }), {
+    player: "FABIAN", copy: "WÜRFELT", roll: "", action: "", meta: "", key: "rolling",
+  });
+
+  for (const roll of [1, 2]) {
+    const result = present({ phase: "awaiting_drink_ack", rollResult: roll, actorName: "TOBI", targetName: "KAT" });
+    assert.equal(result.player, "TOBI");
+    assert.equal(result.copy, "HAT EINE");
+    assert.equal(result.roll, String(roll));
+    assert.equal(result.action, "KAT trinkt 1 Schluck");
+  }
+  assert.equal(present({ phase: "choosing_trottl", actorName: "FABIAN", actionKind: "first_trottl" }).action, "Wähle den 3er Trottl");
+  assert.equal(present({ phase: "choosing_trottl", actorName: "FABIAN", actionKind: "replace_trottl" }).action, "Wähle einen neuen 3er Trottl");
+  assert.equal(present({ phase: "awaiting_drink_ack", rollResult: 3, actorName: "TOBI", targetName: "SPORTAKUS" }).action, "SPORTAKUS trinkt 1 Schluck");
+
+  const fourOpen = present({ phase: "distributing_four", actorName: "FABIAN", remainingSips: 3 });
+  assert.equal(fourOpen.roll, "4");
+  assert.equal(fourOpen.action, "Verteile 4 Schlücke");
+  assert.equal(fourOpen.meta, "Noch 3 übrig");
+  assert.equal(present({ phase: "distributing_four", actorName: "FABIAN", remainingSips: 0 }).meta, "Alle 4 verteilt");
+  assert.deepEqual(present({ phase: "awaiting_four_acks", allocationSummary: "Fabian 3 · Kat 1" }), {
+    player: "", copy: "4 SCHLÜCKE VERTEILT", roll: "", action: "Fabian 3 · Kat 1", meta: "", key: "awaiting_four_acks:Fabian 3 · Kat 1",
+  });
+
+  const reaction = present({ phase: "reaction_active", localReactionActive: true, localRemainingMs: 9200 });
+  assert.equal(reaction.copy, "TIPPE AUF DEN BILDSCHIRM!");
+  assert.equal(reaction.action, "9,2 s");
+  assert.deepEqual(present({ phase: "reaction_active", localReactionStatus: "reacted" }), {
+    player: "", copy: "BESTÄTIGT", roll: "", action: "Warte auf die anderen", meta: "", key: "reaction_active",
+  });
+  assert.equal(present({ phase: "reaction_loser_ack", penaltyNames: ["JULIAN"] }).copy, "WAR ZU LANGSAM");
+  assert.equal(present({ phase: "reaction_loser_ack", penaltyNames: ["JULIAN", "KAT"] }).action, "JULIAN · KAT");
+
+  const shot = present({ phase: "shot_ack", actorName: "TOBI" });
+  assert.equal(shot.roll, "6");
+  assert.equal(shot.action, "Trink einen Shot");
+  assert.equal(present({ phase: "awaiting_reroll", currentPlayerName: "TOBI", localIsCurrent: true }).copy, "IST NOCHMAL AM ZUG");
+  assert.doesNotMatch(ui, /OFFEN|REAKTION WIRD VORBEREITET|BESTÄTIGT – WARTE/);
 });
 
 test("Klassik UI renders and submits every rule phase through direct table interactions", () => {

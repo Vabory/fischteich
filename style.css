@@ -4114,7 +4114,7 @@ button.is-release-pressed {
   width: 100%;
   margin-top: 22px;
   padding-top: 18px;
-  gap: 9px;
+  gap: 7px;
   border-top: 1px solid rgb(255 255 255 / 10%);
   text-align: center;
 }
@@ -4156,10 +4156,10 @@ button.is-release-pressed {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-align: center;
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: center;
-  gap: 9px;
+  grid-template-columns: minmax(42px, 1fr) auto minmax(42px, 1fr);
+  column-gap: 10px;
   min-width: 0;
   white-space: nowrap;
 }
@@ -4167,9 +4167,9 @@ button.is-release-pressed {
 .version-beaver-scene {
   position: relative;
   display: block;
-  flex: 0 0 32px;
-  width: 32px;
-  height: 24px;
+  justify-self: start;
+  width: 42px;
+  height: 28px;
   opacity: 0.68;
 }
 
@@ -4191,30 +4191,31 @@ button.is-release-pressed {
 .version-beaver {
   z-index: 1;
   top: 0;
-  width: 29px;
-  height: 22px;
+  width: 36px;
+  height: 27px;
   transform: translateX(-50%);
   animation: version-beaver-float 4s ease-in-out infinite;
 }
 
 .version-water {
   z-index: 2;
-  bottom: 0;
-  width: 34px;
-  height: 11px;
+  bottom: 3px;
+  width: 43px;
+  height: 14px;
   transform: translateX(-50%);
   animation: version-water-ripple 4.6s ease-in-out infinite;
 }
 
 .settings-app-version-text {
-  flex: 0 1 auto;
+  grid-column: 2;
 }
 
 .version-stump {
-  flex: 0 0 auto;
-  width: 26px;
-  height: 22px;
-  margin-left: 5px;
+  grid-column: 3;
+  justify-self: end;
+  width: 42px;
+  height: 30px;
+  margin-left: 8px;
   object-fit: contain;
   opacity: 0.66;
 }
@@ -4230,11 +4231,11 @@ button.is-release-pressed {
 }
 
 @media (max-width: 360px) {
-  .settings-app-version { gap: 7px; }
-  .version-beaver-scene { flex-basis: 28px; width: 28px; height: 22px; }
-  .version-beaver { width: 26px; height: 20px; }
-  .version-water { width: 30px; height: 10px; }
-  .version-stump { width: 23px; height: 20px; margin-left: 3px; }
+  .settings-app-version { grid-template-columns: minmax(36px, 1fr) auto minmax(36px, 1fr); column-gap: 7px; }
+  .version-beaver-scene { width: 36px; height: 25px; }
+  .version-beaver { width: 31px; height: 24px; }
+  .version-water { bottom: 2px; width: 37px; height: 12px; }
+  .version-stump { width: 34px; height: 27px; margin-left: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

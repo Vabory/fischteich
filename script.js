@@ -236,7 +236,7 @@ const displayNameRenameModal = document.querySelector("#display-name-rename-moda
 const displayNameRenameForm = document.querySelector("#display-name-rename-form");
 const displayNameRenameInput = document.querySelector("#display-name-rename-input");
 const displayNameRenameError = document.querySelector("#display-name-rename-error");
-settingsAppVersionText.textContent = `Fischteich Version V${FISCHTEICH_APP_VERSION}`;
+settingsAppVersionText.textContent = `Fischteich Version ${FISCHTEICH_APP_VERSION}.0`;
 const leaveModal = document.querySelector("#leave-modal");
 const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
 const rageCageReshuffleModal = document.querySelector("#rage-cage-reshuffle-modal");
@@ -1624,7 +1624,8 @@ async function copyShortcutValue(input) {
 
 function renderSettingsAdmin(auth = getAppAuthState()) {
   const isAdmin = auth.isAdmin === true;
-  settingsAdminStatus.textContent = isAdmin ? "Admin angemeldet" : "Adminfunktionen sind geschützt.";
+  settingsAdminStatus.textContent = isAdmin ? "Admin angemeldet" : "";
+  settingsAdminStatus.hidden = !isAdmin;
   settingsAdminStatus.classList.toggle("is-admin", isAdmin);
   openAdminLoginButton.hidden = isAdmin;
   settingsAdminActions.hidden = !isAdmin;

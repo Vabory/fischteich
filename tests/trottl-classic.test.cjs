@@ -925,8 +925,14 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(shotGlass, /<svg[^>]*viewBox="0 0 24 24"/);
   assert.match(shotGlass, /fill="none"/);
   assert.doesNotMatch(shotGlass, /<script|<image|(?:href|src)=|data:/i);
-  assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*78px/);
+  assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*90px/);
   assert.match(css, /\.trottl-classic-event-main\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
+  assert.match(css, /\.trottl-classic-event-action\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
+  assert.match(css, /\.trottl-classic-card-status-label\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums/);
+  assert.match(css, /\.trottl-classic-player--context-muted\s*\{[^}]*opacity:\s*0\.82[^}]*saturate\(0\.84\)/s);
+  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*\.trottl-classic-player-confirm[\s\S]*white-space:\s*nowrap/);
+  assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*max-width:\s*100%[^}]*flex-wrap:\s*wrap/s);
+  assert.match(css, /@media \(max-height: 720px\)[\s\S]*\.trottl-classic-situation\s*\{[^}]*min-height:\s*76px/);
   assert.match(css, /@keyframes trottl-classic-event-enter/);
   assert.match(css, /@media \(max-width: 360px\)[\s\S]*\.trottl-classic-event-main/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.trottl-classic-situation\.is-changing/);
@@ -995,6 +1001,8 @@ test("Klassik event presentation separates headline, action and contextual meta 
   assert.equal(present({
     phase: "awaiting_four_acks", allocationSummary: "Fabian 2 · Kat 1 · Tobi 1", confirmedCount: 1, requiredConfirmationCount: 3,
   }).meta, "1 von 3 bestätigt");
+  const longSummary = "Erling Haarland 1 · Maximilian Mustermann 1 · Katharina 1 · Jonathan 1";
+  assert.equal(present({ phase: "awaiting_four_acks", allocationSummary: longSummary }).action, longSummary);
 
   const reaction = present({ phase: "reaction_active", localReactionActive: true, localRemainingMs: 9200 });
   assert.equal(reaction.copy, "TIPPE AUF DEN BILDSCHIRM!");

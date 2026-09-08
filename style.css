@@ -835,7 +835,7 @@ button:focus-visible {
 .trottl-classic-situation {
   display: grid;
   width: min(92vw, 390px);
-  min-height: 78px;
+  min-height: 90px;
   margin: 0 auto;
   padding: 11px 18px 10px;
   border: 1px solid rgb(170 214 236 / 24%);
@@ -888,18 +888,24 @@ button:focus-visible {
 }
 
 .trottl-classic-event-action {
+  max-width: 100%;
   color: rgb(239 247 252 / 88%);
   font-size: clamp(0.76rem, 3.35vw, 0.94rem);
   font-weight: 680;
   letter-spacing: 0.025em;
   line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .trottl-classic-event-meta {
+  max-width: 100%;
   color: rgb(190 211 224 / 70%);
   font-size: clamp(0.61rem, 2.7vw, 0.72rem);
   font-weight: 750;
   letter-spacing: 0.045em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .trottl-classic-situation.is-four-distribution .trottl-classic-event-meta {
@@ -914,6 +920,7 @@ button:focus-visible {
   align-items: center;
   gap: 4px;
   vertical-align: 0.08em;
+  white-space: nowrap;
 }
 
 .trottl-classic-sip-markers i {
@@ -950,11 +957,13 @@ button:focus-visible {
 }
 
 .trottl-classic-situation.is-reaction-prompt .trottl-classic-event-action {
+  min-height: 1.25em;
   color: #f7fcff;
   font-size: clamp(1.02rem, 4.5vw, 1.28rem);
   font-weight: 950;
   letter-spacing: 0.055em;
   text-shadow: 0 0 12px rgb(214 244 255 / 22%);
+  font-variant-numeric: tabular-nums;
 }
 
 .trottl-classic-situation.is-reaction-urgent .trottl-classic-event-action {
@@ -1221,7 +1230,8 @@ button:focus-visible {
   min-height: 16px;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  column-gap: 5px;
+  row-gap: 3px;
 }
 
 .trottl-classic-game-badges small {
@@ -1235,6 +1245,7 @@ button:focus-visible {
 
 .trottl-classic-card-status-label {
   text-shadow: 0 0 8px color-mix(in srgb, var(--player-accent) 32%, transparent);
+  font-variant-numeric: tabular-nums;
 }
 
 .trottl-classic-self-badge {
@@ -1332,8 +1343,8 @@ button:focus-visible {
 
 .trottl-classic-player--context-muted {
   --player-glow: transparent;
-  opacity: 0.78;
-  filter: saturate(0.78);
+  opacity: 0.82;
+  filter: saturate(0.84);
 }
 
 .trottl-classic-player--action-impact {
@@ -1444,6 +1455,26 @@ button:focus-visible {
   letter-spacing: 0.04em;
 }
 
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-game-seat-content,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-game-seat-content {
+  gap: 3px;
+}
+
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-game-badges,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-game-badges {
+  column-gap: 3px;
+  row-gap: 2px;
+}
+
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player-confirm,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player-confirm {
+  min-height: 30px;
+  padding-inline: 4px;
+  font-size: 0.44rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 .trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player--selected .trottl-classic-card-status-label,
 .trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player--selected .trottl-classic-card-status-label {
   font-size: 0.49rem;
@@ -1515,9 +1546,9 @@ button:focus-visible {
 .trottl-classic-table-stage.is-reaction-active .trottl-classic-table {
   border-color: rgb(255 255 255 / 96%);
   box-shadow:
-    0 0 12px rgb(255 255 255 / 94%),
-    0 0 34px rgb(255 255 255 / 72%),
-    0 0 62px rgb(220 244 255 / 40%),
+    0 0 10px rgb(255 255 255 / 86%),
+    0 0 28px rgb(255 255 255 / 60%),
+    0 0 50px rgb(220 244 255 / 32%),
     0 20px 40px rgb(0 0 0 / 42%),
     inset 0 0 32px rgb(255 255 255 / 22%);
   animation: trottl-classic-reaction-start 170ms ease-out;
@@ -1542,8 +1573,10 @@ button:focus-visible {
 
 .trottl-classic-rule-controls {
   display: flex;
+  max-width: 100%;
   min-height: 34px;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
 }
@@ -1596,6 +1629,7 @@ button:focus-visible {
 }
 
 .trottl-classic-rule-controls p {
+  width: 100%;
   margin: 0;
   color: #ffd5df;
   font-size: 0.68rem;
@@ -1609,14 +1643,17 @@ button:focus-visible {
   }
 
   .trottl-classic-game-view { gap: 7px; }
-  .trottl-classic-situation { min-height: 64px; padding-block: 8px 7px; }
+  .trottl-classic-situation { min-height: 76px; padding-block: 7px 6px; }
   .trottl-classic-game-seat { min-height: 46px; padding: 6px; }
+  .trottl-classic-rule-controls.has-actions { min-height: 54px; padding-block: 5px; }
 }
 
 @media (max-width: 360px) {
   .trottl-classic-situation { width: min(94vw, 390px); padding-inline: 12px; }
   .trottl-classic-event-main { font-size: clamp(0.94rem, 4.55vw, 1.18rem); }
   .trottl-classic-event-action { font-size: clamp(0.72rem, 3.5vw, 0.86rem); }
+  .trottl-classic-rule-controls.has-actions { width: min(94vw, 360px); }
+  .trottl-classic-rule-controls button { padding-inline: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

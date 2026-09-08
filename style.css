@@ -4156,10 +4156,10 @@ button.is-release-pressed {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-align: center;
-  display: grid;
+  display: flex;
   align-items: center;
-  grid-template-columns: minmax(42px, 1fr) auto minmax(42px, 1fr);
-  column-gap: 10px;
+  justify-content: center;
+  gap: 14px;
   min-width: 0;
   white-space: nowrap;
 }
@@ -4167,15 +4167,13 @@ button.is-release-pressed {
 .version-beaver-scene {
   position: relative;
   display: block;
-  justify-self: start;
   width: 42px;
   height: 28px;
   opacity: 0.68;
 }
 
 .version-beaver,
-.version-water,
-.version-stump {
+.version-water {
   display: block;
   pointer-events: none;
   user-select: none;
@@ -4194,7 +4192,7 @@ button.is-release-pressed {
   width: 36px;
   height: 27px;
   transform: translateX(-50%);
-  animation: version-beaver-float 4s ease-in-out infinite;
+  animation: version-beaver-float 3s ease-in-out infinite;
 }
 
 .version-water {
@@ -4203,39 +4201,27 @@ button.is-release-pressed {
   width: 43px;
   height: 14px;
   transform: translateX(-50%);
-  animation: version-water-ripple 4.6s ease-in-out infinite;
+  animation: version-water-ripple 2.6s ease-in-out infinite;
 }
 
 .settings-app-version-text {
-  grid-column: 2;
-}
-
-.version-stump {
-  grid-column: 3;
-  justify-self: end;
-  width: 42px;
-  height: 30px;
-  margin-left: 8px;
-  object-fit: contain;
-  opacity: 0.66;
 }
 
 @keyframes version-beaver-float {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-2px); }
+  50% { transform: translateX(-50%) translateY(-1px); }
 }
 
 @keyframes version-water-ripple {
-  0%, 100% { transform: translateX(calc(-50% - 1px)) scaleX(1); }
-  50% { transform: translateX(calc(-50% + 1px)) scaleX(1.025); }
+  0%, 100% { transform: translateX(calc(-50% - 0.5px)) scaleX(1); }
+  50% { transform: translateX(calc(-50% + 0.5px)) scaleX(1.018); }
 }
 
 @media (max-width: 360px) {
-  .settings-app-version { grid-template-columns: minmax(36px, 1fr) auto minmax(36px, 1fr); column-gap: 7px; }
+  .settings-app-version { gap: 9px; }
   .version-beaver-scene { width: 36px; height: 25px; }
   .version-beaver { width: 31px; height: 24px; }
   .version-water { bottom: 2px; width: 37px; height: 12px; }
-  .version-stump { width: 34px; height: 27px; margin-left: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

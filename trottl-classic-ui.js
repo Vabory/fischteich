@@ -71,6 +71,56 @@
     return view("", "SPIEL LÄUFT");
   }
 
+  function createPlayerCardPresentation(context) {
+    const {
+      isSelf = false,
+      isActive = false,
+      isSelectable = false,
+      isTrottl = false,
+      isDrinkTarget = false,
+      isConfirmed = false,
+      isReactionSuccess = false,
+      isReactionLoser = false,
+      isShotTarget = false,
+      allocation = 0,
+      reactionStatus = "",
+      reactionDurationMs = null,
+      reactionEvaluated = false,
+      drinkSips = 1,
+    } = context;
+    const classes = ["trottl-classic-game-seat", "trottl-classic-player--normal"];
+    if (isSelf) classes.push("trottl-classic-player--self");
+    if (isTrottl) classes.push("trottl-classic-player--trottl");
+    if (isActive) classes.push("trottl-classic-player--active");
+    if (isSelectable) classes.push("trottl-classic-player--selectable");
+    if (allocation > 0) classes.push("trottl-classic-player--selected");
+    if (isDrinkTarget) classes.push("trottl-classic-player--drink-target");
+    if (isShotTarget) classes.push("trottl-classic-player--shot-target");
+    if (isConfirmed) classes.push("trottl-classic-player--confirmed");
+    if (isReactionSuccess) classes.push("trottl-classic-player--reaction-success");
+    if (isReactionLoser) classes.push("trottl-classic-player--reaction-loser");
+
+    let status = "";
+    if (isReactionLoser) {
+      status = reactionStatus === "reacted" && Number.isFinite(reactionDurationMs)
+        ? `${(reactionDurationMs / 1000).toFixed(2).replace(".", ",")} s`
+        : "ZU LANGSAM";
+    } else if (isConfirmed || isReactionSuccess) {
+      status = isReactionSuccess && reactionEvaluated && Number.isFinite(reactionDurationMs)
+        ? `${(reactionDurationMs / 1000).toFixed(2).replace(".", ",")} s`
+        : "BESTÄTIGT";
+    } else if (isShotTarget) {
+      status = "SHOT";
+    } else if (allocation > 0) {
+      status = `${allocation} ${allocation === 1 ? "SCHLUCK" : "SCHLÜCKE"}`;
+    } else if (isDrinkTarget) {
+      status = `${drinkSips} ${drinkSips === 1 ? "SCHLUCK" : "SCHLÜCKE"}`;
+    } else if (isSelectable) {
+      status = "AUSWÄHLEN";
+    }
+    return Object.freeze({ classes: Object.freeze(classes), status });
+  }
+
   function create({ showScreen, showTrottlMenu }) {
     const service = global.trottlClassicService;
     const preview = global.trottlClassicPreview;
@@ -283,29 +333,45 @@
       const content = document.createElement("span");
       const name = document.createElement("strong");
       const badges = document.createElement("span");
+      const selfBadge = document.createElement("small");
       const isSelf = player.userId === snapshot.identity.userId;
       const isActive = player.seatIndex === activeSeatIndex;
       const allocation = Number(ruleView.allocations[player.seatIndex] ?? 0);
       const isSelectable = isSeatSelectable(player.seatIndex, snapshot, ruleView);
       const showConfirmation = needsConfirmation(player.seatIndex, snapshot, ruleView);
       const reaction = service.getReactionPlayer(snapshot.session, player.seatIndex);
-
-      seat.className = "trottl-classic-game-seat trottl-classic-player--normal";
-      if (isSelf) seat.classList.add("trottl-classic-player--self");
-      if (isActive) seat.classList.add("trottl-classic-player--active");
-      if (isSelectable) seat.classList.add("trottl-classic-player--selectable");
-      if (allocation > 0) seat.classList.add("trottl-classic-player--selected");
-      if (player.seatIndex === snapshot.session.currentTrottlSeat) seat.classList.add("trottl-classic-player--trottl");
-      if (
-        player.seatIndex === snapshot.session.actionTargetSeat
-        || (ruleView.phase === "awaiting_four_acks" && allocation > 0 && !ruleView.acknowledgedSeats.has(player.seatIndex))
-      ) seat.classList.add("trottl-classic-player--drink-target");
-      if (reaction?.status === "reacted") seat.classList.add("trottl-classic-player--reaction-success");
-      if (
+      const isTrottl = player.seatIndex === snapshot.session.currentTrottlSeat;
+      const isConfirmed = ruleView.acknowledgedSeats.has(player.seatIndex);
+      const isShotTarget = ruleView.phase === "shot_ack" && player.seatIndex === snapshot.session.actionActorSeat;
+      const isDrinkTarget = (
+        ruleView.phase === "awaiting_drink_ack" && player.seatIndex === snapshot.session.actionTargetSeat
+      ) || (
+        ruleView.phase === "awaiting_four_acks" && allocation > 0 && !isConfirmed
+      );
+      const isReactionLoser = (
         reaction?.status === "timed_out"
         || ruleView.penaltySeats.has(player.seatIndex)
         || (player.seatIndex === ruleView.localSeat && reaction?.status === "pending" && ruleView.localRemainingMs === 0)
-      ) seat.classList.add("trottl-classic-player--reaction-loser");
+      );
+      const isReactionSuccess = reaction?.status === "reacted" && !isReactionLoser;
+      const cardPresentation = createPlayerCardPresentation({
+        isSelf,
+        isActive,
+        isSelectable,
+        isTrottl,
+        isDrinkTarget,
+        isConfirmed,
+        isReactionSuccess,
+        isReactionLoser,
+        isShotTarget,
+        allocation,
+        reactionStatus: reaction?.status,
+        reactionDurationMs: Number(reaction?.duration_ms),
+        reactionEvaluated: ruleView.penaltySeats.size > 0,
+        drinkSips: Number(snapshot.session.actionPayload.sips ?? 1),
+      });
+
+      seat.className = cardPresentation.classes.join(" ");
       seat.dataset.globalSeat = String(player.seatIndex);
       seat.dataset.relativeSeat = String(relativeIndex);
       seat.style.setProperty("--seat-x", position.x.toFixed(6));
@@ -320,41 +386,23 @@
       avatar.setAttribute("aria-hidden", "true");
       content.className = "trottl-classic-game-seat-content";
       name.textContent = player.displayName;
-      badges.className = "trottl-classic-game-badges";
+      badges.className = "trottl-classic-game-badges trottl-classic-game-status";
       if (isSelf) {
-        const selfBadge = document.createElement("small");
+        selfBadge.className = "trottl-classic-self-badge";
         selfBadge.textContent = "DU";
-        badges.append(selfBadge);
+        selfBadge.setAttribute("aria-hidden", "true");
       }
-      if (player.seatIndex === snapshot.session.currentTrottlSeat) {
+      if (isTrottl) {
         const trottlBadge = document.createElement("small");
+        trottlBadge.className = "trottl-classic-trottl-badge";
         trottlBadge.textContent = "TROTTL";
         badges.append(trottlBadge);
       }
-      if (allocation > 0) {
-        const allocationBadge = document.createElement("small");
-        allocationBadge.textContent = `${allocation} ${allocation === 1 ? "SCHLUCK" : "SCHLÜCKE"}`;
-        badges.append(allocationBadge);
-      }
-      if (ruleView.acknowledgedSeats.has(player.seatIndex)) {
-        const ackBadge = document.createElement("small");
-        ackBadge.textContent = "BESTÄTIGT";
-        badges.append(ackBadge);
-      }
-      if (reaction?.status === "reacted") {
-        const reactionBadge = document.createElement("small");
-        const durationMs = Number(reaction.duration_ms);
-        reactionBadge.textContent = ruleView.penaltySeats.size > 0 && Number.isFinite(durationMs)
-          ? `${(durationMs / 1000).toFixed(2).replace(".", ",")} s`
-          : "BESTÄTIGT";
-        badges.append(reactionBadge);
-      } else if (
-        reaction?.status === "timed_out"
-        || (player.seatIndex === ruleView.localSeat && reaction?.status === "pending" && ruleView.localRemainingMs === 0)
-      ) {
-        const timeoutBadge = document.createElement("small");
-        timeoutBadge.textContent = "ZU LANGSAM";
-        badges.append(timeoutBadge);
+      if (cardPresentation.status) {
+        const statusLabel = document.createElement("small");
+        statusLabel.className = "trottl-classic-card-status-label";
+        statusLabel.textContent = cardPresentation.status;
+        badges.append(statusLabel);
       }
       if (showConfirmation) {
         const confirmButton = document.createElement("button");
@@ -370,6 +418,7 @@
         content.append(name, badges);
       }
       seat.append(avatar, content);
+      if (isSelf) seat.append(selfBadge);
       if (isSelectable) {
         seat.addEventListener("click", (event) => {
           event.stopPropagation();
@@ -1114,5 +1163,5 @@
     });
   }
 
-  global.TrottlClassicUI = Object.freeze({ create, createEventPresentation });
+  global.TrottlClassicUI = Object.freeze({ create, createEventPresentation, createPlayerCardPresentation });
 })(window);

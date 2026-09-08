@@ -863,7 +863,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=8[\s\S]*script\.js\?v=78/);
+  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=9[\s\S]*script\.js\?v=78/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -890,13 +890,18 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.doesNotMatch(html, /Pokertisch|Situationserklärer|Reaktionsspiel/);
   assert.match(css, /\.trottl-classic-player-list li[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
   assert.match(css, /\.trottl-classic-table\s*\{[\s\S]*border-radius:\s*48% \/ 18%/);
-  assert.match(css, /\.trottl-classic-player--self[\s\S]*scale\(1\.07\)/);
+  assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1\.04/s);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);
   assert.match(css, /\.trottl-classic-player--drink-target/);
+  assert.match(css, /\.trottl-classic-player--shot-target/);
+  assert.match(css, /\.trottl-classic-player--confirmed/);
   assert.match(css, /\.trottl-classic-player--reaction-success/);
   assert.match(css, /\.trottl-classic-player--reaction-loser/);
   assert.match(css, /\.trottl-classic-player-confirm/);
+  assert.match(css, /\.trottl-classic-game-seat-content strong\s*\{[^}]*-webkit-line-clamp:\s*2/s);
+  assert.match(css, /data-player-count="3"[\s\S]*data-player-count="4"[\s\S]*width:\s*clamp\(112px, 31vw, 132px\)/);
+  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*width:\s*clamp\(88px, 23\.5vw, 102px\)/);
   assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active[\s\S]*255 255 255/);
   assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*78px/);
   assert.match(css, /\.trottl-classic-event-main\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
@@ -970,6 +975,53 @@ test("Klassik event presentation separates headline, action and contextual meta 
   assert.equal(shot.action, "Trink einen Shot");
   assert.equal(present({ phase: "awaiting_reroll", currentPlayerName: "TOBI", localIsCurrent: true }).copy, "IST NOCHMAL AM ZUG");
   assert.doesNotMatch(ui, /OFFEN|REAKTION WIRD VORBEREITET|BESTÄTIGT – WARTE/);
+});
+
+test("Klassik player cards apply semantic state priority and stable status text", () => {
+  const context = vm.createContext({ window: {} });
+  vm.runInContext(ui, context, { filename: "trottl-classic-ui.js" });
+  const present = (value) => JSON.parse(JSON.stringify(context.window.TrottlClassicUI.createPlayerCardPresentation(value)));
+
+  assert.deepEqual(present({}), {
+    classes: ["trottl-classic-game-seat", "trottl-classic-player--normal"], status: "",
+  });
+  const combined = present({
+    isSelf: true,
+    isActive: true,
+    isTrottl: true,
+    isDrinkTarget: true,
+  });
+  for (const stateClass of [
+    "trottl-classic-player--self",
+    "trottl-classic-player--active",
+    "trottl-classic-player--trottl",
+    "trottl-classic-player--drink-target",
+  ]) assert.ok(combined.classes.includes(stateClass));
+  assert.equal(combined.status, "1 SCHLUCK");
+
+  assert.equal(present({ isSelectable: true }).status, "AUSWÄHLEN");
+  assert.equal(present({ isSelectable: true, allocation: 1 }).status, "1 SCHLUCK");
+  assert.equal(present({ isSelectable: true, allocation: 4 }).status, "4 SCHLÜCKE");
+  assert.equal(present({ isShotTarget: true }).status, "SHOT");
+  assert.equal(present({ isDrinkTarget: true, isConfirmed: true }).status, "BESTÄTIGT");
+  assert.equal(present({ isReactionSuccess: true }).status, "BESTÄTIGT");
+  assert.equal(present({ isReactionSuccess: true, reactionEvaluated: true, reactionDurationMs: 820 }).status, "0,82 s");
+  assert.equal(present({ isReactionLoser: true, reactionStatus: "reacted", reactionDurationMs: 1530 }).status, "1,53 s");
+  assert.equal(present({ isReactionLoser: true, reactionStatus: "timed_out" }).status, "ZU LANGSAM");
+
+  const stateOrder = [
+    ".trottl-classic-player--self {",
+    ".trottl-classic-player--active {",
+    ".trottl-classic-player--selectable {",
+    ".trottl-classic-player--drink-target,",
+    ".trottl-classic-player--confirmed,",
+    ".trottl-classic-player--reaction-loser {",
+  ].map((selector) => css.indexOf(selector));
+  assert.ok(stateOrder.every((index) => index >= 0));
+  assert.deepEqual([...stateOrder].sort((a, b) => a - b), stateOrder, "higher-priority state styles must be declared later");
+  assert.match(css, /\.trottl-classic-player--selectable:active\s*\{[^}]*scale:\s*0\.97/s);
+  assert.match(css, /@keyframes trottl-classic-player-active-pulse/);
+  assert.match(css, /@keyframes trottl-classic-player-state-in/);
 });
 
 test("Klassik UI renders and submits every rule phase through direct table interactions", () => {

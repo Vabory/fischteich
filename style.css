@@ -985,37 +985,54 @@ button:focus-visible {
 }
 
 .trottl-classic-game-seat {
-  --player-border: rgb(216 232 239 / 30%);
-  --player-background: rgb(7 13 24 / 94%);
-  --player-glow: rgb(214 235 244 / 8%);
+  --player-border: rgb(204 226 237 / 28%);
+  --player-highlight: rgb(255 255 255 / 7%);
+  --player-background: rgb(6 13 24 / 88%);
+  --player-glow: rgb(111 182 215 / 8%);
+  --player-accent: rgb(215 232 240 / 76%);
+  --player-scale: 1;
 
   position: absolute;
   top: var(--seat-top);
   left: var(--seat-left);
   display: grid;
-  width: clamp(88px, 25vw, 108px);
-  min-height: 50px;
-  padding: 7px 8px;
+  width: clamp(100px, 27vw, 116px);
+  min-height: 62px;
+  padding: 9px;
   align-items: center;
   border: 1px solid var(--player-border);
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgb(255 255 255 / 5%), transparent 54%), var(--player-background);
-  box-shadow: 0 8px 18px rgb(0 0 0 / 38%), 0 0 13px var(--player-glow);
-  grid-template-columns: 30px minmax(0, 1fr);
-  gap: 7px;
-  transform: translate(-50%, -50%);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, var(--player-highlight), transparent 48%),
+    linear-gradient(180deg, rgb(12 25 40 / 82%), var(--player-background));
+  box-shadow:
+    0 9px 21px rgb(0 0 0 / 40%),
+    0 0 16px var(--player-glow),
+    inset 0 1px rgb(255 255 255 / 6%);
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  transform: translate(-50%, -50%) scale(var(--player-scale));
   transform-origin: center;
   pointer-events: auto;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    filter 140ms ease,
+    scale 140ms ease;
 }
 
 .trottl-classic-game-avatar {
   position: relative;
   display: block;
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgb(222 237 242 / 22%);
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgb(222 237 242 / 31%);
   border-radius: 50%;
-  background: linear-gradient(145deg, rgb(221 236 242 / 18%), rgb(89 109 121 / 13%));
+  background:
+    radial-gradient(circle at 35% 28%, rgb(237 248 252 / 19%), transparent 38%),
+    linear-gradient(145deg, rgb(183 215 228 / 14%), rgb(63 85 99 / 12%));
+  box-shadow: inset 0 1px rgb(255 255 255 / 9%);
 }
 
 .trottl-classic-game-avatar::before {
@@ -1046,74 +1063,197 @@ button:focus-visible {
 .trottl-classic-game-seat-content {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  align-content: center;
+  gap: 4px;
 }
 
 .trottl-classic-game-seat-content strong {
+  display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  color: #f0f7fa;
-  font-size: clamp(0.68rem, 2.9vw, 0.82rem);
-  line-height: 1.1;
+  color: #f5faff;
+  font-size: clamp(0.76rem, 3.2vw, 0.9rem);
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  line-height: 1.08;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .trottl-classic-game-badges {
   display: flex;
-  min-height: 13px;
+  min-width: 0;
+  min-height: 16px;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
 .trottl-classic-game-badges small {
-  color: #dcebf1;
-  font-size: 0.52rem;
+  color: var(--player-accent);
+  font-size: 0.5rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.065em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.trottl-classic-card-status-label {
+  text-shadow: 0 0 8px color-mix(in srgb, var(--player-accent) 32%, transparent);
+}
+
+.trottl-classic-self-badge {
+  position: absolute;
+  z-index: 2;
+  top: -9px;
+  left: 50%;
+  min-width: 29px;
+  padding: 2px 7px;
+  border: 1px solid rgb(220 243 252 / 60%);
+  border-radius: 999px;
+  background: rgb(10 25 38 / 96%);
+  box-shadow: 0 0 10px rgb(177 226 246 / 23%);
+  color: #eaf9ff;
+  font-size: 0.48rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  line-height: 1.25;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.trottl-classic-trottl-badge {
+  color: #e1c5ff !important;
 }
 
 .trottl-classic-player--self {
-  --player-border: rgb(235 246 250 / 56%);
-  --player-background: rgb(12 20 32 / 97%);
-  --player-glow: rgb(221 239 247 / 17%);
+  --player-border: rgb(218 240 248 / 48%);
+  --player-background: rgb(9 20 33 / 95%);
+  --player-glow: rgb(178 224 242 / 15%);
+  --player-scale: 1.04;
   z-index: 2;
-  transform: translate(-50%, -50%) scale(1.07);
+}
+
+.trottl-classic-player--trottl {
+  --player-border: rgb(224 197 255 / 67%);
+  --player-glow: rgb(183 113 255 / 18%);
 }
 
 .trottl-classic-player--active {
-  --player-border: rgb(244 250 252 / 72%);
-  --player-glow: rgb(222 244 252 / 28%);
-  box-shadow: 0 8px 18px rgb(0 0 0 / 40%), 0 0 17px var(--player-glow), inset 0 0 12px rgb(255 255 255 / 6%);
+  --player-border: rgb(230 248 255 / 78%);
+  --player-glow: rgb(178 231 250 / 31%);
+  --player-accent: #dff7ff;
+  --player-scale: 1.045;
 }
 
-/* Reserved state hooks for the rule and reaction steps that follow. */
-.trottl-classic-player--selectable { cursor: pointer; }
-.trottl-classic-player--selected,
-.trottl-classic-player--drink-target {
-  --player-border: rgb(255 217 112 / 84%);
-  --player-glow: rgb(255 194 72 / 42%);
+.trottl-classic-player--active:not(.trottl-classic-player--selectable):not(.trottl-classic-player--drink-target):not(.trottl-classic-player--selected):not(.trottl-classic-player--shot-target):not(.trottl-classic-player--confirmed):not(.trottl-classic-player--reaction-success):not(.trottl-classic-player--reaction-loser) {
+  animation: trottl-classic-player-active-pulse 2.8s ease-in-out infinite;
 }
-.trottl-classic-player--trottl { --player-border: rgb(224 197 255 / 76%); }
+
+.trottl-classic-player--selectable {
+  --player-border: rgb(111 224 255 / 82%);
+  --player-glow: rgb(54 200 244 / 34%);
+  --player-accent: #9deaff;
+  cursor: pointer;
+}
+
+.trottl-classic-player--selectable:active {
+  filter: brightness(1.12);
+  scale: 0.97;
+}
+
+.trottl-classic-player--selected,
+.trottl-classic-player--drink-target,
+.trottl-classic-player--shot-target {
+  --player-border: rgb(255 205 92 / 88%);
+  --player-glow: rgb(255 174 45 / 39%);
+  --player-accent: #ffd875;
+  --player-highlight: rgb(255 213 102 / 10%);
+}
+
+.trottl-classic-player--confirmed,
 .trottl-classic-player--reaction-success {
   --player-border: rgb(102 238 168 / 86%);
   --player-glow: rgb(66 224 144 / 36%);
+  --player-accent: #8ff0bd;
+  --player-highlight: rgb(102 238 168 / 9%);
+  animation: trottl-classic-player-state-in 180ms ease-out;
 }
+
 .trottl-classic-player--reaction-loser {
   --player-border: rgb(255 103 130 / 90%);
   --player-glow: rgb(255 65 100 / 42%);
+  --player-accent: #ff9bad;
+  --player-highlight: rgb(255 103 130 / 10%);
+  animation: trottl-classic-player-state-in 180ms ease-out;
 }
 
 .trottl-classic-player-confirm {
-  min-height: 25px;
-  margin-top: 3px;
-  padding: 3px 8px;
-  border-color: rgb(255 255 255 / 64%);
-  background: rgb(241 249 252 / 13%);
+  width: 100%;
+  min-height: 30px;
+  margin-top: 2px;
+  padding: 5px 7px;
+  border: 1px solid rgb(255 255 255 / 66%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 18%), rgb(255 255 255 / 9%));
+  box-shadow: 0 0 11px var(--player-glow);
   color: #fff;
-  font-size: 0.52rem;
+  font-size: 0.5rem;
   font-weight: 950;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.075em;
   line-height: 1;
+}
+
+.trottl-classic-table-stage[data-player-count="3"] .trottl-classic-game-seat,
+.trottl-classic-table-stage[data-player-count="4"] .trottl-classic-game-seat {
+  width: clamp(112px, 31vw, 132px);
+  min-height: 68px;
+  padding: 10px;
+  grid-template-columns: 36px minmax(0, 1fr);
+}
+
+.trottl-classic-table-stage[data-player-count="3"] .trottl-classic-game-avatar,
+.trottl-classic-table-stage[data-player-count="4"] .trottl-classic-game-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-game-seat,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-game-seat {
+  width: clamp(88px, 23.5vw, 102px);
+  min-height: 56px;
+  padding: 7px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-game-avatar,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-game-avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-game-seat-content strong,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-game-seat-content strong {
+  font-size: clamp(0.66rem, 2.75vw, 0.76rem);
+}
+
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-game-badges small,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-game-badges small {
+  font-size: 0.44rem;
+  letter-spacing: 0.04em;
+}
+
+@keyframes trottl-classic-player-active-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0 rgb(190 237 255 / 0%)); }
+  50% { filter: drop-shadow(0 0 6px rgb(190 237 255 / 23%)); }
+}
+
+@keyframes trottl-classic-player-state-in {
+  from { filter: brightness(1.18); }
+  to { filter: brightness(1); }
 }
 
 .trottl-classic-table-stage.is-reaction-active .trottl-classic-table {
@@ -1165,7 +1305,18 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .trottl-classic-situation.is-changing { animation: none; }
+  .trottl-classic-situation.is-changing,
+  .trottl-classic-player--active,
+  .trottl-classic-player--confirmed,
+  .trottl-classic-player--reaction-success,
+  .trottl-classic-player--reaction-loser {
+    animation: none;
+  }
+
+  .trottl-classic-player--selectable:active {
+    filter: none;
+    scale: 1;
+  }
 }
 
 @keyframes fischteich-die-idle {

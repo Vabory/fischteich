@@ -2,7 +2,7 @@
 
 (function installTrottlClassicPreview(global) {
   // Local layout tool only. Keep false in every production build.
-  const TROTTL_CLASSIC_PREVIEW_ENABLED = true;
+  const TROTTL_CLASSIC_PREVIEW_ENABLED = false;
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 8;
   const FAKE_SESSION_ID = "local-preview:trottl-classic-session";

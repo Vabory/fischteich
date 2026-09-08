@@ -4156,6 +4156,90 @@ button.is-release-pressed {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.version-beaver-scene {
+  position: relative;
+  display: block;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 24px;
+  opacity: 0.68;
+}
+
+.version-beaver,
+.version-water,
+.version-stump {
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.version-beaver,
+.version-water {
+  position: absolute;
+  left: 50%;
+  object-fit: contain;
+}
+
+.version-beaver {
+  z-index: 1;
+  top: 0;
+  width: 29px;
+  height: 22px;
+  transform: translateX(-50%);
+  animation: version-beaver-float 4s ease-in-out infinite;
+}
+
+.version-water {
+  z-index: 2;
+  bottom: 0;
+  width: 34px;
+  height: 11px;
+  transform: translateX(-50%);
+  animation: version-water-ripple 4.6s ease-in-out infinite;
+}
+
+.settings-app-version-text {
+  flex: 0 1 auto;
+}
+
+.version-stump {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 22px;
+  margin-left: 5px;
+  object-fit: contain;
+  opacity: 0.66;
+}
+
+@keyframes version-beaver-float {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-2px); }
+}
+
+@keyframes version-water-ripple {
+  0%, 100% { transform: translateX(calc(-50% - 1px)) scaleX(1); }
+  50% { transform: translateX(calc(-50% + 1px)) scaleX(1.025); }
+}
+
+@media (max-width: 360px) {
+  .settings-app-version { gap: 7px; }
+  .version-beaver-scene { flex-basis: 28px; width: 28px; height: 22px; }
+  .version-beaver { width: 26px; height: 20px; }
+  .version-water { width: 30px; height: 10px; }
+  .version-stump { width: 23px; height: 20px; margin-left: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .version-beaver,
+  .version-water { animation: none; }
 }
 
 .admin-login-card {

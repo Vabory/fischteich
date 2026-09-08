@@ -12,15 +12,21 @@ const css = read("style.css");
 const script = read("script.js");
 const service = read("roulette-service.js");
 
-assert.match(html, /style\.css\?v=127/);
+assert.match(html, /style\.css\?v=128/);
 assert.match(html, /roulette-service\.js\?v=6/);
 assert.match(html, /button-release\.js\?v=1/);
-assert.match(html, /script\.js\?v=74/);
+assert.match(html, /script\.js\?v=75/);
 
-assert.match(html, /<p class="settings-app-version" id="settings-app-version"><\/p>/);
+assert.match(html, /class="version-beaver-scene"/);
+assert.match(html, /class="version-beaver" src="\.\/assets\/settings\/beaver\.png\?v=1"/);
+assert.match(html, /class="version-water" src="\.\/assets\/settings\/water\.png\?v=1"/);
+assert.match(html, /class="version-stump" src="\.\/assets\/settings\/stump\.png\?v=1"/);
 assert.equal((script.match(/const FISCHTEICH_APP_VERSION = "1\.0"/g) ?? []).length, 1);
-assert.match(script, /settingsAppVersion\.textContent = `Fischteich Version V\$\{FISCHTEICH_APP_VERSION\}`/);
+assert.match(script, /settingsAppVersionText\.textContent = `Fischteich Version V\$\{FISCHTEICH_APP_VERSION\}`/);
 assert.doesNotMatch(html, /Fischteich Version 1\.0/);
+assert.match(css, /@keyframes version-beaver-float/);
+assert.match(css, /@keyframes version-water-ripple/);
+assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 
 const personalRender = script.slice(
   script.indexOf("function renderPersonalRouletteStatsPanel()"),

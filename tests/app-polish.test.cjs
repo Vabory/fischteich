@@ -12,14 +12,16 @@ const css = read("style.css");
 const script = read("script.js");
 const service = read("roulette-service.js");
 
-assert.match(html, /style\.css\?v=130/);
+assert.match(html, /style\.css\?v=131/);
 assert.match(html, /roulette-service\.js\?v=6/);
 assert.match(html, /button-release\.js\?v=1/);
-assert.match(html, /script\.js\?v=77/);
+assert.match(html, /script\.js\?v=78/);
 
 assert.match(html, /class="version-beaver-scene"/);
 assert.match(html, /class="version-beaver" src="\.\/assets\/settings\/beaver\.png\?v=1"/);
 assert.match(html, /class="version-water" src="\.\/assets\/settings\/water\.png\?v=1"/);
+assert.match(html, /class="version-beaver-scene version-beaver-scene--right"/);
+assert.equal((html.match(/class="version-beaver-scene-inner"/g) ?? []).length, 2);
 assert.doesNotMatch(html, /version-stump|assets\/settings\/stump\.png/);
 assert.equal((script.match(/const FISCHTEICH_APP_VERSION = "1\.0"/g) ?? []).length, 1);
 assert.match(script, /settingsAppVersionText\.textContent = `Fischteich Version \$\{FISCHTEICH_APP_VERSION\}\.0`/);

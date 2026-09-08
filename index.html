@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260908.9">
+    <meta name="fischteich-build" content="20260908.10">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=135">
+    <link rel="stylesheet" href="./style.css?v=136">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -29,7 +29,7 @@
     <script src="./dice-service.js?v=3" defer></script>
     <script src="./trottl-classic-service.js?v=8" defer></script>
     <script src="./trottl-classic-preview.js?v=2" defer></script>
-    <script src="./trottl-classic-ui.js?v=9" defer></script>
+    <script src="./trottl-classic-ui.js?v=10" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=78" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -274,7 +274,12 @@
                 <span class="trottl-classic-event-roll" id="trottl-classic-event-roll" hidden></span>
               </div>
               <p class="trottl-classic-event-action" id="trottl-classic-event-action" hidden></p>
-              <p class="trottl-classic-event-meta" id="trottl-classic-event-meta" hidden></p>
+              <p class="trottl-classic-event-meta" id="trottl-classic-event-meta" hidden>
+                <span id="trottl-classic-event-meta-label"></span>
+                <span class="trottl-classic-sip-markers" id="trottl-classic-sip-markers" aria-hidden="true" hidden>
+                  <i></i><i></i><i></i><i></i>
+                </span>
+              </p>
             </div>
             <div class="trottl-classic-table-stage" id="trottl-classic-table-stage">
               <div class="trottl-classic-table" aria-hidden="true">

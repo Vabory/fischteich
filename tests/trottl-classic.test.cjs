@@ -863,7 +863,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=9[\s\S]*script\.js\?v=78/);
+  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=10[\s\S]*script\.js\?v=78/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -877,6 +877,9 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /id="trottl-classic-event-roll"/);
   assert.match(html, /id="trottl-classic-event-action"/);
   assert.match(html, /id="trottl-classic-event-meta"/);
+  assert.match(html, /id="trottl-classic-event-meta-label"/);
+  const sipMarkerMarkup = html.match(/id="trottl-classic-sip-markers"[\s\S]*?<\/span>/)?.[0] ?? "";
+  assert.equal((sipMarkerMarkup.match(/<i><\/i>/g) ?? []).length, 4);
   assert.match(html, /class="trottl-classic-dice-zone"/);
   assert.match(html, /id="trottl-classic-dice-mount"/);
   assert.match(html, /id="trottl-classic-seat-layer"/);
@@ -898,11 +901,17 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-player--confirmed/);
   assert.match(css, /\.trottl-classic-player--reaction-success/);
   assert.match(css, /\.trottl-classic-player--reaction-loser/);
+  assert.match(css, /\.trottl-classic-player--penalty-confirmed/);
+  assert.match(css, /\.trottl-classic-player--context-muted/);
   assert.match(css, /\.trottl-classic-player-confirm/);
   assert.match(css, /\.trottl-classic-game-seat-content strong\s*\{[^}]*-webkit-line-clamp:\s*2/s);
   assert.match(css, /data-player-count="3"[\s\S]*data-player-count="4"[\s\S]*width:\s*clamp\(112px, 31vw, 132px\)/);
   assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*width:\s*clamp\(88px, 23\.5vw, 102px\)/);
   assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active[\s\S]*255 255 255/);
+  assert.match(css, /\.trottl-classic-situation\.is-reaction-prompt[\s\S]*--reaction-progress/);
+  assert.match(css, /\.trottl-classic-sip-markers i\.is-assigned/);
+  assert.match(css, /\.trottl-classic-situation\.is-four-distribution \.trottl-classic-event-meta/);
+  assert.match(css, /\.trottl-classic-rule-controls\.has-actions[\s\S]*min-height:\s*44px/);
   assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*78px/);
   assert.match(css, /\.trottl-classic-event-main\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
   assert.match(css, /@keyframes trottl-classic-event-enter/);
@@ -950,16 +959,29 @@ test("Klassik event presentation separates headline, action and contextual meta 
   }
   assert.equal(present({ phase: "choosing_trottl", actorName: "FABIAN", actionKind: "first_trottl" }).action, "Wähle den 3er Trottl");
   assert.equal(present({ phase: "choosing_trottl", actorName: "FABIAN", actionKind: "replace_trottl" }).action, "Wähle einen neuen 3er Trottl");
+  assert.equal(present({ phase: "choosing_trottl", actorName: "FABIAN" }).meta, "Tippe auf einen Spieler");
   assert.equal(present({ phase: "awaiting_drink_ack", rollResult: 3, actorName: "TOBI", targetName: "SPORTAKUS" }).action, "SPORTAKUS trinkt 1 Schluck");
 
   const fourOpen = present({ phase: "distributing_four", actorName: "FABIAN", remainingSips: 3 });
   assert.equal(fourOpen.roll, "4");
   assert.equal(fourOpen.action, "Verteile 4 Schlücke");
   assert.equal(fourOpen.meta, "Noch 3 übrig");
-  assert.equal(present({ phase: "distributing_four", actorName: "FABIAN", remainingSips: 0 }).meta, "Alle 4 verteilt");
+  assert.equal(fourOpen.remainingSips, 3);
+  const fourComplete = present({ phase: "distributing_four", actorName: "FABIAN", remainingSips: 0 });
+  assert.equal(fourComplete.meta, "Alle 4 verteilt");
+  assert.equal(fourComplete.remainingSips, 0);
   assert.deepEqual(present({ phase: "awaiting_four_acks", allocationSummary: "Fabian 3 · Kat 1" }), {
     player: "", copy: "4 SCHLÜCKE VERTEILT", roll: "", action: "Fabian 3 · Kat 1", meta: "", key: "awaiting_four_acks:Fabian 3 · Kat 1",
   });
+  assert.equal(present({
+    phase: "awaiting_four_acks", allocationSummary: "Fabian 3 · Kat 1", confirmedCount: 1, requiredConfirmationCount: 2,
+  }).meta, "Noch 1 Bestätigung");
+  assert.equal(present({
+    phase: "awaiting_four_acks", allocationSummary: "Fabian 2 · Kat 1 · Tobi 1", confirmedCount: 2, requiredConfirmationCount: 3,
+  }).meta, "Noch 1 Bestätigung");
+  assert.equal(present({
+    phase: "awaiting_four_acks", allocationSummary: "Fabian 2 · Kat 1 · Tobi 1", confirmedCount: 1, requiredConfirmationCount: 3,
+  }).meta, "1 von 3 bestätigt");
 
   const reaction = present({ phase: "reaction_active", localReactionActive: true, localRemainingMs: 9200 });
   assert.equal(reaction.copy, "TIPPE AUF DEN BILDSCHIRM!");
@@ -1008,6 +1030,16 @@ test("Klassik player cards apply semantic state priority and stable status text"
   assert.equal(present({ isReactionSuccess: true, reactionEvaluated: true, reactionDurationMs: 820 }).status, "0,82 s");
   assert.equal(present({ isReactionLoser: true, reactionStatus: "reacted", reactionDurationMs: 1530 }).status, "1,53 s");
   assert.equal(present({ isReactionLoser: true, reactionStatus: "timed_out" }).status, "ZU LANGSAM");
+  const acknowledgedLoser = present({
+    isReactionLoser: true, isPenaltyAcknowledged: true, reactionStatus: "timed_out",
+  });
+  assert.equal(acknowledgedLoser.status, "BESTÄTIGT");
+  assert.ok(acknowledgedLoser.classes.includes("trottl-classic-player--reaction-loser"));
+  assert.ok(acknowledgedLoser.classes.includes("trottl-classic-player--penalty-confirmed"));
+  assert.ok(present({ isContextMuted: true }).classes.includes("trottl-classic-player--context-muted"));
+  assert.match(ui, /phase === "awaiting_four_acks"[\s\S]*allocation === 0/);
+  assert.match(ui, /\["choosing_trottl", "distributing_four"\][\s\S]*actionActorSeat/);
+  assert.match(ui, /penaltyAcks\.has\(player\.seatIndex\)/);
 
   const stateOrder = [
     ".trottl-classic-player--self {",

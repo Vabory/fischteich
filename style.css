@@ -902,6 +902,60 @@ button:focus-visible {
   letter-spacing: 0.045em;
 }
 
+.trottl-classic-situation.is-four-distribution .trottl-classic-event-meta {
+  color: rgb(224 239 247 / 88%);
+  font-size: clamp(0.7rem, 3vw, 0.8rem);
+  font-weight: 850;
+}
+
+.trottl-classic-sip-markers {
+  display: inline-flex;
+  margin-left: 0.65em;
+  align-items: center;
+  gap: 4px;
+  vertical-align: 0.08em;
+}
+
+.trottl-classic-sip-markers i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgb(190 211 224 / 66%);
+  border-radius: 50%;
+  background: rgb(190 211 224 / 14%);
+  box-shadow: 0 0 5px rgb(190 211 224 / 8%);
+}
+
+.trottl-classic-sip-markers i.is-assigned {
+  border-color: rgb(255 205 92 / 82%);
+  background: #ffd875;
+  box-shadow: 0 0 7px rgb(255 174 45 / 35%);
+}
+
+.trottl-classic-situation.is-reaction-prompt {
+  position: relative;
+  overflow: hidden;
+}
+
+.trottl-classic-situation.is-reaction-prompt::after {
+  position: absolute;
+  right: 18px;
+  bottom: 5px;
+  left: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(220 246 255 / 90%) var(--reaction-progress, 100%), rgb(220 246 255 / 12%) 0);
+  box-shadow: 0 0 7px rgb(198 238 255 / 25%);
+  content: "";
+}
+
+.trottl-classic-situation.is-reaction-prompt .trottl-classic-event-action {
+  color: #f7fcff;
+  font-size: clamp(1.02rem, 4.5vw, 1.28rem);
+  font-weight: 950;
+  letter-spacing: 0.055em;
+  text-shadow: 0 0 12px rgb(214 244 255 / 22%);
+}
+
 @keyframes trottl-classic-event-enter {
   from { opacity: 0.72; transform: translateY(-2px) scale(0.992); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -1018,6 +1072,7 @@ button:focus-visible {
     border-color 180ms ease,
     box-shadow 180ms ease,
     background-color 180ms ease,
+    opacity 180ms ease,
     filter 140ms ease,
     scale 140ms ease;
 }
@@ -1190,6 +1245,35 @@ button:focus-visible {
   animation: trottl-classic-player-state-in 180ms ease-out;
 }
 
+.trottl-classic-player--penalty-confirmed {
+  --player-border: rgb(255 132 151 / 58%);
+  --player-glow: rgb(255 65 100 / 14%);
+  --player-accent: #ffc0cb;
+  --player-highlight: rgb(255 103 130 / 5%);
+}
+
+.trottl-classic-player--context-muted {
+  opacity: 0.78;
+  filter: saturate(0.78);
+}
+
+.trottl-classic-player--selected .trottl-classic-card-status-label {
+  font-size: 0.57rem;
+  font-weight: 950;
+  letter-spacing: 0.075em;
+}
+
+.trottl-classic-player--drink-target .trottl-classic-card-status-label {
+  font-weight: 950;
+}
+
+.trottl-classic-player--shot-target .trottl-classic-card-status-label {
+  font-size: 0.64rem;
+  font-weight: 1000;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 11px rgb(255 205 92 / 42%);
+}
+
 .trottl-classic-player-confirm {
   width: 100%;
   min-height: 30px;
@@ -1246,6 +1330,16 @@ button:focus-visible {
   letter-spacing: 0.04em;
 }
 
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player--selected .trottl-classic-card-status-label,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player--selected .trottl-classic-card-status-label {
+  font-size: 0.49rem;
+}
+
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player--shot-target .trottl-classic-card-status-label,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player--shot-target .trottl-classic-card-status-label {
+  font-size: 0.55rem;
+}
+
 @keyframes trottl-classic-player-active-pulse {
   0%, 100% { filter: drop-shadow(0 0 0 rgb(190 237 255 / 0%)); }
   50% { filter: drop-shadow(0 0 6px rgb(190 237 255 / 23%)); }
@@ -1274,10 +1368,36 @@ button:focus-visible {
   gap: 8px;
 }
 
+.trottl-classic-rule-controls.has-actions {
+  width: min(92vw, 360px);
+  min-height: 58px;
+  margin-inline: auto;
+  padding: 7px;
+  border: 1px solid rgb(184 220 237 / 18%);
+  border-radius: 16px;
+  background: rgb(5 13 25 / 68%);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 22%), inset 0 1px rgb(255 255 255 / 4%);
+}
+
 .trottl-classic-rule-controls button {
-  min-height: 34px;
-  padding: 7px 11px;
+  min-height: 44px;
+  padding: 9px 14px;
   font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.trottl-classic-rule-controls #trottl-classic-four-reset {
+  border-color: rgb(213 234 243 / 22%);
+  background: rgb(255 255 255 / 5%);
+  color: rgb(225 239 246 / 72%);
+}
+
+.trottl-classic-rule-controls #trottl-classic-four-confirm {
+  flex: 1;
+  border-color: rgb(207 239 250 / 62%);
+  background: linear-gradient(180deg, rgb(235 249 255 / 24%), rgb(170 224 243 / 13%));
+  box-shadow: 0 0 15px rgb(177 226 246 / 16%);
+  color: #f4fcff;
 }
 
 .trottl-classic-rule-controls p {
@@ -1309,7 +1429,8 @@ button:focus-visible {
   .trottl-classic-player--active,
   .trottl-classic-player--confirmed,
   .trottl-classic-player--reaction-success,
-  .trottl-classic-player--reaction-loser {
+  .trottl-classic-player--reaction-loser,
+  .trottl-classic-player--penalty-confirmed {
     animation: none;
   }
 

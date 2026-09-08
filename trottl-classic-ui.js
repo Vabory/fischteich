@@ -16,19 +16,22 @@
       localRemainingMs = null,
       remainingSips = 0,
       allocationSummary = "",
+      confirmedCount = 0,
+      requiredConfirmationCount = 0,
       penaltyNames = [],
     } = context;
     const result = Number(rollResult);
-    const view = (player, copy, roll = "", action = "", meta = "", key = phase) => Object.freeze({
-      player, copy, roll, action, meta, key,
+    const view = (player, copy, roll = "", action = "", meta = "", key = phase, details = {}) => Object.freeze({
+      player, copy, roll, action, meta, key, ...details,
     });
-    const rolled = (roll, action, meta = "") => view(
+    const rolled = (roll, action, meta = "", details = {}) => view(
       actorName,
       "HAT EINE",
       String(roll),
       action,
       meta,
       `${phase}:${roll}:${action}:${meta}`,
+      details,
     );
 
     if (rollPhase === "rolling" || phase === "rolling") return view(actorName, "WÜRFELT");
@@ -42,13 +45,35 @@
       return rolled(result, `${targetName} trinkt 1 Schluck`);
     }
     if (phase === "choosing_trottl") {
-      return rolled(3, actionKind === "replace_trottl" ? "Wähle einen neuen 3er Trottl" : "Wähle den 3er Trottl");
+      return rolled(
+        3,
+        actionKind === "replace_trottl" ? "Wähle einen neuen 3er Trottl" : "Wähle den 3er Trottl",
+        "Tippe auf einen Spieler",
+      );
     }
     if (phase === "distributing_four") {
-      return rolled(4, "Verteile 4 Schlücke", remainingSips === 0 ? "Alle 4 verteilt" : `Noch ${remainingSips} übrig`);
+      return rolled(
+        4,
+        "Verteile 4 Schlücke",
+        remainingSips === 0 ? "Alle 4 verteilt" : `Noch ${remainingSips} übrig`,
+        { remainingSips },
+      );
     }
     if (phase === "awaiting_four_acks") {
-      return view("", "4 SCHLÜCKE VERTEILT", "", allocationSummary, "", `${phase}:${allocationSummary}`);
+      const confirmationsRemaining = Math.max(0, requiredConfirmationCount - confirmedCount);
+      const meta = requiredConfirmationCount > 1
+        ? confirmationsRemaining === 1
+          ? "Noch 1 Bestätigung"
+          : `${confirmedCount} von ${requiredConfirmationCount} bestätigt`
+        : "";
+      return view(
+        "",
+        "4 SCHLÜCKE VERTEILT",
+        "",
+        allocationSummary,
+        meta,
+        `${phase}:${allocationSummary}${meta ? `:${meta}` : ""}`,
+      );
     }
     if (phase === "reaction_pending" || phase === "reaction_active") {
       if (localReactionActive) {
@@ -81,7 +106,9 @@
       isConfirmed = false,
       isReactionSuccess = false,
       isReactionLoser = false,
+      isPenaltyAcknowledged = false,
       isShotTarget = false,
+      isContextMuted = false,
       allocation = 0,
       reactionStatus = "",
       reactionDurationMs = null,
@@ -99,9 +126,13 @@
     if (isConfirmed) classes.push("trottl-classic-player--confirmed");
     if (isReactionSuccess) classes.push("trottl-classic-player--reaction-success");
     if (isReactionLoser) classes.push("trottl-classic-player--reaction-loser");
+    if (isPenaltyAcknowledged) classes.push("trottl-classic-player--penalty-confirmed");
+    if (isContextMuted) classes.push("trottl-classic-player--context-muted");
 
     let status = "";
-    if (isReactionLoser) {
+    if (isPenaltyAcknowledged) {
+      status = "BESTÄTIGT";
+    } else if (isReactionLoser) {
       status = reactionStatus === "reacted" && Number.isFinite(reactionDurationMs)
         ? `${(reactionDurationMs / 1000).toFixed(2).replace(".", ",")} s`
         : "ZU LANGSAM";
@@ -142,6 +173,8 @@
     const situationRoll = document.querySelector("#trottl-classic-event-roll");
     const situationAction = document.querySelector("#trottl-classic-event-action");
     const situationMeta = document.querySelector("#trottl-classic-event-meta");
+    const situationMetaLabel = document.querySelector("#trottl-classic-event-meta-label");
+    const sipMarkers = document.querySelector("#trottl-classic-sip-markers");
     const gameDiceMount = document.querySelector("#trottl-classic-dice-mount");
     const gameDiceStatus = document.querySelector("#trottl-classic-dice-status");
     const ruleControls = document.querySelector("#trottl-classic-rule-controls");
@@ -354,6 +387,18 @@
         || (player.seatIndex === ruleView.localSeat && reaction?.status === "pending" && ruleView.localRemainingMs === 0)
       );
       const isReactionSuccess = reaction?.status === "reacted" && !isReactionLoser;
+      const isPenaltyAcknowledged = isReactionLoser && ruleView.penaltyAcks.has(player.seatIndex);
+      const focusedSeat = ruleView.phase === "awaiting_drink_ack"
+        ? snapshot.session.actionTargetSeat
+        : ruleView.phase === "shot_ack"
+          ? snapshot.session.actionActorSeat
+          : null;
+      const isContextMuted = focusedSeat !== null
+        ? player.seatIndex !== focusedSeat
+        : ruleView.phase === "awaiting_four_acks"
+          ? allocation === 0
+          : ["choosing_trottl", "distributing_four"].includes(ruleView.phase)
+            && player.seatIndex === snapshot.session.actionActorSeat;
       const cardPresentation = createPlayerCardPresentation({
         isSelf,
         isActive,
@@ -363,7 +408,9 @@
         isConfirmed,
         isReactionSuccess,
         isReactionLoser,
+        isPenaltyAcknowledged,
         isShotTarget,
+        isContextMuted,
         allocation,
         reactionStatus: reaction?.status,
         reactionDurationMs: Number(reaction?.duration_ms),
@@ -435,6 +482,11 @@
         .filter(([, amount]) => Number(amount) > 0)
         .map(([seat, amount]) => `${playerAtSeat(snapshot, Number(seat))?.displayName ?? "Spieler"} ${amount}`)
         .join(" · ");
+      const requiredConfirmationSeats = Object.entries(ruleView.allocations)
+        .filter(([, amount]) => Number(amount) > 0)
+        .map(([seat]) => Number(seat));
+      const confirmedCount = requiredConfirmationSeats
+        .filter((seat) => ruleView.acknowledgedSeats.has(seat)).length;
       return createEventPresentation({
         phase: ruleView.phase,
         rollPhase: session.rollPhase,
@@ -449,6 +501,8 @@
         localRemainingMs: ruleView.localRemainingMs,
         remainingSips: Math.max(0, 4 - service.getFourTotal(session)),
         allocationSummary,
+        confirmedCount,
+        requiredConfirmationCount: requiredConfirmationSeats.length,
         penaltyNames: [...ruleView.penaltySeats].map((seat) => playerName(snapshot, seat)),
       });
     }
@@ -462,7 +516,16 @@
       setPart(situationCopy, presentation.copy);
       setPart(situationRoll, presentation.roll);
       setPart(situationAction, presentation.action);
-      setPart(situationMeta, presentation.meta);
+      setPart(situationMetaLabel, presentation.meta);
+      const showsSipMarkers = Number.isInteger(presentation.remainingSips);
+      situation.classList.toggle("is-four-distribution", showsSipMarkers);
+      sipMarkers.hidden = !showsSipMarkers;
+      if (showsSipMarkers) {
+        [...sipMarkers.children].forEach((marker, index) => {
+          marker.classList.toggle("is-assigned", index < 4 - presentation.remainingSips);
+        });
+      }
+      situationMeta.hidden = !presentation.meta && !showsSipMarkers;
       if (situation.dataset.eventKey === presentation.key) return;
       situation.dataset.eventKey = presentation.key;
       situation.classList.remove("is-changing");
@@ -482,7 +545,10 @@
 
     function renderReactionCountdown(snapshot, ruleView) {
       clearReactionCountdownTimer();
-      if (state.preview || !ruleView.localReactionActive) return;
+      if (state.preview || !ruleView.localReactionActive) {
+        situation.style.removeProperty("--reaction-progress");
+        return;
+      }
       const update = () => {
         if (state.snapshot?.session.id !== snapshot.session.id
           || state.snapshot?.session.rollSeq !== snapshot.session.rollSeq) return;
@@ -495,6 +561,7 @@
         }
         situationAction.textContent = `${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
         situationAction.hidden = false;
+        situation.style.setProperty("--reaction-progress", `${Math.min(100, (remainingMs / 10000) * 100).toFixed(1)}%`);
         state.reactionCountdownTimer = global.setTimeout(update, 100);
       };
       update();
@@ -536,6 +603,7 @@
       const ruleView = getRuleView(snapshot);
       tableStage.dataset.playerCount = String(snapshot.players.length);
       tableStage.classList.toggle("is-reaction-active", ruleView.localReactionActive);
+      situation.classList.toggle("is-reaction-prompt", ruleView.localReactionActive);
       renderSituation(describeSituation(snapshot, ruleView, activeSeatIndex));
       seatLayer.replaceChildren(...relativeSeats.map(
         (seat) => createGameSeat(seat, snapshot, activeSeatIndex, ruleView),

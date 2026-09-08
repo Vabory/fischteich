@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260908.12">
+    <meta name="fischteich-build" content="20260909.1">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=138">
+    <link rel="stylesheet" href="./style.css?v=139">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -29,7 +29,7 @@
     <script src="./dice-service.js?v=3" defer></script>
     <script src="./trottl-classic-service.js?v=8" defer></script>
     <script src="./trottl-classic-preview.js?v=2" defer></script>
-    <script src="./trottl-classic-ui.js?v=11" defer></script>
+    <script src="./trottl-classic-ui.js?v=12" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=78" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -294,6 +294,7 @@
             <div class="trottl-classic-rule-controls" id="trottl-classic-rule-controls">
               <button class="secondary-button" id="trottl-classic-four-reset" type="button" hidden>Zurücksetzen</button>
               <button class="primary-button" id="trottl-classic-four-confirm" type="button" hidden>Verteilung bestätigen</button>
+              <button class="primary-button trottl-classic-global-confirm" id="trottl-classic-global-confirm" type="button" hidden>BESTÄTIGEN</button>
               <p id="trottl-classic-game-feedback" aria-live="polite"></p>
             </div>
           </section>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 24" fill="none">
+  <defs>
+    <linearGradient id="badge" x1="5" y1="2" x2="39" y2="22" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3C245A"/>
+      <stop offset="1" stop-color="#140C25"/>
+    </linearGradient>
+  </defs>
+  <path d="M7 1.5h32a5.5 5.5 0 0 1 5.5 5.5v10a5.5 5.5 0 0 1-5.5 5.5H7A5.5 5.5 0 0 1 1.5 17V7A5.5 5.5 0 0 1 7 1.5Z" fill="url(#badge)" stroke="#D7B0FF" stroke-width="1.5"/>
+  <path d="M8 5h30" stroke="#F1E1FF" stroke-opacity=".22" stroke-linecap="round"/>
+  <text x="23" y="14.8" fill="#F2E7FF" font-family="system-ui, sans-serif" font-size="7.2" font-weight="800" letter-spacing=".8" text-anchor="middle">TROTTL</text>
+</svg>

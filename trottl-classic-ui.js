@@ -115,6 +115,7 @@
       isAllocationImpact = false,
       isReactionSuccessImpact = false,
       isPenaltyImpact = false,
+      isReactionTimerActive = false,
       allocation = 0,
       reactionStatus = "",
       reactionDurationMs = null,
@@ -140,6 +141,7 @@
     if (isAllocationImpact) classes.push("trottl-classic-player--allocation-impact");
     if (isReactionSuccessImpact) classes.push("trottl-classic-player--success-impact");
     if (isPenaltyImpact) classes.push("trottl-classic-player--penalty-impact");
+    if (isReactionTimerActive) classes.push("trottl-classic-player--reaction-timer");
 
     let status = "";
     if (isPenaltyAcknowledged) {
@@ -158,8 +160,6 @@
       status = `${allocation} ${allocation === 1 ? "SCHLUCK" : "SCHLÜCKE"}`;
     } else if (isDrinkTarget) {
       status = `${drinkSips} ${drinkSips === 1 ? "SCHLUCK" : "SCHLÜCKE"}`;
-    } else if (isSelectable) {
-      status = "AUSWÄHLEN";
     }
     return Object.freeze({ classes: Object.freeze(classes), status });
   }
@@ -192,6 +192,7 @@
     const ruleControls = document.querySelector("#trottl-classic-rule-controls");
     const fourResetButton = document.querySelector("#trottl-classic-four-reset");
     const fourConfirmButton = document.querySelector("#trottl-classic-four-confirm");
+    const globalConfirmButton = document.querySelector("#trottl-classic-global-confirm");
     const gameFeedback = document.querySelector("#trottl-classic-game-feedback");
     const previewPanel = document.querySelector("#trottl-classic-preview-panel");
     const previewCount = document.querySelector("#trottl-classic-preview-count");
@@ -383,16 +384,13 @@
       const { player, relativeIndex } = relativeSeat;
       const position = service.getSeatPosition(relativeIndex, snapshot.players.length);
       const seat = document.createElement("article");
+      const avatarWrap = document.createElement("span");
       const avatar = document.createElement("span");
-      const content = document.createElement("span");
       const name = document.createElement("strong");
-      const badges = document.createElement("span");
-      const selfBadge = document.createElement("small");
       const isSelf = player.userId === snapshot.identity.userId;
       const isActive = player.seatIndex === activeSeatIndex;
       const allocation = Number(ruleView.allocations[player.seatIndex] ?? 0);
       const isSelectable = isSeatSelectable(player.seatIndex, snapshot, ruleView);
-      const showConfirmation = needsConfirmation(player.seatIndex, snapshot, ruleView);
       const reaction = service.getReactionPlayer(snapshot.session, player.seatIndex);
       const isTrottl = player.seatIndex === snapshot.session.currentTrottlSeat;
       const isConfirmed = ruleView.acknowledgedSeats.has(player.seatIndex);
@@ -438,6 +436,7 @@
         isAllocationImpact: effects.allocationImpactSeats.has(player.seatIndex),
         isReactionSuccessImpact: effects.successImpactSeats.has(player.seatIndex),
         isPenaltyImpact: effects.penaltyImpactSeats.has(player.seatIndex),
+        isReactionTimerActive: isSelf && ruleView.localReactionActive,
         allocation,
         reactionStatus: reaction?.status,
         reactionDurationMs: Number(reaction?.duration_ms),
@@ -454,45 +453,37 @@
       // Mirror only its screen X mapping so global +1 proceeds clockwise.
       seat.style.setProperty("--seat-left", `${(50 - (position.x * 36)).toFixed(3)}%`);
       seat.style.setProperty("--seat-top", `${(50 + (position.y * 42)).toFixed(3)}%`);
-      seat.setAttribute("aria-label", `${player.displayName}${isSelf ? ", du" : ""}${isActive ? ", am Zug" : ""}`);
+      const seatDescription = [
+        player.displayName,
+        isSelf ? "du" : "",
+        isActive ? "am Zug" : "",
+        isTrottl ? "3er Trottl" : "",
+        isSelectable ? "auswählbar" : "",
+        cardPresentation.status,
+      ].filter(Boolean).join(", ");
+      seat.setAttribute("aria-label", seatDescription);
 
+      avatarWrap.className = "trottl-classic-avatar-wrap";
       avatar.className = "trottl-classic-game-avatar";
       avatar.setAttribute("aria-hidden", "true");
-      content.className = "trottl-classic-game-seat-content";
+      name.className = "trottl-classic-seat-name";
       name.textContent = player.displayName;
-      badges.className = "trottl-classic-game-badges trottl-classic-game-status";
-      if (isSelf) {
-        selfBadge.className = "trottl-classic-self-badge";
-        selfBadge.textContent = "DU";
-        selfBadge.setAttribute("aria-hidden", "true");
-      }
       if (isTrottl) {
-        const trottlBadge = document.createElement("small");
+        const trottlBadge = document.createElement("img");
         trottlBadge.className = "trottl-classic-trottl-badge";
-        trottlBadge.textContent = "TROTTL";
-        badges.append(trottlBadge);
+        trottlBadge.src = "./assets/trottl-classic/trottl-badge.svg";
+        trottlBadge.alt = "";
+        trottlBadge.setAttribute("aria-hidden", "true");
+        seat.append(trottlBadge);
       }
       if (cardPresentation.status) {
         const statusLabel = document.createElement("small");
         statusLabel.className = "trottl-classic-card-status-label";
         statusLabel.textContent = cardPresentation.status;
-        badges.append(statusLabel);
+        avatarWrap.append(statusLabel);
       }
-      if (showConfirmation) {
-        const confirmButton = document.createElement("button");
-        confirmButton.type = "button";
-        confirmButton.className = "trottl-classic-player-confirm";
-        confirmButton.textContent = "BESTÄTIGEN";
-        confirmButton.addEventListener("click", (event) => {
-          event.stopPropagation();
-          void handleConfirmation();
-        });
-        content.append(name, badges, confirmButton);
-      } else {
-        content.append(name, badges);
-      }
-      seat.append(avatar, content);
-      if (isSelf) seat.append(selfBadge);
+      avatarWrap.prepend(avatar);
+      seat.append(avatarWrap, name);
       if (isSelectable) {
         seat.addEventListener("click", (event) => {
           event.stopPropagation();
@@ -589,7 +580,10 @@
         }
         situationAction.textContent = `${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
         situationAction.hidden = false;
-        situation.style.setProperty("--reaction-progress", `${Math.min(100, (remainingMs / 10000) * 100).toFixed(1)}%`);
+        const reactionProgress = `${Math.min(100, (remainingMs / 10000) * 100).toFixed(1)}%`;
+        situation.style.setProperty("--reaction-progress", reactionProgress);
+        seatLayer.querySelector(".trottl-classic-player--reaction-timer")
+          ?.style.setProperty("--seat-reaction-progress", reactionProgress);
         situation.classList.toggle("is-reaction-urgent", remainingMs <= 3000);
         state.reactionCountdownTimer = global.setTimeout(update, 100);
       };
@@ -620,11 +614,16 @@
       const mayDistribute = ruleView.phase === "distributing_four"
         && ruleView.localSeat === snapshot.session.actionActorSeat;
       const total = service.getFourTotal(snapshot.session);
+      const localNeedsConfirmation = needsConfirmation(ruleView.localSeat, snapshot, ruleView);
       fourResetButton.hidden = !mayDistribute;
       fourResetButton.disabled = state.actionRequestPending || total === 0;
       fourConfirmButton.hidden = !mayDistribute || total !== 4;
       fourConfirmButton.disabled = state.actionRequestPending;
-      ruleControls.classList.toggle("has-actions", mayDistribute);
+      globalConfirmButton.hidden = !localNeedsConfirmation;
+      globalConfirmButton.disabled = state.actionRequestPending;
+      ruleControls.classList.toggle("has-actions", mayDistribute || localNeedsConfirmation);
+      ruleControls.classList.toggle("has-four-actions", mayDistribute);
+      ruleControls.classList.toggle("has-confirm-action", localNeedsConfirmation);
     }
 
     function collectVisualEffects(snapshot, ruleView) {
@@ -987,7 +986,7 @@
     }
 
     function handleReactionTap(event) {
-      if (event?.target?.closest?.(".trottl-classic-preview-panel, .trottl-classic-rule-controls, .trottl-classic-player-confirm")) return;
+      if (event?.target?.closest?.(".trottl-classic-preview-panel, .trottl-classic-rule-controls")) return;
       const snapshot = state.snapshot;
       if (!snapshot || state.preview || state.actionRequestPending) return;
       const session = snapshot.session;
@@ -1313,6 +1312,7 @@
     gameView.addEventListener("click", handleReactionTap);
     fourResetButton.addEventListener("click", resetFourSips);
     fourConfirmButton.addEventListener("click", confirmFourSips);
+    globalConfirmButton.addEventListener("click", handleConfirmation);
     if (previewEnabled) {
       for (let playerCount = preview.minPlayers; playerCount <= preview.maxPlayers; playerCount += 1) {
         const button = document.createElement("button");

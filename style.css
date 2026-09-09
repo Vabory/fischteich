@@ -640,88 +640,290 @@ button:focus-visible {
 }
 
 .trottl-classic-session-state {
-  margin: 8px 0 0;
+  margin: 3px 0 0;
   color: #91e5ff;
-  font-size: 0.82rem;
+  font-size: 0.67rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
-.trottl-classic-player-panel {
-  width: min(86vw, 360px);
-  margin-top: clamp(24px, 4.5dvh, 38px);
-  padding: 18px;
-  border: 1px solid rgb(121 194 236 / 28%);
-  border-radius: 20px;
-  background: rgb(5 12 29 / 82%);
-  box-shadow: 0 14px 32px rgb(0 0 0 / 30%);
+.trottl-classic-session-shell:not(.is-playing) {
+  padding-top: max(calc(env(safe-area-inset-top) + 50px), 64px);
+  padding-bottom: max(calc(env(safe-area-inset-bottom) + 16px), 22px);
+  overflow: hidden;
 }
 
-.trottl-classic-player-panel h2 {
-  margin: 0 0 12px;
-  font-size: 1rem;
+.trottl-classic-session-shell > .trottl-classic-header {
+  width: min(90vw, 380px);
+  flex: none;
+}
+
+.trottl-classic-session-shell > .trottl-classic-header .eyebrow {
+  margin-bottom: 2px;
+  font-size: clamp(0.58rem, 2.5vw, 0.68rem);
+  letter-spacing: 0.11em;
+}
+
+.trottl-classic-session-shell > .trottl-classic-header h1 {
+  font-size: clamp(1.2rem, 5.2vw, 1.55rem);
+  letter-spacing: 0.04em;
+}
+
+.trottl-classic-player-panel {
+  display: flex;
+  width: min(90vw, 380px);
+  min-height: 0;
+  margin-top: clamp(8px, 1.5dvh, 14px);
+  padding: 11px;
+  border: 1px solid rgb(121 194 236 / 28%);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 4%), transparent 40%),
+    rgb(5 12 29 / 82%);
+  box-shadow: 0 14px 32px rgb(0 0 0 / 30%), inset 0 1px rgb(255 255 255 / 4%);
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.trottl-classic-player-panel-header {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trottl-classic-player-panel-header h2,
+.trottl-classic-player-panel-header p {
+  margin: 0;
+}
+
+.trottl-classic-player-panel-header h2 {
+  color: #f2f9ff;
+  font-size: 0.88rem;
+  letter-spacing: 0.015em;
+}
+
+.trottl-classic-player-panel-header p {
+  color: rgb(194 225 241 / 76%);
+  font-size: 0.7rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .trottl-classic-player-list {
   display: grid;
+  min-height: 0;
   margin: 0;
-  padding: 0;
-  gap: 7px;
+  padding: 0 2px 1px 0;
+  gap: 6px;
   list-style: none;
-  counter-reset: classic-player;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-.trottl-classic-player-list li {
+.trottl-classic-lobby-player {
   display: grid;
-  min-height: 42px;
-  padding: 8px 11px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px 8px 4px 5px;
   align-items: center;
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 12px;
   background: rgb(255 255 255 / 5%);
-  counter-increment: classic-player;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 7px;
 }
 
-.trottl-classic-player-list li::before {
-  color: rgb(159 217 245 / 68%);
-  content: counter(classic-player) ".";
-  font-size: 0.78rem;
-  font-weight: 800;
+.trottl-classic-lobby-player.is-self {
+  min-height: 83px;
+  margin-top: 3px;
+  padding: 7px 8px 6px 6px;
+  border-color: rgb(188 228 249 / 34%);
+  background:
+    linear-gradient(110deg, rgb(100 205 255 / 7%), transparent 45%, rgb(255 111 197 / 4%)),
+    rgb(255 255 255 / 8%);
+  box-shadow: inset 0 1px rgb(255 255 255 / 7%), 0 7px 17px rgb(0 0 0 / 19%);
+  grid-template-columns: 64px minmax(0, 1fr) minmax(92px, auto);
 }
 
-.trottl-classic-player-list span {
+.trottl-classic-lobby-avatar-column {
+  display: grid;
   min-width: 0;
+  justify-items: center;
+  gap: 1px;
+}
+
+.trottl-classic-lobby-avatar {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.trottl-classic-lobby-player.is-self .trottl-classic-lobby-avatar {
+  width: 58px;
+  height: 58px;
+}
+
+.trottl-classic-lobby-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.trottl-classic-lobby-avatar.is-empty {
+  border: 1px dashed rgb(188 220 237 / 30%);
+  background: radial-gradient(circle, rgb(219 239 249 / 8%), rgb(66 103 128 / 5%));
+}
+
+.trottl-classic-lobby-avatar.is-empty::after {
+  width: 38%;
+  aspect-ratio: 1;
+  border: 1px solid rgb(204 231 244 / 28%);
+  border-radius: 50%;
+  content: "";
+}
+
+.trottl-classic-lobby-identity,
+.trottl-classic-lobby-name-line,
+.trottl-classic-lobby-name-line strong {
+  min-width: 0;
+}
+
+.trottl-classic-lobby-name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trottl-classic-lobby-name-line strong {
   overflow: hidden;
-  font-weight: 760;
+  color: #f2f8fc;
+  font-size: clamp(0.78rem, 3.35vw, 0.91rem);
+  font-weight: 780;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.trottl-classic-player-list small {
+.trottl-classic-lobby-player.is-self .trottl-classic-lobby-name-line strong {
+  font-size: clamp(0.86rem, 3.75vw, 1rem);
+}
+
+.trottl-classic-host-badge {
+  flex: none;
   padding: 3px 7px;
   border: 1px solid rgb(117 216 255 / 25%);
   border-radius: 999px;
   color: #9ce9ff;
-  font-size: 0.62rem;
+  font-size: 0.55rem;
   font-weight: 850;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.trottl-classic-ready-status {
+  color: rgb(199 216 225 / 59%);
+  font-size: clamp(0.59rem, 2.55vw, 0.68rem);
+  font-weight: 820;
+  white-space: nowrap;
+}
+
+.trottl-classic-ready-status.is-ready {
+  color: #7cf1a6;
+}
+
+.trottl-classic-avatar-action,
+.trottl-classic-ready-button,
+.trottl-classic-unready-button {
+  border: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.trottl-classic-avatar-action {
+  width: 68px;
+  min-height: 18px;
+  padding: 2px 1px;
+  background: transparent;
+  color: #9edff8;
+  font-size: 0.53rem;
+  font-weight: 780;
+  line-height: 1.1;
+}
+
+.trottl-classic-avatar-action:disabled {
+  color: rgb(183 205 216 / 32%);
+}
+
+.trottl-classic-self-ready-controls {
+  display: grid;
+  min-width: 0;
+  justify-items: stretch;
+  gap: 4px;
+}
+
+.trottl-classic-ready-button,
+.trottl-classic-ready-status.is-self-status {
+  display: grid;
+  min-height: 36px;
+  padding: 7px 9px;
+  place-items: center;
+  border: 1px solid rgb(215 235 245 / 20%);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 6%);
+  color: rgb(224 238 245 / 76%);
+  font-size: 0.7rem;
+  font-weight: 880;
+}
+
+.trottl-classic-ready-status.is-self-status {
+  border-color: rgb(93 232 143 / 38%);
+  background: linear-gradient(180deg, rgb(72 214 124 / 20%), rgb(31 126 72 / 12%));
+  box-shadow: 0 0 14px rgb(53 216 115 / 10%);
+  color: #8cf4af;
+}
+
+.trottl-classic-ready-button:disabled {
+  opacity: 0.38;
+}
+
+.trottl-classic-unready-button {
+  min-height: 21px;
+  padding: 2px;
+  background: transparent;
+  color: rgb(210 226 234 / 59%);
+  font-size: 0.51rem;
+  font-weight: 740;
+  line-height: 1.1;
+}
+
+.trottl-classic-avatar-required {
+  color: rgb(220 226 232 / 52%);
+  font-size: 0.49rem;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .trottl-classic-actions {
   display: grid;
-  width: min(86vw, 360px);
+  width: min(90vw, 380px);
   margin-top: auto;
-  padding-top: 18px;
-  gap: 10px;
+  padding-top: 10px;
+  gap: 7px;
 }
 
 .trottl-classic-actions button {
   width: 100%;
-  min-height: 50px;
+  min-height: 44px;
 }
 
 .trottl-classic-lobby-view {
@@ -731,6 +933,31 @@ button:focus-visible {
   flex: 1;
   align-items: center;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.trottl-classic-lobby-view > .trottl-classic-feedback {
+  min-height: 1.15em;
+  margin-top: 6px;
+  font-size: 0.68rem;
+}
+
+.trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-player-list,
+.trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-player-list {
+  gap: 4px;
+}
+
+.trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-lobby-player:not(.is-self),
+.trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-lobby-player:not(.is-self) {
+  min-height: 42px;
+  padding-block: 2px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
+.trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-lobby-player:not(.is-self) .trottl-classic-lobby-avatar,
+.trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-lobby-player:not(.is-self) .trottl-classic-lobby-avatar {
+  width: 36px;
+  height: 36px;
 }
 
 .trottl-classic-screen.is-playing .trottl-classic-session-shell {
@@ -1630,6 +1857,20 @@ button:focus-visible {
 }
 
 @media (max-height: 720px) {
+  .trottl-classic-session-shell:not(.is-playing) {
+    padding-top: max(calc(env(safe-area-inset-top) + 45px), 58px);
+    padding-bottom: max(calc(env(safe-area-inset-bottom) + 10px), 15px);
+  }
+
+  .trottl-classic-session-shell > .trottl-classic-header .eyebrow { margin-bottom: 0; }
+  .trottl-classic-player-panel { margin-top: 5px; padding-block: 8px; }
+  .trottl-classic-player-panel-header { margin-bottom: 5px; }
+  .trottl-classic-lobby-player { min-height: 43px; }
+  .trottl-classic-lobby-player:not(.is-self) .trottl-classic-lobby-avatar { width: 37px; height: 37px; }
+  .trottl-classic-lobby-player.is-self { min-height: 76px; }
+  .trottl-classic-actions { padding-top: 6px; gap: 5px; }
+  .trottl-classic-actions button { min-height: 40px; }
+
   .trottl-classic-screen.is-playing .trottl-classic-session-shell {
     padding-top: max(calc(env(safe-area-inset-top) + 48px), 62px);
     padding-bottom: max(calc(env(safe-area-inset-bottom) + 8px), 12px);
@@ -1642,6 +1883,13 @@ button:focus-visible {
 }
 
 @media (max-width: 360px) {
+  .trottl-classic-player-panel,
+  .trottl-classic-actions { width: min(92vw, 380px); }
+  .trottl-classic-lobby-player { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 5px; }
+  .trottl-classic-lobby-player.is-self { grid-template-columns: 61px minmax(0, 1fr) minmax(86px, auto); }
+  .trottl-classic-ready-status { font-size: 0.57rem; }
+  .trottl-classic-host-badge { padding-inline: 5px; }
+
   .trottl-classic-situation { width: min(94vw, 390px); padding-inline: 12px; }
   .trottl-classic-event-main { font-size: clamp(0.94rem, 4.55vw, 1.18rem); }
   .trottl-classic-event-action { font-size: clamp(0.72rem, 3.5vw, 0.86rem); }

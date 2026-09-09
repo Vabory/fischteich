@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260909.3">
+    <meta name="fischteich-build" content="20260909.4">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=139">
+    <link rel="stylesheet" href="./style.css?v=140">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -30,7 +30,7 @@
     <script src="./trottl-avatar-service.js?v=1" defer></script>
     <script src="./trottl-classic-service.js?v=9" defer></script>
     <script src="./trottl-classic-preview.js?v=2" defer></script>
-    <script src="./trottl-classic-ui.js?v=12" defer></script>
+    <script src="./trottl-classic-ui.js?v=13" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=78" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -243,7 +243,10 @@
           </header>
           <div class="trottl-classic-lobby-view" id="trottl-classic-lobby-view">
             <section class="trottl-classic-player-panel" aria-labelledby="trottl-classic-player-title">
-              <h2 id="trottl-classic-player-title">Spieler</h2>
+              <header class="trottl-classic-player-panel-header">
+                <h2 id="trottl-classic-player-title"><span id="trottl-classic-player-count">0 Spieler</span></h2>
+                <p id="trottl-classic-ready-count">0 / 0 bereit</p>
+              </header>
               <ol class="trottl-classic-player-list" id="trottl-classic-player-list"></ol>
             </section>
             <p class="trottl-classic-feedback" id="trottl-classic-session-feedback" aria-live="polite"></p>

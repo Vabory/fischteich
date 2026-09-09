@@ -1,6 +1,40 @@
 "use strict";
 
 (function installTrottlClassicUi(global) {
+  const AVATAR_SELECT_REQUEST_EVENT = "fischteich:trottl-avatar-select-request";
+
+  function getLobbyAvatarById(avatarId, avatarService = global.trottlAvatarService) {
+    if (typeof avatarId !== "string" || !avatarService) return null;
+    return avatarService.getTrottlAvatarById(avatarId);
+  }
+
+  function createLobbyPresentation({ players, localUserId, hostUserId, minPlayers = 3 }) {
+    const source = Array.isArray(players) ? players : [];
+    const others = source.filter((player) => player.userId !== localUserId);
+    const self = source.find((player) => player.userId === localUserId) ?? null;
+    const orderedPlayers = Object.freeze(self ? [...others, self] : [...others]);
+    const playerCount = source.length;
+    const readyCount = source.filter((player) => player.isReady === true).length;
+    const missingPlayers = Math.max(0, minPlayers - playerCount);
+    const allReady = playerCount > 0
+      && source.every((player) => player.isReady === true && player.avatarId !== null);
+    const isHost = localUserId === hostUserId;
+    let startLabel;
+    if (missingPlayers > 0) startLabel = `Noch ${missingPlayers} Spieler benötigt`;
+    else if (!allReady) startLabel = "Warten auf Bereitschaft";
+    else startLabel = isHost ? "Spiel starten" : "Warten auf Host";
+    return Object.freeze({
+      orderedPlayers,
+      self,
+      playerCount,
+      readyCount,
+      allReady,
+      isHost,
+      canStart: isHost && missingPlayers === 0 && allReady,
+      startLabel,
+    });
+  }
+
   function createEventPresentation(context) {
     const {
       phase,
@@ -199,6 +233,8 @@
     const previewPerspective = document.querySelector("#trottl-classic-preview-perspective");
     const previewActive = document.querySelector("#trottl-classic-preview-active");
     const playerList = document.querySelector("#trottl-classic-player-list");
+    const playerCountLabel = document.querySelector("#trottl-classic-player-count");
+    const readyCountLabel = document.querySelector("#trottl-classic-ready-count");
     const sessionFeedback = document.querySelector("#trottl-classic-session-feedback");
     const startButton = document.querySelector("#trottl-classic-start");
     const leaveButton = document.querySelector("#trottl-classic-leave");
@@ -266,6 +302,8 @@
       if (message.includes("REACTION_TOO_EARLY")) return "Die Reaktionsrunde hat noch nicht begonnen.";
       if (message.includes("REACTION_LOCKOUT")) return "Bestätigung ist nach der kurzen Sperre möglich.";
       if (message.includes("NOT_PLAYING")) return "Dieses Spiel läuft nicht mehr.";
+      if (message.includes("AVATAR_REQUIRED")) return "Wähle zuerst einen Avatar.";
+      if (message.includes("PLAYERS_NOT_READY")) return "Noch sind nicht alle Spieler bereit.";
       if (message.includes("LOCAL_IDENTITY_REQUIRED")) return "Bitte zuerst einen Fischteich-Namen festlegen.";
       if (message.includes("AUTH_REQUIRED") || error?.code === "42501") {
         return "Anmeldung noch nicht bereit. Bitte erneut versuchen.";
@@ -298,29 +336,137 @@
 
     function renderLobby(snapshot) {
       const { session, players, identity } = snapshot;
-      const isHost = session.hostUserId === identity.userId;
+      const presentation = createLobbyPresentation({
+        players,
+        localUserId: identity.userId,
+        hostUserId: session.hostUserId,
+        minPlayers: service.minPlayers,
+      });
       sessionRoom.textContent = `RAUM ${session.roomSlot}`;
       sessionState.textContent = "Lobby";
+      playerCountLabel.textContent = `${presentation.playerCount} Spieler`;
+      readyCountLabel.textContent = `${presentation.readyCount} / ${presentation.playerCount} bereit`;
+      lobbyView.dataset.playerCount = String(presentation.playerCount);
       playerList.replaceChildren();
-      for (const player of players) {
+      for (const player of presentation.orderedPlayers) {
+        const isSelf = player.userId === identity.userId;
         const item = document.createElement("li");
-        const name = document.createElement("span");
+        const avatarColumn = document.createElement("div");
+        const avatar = document.createElement("span");
+        const identityColumn = document.createElement("div");
+        const nameLine = document.createElement("div");
+        const name = document.createElement("strong");
+        const readyStatus = document.createElement("span");
+        const avatarRecord = getLobbyAvatarById(player.avatarId);
+        item.className = `trottl-classic-lobby-player${isSelf ? " is-self" : ""}`;
         name.textContent = player.displayName;
+        name.title = player.displayName;
         item.dataset.seatIndex = String(player.seatIndex);
-        item.append(name);
+        item.dataset.userId = player.userId;
+        avatarColumn.className = "trottl-classic-lobby-avatar-column";
+        avatar.className = `trottl-classic-lobby-avatar${avatarRecord ? "" : " is-empty"}`;
+        if (avatarRecord) {
+          const image = document.createElement("img");
+          image.src = avatarRecord.src;
+          image.alt = avatarRecord.displayName;
+          image.width = 96;
+          image.height = 96;
+          image.draggable = false;
+          avatar.append(image);
+        } else {
+          avatar.setAttribute("role", "img");
+          avatar.setAttribute("aria-label", "Kein Avatar gewählt");
+        }
+        avatarColumn.append(avatar);
+        identityColumn.className = "trottl-classic-lobby-identity";
+        nameLine.className = "trottl-classic-lobby-name-line";
+        nameLine.append(name);
         if (player.userId === session.hostUserId) {
           const badge = document.createElement("small");
+          badge.className = "trottl-classic-host-badge";
           badge.textContent = "Host";
-          item.append(badge);
+          nameLine.append(badge);
+        }
+        identityColumn.append(nameLine);
+
+        if (!isSelf) {
+          readyStatus.className = `trottl-classic-ready-status${player.isReady ? " is-ready" : ""}`;
+          readyStatus.textContent = player.isReady ? "✓ Bereit" : "Nicht bereit";
+          item.append(avatarColumn, identityColumn, readyStatus);
+        } else {
+          const avatarButton = document.createElement("button");
+          const readyControls = document.createElement("div");
+          avatarButton.type = "button";
+          avatarButton.className = "trottl-classic-avatar-action";
+          avatarButton.textContent = player.avatarId === null ? "Avatar wählen" : "Avatar ändern";
+          avatarButton.disabled = state.busy || player.isReady;
+          avatarButton.addEventListener("click", () => requestAvatarSelection(player));
+          avatarColumn.append(avatarButton);
+          readyControls.className = "trottl-classic-self-ready-controls";
+          if (player.isReady) {
+            readyStatus.className = "trottl-classic-ready-status is-ready is-self-status";
+            readyStatus.textContent = "✓ Bereit";
+            const cancelButton = document.createElement("button");
+            cancelButton.type = "button";
+            cancelButton.className = "trottl-classic-unready-button";
+            cancelButton.textContent = "Bereitschaft abbrechen";
+            cancelButton.disabled = state.busy;
+            cancelButton.addEventListener("click", () => void updateReady(false));
+            readyControls.append(readyStatus, cancelButton);
+          } else {
+            const readyButton = document.createElement("button");
+            readyButton.type = "button";
+            readyButton.className = "trottl-classic-ready-button";
+            readyButton.textContent = "○ Bereit";
+            readyButton.disabled = state.busy || player.avatarId === null;
+            readyButton.addEventListener("click", () => void updateReady(true));
+            readyControls.append(readyButton);
+            if (player.avatarId === null) {
+              const hint = document.createElement("small");
+              hint.className = "trottl-classic-avatar-required";
+              hint.textContent = "Wähle zuerst einen Avatar";
+              readyControls.append(hint);
+            }
+          }
+          item.append(avatarColumn, identityColumn, readyControls);
         }
         playerList.append(item);
       }
-      startButton.hidden = session.status !== "lobby" || !isHost;
-      startButton.disabled = state.busy || players.length < service.minPlayers;
-      startButton.textContent = players.length < service.minPlayers
-        ? `Noch ${service.minPlayers - players.length} Spieler benötigt`
-        : "Spiel starten";
+      startButton.hidden = session.status !== "lobby";
+      startButton.disabled = state.busy || !presentation.canStart;
+      startButton.textContent = presentation.startLabel;
       leaveButton.disabled = state.busy;
+    }
+
+    function requestAvatarSelection(player) {
+      if (state.busy || player.isReady || !state.snapshot) return;
+      sessionFeedback.textContent = "Avatar-Auswahl ist noch nicht verfügbar.";
+      global.dispatchEvent(new CustomEvent(AVATAR_SELECT_REQUEST_EVENT, {
+        detail: Object.freeze({
+          sessionId: state.snapshot.session.id,
+          avatarId: player.avatarId,
+        }),
+      }));
+    }
+
+    async function updateReady(ready) {
+      const snapshot = state.snapshot;
+      const localPlayer = snapshot?.players.find((player) => player.userId === snapshot.identity.userId);
+      if (state.busy || snapshot?.session.status !== "lobby" || !localPlayer) return;
+      if (ready && localPlayer.avatarId === null) return;
+      state.busy = true;
+      sessionFeedback.textContent = ready ? "Bereitschaft wird bestätigt …" : "Bereitschaft wird zurückgenommen …";
+      renderLobby(snapshot);
+      try {
+        state.snapshot = await service.setReady(snapshot.session.id, ready);
+        sessionFeedback.textContent = "";
+      } catch (error) {
+        console.warn("3er-Trottl-Bereitschaft konnte nicht geändert werden.", error);
+        sessionFeedback.textContent = describeError(error, "Bereitschaft konnte nicht geändert werden.");
+      } finally {
+        state.busy = false;
+        renderSession();
+      }
     }
 
     function playerAtSeat(snapshot, seatIndex) {
@@ -1221,6 +1367,13 @@
 
     async function startGame() {
       if (state.busy || !state.snapshot) return;
+      const presentation = createLobbyPresentation({
+        players: state.snapshot.players,
+        localUserId: state.snapshot.identity.userId,
+        hostUserId: state.snapshot.session.hostUserId,
+        minPlayers: service.minPlayers,
+      });
+      if (!presentation.canStart) return;
       state.busy = true;
       sessionFeedback.textContent = "Spiel wird gestartet …";
       renderSession();
@@ -1341,5 +1494,12 @@
     });
   }
 
-  global.TrottlClassicUI = Object.freeze({ create, createEventPresentation, createPlayerCardPresentation });
+  global.TrottlClassicUI = Object.freeze({
+    create,
+    createEventPresentation,
+    createPlayerCardPresentation,
+    createLobbyPresentation,
+    getLobbyAvatarById,
+    avatarSelectRequestEvent: AVATAR_SELECT_REQUEST_EVENT,
+  });
 })(window);

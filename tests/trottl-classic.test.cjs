@@ -904,7 +904,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=12[\s\S]*script\.js\?v=78/);
+  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=13[\s\S]*script\.js\?v=78/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -930,10 +930,10 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /service\.getRelativeSeats\(snapshot\.players, snapshot\.identity\.userId\)/);
   assert.match(ui, /service\.getSeatPosition\(relativeIndex, snapshot\.players\.length\)/);
   assert.match(ui, /player\.seatIndex === activeSeatIndex/);
-  assert.match(ui, /players\.length < service\.minPlayers/);
-  assert.match(ui, /session\.hostUserId === identity\.userId/);
+  assert.match(ui, /state\.busy \|\| !presentation\.canStart/);
+  assert.match(ui, /hostUserId:\s*session\.hostUserId/);
   assert.doesNotMatch(html, /Pokertisch|Situationserklärer|Reaktionsspiel/);
-  assert.match(css, /\.trottl-classic-player-list li[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
+  assert.match(css, /\.trottl-classic-lobby-player\s*\{[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
   assert.match(css, /\.trottl-classic-table\s*\{[\s\S]*border-radius:\s*48% \/ 18%/);
   assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1\.04/s);
   assert.match(css, /\.trottl-classic-player--active/);

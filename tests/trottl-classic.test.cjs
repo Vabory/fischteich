@@ -59,6 +59,8 @@ function createHarness() {
     user_id: USER_ID,
     display_name_snapshot: "Fabian",
     seat_index: 0,
+    avatar_id: null,
+    is_ready: false,
     joined_at: "2026-09-06T10:00:00Z",
   }];
   const roomRows = [
@@ -75,6 +77,14 @@ function createHarness() {
       }
       if (name === "join_trottl_classic_room") return { data: SESSION_ID, error: null };
       if (name === "leave_trottl_classic_session") return { data: "lobby", error: null };
+      if (name === "set_trottl_classic_avatar") {
+        playerRows[0].avatar_id = parameters.p_avatar_id;
+        return { data: parameters.p_avatar_id, error: null };
+      }
+      if (name === "set_trottl_classic_ready") {
+        playerRows[0].is_ready = parameters.p_ready;
+        return { data: parameters.p_ready, error: null };
+      }
       if (name === "start_trottl_classic_session") {
         sessionRow.status = "playing";
         sessionRow.player_count = 3;
@@ -142,7 +152,7 @@ function createHarness() {
   };
   const windowTarget = { window: null };
   windowTarget.window = windowTarget;
-  vm.runInNewContext(read("trottl-classic-service.js"), {
+  const context = {
     window: windowTarget,
     supabaseClient,
     getLocalIdentity: () => ({ deviceId: "30000000-0000-4000-8000-000000000001", displayName: "Fabian" }),
@@ -159,7 +169,9 @@ function createHarness() {
     Promise,
     RangeError,
     TypeError,
-  });
+  };
+  vm.runInNewContext(read("trottl-avatar-service.js"), context);
+  vm.runInNewContext(read("trottl-classic-service.js"), context);
   return { service: windowTarget.trottlClassicService, rpcCalls, channels, removedChannels, sessionRow };
 }
 
@@ -230,7 +242,34 @@ test("join reuses authenticated Fischteich identity and loads ordered membership
   assert.equal(snapshot.session.id, SESSION_ID);
   assert.equal(snapshot.players[0].seatIndex, 0);
   assert.equal(snapshot.players[0].displayName, "Fabian");
+  assert.equal(snapshot.players[0].avatarId, null);
+  assert.equal(snapshot.players[0].isReady, false);
   assert.equal(snapshot.identity.userId, USER_ID);
+});
+
+test("avatar and ready wrappers update and reload the authoritative lobby snapshot", async () => {
+  const { service, rpcCalls } = createHarness();
+  const withAvatar = await service.setAvatar(SESSION_ID, "party-piranha");
+  assert.equal(withAvatar.players[0].avatarId, "party-piranha");
+  assert.equal(withAvatar.players[0].isReady, false);
+  const ready = await service.setReady(SESSION_ID, true);
+  assert.equal(ready.players[0].avatarId, "party-piranha");
+  assert.equal(ready.players[0].isReady, true);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rpcCalls
+      .filter(({ name }) => name === "set_trottl_classic_avatar" || name === "set_trottl_classic_ready")
+      .map(({ name, parameters }) => ({ name, parameters })))),
+    [
+      {
+        name: "set_trottl_classic_avatar",
+        parameters: { p_session_id: SESSION_ID, p_avatar_id: "party-piranha" },
+      },
+      {
+        name: "set_trottl_classic_ready",
+        parameters: { p_session_id: SESSION_ID, p_ready: true },
+      },
+    ],
+  );
 });
 
 test("start and leave use narrow server-authoritative RPCs", async () => {
@@ -865,7 +904,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=8[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=12[\s\S]*script\.js\?v=78/);
+  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=12[\s\S]*script\.js\?v=78/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

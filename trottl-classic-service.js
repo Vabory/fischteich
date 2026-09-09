@@ -223,6 +223,7 @@
 
   function normalizePlayer(value) {
     const seatIndex = Number(value?.seat_index);
+    const avatarId = value?.avatar_id;
     if (
       !value
       || typeof value.session_id !== "string"
@@ -231,12 +232,16 @@
       || !Number.isInteger(seatIndex)
       || seatIndex < 0
       || seatIndex >= MAX_PLAYERS
+      || (avatarId !== null && !global.trottlAvatarService?.isValidTrottlAvatarId(avatarId))
+      || typeof value.is_ready !== "boolean"
     ) return null;
     return Object.freeze({
       sessionId: value.session_id,
       userId: value.user_id,
       displayName: value.display_name_snapshot,
       seatIndex,
+      avatarId,
+      isReady: value.is_ready === true,
       joinedAt: value.joined_at,
     });
   }
@@ -336,7 +341,7 @@
         .maybeSingle(),
       supabaseClient
         .from("trottl_classic_players")
-        .select("session_id,user_id,display_name_snapshot,seat_index,joined_at")
+        .select("session_id,user_id,display_name_snapshot,seat_index,avatar_id,is_ready,joined_at")
         .eq("session_id", sessionId)
         .order("seat_index", { ascending: true }),
       supabaseClient.rpc("get_trottl_classic_server_time", { p_session_id: sessionId }),
@@ -397,6 +402,26 @@
     });
     if (error) throw error;
     if (data !== sessionId) throw new Error("Start returned an unexpected session id");
+    return loadSession(sessionId);
+  }
+
+  async function setAvatar(sessionId, avatarId) {
+    await ensureIdentity();
+    const { error } = await supabaseClient.rpc("set_trottl_classic_avatar", {
+      p_session_id: sessionId,
+      p_avatar_id: avatarId,
+    });
+    if (error) throw error;
+    return loadSession(sessionId);
+  }
+
+  async function setReady(sessionId, ready) {
+    await ensureIdentity();
+    const { error } = await supabaseClient.rpc("set_trottl_classic_ready", {
+      p_session_id: sessionId,
+      p_ready: ready,
+    });
+    if (error) throw error;
     return loadSession(sessionId);
   }
 
@@ -578,6 +603,8 @@
     joinRoom,
     leaveSession,
     startSession,
+    setAvatar,
+    setReady,
     rollSession,
     resolveRoll,
     acknowledgeDrink,

@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260909.4">
+    <meta name="fischteich-build" content="20260909.5">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=140">
+    <link rel="stylesheet" href="./style.css?v=141">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -30,7 +30,7 @@
     <script src="./trottl-avatar-service.js?v=1" defer></script>
     <script src="./trottl-classic-service.js?v=9" defer></script>
     <script src="./trottl-classic-preview.js?v=2" defer></script>
-    <script src="./trottl-classic-ui.js?v=13" defer></script>
+    <script src="./trottl-classic-ui.js?v=14" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=78" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -634,6 +634,22 @@
             <strong class="roulette-stat-value roulette-stat-value--total" id="roulette-stat-total">0</strong>
           </div>
         </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop trottl-avatar-modal-backdrop" id="trottl-avatar-modal" role="dialog" aria-modal="true" aria-labelledby="trottl-avatar-modal-title" aria-describedby="trottl-avatar-modal-description" hidden>
+      <section class="trottl-avatar-modal-card" aria-busy="false">
+        <header class="trottl-avatar-modal-header">
+          <span>3ER TROTTL</span>
+          <h2 id="trottl-avatar-modal-title">Wähle deinen Avatar</h2>
+          <p id="trottl-avatar-modal-description">Such dir deinen Fisch für diese Runde aus.</p>
+        </header>
+        <div class="trottl-avatar-grid" id="trottl-avatar-grid" role="radiogroup" aria-label="Avatar auswählen"></div>
+        <p class="trottl-avatar-modal-feedback" id="trottl-avatar-modal-feedback" aria-live="polite"></p>
+        <footer class="trottl-avatar-modal-actions">
+          <button class="secondary-button" id="trottl-avatar-cancel" type="button">Abbrechen</button>
+          <button class="primary-button" id="trottl-avatar-confirm" type="button" disabled>Auswählen</button>
+        </footer>
       </section>
     </div>
 

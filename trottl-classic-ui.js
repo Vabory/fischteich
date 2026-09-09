@@ -35,6 +35,26 @@
     });
   }
 
+  function createAvatarModalPresentation({
+    avatars,
+    currentAvatarId = null,
+    pendingAvatarId = null,
+    required = false,
+    submitting = false,
+    isReady = false,
+  }) {
+    const visibleAvatars = Object.freeze((Array.isArray(avatars) ? avatars : [])
+      .filter((avatar) => avatar && avatar.hiddenByDefault !== true));
+    const selectedAvatar = visibleAvatars.find((avatar) => avatar.id === pendingAvatarId) ?? null;
+    return Object.freeze({
+      visibleAvatars,
+      selectedAvatarId: selectedAvatar?.id ?? null,
+      currentAvatarId,
+      canCancel: !required && !submitting,
+      canConfirm: selectedAvatar !== null && !submitting && !isReady,
+    });
+  }
+
   function createEventPresentation(context) {
     const {
       phase,
@@ -238,6 +258,12 @@
     const sessionFeedback = document.querySelector("#trottl-classic-session-feedback");
     const startButton = document.querySelector("#trottl-classic-start");
     const leaveButton = document.querySelector("#trottl-classic-leave");
+    const avatarModal = document.querySelector("#trottl-avatar-modal");
+    const avatarModalCard = avatarModal.querySelector(".trottl-avatar-modal-card");
+    const avatarGrid = document.querySelector("#trottl-avatar-grid");
+    const avatarModalFeedback = document.querySelector("#trottl-avatar-modal-feedback");
+    const avatarCancelButton = document.querySelector("#trottl-avatar-cancel");
+    const avatarConfirmButton = document.querySelector("#trottl-avatar-confirm");
     const roomBackButton = document.querySelector("#close-trottl-classic-rooms");
     const sessionBackButton = document.querySelector("#close-trottl-classic-session");
 
@@ -275,6 +301,14 @@
       visualReactionStatuses: Object.freeze({}),
       visualPenaltySeats: new Set(),
       visualFourTotal: 0,
+      avatarModalOpen: false,
+      avatarModalRequired: false,
+      avatarModalSessionId: null,
+      avatarModalServerAvatarId: null,
+      pendingAvatarId: null,
+      avatarSubmitting: false,
+      avatarReadyConflict: false,
+      avatarModalReturnFocus: null,
     };
 
     const gameDice = global.FischteichDice.mount({
@@ -309,6 +343,190 @@
         return "Anmeldung noch nicht bereit. Bitte erneut versuchen.";
       }
       return fallback;
+    }
+
+    function localLobbyPlayer(snapshot = state.snapshot) {
+      return snapshot?.players.find((player) => player.userId === snapshot.identity.userId) ?? null;
+    }
+
+    function getAvatarModalPresentation() {
+      return createAvatarModalPresentation({
+        avatars: global.trottlAvatarService.getDefaultVisibleTrottlAvatars(),
+        currentAvatarId: state.avatarModalServerAvatarId,
+        pendingAvatarId: state.pendingAvatarId,
+        required: state.avatarModalRequired,
+        submitting: state.avatarSubmitting,
+        isReady: localLobbyPlayer()?.isReady === true || state.avatarReadyConflict,
+      });
+    }
+
+    function renderAvatarModal({ focusSelected = false } = {}) {
+      avatarModal.hidden = !state.avatarModalOpen;
+      if (!state.avatarModalOpen) return;
+      const presentation = getAvatarModalPresentation();
+      avatarModal.dataset.required = String(state.avatarModalRequired);
+      avatarModalCard.setAttribute("aria-busy", String(state.avatarSubmitting));
+      avatarCancelButton.hidden = state.avatarModalRequired;
+      avatarCancelButton.disabled = !presentation.canCancel;
+      avatarConfirmButton.disabled = !presentation.canConfirm;
+      avatarConfirmButton.textContent = state.avatarSubmitting ? "Wird gespeichert …" : "Auswählen";
+      avatarGrid.replaceChildren(...presentation.visibleAvatars.map((avatar) => {
+        const button = document.createElement("button");
+        const image = document.createElement("img");
+        const name = document.createElement("span");
+        const selected = avatar.id === presentation.selectedAvatarId;
+        button.type = "button";
+        button.className = `trottl-avatar-option${selected ? " is-selected" : ""}`;
+        button.dataset.avatarId = avatar.id;
+        button.setAttribute("role", "radio");
+        button.setAttribute("aria-checked", String(selected));
+        button.setAttribute("aria-label", `${avatar.displayName} auswählen`);
+        button.disabled = state.avatarSubmitting || localLobbyPlayer()?.isReady === true;
+        image.src = avatar.src;
+        image.alt = "";
+        image.width = 128;
+        image.height = 128;
+        image.draggable = false;
+        name.textContent = avatar.displayName;
+        button.append(image, name);
+        button.addEventListener("click", () => selectPendingAvatar(avatar.id));
+        return button;
+      }));
+      if (focusSelected) {
+        requestAnimationFrame(() => {
+          avatarGrid.querySelector(".is-selected")?.focus({ preventScroll: true });
+        });
+      }
+    }
+
+    function openAvatarModal({ required = false } = {}) {
+      const snapshot = state.snapshot;
+      const player = localLobbyPlayer(snapshot);
+      if (
+        state.avatarSubmitting
+        || !snapshot
+        || snapshot.session.status !== "lobby"
+        || !player
+        || player.isReady
+      ) return false;
+      state.avatarModalOpen = true;
+      state.avatarModalRequired = required || player.avatarId === null;
+      state.avatarModalSessionId = snapshot.session.id;
+      state.avatarModalServerAvatarId = player.avatarId;
+      state.pendingAvatarId = player.avatarId;
+      state.avatarReadyConflict = false;
+      state.avatarModalReturnFocus = document.activeElement;
+      avatarModalFeedback.textContent = "";
+      renderAvatarModal();
+      requestAnimationFrame(() => {
+        const target = avatarGrid.querySelector(".is-selected")
+          ?? avatarGrid.querySelector(".trottl-avatar-option");
+        target?.focus({ preventScroll: true });
+      });
+      return true;
+    }
+
+    function closeAvatarModal({ force = false, restoreFocus = true } = {}) {
+      if (!state.avatarModalOpen || (state.avatarModalRequired && !force)) return false;
+      const returnFocus = state.avatarModalReturnFocus;
+      state.avatarModalOpen = false;
+      state.avatarModalRequired = false;
+      state.avatarModalSessionId = null;
+      state.avatarModalServerAvatarId = null;
+      state.pendingAvatarId = null;
+      state.avatarReadyConflict = false;
+      state.avatarModalReturnFocus = null;
+      avatarModalFeedback.textContent = "";
+      renderAvatarModal();
+      if (restoreFocus && returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+      return true;
+    }
+
+    function selectPendingAvatar(avatarId) {
+      if (!state.avatarModalOpen || state.avatarSubmitting || localLobbyPlayer()?.isReady) return;
+      const avatar = global.trottlAvatarService
+        .getDefaultVisibleTrottlAvatars()
+        .find((candidate) => candidate.id === avatarId);
+      if (!avatar) return;
+      state.pendingAvatarId = avatar.id;
+      avatarModalFeedback.textContent = "";
+      renderAvatarModal({ focusSelected: true });
+    }
+
+    async function submitAvatarSelection() {
+      if (!state.avatarModalOpen || state.avatarSubmitting) return false;
+      const snapshot = state.snapshot;
+      const player = localLobbyPlayer(snapshot);
+      const presentation = getAvatarModalPresentation();
+      if (
+        !snapshot
+        || snapshot.session.id !== state.avatarModalSessionId
+        || player?.isReady
+        || !presentation.canConfirm
+      ) return false;
+      state.avatarSubmitting = true;
+      avatarModalFeedback.textContent = "";
+      renderAvatarModal();
+      try {
+        const updatedSnapshot = await service.setAvatar(snapshot.session.id, presentation.selectedAvatarId);
+        if (state.snapshot?.session.id === snapshot.session.id) state.snapshot = updatedSnapshot;
+        closeAvatarModal({ force: true, restoreFocus: false });
+        renderSession();
+        return true;
+      } catch (error) {
+        console.warn("3er-Trottl-Avatar konnte nicht gespeichert werden.", error);
+        const alreadyReady = String(error?.message ?? "").includes("PLAYER_ALREADY_READY");
+        state.avatarReadyConflict = alreadyReady;
+        avatarModalFeedback.textContent = alreadyReady
+          ? "Du bist bereits bereit. Bereitschaft zuerst abbrechen."
+          : "Avatar konnte nicht gespeichert werden.";
+        return false;
+      } finally {
+        state.avatarSubmitting = false;
+        if (state.avatarModalOpen) renderAvatarModal();
+      }
+    }
+
+    function syncAvatarModalWithSnapshot(snapshot) {
+      const player = localLobbyPlayer(snapshot);
+      if (state.avatarModalOpen) {
+        const sessionChanged = snapshot.session.id !== state.avatarModalSessionId;
+        const avatarChangedElsewhere = player?.avatarId !== state.avatarModalServerAvatarId;
+        if (!player || sessionChanged || player.isReady || avatarChangedElsewhere) {
+          closeAvatarModal({ force: true, restoreFocus: false });
+        }
+        return;
+      }
+      if (snapshot.session.status === "lobby" && player && !player.isReady && player.avatarId === null) {
+        openAvatarModal({ required: true });
+      }
+    }
+
+    function handleAvatarSelectRequest(event) {
+      if (event.detail?.sessionId !== state.snapshot?.session.id) return;
+      openAvatarModal({ required: false });
+    }
+
+    function handleAvatarModalKeydown(event) {
+      if (!state.avatarModalOpen) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeAvatarModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...avatarModal.querySelectorAll("button:not(:disabled):not([hidden])")];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     function renderRooms() {
@@ -436,11 +654,11 @@
       startButton.disabled = state.busy || !presentation.canStart;
       startButton.textContent = presentation.startLabel;
       leaveButton.disabled = state.busy;
+      syncAvatarModalWithSnapshot(snapshot);
     }
 
     function requestAvatarSelection(player) {
       if (state.busy || player.isReady || !state.snapshot) return;
-      sessionFeedback.textContent = "Avatar-Auswahl ist noch nicht verfügbar.";
       global.dispatchEvent(new CustomEvent(AVATAR_SELECT_REQUEST_EVENT, {
         detail: Object.freeze({
           sessionId: state.snapshot.session.id,
@@ -1199,6 +1417,7 @@
       gameView.hidden = !isPlaying;
       previewPanel.hidden = !previewEnabled || !state.preview;
       if (isPlaying) {
+        closeAvatarModal({ force: true, restoreFocus: false });
         syncGameDice(snapshot, rollSource);
         renderGame(snapshot, state.preview?.activeSeatIndex ?? snapshot.session.currentTurnSeat);
       }
@@ -1276,6 +1495,7 @@
 
     async function openRooms({ feedback = "" } = {}) {
       if (previewEnabled) return openPreview();
+      closeAvatarModal({ force: true, restoreFocus: false });
       await stopSessionRealtime();
       state.snapshot = null;
       clearResolveTimer();
@@ -1461,6 +1681,13 @@
     sessionBackButton.addEventListener("click", () => void leaveCurrentSession());
     leaveButton.addEventListener("click", () => void leaveCurrentSession());
     startButton.addEventListener("click", () => void startGame());
+    avatarCancelButton.addEventListener("click", () => closeAvatarModal());
+    avatarConfirmButton.addEventListener("click", () => void submitAvatarSelection());
+    avatarModal.addEventListener("click", (event) => {
+      if (event.target === avatarModal) closeAvatarModal();
+    });
+    global.addEventListener(AVATAR_SELECT_REQUEST_EVENT, handleAvatarSelectRequest);
+    document.addEventListener("keydown", handleAvatarModalKeydown);
     gameDiceButton.addEventListener("click", () => void requestRoll());
     gameView.addEventListener("click", handleReactionTap);
     fourResetButton.addEventListener("click", resetFourSips);
@@ -1499,6 +1726,7 @@
     createEventPresentation,
     createPlayerCardPresentation,
     createLobbyPresentation,
+    createAvatarModalPresentation,
     getLobbyAvatarById,
     avatarSelectRequestEvent: AVATAR_SELECT_REQUEST_EVENT,
   });

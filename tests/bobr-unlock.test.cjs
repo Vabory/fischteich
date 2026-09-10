@@ -28,8 +28,10 @@ function rapidTaps(sequence, count, startAt = 0, gap = 100) {
 
 test("locked beavers remain still and both existing scenes are invisible tap targets", () => {
   assert.equal((html.match(/data-bobr-tap-target/g) ?? []).length, 2);
-  assert.match(script, /closest\("\[data-bobr-tap-target\]"\)/);
-  assert.match(script, /bobrTapTargets\.includes\(tapTarget\)/);
+  assert.match(script, /settingsAppVersion\.querySelectorAll\("\[data-bobr-tap-target\]"\)/);
+  assert.match(script, /state\.bobrTapTargets\.includes\(event\.currentTarget\)/);
+  assert.match(css, /\.version-beaver-scene\s*\{[^}]*pointer-events:\s*auto[^}]*touch-action:\s*manipulation/s);
+  assert.match(css, /\.version-beaver-scene::before\s*\{[^}]*inset:\s*-8px[^}]*pointer-events:\s*auto/s);
   assert.match(css, /\.settings-app-version\.is-bobr-unlocked:not\(\.is-bobr-unlock-sparkling\) \.version-beaver\s*\{[^}]*animation:/s);
   const baseBeaver = css.match(/\.version-beaver\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
   const baseWater = css.match(/\.version-water\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
@@ -65,7 +67,7 @@ test("settings close resets only ephemeral in-memory progress", () => {
   rapidTaps(sequence, 10, 0, 100);
   sequence.reset();
   assert.ok(rapidTaps(sequence, 5, 1000, 100).every((unlocked) => unlocked === false));
-  assert.match(script, /function closeSettingsModal\(\)\s*\{[\s\S]*state\.bobrTapSequence\.reset\(\)/);
+  assert.match(script, /function closeSettingsModal\(\)\s*\{[\s\S]*deactivateBobrTapListeners\(\{ reset: true \}\)/);
   assert.doesNotMatch(source, /localStorage|sessionStorage|supabaseClient|\.from\(/);
 });
 
@@ -86,7 +88,7 @@ test("confirmed RPC state updates the central profile and failed requests stay l
   assert.match(auth, /supabaseClient\.rpc\("unlock_mystical_bobr"\)/);
   assert.match(auth, /appAuthState\.currentProfile = profile[\s\S]*publishAppAuthState\(\)/);
   assert.match(script, /await window\.bobrUnlockService\.unlockMysticalBobr\(\)[\s\S]*renderBobrUnlockState\(profile, \{ sparkle:/);
-  assert.match(script, /catch \(error\) \{[\s\S]*state\.bobrTapSequence\.enable\(\)/);
+  assert.match(script, /catch \(error\) \{[\s\S]*\[BOBR\] unlock rpc failed[\s\S]*state\.bobrTapSequence\.enable\(\)/);
   assert.doesNotMatch(script, /localStorage[^\n]*bobr|bobr[^\n]*localStorage/i);
 });
 
@@ -98,6 +100,39 @@ test("persisted profiles animate immediately without replaying the sparkle", () 
   assert.match(auth, /bobrUnlocked: profile\.bobr_unlocked === true/);
   assert.match(script, /function openSettingsModal\(\)\s*\{[\s\S]*renderBobrUnlockState\(getAppAuthState\(\)\.currentProfile\)/);
   assert.match(script, /if \(unlocked\) state\.bobrTapSequence\.disable\(\)/);
+});
+
+test("iOS taps use one pointerup stream with an explicit open and close lifecycle", () => {
+  assert.match(script, /target\.addEventListener\("pointerup", handleBobrEasterEggTap/);
+  assert.doesNotMatch(script, /addEventListener\("(?:click|touchend)", handleBobrEasterEggTap/);
+  assert.match(script, /event\.isPrimary === false/);
+  assert.match(script, /function openSettingsModal\(\)[\s\S]*activateBobrTapListeners\(\)/);
+  assert.match(script, /function closeSettingsModal\(\)[\s\S]*deactivateBobrTapListeners\(\{ reset: true \}\)/);
+  assert.match(script, /target\.removeEventListener\("pointerup", handleBobrEasterEggTap\)/);
+  assert.match(script, /const alreadyBound =[\s\S]*if \(alreadyBound\) return/);
+  assert.match(script, /targets\.every\(\(target, index\) => target === state\.bobrTapTargets\[index\]\)/);
+});
+
+test("threshold invokes the normal parameterless RPC path once and emits safe debug logs", () => {
+  assert.match(script, /if \(!thresholdReached\) return;[\s\S]*state\.bobrUnlockRunning = true/);
+  assert.match(script, /state\.bobrUnlockRunning[\s\S]*deactivateBobrTapListeners\(\)[\s\S]*await window\.bobrUnlockService\.unlockMysticalBobr\(\)/);
+  assert.match(auth, /supabaseClient\.rpc\("unlock_mystical_bobr"\)/);
+  assert.doesNotMatch(auth, /rpc\("unlock_mystical_bobr",/);
+  for (const message of [
+    "tap ${tapCount}/${window.bobrUnlockService.requiredTaps}",
+    "sequence reset",
+    "threshold reached",
+    "unlock rpc start",
+    "unlock rpc success",
+    "unlock rpc failed",
+  ]) assert.ok(script.includes(`[BOBR] ${message}`));
+  assert.doesNotMatch(script, /\[BOBR\][^\n]*(?:user|token|uuid|profileId)/i);
+});
+
+test("locked auth rerenders no longer reset an in-flight sequence", () => {
+  const renderer = script.match(/function renderBobrUnlockState[\s\S]*?^\}/m)?.[0] ?? "";
+  assert.doesNotMatch(renderer, /bobrTapSequence\.enable|bobrTapSequence\.reset/);
+  assert.match(script, /const alreadyBound =[\s\S]*if \(alreadyBound\) return/);
 });
 
 test("first successful unlock sparkles both beavers once, then enables faster motion", () => {

@@ -39,6 +39,7 @@
         enabled = false;
         reset();
       },
+      getTapCount: () => tapCount,
       isEnabled: () => enabled,
     });
   }

@@ -224,7 +224,6 @@ const settingsAdminStatus = document.querySelector("#settings-admin-status");
 const settingsAdminActions = document.querySelector("#settings-admin-actions");
 const settingsAppVersion = document.querySelector("#settings-app-version");
 const settingsAppVersionText = document.querySelector("#settings-app-version-text");
-const bobrTapTargets = Object.freeze([...document.querySelectorAll("[data-bobr-tap-target]")]);
 const openAdminLoginButton = document.querySelector("#open-admin-login");
 const adminLogoutButton = document.querySelector("#admin-logout");
 const adminLoginModal = document.querySelector("#admin-login-modal");
@@ -459,6 +458,7 @@ const state = {
   bobrTapSequence: window.bobrUnlockService.createBobrTapSequence(),
   bobrUnlockRunning: false,
   bobrSparkleTimer: null,
+  bobrTapTargets: [],
   buffaloRealtimeUnsubscribe: null,
   buffaloPushSettingsRunning: false,
   buffaloPushSettingsRequestId: 0,
@@ -1648,7 +1648,6 @@ function renderBobrUnlockState(profile, { sparkle = false } = {}) {
   const unlocked = window.bobrUnlockService.isMysticalBobrUnlocked(profile);
   settingsAppVersion.classList.toggle("is-bobr-unlocked", unlocked);
   if (unlocked) state.bobrTapSequence.disable();
-  else state.bobrTapSequence.enable();
   if (!sparkle) return;
   clearBobrUnlockSparkle();
   settingsAppVersion.classList.add("is-bobr-unlock-sparkling");
@@ -1658,26 +1657,67 @@ function renderBobrUnlockState(profile, { sparkle = false } = {}) {
   }, 760);
 }
 
+function deactivateBobrTapListeners({ reset = false } = {}) {
+  for (const target of state.bobrTapTargets) {
+    target.removeEventListener("pointerup", handleBobrEasterEggTap);
+  }
+  state.bobrTapTargets = [];
+  if (reset) {
+    if (state.bobrTapSequence.getTapCount() > 0) console.debug("[BOBR] sequence reset");
+    state.bobrTapSequence.reset();
+  }
+}
+
+function activateBobrTapListeners() {
+  if (settingsModal.hidden
+    || state.bobrUnlockRunning
+    || window.bobrUnlockService.isMysticalBobrUnlocked(getAppAuthState().currentProfile)) return;
+  const targets = [...settingsAppVersion.querySelectorAll("[data-bobr-tap-target]")];
+  const alreadyBound = state.bobrTapTargets.length > 0
+    && targets.length === state.bobrTapTargets.length
+    && targets.every((target, index) => target === state.bobrTapTargets[index]);
+  if (alreadyBound) return;
+  deactivateBobrTapListeners();
+  state.bobrTapTargets = targets;
+  for (const target of targets) {
+    target.addEventListener("pointerup", handleBobrEasterEggTap, { passive: true });
+  }
+}
+
 async function handleBobrEasterEggTap(event) {
   if (settingsModal.hidden || state.bobrUnlockRunning) return;
-  const tapTarget = event.target.closest("[data-bobr-tap-target]");
-  if (!tapTarget || !bobrTapTargets.includes(tapTarget)) return;
+  if (event.isPrimary === false || (event.button !== undefined && event.button !== 0)) return;
+  if (!state.bobrTapTargets.includes(event.currentTarget)) return;
   if (window.bobrUnlockService.isMysticalBobrUnlocked(getAppAuthState().currentProfile)) return;
-  if (!state.bobrTapSequence.recordTap(window.performance.now())) return;
+  const previousTapCount = state.bobrTapSequence.getTapCount();
+  const thresholdReached = state.bobrTapSequence.recordTap(window.performance.now());
+  const tapCount = thresholdReached
+    ? window.bobrUnlockService.requiredTaps
+    : state.bobrTapSequence.getTapCount();
+  if (previousTapCount > 0 && tapCount === 1) console.debug("[BOBR] sequence reset");
+  console.debug(`[BOBR] tap ${tapCount}/${window.bobrUnlockService.requiredTaps}`);
+  if (!thresholdReached) return;
+  console.debug("[BOBR] threshold reached");
 
   state.bobrUnlockRunning = true;
+  deactivateBobrTapListeners();
   try {
+    console.debug("[BOBR] unlock rpc start");
     const profile = await window.bobrUnlockService.unlockMysticalBobr();
+    console.debug("[BOBR] unlock rpc success");
     renderBobrUnlockState(profile, { sparkle: !settingsModal.hidden });
   } catch (error) {
+    console.debug("[BOBR] unlock rpc failed");
     state.bobrTapSequence.enable();
     console.warn("Mystical Bobr konnte nicht freigeschaltet werden.", error);
   } finally {
     state.bobrUnlockRunning = false;
+    activateBobrTapListeners();
   }
 }
 
 function openSettingsModal() {
+  state.bobrTapSequence.enable();
   renderBobrUnlockState(getAppAuthState().currentProfile);
   renderSettingsIdentity();
   renderSettingsAdmin();
@@ -1686,6 +1726,7 @@ function openSettingsModal() {
   void renderBuffaloPushSettings();
   appElement.inert = true;
   settingsModal.hidden = false;
+  activateBobrTapListeners();
   document.querySelector("#close-settings").focus({ preventScroll: true });
 }
 
@@ -1762,7 +1803,7 @@ async function logoutAdminFromSettings() {
 }
 
 function closeSettingsModal() {
-  state.bobrTapSequence.reset();
+  deactivateBobrTapListeners({ reset: true });
   clearBobrUnlockSparkle();
   settingsModal.hidden = true;
   appElement.inert = false;
@@ -4809,7 +4850,6 @@ document.querySelector("#start-manual-participants").addEventListener("click", (
 });
 openSettingsButton.addEventListener("click", openSettingsModal);
 document.querySelector("#close-settings").addEventListener("click", closeSettingsModal);
-settingsAppVersion.addEventListener("click", (event) => void handleBobrEasterEggTap(event));
 buffaloPushToggle.addEventListener("click", () => {
   void toggleBuffaloPushSettings();
 });
@@ -5262,6 +5302,13 @@ initializeBuffaloTimer();
 void initializeBuffaloPush();
 subscribeToAppAuthState((auth) => {
   renderSettingsAdmin(auth);
-  if (!state.bobrUnlockRunning) renderBobrUnlockState(auth.currentProfile);
+  if (!state.bobrUnlockRunning) {
+    renderBobrUnlockState(auth.currentProfile);
+    if (window.bobrUnlockService.isMysticalBobrUnlocked(auth.currentProfile)) {
+      deactivateBobrTapListeners();
+    } else {
+      activateBobrTapListeners();
+    }
+  }
 });
 void initializeAppAuth().then(() => trottlClassic.restoreMembership());

@@ -89,6 +89,9 @@ function createHarness() {
       if (name === "heartbeat_trottl_classic_lobby") {
         return { data: "2026-09-06T10:00:30Z", error: null };
       }
+      if (name === "cleanup_trottl_classic_lobby") {
+        return { data: 1, error: null };
+      }
       if (name === "kick_trottl_classic_player") {
         return { data: true, error: null };
       }
@@ -286,6 +289,16 @@ test("heartbeat wrapper sends only the current lobby session and validates serve
   assert.deepEqual(
     JSON.parse(JSON.stringify(rpcCalls.filter(({ name }) => name === "heartbeat_trottl_classic_lobby"))),
     [{ name: "heartbeat_trottl_classic_lobby", parameters: { p_session_id: SESSION_ID } }],
+  );
+});
+
+test("cleanup wrapper triggers only the existing server-authoritative lobby cleanup", async () => {
+  const { service, rpcCalls } = createHarness();
+  const playerCount = await service.cleanupLobby(SESSION_ID);
+  assert.equal(playerCount, 1);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rpcCalls.filter(({ name }) => name === "cleanup_trottl_classic_lobby"))),
+    [{ name: "cleanup_trottl_classic_lobby", parameters: { p_session_id: SESSION_ID } }],
   );
 });
 
@@ -951,7 +964,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=11[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=20[\s\S]*script\.js\?v=83/);
+  assert.match(html, /trottl-classic-service\.js\?v=12[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=21[\s\S]*script\.js\?v=84/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

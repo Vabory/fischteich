@@ -438,6 +438,19 @@
     return data;
   }
 
+  async function cleanupLobby(sessionId) {
+    await ensureIdentity();
+    const { data, error } = await supabaseClient.rpc("cleanup_trottl_classic_lobby", {
+      p_session_id: sessionId,
+    });
+    if (error) throw error;
+    const playerCount = Number(data);
+    if (!Number.isSafeInteger(playerCount) || playerCount < 0 || playerCount > MAX_PLAYERS) {
+      throw new Error("Lobby cleanup returned an invalid player count");
+    }
+    return playerCount;
+  }
+
   async function kickPlayer(sessionId, targetPlayerId) {
     await ensureIdentity();
     const { data, error } = await supabaseClient.rpc("kick_trottl_classic_player", {
@@ -630,6 +643,7 @@
     setAvatar,
     setReady,
     heartbeat,
+    cleanupLobby,
     kickPlayer,
     rollSession,
     resolveRoll,

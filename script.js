@@ -5212,6 +5212,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     void refreshBuffaloTimer();
     trottlClassic.refresh();
+  } else {
+    void trottlClassic.suspend();
   }
 });
 window.addEventListener("storage", (event) => {

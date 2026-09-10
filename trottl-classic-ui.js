@@ -3,6 +3,7 @@
 (function installTrottlClassicUi(global) {
   const AVATAR_SELECT_REQUEST_EVENT = "fischteich:trottl-avatar-select-request";
   const LOBBY_HEARTBEAT_INTERVAL_MS = 30_000;
+  const LOBBY_CLEANUP_INTERVAL_MS = 20_000;
 
   function getLobbyAvatarById(avatarId, avatarService = global.trottlAvatarService) {
     if (typeof avatarId !== "string" || !avatarService) return null;
@@ -345,6 +346,9 @@
       lobbyHeartbeatTimer: null,
       lobbyHeartbeatSessionId: null,
       lobbyHeartbeatRequest: null,
+      lobbyCleanupTimer: null,
+      lobbyCleanupSessionId: null,
+      lobbyCleanupRequest: null,
       kickModalOpen: false,
       kickTargetUserId: null,
       kickTargetName: "",
@@ -451,6 +455,62 @@
         );
       }
       if (immediate) void sendLobbyHeartbeat(sessionId);
+    }
+
+    function stopLobbyCleanup() {
+      if (state.lobbyCleanupTimer !== null) global.clearInterval(state.lobbyCleanupTimer);
+      state.lobbyCleanupTimer = null;
+      state.lobbyCleanupSessionId = null;
+      state.lobbyCleanupRequest = null;
+    }
+
+    function sendLobbyCleanup(sessionId = state.lobbyCleanupSessionId) {
+      if (
+        !sessionId
+        || state.lobbyCleanupSessionId !== sessionId
+        || state.snapshot?.session.id !== sessionId
+        || state.snapshot.session.status !== "lobby"
+        || localLobbyPlayer(state.snapshot) === null
+        || document.visibilityState === "hidden"
+      ) return Promise.resolve(false);
+      if (state.lobbyCleanupRequest?.sessionId === sessionId) {
+        return state.lobbyCleanupRequest.promise;
+      }
+      const request = { sessionId, promise: null };
+      request.promise = service.cleanupLobby(sessionId)
+        .then(() => true)
+        .catch((error) => {
+          console.warn("3er-Trottl-Lobby-Cleanup fehlgeschlagen.", error);
+          return false;
+        })
+        .finally(() => {
+          if (state.lobbyCleanupRequest === request) state.lobbyCleanupRequest = null;
+        });
+      state.lobbyCleanupRequest = request;
+      return request.promise;
+    }
+
+    function startLobbyCleanup(sessionId, { immediate = false } = {}) {
+      if (
+        previewEnabled
+        || !sessionId
+        || state.snapshot?.session.status !== "lobby"
+        || localLobbyPlayer(state.snapshot) === null
+      ) {
+        stopLobbyCleanup();
+        return;
+      }
+      if (state.lobbyCleanupSessionId !== sessionId) {
+        stopLobbyCleanup();
+        state.lobbyCleanupSessionId = sessionId;
+      }
+      if (document.visibilityState !== "hidden" && state.lobbyCleanupTimer === null) {
+        state.lobbyCleanupTimer = global.setInterval(
+          () => void sendLobbyCleanup(sessionId),
+          LOBBY_CLEANUP_INTERVAL_MS,
+        );
+      }
+      if (immediate) void sendLobbyCleanup(sessionId);
     }
 
     function renderKickModal() {
@@ -1707,6 +1767,7 @@
       previewPanel.hidden = !previewEnabled || !state.preview;
       if (isPlaying) {
         stopLobbyHeartbeat();
+        stopLobbyCleanup();
         closeKickModal({ force: true, restoreFocus: false });
         closeAvatarModal({ force: true, restoreFocus: false });
         syncGameDice(snapshot, rollSource);
@@ -1715,6 +1776,7 @@
       else {
         renderLobby(snapshot);
         startLobbyHeartbeat(snapshot.session.id);
+        startLobbyCleanup(snapshot.session.id);
       }
     }
 
@@ -1752,6 +1814,7 @@
         (status) => {
           if (status === "SUBSCRIBED" && state.snapshot?.session.id === sessionId) {
             startLobbyHeartbeat(sessionId, { immediate: true });
+            startLobbyCleanup(sessionId);
           }
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             sessionFeedback.textContent = "Live-Verbindung unterbrochen. Verbindung wird erneut geprüft.";
@@ -1793,6 +1856,7 @@
     async function openRooms({ feedback = "" } = {}) {
       if (previewEnabled) return openPreview();
       stopLobbyHeartbeat();
+      stopLobbyCleanup();
       closeKickModal({ force: true, restoreFocus: false });
       closeAvatarModal({ force: true, restoreFocus: false });
       await stopSessionRealtime();
@@ -1809,6 +1873,7 @@
 
     async function openPreview() {
       stopLobbyHeartbeat();
+      stopLobbyCleanup();
       await Promise.all([stopRoomRealtime(), stopSessionRealtime()]);
       state.preview = state.preview ?? preview.createState();
       state.snapshot = preview.createSnapshot(state.preview);
@@ -1823,6 +1888,7 @@
     async function openSnapshot(snapshot) {
       await stopRoomRealtime();
       stopLobbyHeartbeat();
+      stopLobbyCleanup();
       resetDiceTracking(snapshot.session.id);
       state.snapshot = snapshot;
       sessionFeedback.textContent = "";
@@ -1830,6 +1896,7 @@
       renderSession("recovery");
       if (snapshot.session.status === "lobby") {
         startLobbyHeartbeat(snapshot.session.id, { immediate: true });
+        startLobbyCleanup(snapshot.session.id);
       }
       ensureSessionRealtime(snapshot.session.id);
       sessionBackButton.focus({ preventScroll: true });
@@ -1859,6 +1926,7 @@
     async function handleLobbyMembershipRemoved(sessionId) {
       if (state.snapshot?.session.id !== sessionId) return;
       stopLobbyHeartbeat();
+      stopLobbyCleanup();
       closeKickModal({ force: true, restoreFocus: false });
       closeAvatarModal({ force: true, restoreFocus: false });
       state.snapshot = null;
@@ -1938,12 +2006,14 @@
       if (state.busy || !state.snapshot) return;
       if (previewEnabled && state.preview) {
         stopLobbyHeartbeat();
+        stopLobbyCleanup();
         state.snapshot = null;
         await returnToTrottlMenu();
         return;
       }
       state.busy = true;
       stopLobbyHeartbeat();
+      stopLobbyCleanup();
       closeKickModal({ force: true, restoreFocus: false });
       sessionFeedback.textContent = "Raum wird verlassen …";
       if (state.snapshot.session.status === "playing") situation.textContent = "RAUM WIRD VERLASSEN";
@@ -1958,6 +2028,7 @@
         ensureSessionRealtime(sessionId);
         if (state.snapshot?.session.status === "lobby") {
           startLobbyHeartbeat(sessionId, { immediate: true });
+          startLobbyCleanup(sessionId, { immediate: true });
         }
       } finally {
         state.busy = false;
@@ -1967,6 +2038,7 @@
 
     async function returnToTrottlMenu() {
       stopLobbyHeartbeat();
+      stopLobbyCleanup();
       await stopRoomRealtime();
       clearResolveTimer();
       showTrottlMenu({ focusSelector: "#open-trottl-classic" });
@@ -1990,6 +2062,7 @@
 
     async function suspend() {
       stopLobbyHeartbeat();
+      stopLobbyCleanup();
       clearResolveTimer();
       clearActionBoundaryTimer();
       clearReactionCountdownTimer();
@@ -2007,6 +2080,7 @@
       } else if (!sessionScreen.hidden && state.snapshot) {
         if (state.snapshot.session.status === "lobby") {
           startLobbyHeartbeat(state.snapshot.session.id, { immediate: true });
+          startLobbyCleanup(state.snapshot.session.id, { immediate: true });
         }
         ensureSessionRealtime(state.snapshot.session.id);
         void refreshSession({ rollSource: "recovery" });

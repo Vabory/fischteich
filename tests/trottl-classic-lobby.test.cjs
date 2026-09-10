@@ -74,14 +74,32 @@ test("ready counter and host start states derive only from the current snapshot"
 test("ready and avatar controls express every local server-backed state", () => {
   assert.match(uiSource, /player\.isReady \? "✓ Bereit" : "Nicht bereit"/);
   assert.match(uiSource, /service\.setReady\(snapshot\.session\.id, ready\)/);
-  assert.match(uiSource, /updateReady\(true\)/);
-  assert.match(uiSource, /updateReady\(false\)/);
+  assert.match(uiSource, /readyButton\.textContent = player\.isReady \? "✓ Bereit" : "○ Bereit"/);
+  assert.match(uiSource, /readyButton\.addEventListener\("click", \(\) => void updateReady\(!player\.isReady\)\)/);
+  assert.match(uiSource, /readyButton\.setAttribute\("aria-pressed", String\(player\.isReady\)\)/);
   assert.match(uiSource, /avatarButton\.disabled = state\.busy \|\| player\.isReady/);
   assert.match(uiSource, /player\.avatarId === null \? "Avatar wählen" : "Avatar ändern"/);
-  assert.match(uiSource, /readyButton\.disabled = state\.busy \|\| player\.avatarId === null/);
+  assert.match(uiSource, /readyButton\.disabled = state\.busy \|\| \(!player\.isReady && player\.avatarId === null\)/);
   assert.match(uiSource, /Wähle zuerst einen Avatar/);
   assert.match(uiSource, /trottl-classic-host-badge/);
   assert.match(uiSource, /AVATAR_SELECT_REQUEST_EVENT/);
+});
+
+test("the local ready control stays one toggle in the same layout slot", () => {
+  const selfBranch = uiSource.match(/if \(!isSelf\)[\s\S]*?item\.append\(avatarColumn, identityColumn, readyControls\);/)?.[0] ?? "";
+  assert.equal((selfBranch.match(/document\.createElement\("button"\)/g) ?? []).length, 2);
+  assert.equal((selfBranch.match(/readyControls\.append\(readyButton\)/g) ?? []).length, 1);
+  assert.doesNotMatch(selfBranch, /Bereitschaft abbrechen|trottl-classic-unready-button|cancelButton/);
+  assert.match(css, /\.trottl-classic-lobby-player\.is-self[\s\S]*min-height:\s*83px/);
+  assert.match(css, /\.trottl-classic-ready-button\s*\{[\s\S]*min-height:\s*36px/);
+  assert.match(css, /\.trottl-classic-ready-button\.is-ready\s*\{[\s\S]*color:\s*#8cf4af/);
+});
+
+test("ready changes remain snapshot-backed without optimistic local state", () => {
+  const updateReady = uiSource.match(/async function updateReady\(ready\)[\s\S]*?\n    }/)?.[0] ?? "";
+  assert.match(updateReady, /state\.snapshot = await service\.setReady\(snapshot\.session\.id, ready\)/);
+  assert.doesNotMatch(updateReady, /localPlayer\.isReady\s*=|\.classList\.toggle/);
+  assert.match(updateReady, /finally[\s\S]*renderSession\(\)/);
 });
 
 test("lobby structure and responsive CSS support three through eight players without name overflow", () => {

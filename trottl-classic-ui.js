@@ -655,30 +655,19 @@
           avatarButton.addEventListener("click", () => requestAvatarSelection(player));
           avatarColumn.append(avatarButton);
           readyControls.className = "trottl-classic-self-ready-controls";
-          if (player.isReady) {
-            readyStatus.className = "trottl-classic-ready-status is-ready is-self-status";
-            readyStatus.textContent = "✓ Bereit";
-            const cancelButton = document.createElement("button");
-            cancelButton.type = "button";
-            cancelButton.className = "trottl-classic-unready-button";
-            cancelButton.textContent = "Bereitschaft abbrechen";
-            cancelButton.disabled = state.busy;
-            cancelButton.addEventListener("click", () => void updateReady(false));
-            readyControls.append(readyStatus, cancelButton);
-          } else {
-            const readyButton = document.createElement("button");
-            readyButton.type = "button";
-            readyButton.className = "trottl-classic-ready-button";
-            readyButton.textContent = "○ Bereit";
-            readyButton.disabled = state.busy || player.avatarId === null;
-            readyButton.addEventListener("click", () => void updateReady(true));
-            readyControls.append(readyButton);
-            if (player.avatarId === null) {
-              const hint = document.createElement("small");
-              hint.className = "trottl-classic-avatar-required";
-              hint.textContent = "Wähle zuerst einen Avatar";
-              readyControls.append(hint);
-            }
+          const readyButton = document.createElement("button");
+          readyButton.type = "button";
+          readyButton.className = `trottl-classic-ready-button${player.isReady ? " is-ready" : ""}`;
+          readyButton.textContent = player.isReady ? "✓ Bereit" : "○ Bereit";
+          readyButton.setAttribute("aria-pressed", String(player.isReady));
+          readyButton.disabled = state.busy || (!player.isReady && player.avatarId === null);
+          readyButton.addEventListener("click", () => void updateReady(!player.isReady));
+          readyControls.append(readyButton);
+          if (player.avatarId === null) {
+            const hint = document.createElement("small");
+            hint.className = "trottl-classic-avatar-required";
+            hint.textContent = "Wähle zuerst einen Avatar";
+            readyControls.append(hint);
           }
           item.append(avatarColumn, identityColumn, readyControls);
         }

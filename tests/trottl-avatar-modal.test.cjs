@@ -133,16 +133,36 @@ test("confirmation is single-flight, server-backed and never changes ready state
   assert.match(uiSource, /avatarConfirmButton\.disabled = !presentation\.canConfirm/);
 });
 
-test("modal markup and CSS provide an accessible three-column mobile dialog", () => {
+test("modal markup and CSS provide a focused two-column mobile dialog", () => {
+  const avatarGridCss = Array.from(css.matchAll(/\.trottl-avatar-grid\s*\{[^}]*\}/g), ([block]) => block)
+    .find((block) => block.includes("grid-template-columns")) ?? "";
   assert.match(html, /id="trottl-avatar-modal"[^>]*role="dialog"[^>]*aria-modal="true"/);
+  assert.doesNotMatch(html, /aria-describedby="trottl-avatar-modal-description"/);
+  assert.doesNotMatch(html, />3ER TROTTL<|Such dir deinen Fisch für diese Runde aus\./);
+  assert.match(html, /<header class="trottl-avatar-modal-header">\s*<h2 id="trottl-avatar-modal-title">Wähle deinen Avatar<\/h2>\s*<\/header>/);
   assert.match(html, /id="trottl-avatar-grid"[^>]*role="radiogroup"/);
   assert.match(uiSource, /role", "radio"[\s\S]*aria-checked/);
   assert.match(uiSource, /image\.alt = ""/);
-  assert.match(css, /\.trottl-avatar-grid[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(css, /max-height:\s*min\(92dvh, 760px\)/);
+  assert.match(avatarGridCss, /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(avatarGridCss, /repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(avatarGridCss, /--trottl-avatar-size:\s*clamp\(92px, 27vw, 118px\)/);
+  assert.match(css, /max-height:\s*min\(84dvh, 720px\)/);
+  assert.match(css, /grid-template-rows:\s*auto minmax\(0, 1fr\) auto auto/);
+  assert.match(css, /overflow-x:\s*hidden[\s\S]*overflow-y:\s*auto/);
   assert.match(css, /-webkit-overflow-scrolling:\s*touch/);
+  assert.match(css, /max\(32px, calc\(env\(safe-area-inset-top\) \+ 18px\)\)/);
+  assert.match(css, /width:\s*min\(100%, 390px\)/);
   assert.match(css, /\.trottl-avatar-modal-actions button[\s\S]*min-height:\s*46px/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.trottl-avatar-modal-card[\s\S]*animation:\s*none/);
+});
+
+test("larger avatar selection keeps its ring, checkmark and pending confirmation flow", () => {
+  assert.match(css, /\.trottl-avatar-option::before[\s\S]*width:\s*var\(--trottl-avatar-size\)/);
+  assert.match(css, /\.trottl-avatar-option img[\s\S]*width:\s*var\(--trottl-avatar-size\)[\s\S]*height:\s*var\(--trottl-avatar-size\)/);
+  assert.match(css, /\.trottl-avatar-option\.is-selected::before[\s\S]*border-color:[\s\S]*transform:\s*scale\(1\.04\)/);
+  assert.match(css, /\.trottl-avatar-option\.is-selected::after[\s\S]*content:\s*"✓"/);
+  assert.match(uiSource, /state\.pendingAvatarId = avatar\.id/);
+  assert.match(uiSource, /avatarConfirmButton\.disabled = !presentation\.canConfirm/);
 });
 
 test("invalid pending registry IDs remain non-confirmable without crashing", () => {

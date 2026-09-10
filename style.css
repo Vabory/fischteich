@@ -816,8 +816,7 @@ button:focus-visible {
 }
 
 .trottl-classic-avatar-action,
-.trottl-classic-ready-button,
-.trottl-classic-unready-button {
+.trottl-classic-ready-button {
   border: 0;
   color: inherit;
   font: inherit;
@@ -845,8 +844,7 @@ button:focus-visible {
   gap: 4px;
 }
 
-.trottl-classic-ready-button,
-.trottl-classic-ready-status.is-self-status {
+.trottl-classic-ready-button {
   display: grid;
   min-height: 36px;
   padding: 7px 9px;
@@ -859,7 +857,7 @@ button:focus-visible {
   font-weight: 880;
 }
 
-.trottl-classic-ready-status.is-self-status {
+.trottl-classic-ready-button.is-ready {
   border-color: rgb(93 232 143 / 38%);
   background: linear-gradient(180deg, rgb(72 214 124 / 20%), rgb(31 126 72 / 12%));
   box-shadow: 0 0 14px rgb(53 216 115 / 10%);
@@ -868,16 +866,6 @@ button:focus-visible {
 
 .trottl-classic-ready-button:disabled {
   opacity: 0.38;
-}
-
-.trottl-classic-unready-button {
-  min-height: 21px;
-  padding: 2px;
-  background: transparent;
-  color: rgb(210 226 234 / 59%);
-  font-size: 0.51rem;
-  font-weight: 740;
-  line-height: 1.1;
 }
 
 .trottl-classic-avatar-required {
@@ -1858,9 +1846,8 @@ button:focus-visible {
     padding-block: 14px;
   }
 
-  .trottl-avatar-modal-header p { margin-block: 4px 7px; }
-  .trottl-avatar-grid { gap-block: 5px; }
-  .trottl-avatar-option { min-height: 102px; }
+  .trottl-avatar-grid { gap-block: 9px; }
+  .trottl-avatar-option { min-height: 126px; }
 
   .trottl-classic-session-shell:not(.is-playing) {
     padding-top: max(calc(env(safe-area-inset-top) + 45px), 58px);
@@ -4513,7 +4500,7 @@ button.is-release-pressed {
 .trottl-avatar-modal-backdrop {
   z-index: 55;
   padding:
-    max(14px, env(safe-area-inset-top))
+    max(32px, calc(env(safe-area-inset-top) + 18px))
     max(12px, env(safe-area-inset-right))
     max(14px, env(safe-area-inset-bottom))
     max(12px, env(safe-area-inset-left));
@@ -4523,7 +4510,7 @@ button.is-release-pressed {
 .trottl-avatar-modal-card {
   display: grid;
   width: min(100%, 390px);
-  max-height: min(92dvh, 760px);
+  max-height: min(84dvh, 720px);
   padding: clamp(16px, 4.5vw, 22px);
   border: 1px solid rgb(147 214 244 / 30%);
   border-radius: 24px;
@@ -4545,15 +4532,6 @@ button.is-release-pressed {
   text-align: center;
 }
 
-.trottl-avatar-modal-header > span {
-  display: block;
-  margin-bottom: 4px;
-  color: #77dfff;
-  font-size: 0.58rem;
-  font-weight: 900;
-  letter-spacing: 0.17em;
-}
-
 .trottl-avatar-modal-header h2 {
   margin: 0;
   color: #f5fbff;
@@ -4562,20 +4540,14 @@ button.is-release-pressed {
   text-transform: uppercase;
 }
 
-.trottl-avatar-modal-header p {
-  margin: 7px 0 12px;
-  color: rgb(207 229 241 / 70%);
-  font-size: clamp(0.68rem, 3vw, 0.78rem);
-  line-height: 1.35;
-}
-
 .trottl-avatar-grid {
+  --trottl-avatar-size: clamp(92px, 27vw, 118px);
   display: grid;
   min-height: 0;
-  padding: 5px 3px 8px;
+  padding: 14px 3px 10px;
   align-content: start;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(7px, 2.5vw, 11px) clamp(5px, 2vw, 9px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(10px, 3vw, 14px) clamp(8px, 2.5vw, 12px);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -4588,7 +4560,7 @@ button.is-release-pressed {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 112px;
+  min-height: 138px;
   padding: 4px 1px 5px;
   align-content: start;
   justify-items: center;
@@ -4603,7 +4575,7 @@ button.is-release-pressed {
 .trottl-avatar-option::before {
   position: absolute;
   top: 2px;
-  width: clamp(68px, 20vw, 84px);
+  width: var(--trottl-avatar-size);
   aspect-ratio: 1;
   border: 2px solid transparent;
   border-radius: 50%;
@@ -4614,8 +4586,8 @@ button.is-release-pressed {
 
 .trottl-avatar-option img {
   display: block;
-  width: clamp(68px, 20vw, 84px);
-  height: clamp(68px, 20vw, 84px);
+  width: var(--trottl-avatar-size);
+  height: var(--trottl-avatar-size);
   border-radius: 50%;
   object-fit: contain;
 }
@@ -4650,7 +4622,7 @@ button.is-release-pressed {
 .trottl-avatar-option.is-selected::after {
   position: absolute;
   top: 2px;
-  right: max(5px, calc(50% - 42px));
+  right: max(7px, calc(50% - (var(--trottl-avatar-size) / 2)));
   display: grid;
   width: 20px;
   aspect-ratio: 1;

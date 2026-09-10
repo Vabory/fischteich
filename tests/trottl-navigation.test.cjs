@@ -10,6 +10,21 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const html = read("index.html");
 const css = read("style.css");
 const script = read("script.js");
+const buttonRelease = read("button-release.js");
+
+const trottlAssets = [
+  ["dice-game-background.png", 883, 1781],
+  ["text-3er-trottl.png", 1448, 1086],
+  ["text-spielmodus-wählen.png", 2172, 724],
+  ["button-fischteich-würfel.png", 2172, 724],
+  ["button-dice-game-classic.png", 2172, 724],
+  ["button-dice-game-special.png", 2172, 724],
+];
+
+function pngDimensions(file) {
+  const data = fs.readFileSync(path.join(root, "assets", file));
+  return [data.readUInt32BE(16), data.readUInt32BE(20)];
+}
 
 test("the existing main-menu entry opens one central 3er-Trottl screen", () => {
   assert.equal((html.match(/id="trottl-menu-screen"/g) ?? []).length, 1);
@@ -18,11 +33,14 @@ test("the existing main-menu entry opens one central 3er-Trottl screen", () => {
   assert.match(script, /#close-trottl-menu"\)\.addEventListener\("click", showMenu\)/);
 });
 
-test("the menu exposes only Würfel, Klassik and Deluxe with replaceable icon slots", () => {
-  for (const label of ["Fischteich Würfel", "3er Trottl Klassik", "3er Trottl Deluxe"]) {
-    assert.match(html, new RegExp(`class="trottl-menu-label">${label}<`));
+test("the menu uses all six supplied PNG assets and exposes Special instead of Deluxe", () => {
+  for (const [file, width, height] of trottlAssets) {
+    assert.match(html, new RegExp(`\\./assets/${file.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\?v=1`));
+    assert.deepEqual(pngDimensions(file), [width, height]);
   }
-  assert.equal((html.match(/class="trottl-menu-icon"/g) ?? []).length, 3);
+  assert.match(html, /id="trottl-menu-title">3er Trottl – Spielmodus wählen</);
+  assert.match(html, /id="open-trottl-deluxe"[^>]*aria-label="3er Trottl Special"/);
+  assert.doesNotMatch(html, /3er Trottl Deluxe|trottl-menu-icon|trottl-menu-label/);
   assert.doesNotMatch(html, /3er Trottl Online/i);
 });
 
@@ -33,7 +51,7 @@ test("Fischteich Würfel has its own screen and returns to the Trottl menu", () 
   assert.match(script, /#close-fischteich-dice"\)\.addEventListener[\s\S]*showTrottlMenu\(\{ focusSelector: "#open-fischteich-dice" \}\)/);
 });
 
-test("Klassik opens its room selection while Deluxe remains a harmless placeholder", () => {
+test("Klassik opens its room selection while Special retains the harmless placeholder flow", () => {
   const placeholderFunction = script.slice(
     script.indexOf("function showTrottlPlaceholder("),
     script.indexOf("function updateMarkerSize("),
@@ -41,15 +59,66 @@ test("Klassik opens its room selection while Deluxe remains a harmless placehold
   assert.match(placeholderFunction, /textContent = `\$\{label\} ist noch nicht verfügbar\.`/);
   assert.doesNotMatch(placeholderFunction, /showScreen|fetch|supabase|startGame/);
   assert.match(script, /#open-trottl-classic"\)\.addEventListener[\s\S]*trottlClassic\.openRooms\(\)/);
-  assert.match(script, /showTrottlPlaceholder\("3er Trottl Deluxe"\)/);
+  assert.match(script, /#open-trottl-deluxe"\)\.addEventListener[\s\S]*showTrottlPlaceholder\("3er Trottl Special"\)/);
+  assert.doesNotMatch(script, /3er Trottl Deluxe/);
 });
 
-test("Trottl screens reuse central navigation, Escape order and iOS safe areas", () => {
+test("Trottl screens reuse central navigation, Escape order and shared smart release handling", () => {
   assert.match(script, /const screens = Array\.from\(document\.querySelectorAll\("\.screen"\)\)/);
   assert.match(script, /!fischteichDiceScreen\.hidden[\s\S]*showTrottlMenu/);
   assert.match(script, /trottlClassic\.isSessionScreenActive\(\)[\s\S]*trottlClassic\.goBack\(\)/);
   assert.match(script, /!trottlMenuScreen\.hidden[\s\S]*showMenu/);
-  assert.match(css, /\.trottl-menu-shell\s*\{[\s\S]*env\(safe-area-inset-top\)[\s\S]*env\(safe-area-inset-right\)[\s\S]*env\(safe-area-inset-bottom\)[\s\S]*env\(safe-area-inset-left\)/);
-  assert.match(css, /\.trottl-menu-actions\s*\{[\s\S]*width:\s*min\(83vw, 326px\)[\s\S]*grid-auto-rows:\s*clamp\(74px, 9\.8dvh, 78px\)/);
   assert.match(css, /\.trottl-menu-shell[\s\S]*overflow:\s*hidden/);
+  assert.match(css, /\.trottl-menu-header\s*\{[^}]*env\(safe-area-inset-top\)/s);
+  assert.match(buttonRelease, /addEventListener\("pointerdown"[\s\S]*addEventListener\("pointerup"[\s\S]*addEventListener\("click"/);
+  assert.match(buttonRelease, /isValidRelease = !interaction\.canceled && isInsideButton/);
+  assert.match(css, /\.sidemenu-asset-actions button\.is-release-pressed/);
+});
+
+test("Trottl and Spieler Aufteilen share the exact three-button grid", () => {
+  assert.match(html, /class="teams-menu-actions sidemenu-asset-actions"/);
+  assert.match(html, /class="trottl-menu-actions sidemenu-asset-actions"/);
+  assert.match(css, /\.sidemenu-asset-actions\s*\{[^}]*--teams-menu-visual-button-width:\s*min\(83vw, 326px\)[^}]*--teams-menu-button-row-height:\s*clamp\(74px, 9\.8dvh, 78px\)[^}]*--teams-menu-button-gap:\s*0px[^}]*top:\s*clamp\(318px, 41\.6dvh, 334px\)/s);
+  assert.match(css, /\.trottl-menu-actions #open-trottl-classic,[\s\S]*\.trottl-menu-actions #open-trottl-deluxe\s*\{[^}]*translate:\s*0 var\(--teams-menu-lower-buttons-offset\)/s);
+  assert.match(css, /@media \(max-height: 700px\)[\s\S]*\.sidemenu-asset-actions\s*\{[^}]*min\(83vw, 43dvh, 301px\)[^}]*clamp\(67px, 10\.5dvh, 74px\)[^}]*top:\s*clamp\(266px, 42dvh, 300px\)/s);
+
+  for (const [width, height, safeTop] of [[375, 667, 20], [390, 844, 47], [393, 793, 47], [393, 852, 59], [430, 932, 59]]) {
+    const short = height <= 700;
+    const buttonWidth = short
+      ? Math.min(width * 0.83, height * 0.43, 301)
+      : Math.min(width * 0.83, 326);
+    const rowHeight = short
+      ? Math.min(74, Math.max(67, height * 0.105))
+      : Math.min(78, Math.max(74, height * 0.098));
+    const top = short
+      ? Math.min(300, Math.max(266, height * 0.42))
+      : Math.min(334, Math.max(318, height * 0.416));
+    const lowerOffset = buttonWidth * 0.02114;
+    const buttonTops = [top, top + rowHeight + lowerOffset, top + (2 * rowHeight) + lowerOffset];
+    const headerTop = Math.max(safeTop + 12, Math.min(42, Math.max(30, height * 0.048)));
+    const titleHeight = Math.min(width * 0.48, 188) * (1086 / 1448);
+    const subtitleHeight = Math.min(width * 0.78, 306) * (724 / 2172);
+    const headerBottom = headerTop + titleHeight - 10 + subtitleHeight;
+    const firstButtonVisualTop = top + ((rowHeight - (buttonWidth * (724 / 2172))) / 2);
+    assert.ok(buttonWidth <= width);
+    assert.ok(buttonTops[2] + rowHeight < height);
+    assert.ok(headerBottom < firstButtonVisualTop);
+    assert.ok(Math.abs((buttonTops[1] - buttonTops[0]) - (rowHeight + lowerOffset)) < 1e-9);
+    assert.ok(Math.abs((buttonTops[2] - buttonTops[1]) - rowHeight) < 1e-9);
+  }
+});
+
+test("the dedicated background shifts independently while the menu UI remains fixed", () => {
+  assert.match(css, /\.trottl-menu-screen\s*\{[^}]*--trottl-menu-background-offset:\s*59px/s);
+  assert.match(css, /\.trottl-menu-background\s*\{[^}]*height:\s*calc\(100% \+ var\(--trottl-menu-background-offset\)\)[^}]*translateY\(calc\(-1 \* var\(--trottl-menu-background-offset\)\)\)/s);
+  const shell = css.match(/\.trottl-menu-shell\s*\{[^}]*\}/s)?.[0] ?? "";
+  assert.match(shell, /inset:\s*0/);
+  assert.doesNotMatch(shell, /59px|translate|transform/);
+});
+
+test("Spieler Aufteilen keeps its original assets and per-button alignment corrections", () => {
+  for (const asset of ["sidemenu-background.png?v=2", "sidemenu-fisch-asset.png?v=1", "teams-aufteilen-logo.png", "button-finger-auswahl.png", "button-team-aufteilung.png?v=1", "button-rage-cage-verteilung.png?v=1"]) {
+    assert.ok(html.includes(`./assets/${asset}`));
+  }
+  assert.match(css, /\.teams-menu-actions #start-random-participants img[\s\S]*-0\.01135/);
 });

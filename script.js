@@ -4824,7 +4824,7 @@ document.querySelector("#open-trottl-classic").addEventListener("click", () => {
   void trottlClassic.openRooms();
 });
 document.querySelector("#open-trottl-deluxe").addEventListener("click", () => {
-  showTrottlPlaceholder("3er Trottl Deluxe");
+  showTrottlPlaceholder("3er Trottl Special");
 });
 document.querySelector("#start-finger-selection").addEventListener("click", () => {
   state.gameReturnTarget = "teams-menu";

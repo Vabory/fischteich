@@ -150,6 +150,15 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
+.trottl-menu-screen {
+  --trottl-menu-background-offset: 59px;
+}
+
+.trottl-menu-background {
+  height: calc(100% + var(--trottl-menu-background-offset));
+  transform: translateY(calc(-1 * var(--trottl-menu-background-offset)));
+}
+
 .sidemenu-fish-asset {
   position: absolute;
   z-index: 1;
@@ -181,7 +190,7 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
-.teams-menu-actions {
+.sidemenu-asset-actions {
   --teams-menu-visual-button-width: min(83vw, 326px);
   --teams-menu-button-row-height: clamp(74px, 9.8dvh, 78px);
   --teams-menu-button-gap: 0px;
@@ -198,7 +207,7 @@ button:focus-visible {
   transform: translateX(-50%);
 }
 
-.teams-menu-actions button {
+.sidemenu-asset-actions button {
   display: grid;
   width: 100%;
   height: 100%;
@@ -211,7 +220,7 @@ button:focus-visible {
   transition: transform 110ms ease-out;
 }
 
-.teams-menu-actions img {
+.sidemenu-asset-actions img {
   display: block;
   width: var(--teams-menu-visual-button-width);
   max-width: 100%;
@@ -228,11 +237,14 @@ button:focus-visible {
 }
 
 .teams-menu-actions #start-random-participants,
-.teams-menu-actions #start-manual-participants {
+.teams-menu-actions #start-manual-participants,
+.trottl-menu-actions #open-trottl-classic,
+.trottl-menu-actions #open-trottl-deluxe {
   translate: 0 var(--teams-menu-lower-buttons-offset);
 }
 
-.teams-menu-actions button:active {
+.sidemenu-asset-actions button:active,
+.sidemenu-asset-actions button.is-release-pressed {
   transform: scale(0.975);
 }
 
@@ -240,94 +252,56 @@ button:focus-visible {
   position: absolute;
   z-index: 2;
   inset: 0;
-  display: flex;
   min-width: 0;
-  padding:
-    max(calc(env(safe-area-inset-top) + 58px), 76px)
-    max(calc(env(safe-area-inset-right) + 24px), 24px)
-    max(calc(env(safe-area-inset-bottom) + 24px), 32px)
-    max(calc(env(safe-area-inset-left) + 24px), 24px);
-  align-items: center;
-  flex-direction: column;
   overflow: hidden;
 }
 
 .trottl-menu-header {
-  width: min(83vw, 326px);
-  margin-top: clamp(24px, 5dvh, 48px);
-  text-align: center;
+  position: absolute;
+  z-index: 2;
+  top: max(calc(env(safe-area-inset-top) + 12px), clamp(30px, 4.8dvh, 42px));
+  left: 50%;
+  width: 100%;
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 
-.trottl-menu-header h1,
 .trottl-dice-header h1 {
   margin: 0;
   font-size: clamp(1.65rem, 7.2vw, 2.25rem);
   line-height: 1.05;
 }
 
-.trottl-menu-actions {
-  display: grid;
-  width: min(83vw, 326px);
-  margin-top: clamp(38px, 7dvh, 62px);
-  grid-auto-rows: clamp(74px, 9.8dvh, 78px);
-  gap: 10px;
+.trottl-menu-title-asset,
+.trottl-menu-subtitle-asset {
+  display: block;
+  height: auto;
+  margin-inline: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
-.trottl-menu-entry {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  padding: 0 17px;
-  align-items: center;
-  border: 1px solid rgb(93 187 255 / 42%);
-  border-radius: 18px;
-  background: linear-gradient(145deg, rgb(11 31 63 / 94%), rgb(18 10 42 / 94%));
-  box-shadow: 0 10px 24px rgb(0 0 0 / 32%), inset 0 0 18px rgb(91 186 255 / 7%);
-  grid-template-columns: 42px minmax(0, 1fr) 18px;
-  gap: 10px;
-  text-align: left;
-  transition: border-color 110ms ease-out, transform 110ms ease-out;
+.trottl-menu-title-asset {
+  width: min(48vw, 188px);
 }
 
-.trottl-menu-entry:active,
-.trottl-menu-entry.is-release-pressed {
-  border-color: rgb(128 216 255 / 78%);
-  transform: scale(0.975);
+.trottl-menu-subtitle-asset {
+  width: min(78vw, 306px);
+  margin-top: -10px;
 }
 
-.trottl-menu-icon {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgb(255 255 255 / 16%);
-  border-radius: 13px;
-  background: rgb(255 255 255 / 7%);
-  color: #9eeaff;
-  font-size: 1.45rem;
-  line-height: 1;
-  place-items: center;
-}
-
-.trottl-menu-label {
-  min-width: 0;
-  font-size: clamp(0.92rem, 4vw, 1.05rem);
-  font-weight: 850;
-  line-height: 1.15;
-}
-
-.trottl-menu-arrow {
-  color: #78dcff;
-  font-size: 1.55rem;
-  line-height: 1;
-  text-align: right;
+.trottl-menu-actions img {
+  aspect-ratio: 2172 / 724;
 }
 
 .trottl-menu-feedback {
-  width: min(83vw, 326px);
+  position: absolute;
+  top: calc(100% + var(--teams-menu-lower-buttons-offset) + 12px);
+  left: 0;
+  width: 100%;
   min-height: 1.35em;
-  margin: 14px 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 0.76rem;
   line-height: 1.35;
@@ -6150,7 +6124,7 @@ button.is-release-pressed {
     width: min(82vw, 48dvh, 320px);
   }
 
-  .teams-menu-actions {
+  .sidemenu-asset-actions {
     --teams-menu-visual-button-width: min(83vw, 43dvh, 301px);
     --teams-menu-button-row-height: clamp(67px, 10.5dvh, 74px);
 

@@ -156,6 +156,7 @@ button:focus-visible {
 
 .trottl-menu-background {
   height: calc(100% + var(--trottl-menu-background-offset));
+  filter: brightness(0.765);
   transform: translateY(calc(-1 * var(--trottl-menu-background-offset)));
 }
 
@@ -283,13 +284,13 @@ button:focus-visible {
 }
 
 .trottl-menu-title-asset {
-  width: min(56vw, 220px);
-  transform: translateY(-14px);
+  width: min(59vw, 232px);
+  transform: translateY(-11px);
 }
 
 .trottl-menu-subtitle-asset {
   width: min(70vw, 274px);
-  margin-top: calc(min(36vw, 141px) - min(42vw, 165px) - 4px);
+  margin-top: calc(min(36vw, 141px) - min(44.25vw, 174px) + 8px);
 }
 
 .trottl-menu-actions {
@@ -302,6 +303,10 @@ button:focus-visible {
 
 .trottl-menu-actions #open-trottl-deluxe {
   translate: 0 calc(var(--teams-menu-lower-buttons-offset) * 2);
+}
+
+.trottl-menu-actions #open-trottl-deluxe img {
+  filter: brightness(0.95);
 }
 
 .trottl-menu-feedback {

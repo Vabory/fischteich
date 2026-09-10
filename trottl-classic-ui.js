@@ -291,6 +291,12 @@
     const avatarModalFeedback = document.querySelector("#trottl-avatar-modal-feedback");
     const avatarCancelButton = document.querySelector("#trottl-avatar-cancel");
     const avatarConfirmButton = document.querySelector("#trottl-avatar-confirm");
+    const kickModal = document.querySelector("#trottl-kick-modal");
+    const kickModalCard = kickModal.querySelector(".trottl-kick-modal-card");
+    const kickModalCopy = document.querySelector("#trottl-kick-modal-copy");
+    const kickModalFeedback = document.querySelector("#trottl-kick-modal-feedback");
+    const kickCancelButton = document.querySelector("#trottl-kick-cancel");
+    const kickConfirmButton = document.querySelector("#trottl-kick-confirm");
     const roomBackButton = document.querySelector("#close-trottl-classic-rooms");
     const sessionBackButton = document.querySelector("#close-trottl-classic-session");
 
@@ -339,6 +345,11 @@
       lobbyHeartbeatTimer: null,
       lobbyHeartbeatSessionId: null,
       lobbyHeartbeatRequest: null,
+      kickModalOpen: false,
+      kickTargetUserId: null,
+      kickTargetName: "",
+      kickSubmitting: false,
+      kickModalReturnFocus: null,
     };
 
     const gameDice = global.FischteichDice.mount({
@@ -440,6 +451,111 @@
         );
       }
       if (immediate) void sendLobbyHeartbeat(sessionId);
+    }
+
+    function renderKickModal() {
+      kickModal.hidden = !state.kickModalOpen;
+      if (!state.kickModalOpen) return;
+      kickModalCard.setAttribute("aria-busy", String(state.kickSubmitting));
+      kickModalCopy.textContent = `${state.kickTargetName} aus der Lobby entfernen?`;
+      kickCancelButton.disabled = state.kickSubmitting;
+      kickConfirmButton.disabled = state.kickSubmitting;
+      kickConfirmButton.textContent = state.kickSubmitting ? "Wird entfernt …" : "Entfernen";
+    }
+
+    function openKickModal(player) {
+      const snapshot = state.snapshot;
+      if (
+        previewEnabled
+        || state.kickSubmitting
+        || !snapshot
+        || snapshot.session.status !== "lobby"
+        || snapshot.session.hostUserId !== snapshot.identity.userId
+        || player.userId === snapshot.identity.userId
+        || !snapshot.players.some((candidate) => candidate.userId === player.userId)
+      ) return false;
+      state.kickModalOpen = true;
+      state.kickTargetUserId = player.userId;
+      state.kickTargetName = player.displayName;
+      state.kickModalReturnFocus = document.activeElement;
+      kickModalFeedback.textContent = "";
+      renderKickModal();
+      requestAnimationFrame(() => kickCancelButton.focus({ preventScroll: true }));
+      return true;
+    }
+
+    function closeKickModal({ force = false, restoreFocus = true } = {}) {
+      if (!state.kickModalOpen || (state.kickSubmitting && !force)) return false;
+      const returnFocus = state.kickModalReturnFocus;
+      state.kickModalOpen = false;
+      state.kickTargetUserId = null;
+      state.kickTargetName = "";
+      state.kickModalReturnFocus = null;
+      kickModalFeedback.textContent = "";
+      renderKickModal();
+      if (restoreFocus && returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+      return true;
+    }
+
+    function syncKickModalWithSnapshot(snapshot) {
+      if (!state.kickModalOpen) return;
+      const targetExists = snapshot.players.some((player) => player.userId === state.kickTargetUserId);
+      const localIsHost = snapshot.session.hostUserId === snapshot.identity.userId;
+      if (snapshot.session.status !== "lobby" || !targetExists || !localIsHost) {
+        closeKickModal({ force: true, restoreFocus: false });
+      }
+    }
+
+    async function submitKick() {
+      const snapshot = state.snapshot;
+      const targetUserId = state.kickTargetUserId;
+      if (
+        state.kickSubmitting
+        || !state.kickModalOpen
+        || !snapshot
+        || !targetUserId
+        || snapshot.session.hostUserId !== snapshot.identity.userId
+        || targetUserId === snapshot.identity.userId
+      ) return false;
+      state.kickSubmitting = true;
+      kickModalFeedback.textContent = "";
+      renderKickModal();
+      try {
+        const updatedSnapshot = await service.kickPlayer(snapshot.session.id, targetUserId);
+        if (state.snapshot?.session.id === snapshot.session.id) state.snapshot = updatedSnapshot;
+        closeKickModal({ force: true, restoreFocus: false });
+        renderSession();
+        return true;
+      } catch (error) {
+        console.warn("3er-Trottl-Spieler konnte nicht entfernt werden.", error);
+        kickModalFeedback.textContent = describeError(error, "Spieler konnte nicht entfernt werden.");
+        return false;
+      } finally {
+        state.kickSubmitting = false;
+        if (state.kickModalOpen) renderKickModal();
+      }
+    }
+
+    function handleKickModalKeydown(event) {
+      if (!state.kickModalOpen) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeKickModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...kickModal.querySelectorAll("button:not(:disabled)")];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     function getAvatarModalPresentation() {
@@ -700,7 +816,21 @@
         if (!isSelf) {
           readyStatus.className = `trottl-classic-ready-status${player.isReady ? " is-ready" : ""}`;
           readyStatus.textContent = player.isReady ? "✓ Bereit" : "Nicht bereit";
-          item.append(avatarColumn, identityColumn, readyStatus);
+          if (presentation.isHost && !previewEnabled) {
+            const actions = document.createElement("div");
+            const kickButton = document.createElement("button");
+            actions.className = "trottl-classic-other-player-actions";
+            kickButton.type = "button";
+            kickButton.className = "trottl-classic-kick-button";
+            kickButton.textContent = "×";
+            kickButton.setAttribute("aria-label", `${player.displayName} aus Lobby entfernen`);
+            kickButton.disabled = state.kickSubmitting;
+            kickButton.addEventListener("click", () => openKickModal(player));
+            actions.append(readyStatus, kickButton);
+            item.append(avatarColumn, identityColumn, actions);
+          } else {
+            item.append(avatarColumn, identityColumn, readyStatus);
+          }
         } else {
           const avatarButton = document.createElement("button");
           const readyControls = document.createElement("div");
@@ -734,6 +864,7 @@
       startButton.textContent = presentation.startLabel;
       leaveButton.disabled = state.busy;
       syncAvatarModalWithSnapshot(snapshot);
+      syncKickModalWithSnapshot(snapshot);
       preloadAvailableAvatarChoices();
     }
 
@@ -1576,6 +1707,7 @@
       previewPanel.hidden = !previewEnabled || !state.preview;
       if (isPlaying) {
         stopLobbyHeartbeat();
+        closeKickModal({ force: true, restoreFocus: false });
         closeAvatarModal({ force: true, restoreFocus: false });
         syncGameDice(snapshot, rollSource);
         renderGame(snapshot, state.preview?.activeSeatIndex ?? snapshot.session.currentTurnSeat);
@@ -1661,6 +1793,7 @@
     async function openRooms({ feedback = "" } = {}) {
       if (previewEnabled) return openPreview();
       stopLobbyHeartbeat();
+      closeKickModal({ force: true, restoreFocus: false });
       closeAvatarModal({ force: true, restoreFocus: false });
       await stopSessionRealtime();
       state.snapshot = null;
@@ -1723,6 +1856,17 @@
       return first === "live" || second === "live" ? "live" : "recovery";
     }
 
+    async function handleLobbyMembershipRemoved(sessionId) {
+      if (state.snapshot?.session.id !== sessionId) return;
+      stopLobbyHeartbeat();
+      closeKickModal({ force: true, restoreFocus: false });
+      closeAvatarModal({ force: true, restoreFocus: false });
+      state.snapshot = null;
+      await stopSessionRealtime();
+      await openRooms();
+      roomFeedback.textContent = "Du wurdest aus der Lobby entfernt.";
+    }
+
     async function refreshSession({ rollSource = "recovery" } = {}) {
       if (!state.snapshot) return null;
       if (state.sessionRefreshPromise) {
@@ -1731,9 +1875,19 @@
         return state.sessionRefreshPromise;
       }
       const sessionId = state.snapshot.session.id;
+      const hadLocalLobbyMembership = state.snapshot.session.status === "lobby"
+        && localLobbyPlayer(state.snapshot) !== null;
       state.sessionRefreshPromise = service.loadSession(sessionId)
-        .then((snapshot) => {
+        .then(async (snapshot) => {
           if (state.snapshot?.session.id !== sessionId) return snapshot;
+          if (
+            hadLocalLobbyMembership
+            && snapshot.session.status === "lobby"
+            && localLobbyPlayer(snapshot) === null
+          ) {
+            await handleLobbyMembershipRemoved(sessionId);
+            return snapshot;
+          }
           state.snapshot = snapshot;
           sessionFeedback.textContent = "";
           renderSession(rollSource);
@@ -1790,6 +1944,7 @@
       }
       state.busy = true;
       stopLobbyHeartbeat();
+      closeKickModal({ force: true, restoreFocus: false });
       sessionFeedback.textContent = "Raum wird verlassen …";
       if (state.snapshot.session.status === "playing") situation.textContent = "RAUM WIRD VERLASSEN";
       renderSession();
@@ -1869,6 +2024,12 @@
     });
     global.addEventListener(AVATAR_SELECT_REQUEST_EVENT, handleAvatarSelectRequest);
     document.addEventListener("keydown", handleAvatarModalKeydown);
+    kickCancelButton.addEventListener("click", () => closeKickModal());
+    kickConfirmButton.addEventListener("click", () => void submitKick());
+    kickModal.addEventListener("click", (event) => {
+      if (event.target === kickModal) closeKickModal();
+    });
+    document.addEventListener("keydown", handleKickModalKeydown);
     gameDiceButton.addEventListener("click", () => void requestRoll());
     gameView.addEventListener("click", handleReactionTap);
     fourResetButton.addEventListener("click", resetFourSips);

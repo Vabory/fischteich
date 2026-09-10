@@ -86,7 +86,7 @@ test("lobby render and modal open start the same non-blocking safety preload", (
   const open = uiSource.match(/function openAvatarModal[\s\S]*?\n    }\n\n    function closeAvatarModal/)?.[0] ?? "";
   assert.match(helper, /preloadTrottlAvatars\(getAvailableAvatarChoices\(\)\)/);
   assert.doesNotMatch(helper, /await|\.then\(/);
-  assert.match(lobby, /syncAvatarModalWithSnapshot\(snapshot\);\s*preloadAvailableAvatarChoices\(\)/);
+  assert.match(lobby, /syncAvatarModalWithSnapshot\(snapshot\);\s*syncKickModalWithSnapshot\(snapshot\);\s*preloadAvailableAvatarChoices\(\)/);
   assert.match(open, /preloadAvailableAvatarChoices\(\);\s*renderAvatarModal\(\)/);
   assert.doesNotMatch(open, /await preload|preload[\s\S]*?\.then\(/);
   assert.doesNotMatch(html, /<link[^>]+rel="preload"[^>]+assets\/avatars/i);

@@ -824,6 +824,44 @@ button:focus-visible {
   color: #7cf1a6;
 }
 
+.trottl-classic-other-player-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.trottl-classic-kick-button {
+  display: grid;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgb(225 190 182 / 18%);
+  border-radius: 10px;
+  background: rgb(164 104 91 / 7%);
+  color: rgb(230 213 207 / 64%);
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.trottl-classic-kick-button:active:not(:disabled) {
+  background: rgb(185 111 94 / 15%);
+  color: #f3d6cc;
+}
+
+.trottl-classic-kick-button:focus-visible {
+  outline: 2px solid rgb(245 191 170 / 70%);
+  outline-offset: 1px;
+}
+
+.trottl-classic-kick-button:disabled {
+  opacity: 0.38;
+}
+
 .trottl-classic-avatar-action,
 .trottl-classic-ready-button {
   border: 0;
@@ -4678,6 +4716,68 @@ button.is-release-pressed {
   min-height: 46px;
   padding-inline: 10px;
   font-size: 0.7rem;
+}
+
+.trottl-kick-modal-backdrop {
+  z-index: 56;
+  padding:
+    max(24px, calc(env(safe-area-inset-top) + 12px))
+    max(18px, env(safe-area-inset-right))
+    max(24px, calc(env(safe-area-inset-bottom) + 12px))
+    max(18px, env(safe-area-inset-left));
+}
+
+.trottl-kick-modal-card {
+  width: min(100%, 326px);
+  padding: 22px 20px 19px;
+  border-color: rgb(184 213 230 / 23%);
+  background:
+    radial-gradient(circle at 50% 0, rgb(61 157 203 / 11%), transparent 55%),
+    linear-gradient(155deg, rgb(13 25 47 / 99%), rgb(6 10 27 / 99%));
+}
+
+.trottl-kick-modal-card h2 {
+  margin-bottom: 8px;
+  color: #f4f9fc;
+  font-size: 1.18rem;
+}
+
+.trottl-kick-modal-card > p {
+  margin-bottom: 16px;
+  color: rgb(211 226 235 / 76%);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.trottl-kick-modal-card > .trottl-kick-modal-feedback {
+  min-height: 1.2em;
+  margin: -5px 0 10px;
+  color: #ffd0c4;
+  font-size: 0.68rem;
+}
+
+.trottl-kick-modal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.trottl-kick-modal-actions button {
+  min-height: 44px;
+}
+
+.trottl-kick-confirm {
+  border: 1px solid rgb(226 151 122 / 36%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(174 88 67 / 82%), rgb(119 54 45 / 88%));
+  color: #fff5f0;
+  font: inherit;
+  font-weight: 850;
+}
+
+.trottl-kick-confirm:disabled {
+  opacity: 0.48;
 }
 
 @keyframes trottl-avatar-backdrop-in {

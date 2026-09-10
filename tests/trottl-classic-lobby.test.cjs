@@ -87,8 +87,10 @@ test("ready and avatar controls express every local server-backed state", () => 
 
 test("the local ready control stays one toggle in the same layout slot", () => {
   const selfBranch = uiSource.match(/if \(!isSelf\)[\s\S]*?item\.append\(avatarColumn, identityColumn, readyControls\);/)?.[0] ?? "";
-  assert.equal((selfBranch.match(/document\.createElement\("button"\)/g) ?? []).length, 2);
+  const localControls = selfBranch.match(/} else \{[\s\S]*?item\.append\(avatarColumn, identityColumn, readyControls\);/)?.[0] ?? "";
+  assert.equal((localControls.match(/document\.createElement\("button"\)/g) ?? []).length, 2);
   assert.equal((selfBranch.match(/readyControls\.append\(readyButton\)/g) ?? []).length, 1);
+  assert.doesNotMatch(localControls, /trottl-classic-kick-button/);
   assert.doesNotMatch(selfBranch, /Bereitschaft abbrechen|trottl-classic-unready-button|cancelButton/);
   assert.match(css, /\.trottl-classic-lobby-player\.is-self[\s\S]*min-height:\s*83px/);
   assert.match(css, /\.trottl-classic-ready-button\s*\{[\s\S]*min-height:\s*36px/);

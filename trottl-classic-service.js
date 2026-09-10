@@ -438,6 +438,17 @@
     return data;
   }
 
+  async function kickPlayer(sessionId, targetPlayerId) {
+    await ensureIdentity();
+    const { data, error } = await supabaseClient.rpc("kick_trottl_classic_player", {
+      p_session_id: sessionId,
+      p_target_player_id: targetPlayerId,
+    });
+    if (error) throw error;
+    if (typeof data !== "boolean") throw new Error("Kick returned an invalid result");
+    return loadSession(sessionId);
+  }
+
   async function rollSession(sessionId) {
     await ensureIdentity();
     const { data, error } = await supabaseClient.rpc("roll_trottl_classic_die", {
@@ -619,6 +630,7 @@
     setAvatar,
     setReady,
     heartbeat,
+    kickPlayer,
     rollSession,
     resolveRoll,
     acknowledgeDrink,

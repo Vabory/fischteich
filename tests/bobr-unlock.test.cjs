@@ -15,6 +15,7 @@ const html = read("index.html");
 const css = read("style.css");
 const avatarService = read("trottl-avatar-service.js");
 const migration = read("supabase/migrations/20260910000000_unlock_mystical_bobr.sql");
+const repairMigration = read("supabase/migrations/20260910010000_repair_mystical_bobr_unlock.sql");
 
 function loadService(overrides = {}) {
   const context = vm.createContext({ window: { ...overrides } });
@@ -71,17 +72,26 @@ test("settings close resets only ephemeral in-memory progress", () => {
   assert.doesNotMatch(source, /localStorage|sessionStorage|supabaseClient|\.from\(/);
 });
 
-test("server unlock is self-scoped, idempotent and preserves the first timestamp", () => {
+test("server unlock schema and permissions remain defined by the original migration", () => {
   assert.match(migration, /add column bobr_unlocked boolean not null default false/i);
   assert.match(migration, /add column bobr_unlocked_at timestamptz/i);
   assert.match(migration, /create function public\.unlock_mystical_bobr\(\)/i);
-  assert.match(migration, /v_user_id uuid := auth\.uid\(\)/i);
-  assert.match(migration, /where profile\.user_id = v_user_id/i);
-  assert.match(migration, /bobr_unlocked = true/i);
-  assert.match(migration, /bobr_unlocked_at = pg_catalog\.coalesce\(profile\.bobr_unlocked_at, pg_catalog\.now\(\)\)/i);
   assert.match(migration, /revoke all on function public\.unlock_mystical_bobr\(\) from public, anon/i);
   assert.match(migration, /grant execute on function public\.unlock_mystical_bobr\(\) to authenticated/i);
-  assert.doesNotMatch(migration, /\bp_(?:user|profile|uuid)(?:_id)?\b/i);
+});
+
+test("repair keeps the unlock self-scoped, idempotent and preserves the first timestamp", () => {
+  assert.match(repairMigration, /create or replace function public\.unlock_mystical_bobr\(\)/i);
+  assert.match(repairMigration, /returns public\.app_profiles/i);
+  assert.match(repairMigration, /security definer[\s\S]*set search_path = ''/i);
+  assert.match(repairMigration, /v_user_id uuid := auth\.uid\(\)/i);
+  assert.match(repairMigration, /where profile\.user_id = v_user_id/i);
+  assert.match(repairMigration, /bobr_unlocked = true/i);
+  assert.match(repairMigration, /bobr_unlocked_at = coalesce\(profile\.bobr_unlocked_at, pg_catalog\.now\(\)\)/i);
+  assert.doesNotMatch(repairMigration, /pg_catalog\.coalesce\(/i);
+  assert.match(repairMigration, /if v_user_id is null[\s\S]*errcode = '42501'[\s\S]*An authenticated user is required/i);
+  assert.match(repairMigration, /if not found[\s\S]*errcode = '23503'[\s\S]*No app profile exists for the authenticated user/i);
+  assert.doesNotMatch(repairMigration, /\bp_(?:user|profile|uuid)(?:_id)?\b/i);
 });
 
 test("confirmed RPC state updates the central profile and failed requests stay locked", () => {

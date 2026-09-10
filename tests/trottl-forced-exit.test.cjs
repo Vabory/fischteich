@@ -97,8 +97,9 @@ test("session realtime forwards full payloads for exact DELETE classification", 
   assert.match(ui, /\(payload\) => handleSessionRealtimeChange\(sessionId, payload\)/);
 });
 
-test("gameplay reconnect remains membership-bound after a forced exit", () => {
+test("gameplay reconnect and open join are distinguished after a forced exit", () => {
   assert.match(ui, /room\.isMember[\s\S]*Wieder beitreten/);
-  assert.match(ui, /button\.disabled = state\.busy \|\| \(room\.status === "playing" && !room\.isMember\)/);
+  assert.match(ui, /room\.status === "playing" \? roomFull \? "Raum voll" : "Beitreten"/);
+  assert.match(ui, /room\.status === "playing" && roomFull && !room\.isMember/);
   assert.match(ui, /status === "playing"[\s\S]*recoverSessionConnection\(\)/);
 });

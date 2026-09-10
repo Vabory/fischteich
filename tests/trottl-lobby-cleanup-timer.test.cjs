@@ -24,11 +24,11 @@ test("active lobby cleanup uses one fixed twenty-second interval", () => {
   assert.match(ui, /state\.lobbyCleanupTimer === null[\s\S]*global\.setInterval\([\s\S]*LOBBY_CLEANUP_INTERVAL_MS/);
 });
 
-test("cleanup requires the current visible lobby and local membership", () => {
+test("cleanup requires the current visible Classic session and local membership", () => {
   const sender = ui.match(/function sendLobbyCleanup\([\s\S]*?\n    }/)?.[0] ?? "";
   assert.match(sender, /state\.lobbyCleanupSessionId !== sessionId/);
   assert.match(sender, /state\.snapshot\?\.session\.id !== sessionId/);
-  assert.match(sender, /state\.snapshot\.session\.status !== "lobby"/);
+  assert.match(sender, /!\["lobby", "playing"\]\.includes\(state\.snapshot\.session\.status\)/);
   assert.match(sender, /localLobbyPlayer\(state\.snapshot\) === null/);
   assert.match(sender, /document\.visibilityState === "hidden"/);
 });
@@ -53,10 +53,10 @@ test("visibility resume performs immediate cleanup and restarts one timer", () =
   assert.match(ui, /function resume\(\)[\s\S]*startLobbyHeartbeat\(state\.snapshot\.session\.id, \{ immediate: true \}\);\s*startLobbyCleanup\(state\.snapshot\.session\.id, \{ immediate: true \}\)/);
 });
 
-test("leave, gameplay, session changes and kick removal stop cleanup", () => {
-  assert.match(ui, /if \(isPlaying\) \{\s*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
+test("leave and session changes stop cleanup while gameplay keeps it active", () => {
+  assert.doesNotMatch(ui, /if \(isPlaying\) \{\s*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
   assert.match(ui, /async function openSnapshot[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
-  assert.match(ui, /async function leaveCurrentSession[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
+  assert.match(ui, /async function performConfirmedLeave[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
   assert.match(ui, /async function exitClassicSessionToRoomPicker[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
   assert.match(ui, /async function openRooms[\s\S]*stopLobbyCleanup\(\)/);
 });

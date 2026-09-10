@@ -232,7 +232,7 @@ test("room summaries always expose exactly the two isolated fixed slots", async 
   assert.equal(rooms[1].sessionId, null);
   assert.equal(rooms[1].playerCount, 0);
   assert.equal(service.maxPlayers, 8);
-  assert.equal(service.minPlayers, 3);
+  assert.equal(service.minPlayers, 2);
 });
 
 test("a running room blocks newcomers while preserving the reconnect marker", () => {
@@ -978,7 +978,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=14[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=24[\s\S]*script\.js\?v=86/);
+  assert.match(html, /trottl-classic-service\.js\?v=15[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=25[\s\S]*script\.js\?v=86/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

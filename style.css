@@ -4732,6 +4732,27 @@ button.is-release-pressed {
     max(18px, env(safe-area-inset-left));
 }
 
+.trottl-leave-modal-backdrop {
+  z-index: 57;
+}
+
+.trottl-leave-modal-card {
+  width: min(88vw, 22rem);
+  text-align: center;
+}
+
+.trottl-leave-modal-card h2 {
+  margin: 0;
+}
+
+.trottl-leave-modal-card > p {
+  margin: 0.75rem 0 0;
+}
+
+.trottl-leave-modal-actions {
+  margin-top: 1rem;
+}
+
 .trottl-kick-modal-card {
   width: min(100%, 326px);
   padding: 22px 20px 19px;

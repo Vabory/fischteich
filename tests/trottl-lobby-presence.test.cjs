@@ -93,7 +93,7 @@ test("public cleanup remains server-authoritative and internal cleanup is not cl
   assert.match(migration, /grant execute on function public\.cleanup_trottl_classic_lobby\(uuid\) to authenticated/i);
 });
 
-test("client heartbeat uses one 30-second lobby lifecycle and existing Realtime", () => {
+test("client heartbeat uses one 30-second active-session lifecycle and existing Realtime", () => {
   assert.match(service, /async function heartbeat\(sessionId\)[\s\S]*rpc\("heartbeat_trottl_classic_lobby"[\s\S]*p_session_id: sessionId/i);
   assert.match(service, /lastSeenAt: value\.last_seen_at \?\? null/);
   assert.match(service, /select\("session_id,user_id,display_name_snapshot,seat_index,avatar_id,is_ready,joined_at,last_seen_at"\)/);
@@ -105,7 +105,7 @@ test("client heartbeat uses one 30-second lobby lifecycle and existing Realtime"
   assert.match(ui, /status === "SUBSCRIBED"[\s\S]*startLobbyHeartbeat\(sessionId, \{ immediate: true \}\)/);
   assert.match(ui, /leaveCurrentSession[\s\S]*stopLobbyHeartbeat\(\)/);
   assert.match(ui, /function suspend[\s\S]*stopLobbyHeartbeat\(\)/);
-  assert.match(ui, /if \(isPlaying\) \{\s*stopLobbyHeartbeat\(\)/);
+  assert.match(ui, /!\["lobby", "playing"\]\.includes\(state\.snapshot\.session\.status\)/);
   assert.match(script, /visibilitychange[\s\S]*visibilityState === "visible"[\s\S]*trottlClassic\.refresh\(\)/);
   assert.match(service, /table: "trottl_classic_players"/);
   assert.doesNotMatch(ui, /beforeunload|unload/);

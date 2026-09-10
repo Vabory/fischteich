@@ -8,6 +8,7 @@ const test = require("node:test");
 const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const presenceMigration = read("supabase/migrations/20260910020000_add_trottl_lobby_presence.sql");
+const openRoomMigration = read("supabase/migrations/20260911020000_open_trottl_classic_rooms.sql");
 const adminResetMigration = read("supabase/migrations/20260910040000_add_trottl_classic_admin_room_reset.sql");
 const service = read("trottl-classic-service.js");
 const ui = read("trottl-classic-ui.js");
@@ -19,6 +20,7 @@ function functionBody(source, name) {
 }
 
 const join = functionBody(presenceMigration, "join_trottl_classic_room");
+const openJoin = functionBody(openRoomMigration, "join_trottl_classic_room");
 
 test("the stuck connection copy never destroys the structured situation DOM", () => {
   assert.doesNotMatch(ui, /situation\.textContent\s*=/);
@@ -82,28 +84,30 @@ test("playing reconnect preserves seat, avatar, ready and host state", () => {
   assert.doesNotMatch(reconnect, /insert into public\.trottl_classic_players|set seat_index|set avatar_id|set is_ready|host_user_id\s*=/i);
 });
 
-test("foreign and browser-reset UUIDs remain blocked from a running game", () => {
-  assert.match(join, /if v_session\.status <> 'lobby' then\s+raise exception using errcode = 'P0001', message = 'TROTTL_CLASSIC_GAME_ALREADY_STARTED'/i);
-  assert.match(join, /where player\.user_id = v_user_id\s+and session\.status in \('lobby', 'playing'\)/i);
+test("foreign UUIDs may join a running Classic game below capacity", () => {
+  assert.doesNotMatch(openJoin, /TROTTL_CLASSIC_GAME_ALREADY_STARTED/i);
+  assert.match(openJoin, /session\.status in \('lobby', 'playing'\)/i);
+  assert.match(openJoin, /v_remaining_count >= 8[\s\S]*TROTTL_CLASSIC_ROOM_FULL/i);
 });
 
-test("room cards distinguish member reconnect from a blocked running room", () => {
+test("room cards distinguish reconnect, open join and full running rooms", () => {
   assert.match(ui, /room\.isMember\s*\? room\.status === "playing" \? "Wieder beitreten" : "Weiter"/);
-  assert.match(ui, /button\.disabled = state\.busy \|\| \(room\.status === "playing" && !room\.isMember\)/);
+  assert.match(ui, /room\.status === "playing" \? roomFull \? "Raum voll" : "Beitreten"/);
+  assert.match(ui, /room\.status === "playing" && roomFull && !room\.isMember/);
 });
 
-test("gameplay back navigation is local while lobby leave remains server-authoritative", () => {
+test("gameplay back navigation confirms one server-authoritative leave", () => {
   const leave = ui.match(/async function leaveCurrentSession\(\)[\s\S]*?\n    }/)?.[0] ?? "";
-  assert.match(leave, /status === "playing"[\s\S]*openRooms\(\{ feedback: "Du kannst dem laufenden Spiel wieder beitreten\." \}\)[\s\S]*return;/);
-  assert.match(leave, /await service\.leaveSession\(sessionId\)/);
-  const gameplayBranch = leave.match(/if \(state\.snapshot\.session\.status === "playing"\)[\s\S]*?return;/)?.[0] ?? "";
-  assert.doesNotMatch(gameplayBranch, /leaveSession|leave_trottl_classic_session/);
+  assert.match(leave, /status === "playing"[\s\S]*openLeaveModal\(\)[\s\S]*return;/);
+  assert.match(ui, /async function performConfirmedLeave\(\)[\s\S]*await service\.leaveSession\(sessionId\)/);
+  assert.match(ui, /state\.leaveSubmitting[\s\S]*leaveConfirmButton\.disabled = state\.leaveSubmitting/);
 });
 
-test("gameplay membership is never removed by stale cleanup or heartbeat", () => {
-  const cleanup = functionBody(presenceMigration, "cleanup_trottl_classic_lobby_locked");
-  assert.match(cleanup, /if v_session\.status <> 'lobby' then\s+return v_session\.player_count/i);
-  assert.match(ui, /if \(isPlaying\) \{\s*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
+test("gameplay membership uses the same heartbeat and stale cleanup lifecycle", () => {
+  const cleanup = functionBody(openRoomMigration, "cleanup_trottl_classic_lobby_locked");
+  assert.match(cleanup, /status not in \('lobby', 'playing'\)/i);
+  assert.match(cleanup, /p_now > player\.last_seen_at \+ pg_catalog\.make_interval\(secs => 120\)/i);
+  assert.match(ui, /!\["lobby", "playing"\]\.includes\(state\.snapshot\.session\.status\)/);
 });
 
 test("reaction recovery consumes persisted deadlines without creating replacement timing", () => {

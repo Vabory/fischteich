@@ -57,7 +57,9 @@ test("ready counter and host start states derive only from the current snapshot"
     player("third", 2, { ready: true }),
   ];
   const ready = waiting.map((entry) => player(entry.userId, entry.seatIndex, { ready: true }));
-  assert.equal(ui.createLobbyPresentation({ players: twoPlayers, localUserId: "host", hostUserId: "host" }).startLabel, "Noch 1 Spieler benötigt");
+  const twoPlayerView = ui.createLobbyPresentation({ players: twoPlayers, localUserId: "host", hostUserId: "host" });
+  assert.equal(twoPlayerView.startLabel, "Spiel starten");
+  assert.equal(twoPlayerView.canStart, true);
   const waitingView = ui.createLobbyPresentation({ players: waiting, localUserId: "host", hostUserId: "host" });
   assert.equal(waitingView.readyCount, 2);
   assert.equal(waitingView.playerCount, 3);

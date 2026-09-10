@@ -36,7 +36,7 @@
     });
   }
 
-  function createLobbyPresentation({ players, localUserId, hostUserId, minPlayers = 3 }) {
+  function createLobbyPresentation({ players, localUserId, hostUserId, minPlayers = 2 }) {
     const source = Array.isArray(players) ? players : [];
     const others = source.filter((player) => player.userId !== localUserId);
     const self = source.find((player) => player.userId === localUserId) ?? null;
@@ -298,6 +298,10 @@
     const kickModalFeedback = document.querySelector("#trottl-kick-modal-feedback");
     const kickCancelButton = document.querySelector("#trottl-kick-cancel");
     const kickConfirmButton = document.querySelector("#trottl-kick-confirm");
+    const leaveModal = document.querySelector("#trottl-leave-modal");
+    const leaveModalCard = leaveModal.querySelector(".trottl-leave-modal-card");
+    const leaveCancelButton = document.querySelector("#trottl-leave-cancel");
+    const leaveConfirmButton = document.querySelector("#trottl-leave-confirm");
     const roomBackButton = document.querySelector("#close-trottl-classic-rooms");
     const sessionBackButton = document.querySelector("#close-trottl-classic-session");
 
@@ -355,6 +359,9 @@
       kickTargetName: "",
       kickSubmitting: false,
       kickModalReturnFocus: null,
+      leaveModalOpen: false,
+      leaveSubmitting: false,
+      leaveModalReturnFocus: null,
       connectionChecking: false,
       sessionRecoveryPromise: null,
       sessionLifecycleGeneration: 0,
@@ -427,7 +434,7 @@
         !sessionId
         || state.lobbyHeartbeatSessionId !== sessionId
         || state.snapshot?.session.id !== sessionId
-        || state.snapshot.session.status !== "lobby"
+        || !["lobby", "playing"].includes(state.snapshot.session.status)
         || document.visibilityState === "hidden"
       ) return Promise.resolve(false);
       if (state.lobbyHeartbeatRequest?.sessionId === sessionId) {
@@ -448,7 +455,7 @@
     }
 
     function startLobbyHeartbeat(sessionId, { immediate = false } = {}) {
-      if (previewEnabled || !sessionId || state.snapshot?.session.status !== "lobby") {
+      if (previewEnabled || !sessionId || !["lobby", "playing"].includes(state.snapshot?.session.status)) {
         stopLobbyHeartbeat();
         return;
       }
@@ -477,7 +484,7 @@
         !sessionId
         || state.lobbyCleanupSessionId !== sessionId
         || state.snapshot?.session.id !== sessionId
-        || state.snapshot.session.status !== "lobby"
+        || !["lobby", "playing"].includes(state.snapshot.session.status)
         || localLobbyPlayer(state.snapshot) === null
         || document.visibilityState === "hidden"
       ) return Promise.resolve(false);
@@ -502,7 +509,7 @@
       if (
         previewEnabled
         || !sessionId
-        || state.snapshot?.session.status !== "lobby"
+        || !["lobby", "playing"].includes(state.snapshot?.session.status)
         || localLobbyPlayer(state.snapshot) === null
       ) {
         stopLobbyCleanup();
@@ -614,6 +621,56 @@
       }
       if (event.key !== "Tab") return;
       const focusable = [...kickModal.querySelectorAll("button:not(:disabled)")];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function renderLeaveModal() {
+      leaveModal.hidden = !state.leaveModalOpen;
+      if (!state.leaveModalOpen) return;
+      leaveModalCard.setAttribute("aria-busy", String(state.leaveSubmitting));
+      leaveCancelButton.disabled = state.leaveSubmitting;
+      leaveConfirmButton.disabled = state.leaveSubmitting;
+      leaveConfirmButton.textContent = state.leaveSubmitting ? "Wird verlassen …" : "Ja";
+    }
+
+    function openLeaveModal() {
+      if (state.leaveSubmitting || state.snapshot?.session.status !== "playing") return false;
+      state.leaveModalOpen = true;
+      state.leaveModalReturnFocus = document.activeElement;
+      renderLeaveModal();
+      requestAnimationFrame(() => leaveCancelButton.focus({ preventScroll: true }));
+      return true;
+    }
+
+    function closeLeaveModal({ force = false, restoreFocus = true } = {}) {
+      if (!state.leaveModalOpen || (state.leaveSubmitting && !force)) return false;
+      const returnFocus = state.leaveModalReturnFocus;
+      state.leaveModalOpen = false;
+      state.leaveModalReturnFocus = null;
+      renderLeaveModal();
+      if (restoreFocus && returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+      return true;
+    }
+
+    function handleLeaveModalKeydown(event) {
+      if (!state.leaveModalOpen) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeLeaveModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...leaveModal.querySelectorAll("button:not(:disabled)")];
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable.at(-1);
@@ -816,10 +873,11 @@
         title.textContent = `RAUM ${room.roomSlot}`;
         count.textContent = `${room.playerCount} / ${service.maxPlayers} Spieler`;
         status.className = "trottl-classic-room-status";
+        const roomFull = room.playerCount >= service.maxPlayers;
         status.textContent = room.isMember
           ? room.status === "playing" ? "Wieder beitreten" : "Weiter"
-          : room.status === "playing" ? "Spiel läuft" : room.status === "lobby" ? "Lobby" : "Frei";
-        button.disabled = state.busy || (room.status === "playing" && !room.isMember);
+          : room.status === "playing" ? roomFull ? "Raum voll" : "Beitreten" : room.status === "lobby" ? "Lobby" : "Frei";
+        button.disabled = state.busy || (room.status === "playing" && roomFull && !room.isMember);
         button.append(title, count, status);
         button.addEventListener("click", () => void joinRoom(room.roomSlot));
         roomList.append(button);
@@ -1768,22 +1826,23 @@
       const snapshot = state.snapshot;
       if (!snapshot) return;
       const isPlaying = snapshot.session.status === "playing";
-      sessionBackButton.setAttribute("aria-label", isPlaying ? "Zur Raumauswahl" : "Raum verlassen");
+      sessionBackButton.setAttribute("aria-label", "Raum verlassen");
       sessionScreen.classList.toggle("is-playing", isPlaying);
       sessionHeader.hidden = isPlaying;
       lobbyView.hidden = isPlaying;
       gameView.hidden = !isPlaying;
       previewPanel.hidden = !previewEnabled || !state.preview;
       if (isPlaying) {
-        stopLobbyHeartbeat();
-        stopLobbyCleanup();
         closeKickModal({ force: true, restoreFocus: false });
         closeAvatarModal({ force: true, restoreFocus: false });
         syncGameDice(snapshot, rollSource);
         renderGame(snapshot, state.preview?.activeSeatIndex ?? snapshot.session.currentTurnSeat);
       }
       else {
+        closeLeaveModal({ force: true, restoreFocus: false });
         renderLobby(snapshot);
+      }
+      if (!previewEnabled) {
         startLobbyHeartbeat(snapshot.session.id);
         startLobbyCleanup(snapshot.session.id);
       }
@@ -1956,6 +2015,7 @@
       stopLobbyCleanup();
       closeKickModal({ force: true, restoreFocus: false });
       closeAvatarModal({ force: true, restoreFocus: false });
+      closeLeaveModal({ force: true, restoreFocus: false });
       await stopSessionRealtime();
       state.snapshot = null;
       clearResolveTimer();
@@ -1994,10 +2054,8 @@
       sessionFeedback.textContent = "";
       showScreen(sessionScreen);
       renderSession("recovery");
-      if (snapshot.session.status === "lobby") {
-        startLobbyHeartbeat(snapshot.session.id, { immediate: true });
-        startLobbyCleanup(snapshot.session.id);
-      }
+      startLobbyHeartbeat(snapshot.session.id, { immediate: true });
+      startLobbyCleanup(snapshot.session.id);
       ensureSessionRealtime(snapshot.session.id);
       sessionBackButton.focus({ preventScroll: true });
     }
@@ -2037,6 +2095,7 @@
       state.reactionStartPending = false;
       state.kickSubmitting = false;
       state.avatarSubmitting = false;
+      state.leaveSubmitting = false;
       state.sessionRefreshQueued = false;
       state.sessionRefreshQueuedSource = null;
       state.sessionRefreshQueuedRecoveryFallback = false;
@@ -2048,6 +2107,7 @@
       gameFeedback.textContent = "";
       closeKickModal({ force: true, restoreFocus: false });
       closeAvatarModal({ force: true, restoreFocus: false });
+      closeLeaveModal({ force: true, restoreFocus: false });
       state.snapshot = null;
       await stopSessionRealtime();
       if (state.sessionLifecycleGeneration !== exitGeneration) return false;
@@ -2193,6 +2253,37 @@
       }
     }
 
+    async function performConfirmedLeave() {
+      if (state.leaveSubmitting || state.busy || !state.snapshot) return false;
+      const sessionId = state.snapshot.session.id;
+      state.leaveSubmitting = true;
+      state.busy = true;
+      setConnectionChecking(false);
+      stopLobbyHeartbeat();
+      stopLobbyCleanup();
+      renderLeaveModal();
+      sessionFeedback.textContent = "Raum wird verlassen …";
+      try {
+        await service.leaveSession(sessionId);
+        closeLeaveModal({ force: true, restoreFocus: false });
+        if (state.snapshot?.session.id === sessionId) await openRooms({ feedback: "Raum verlassen." });
+        return true;
+      } catch (error) {
+        console.warn("3er-Trottl-Raum konnte nicht verlassen werden.", error);
+        sessionFeedback.textContent = "Raum konnte nicht verlassen werden. Bitte erneut versuchen.";
+        ensureSessionRealtime(sessionId);
+        startLobbyHeartbeat(sessionId, { immediate: true });
+        startLobbyCleanup(sessionId, { immediate: true });
+        return false;
+      } finally {
+        state.leaveSubmitting = false;
+        state.busy = false;
+        renderLeaveModal();
+        renderRooms();
+        renderSession();
+      }
+    }
+
     async function leaveCurrentSession() {
       if (state.busy || !state.snapshot) return;
       if (previewEnabled && state.preview) {
@@ -2203,38 +2294,10 @@
         return;
       }
       if (state.snapshot.session.status === "playing") {
-        state.busy = true;
-        setConnectionChecking(false);
-        stopLobbyHeartbeat();
-        stopLobbyCleanup();
-        closeKickModal({ force: true, restoreFocus: false });
-        await openRooms({ feedback: "Du kannst dem laufenden Spiel wieder beitreten." });
-        state.busy = false;
-        renderRooms();
+        openLeaveModal();
         return;
       }
-      state.busy = true;
-      stopLobbyHeartbeat();
-      stopLobbyCleanup();
-      closeKickModal({ force: true, restoreFocus: false });
-      sessionFeedback.textContent = "Raum wird verlassen …";
-      renderSession();
-      const sessionId = state.snapshot.session.id;
-      try {
-        await service.leaveSession(sessionId);
-        await openRooms({ feedback: "Raum verlassen." });
-      } catch (error) {
-        console.warn("3er-Trottl-Raum konnte nicht verlassen werden.", error);
-        sessionFeedback.textContent = "Raum konnte nicht verlassen werden. Bitte erneut versuchen.";
-        ensureSessionRealtime(sessionId);
-        if (state.snapshot?.session.status === "lobby") {
-          startLobbyHeartbeat(sessionId, { immediate: true });
-          startLobbyCleanup(sessionId, { immediate: true });
-        }
-      } finally {
-        state.busy = false;
-        renderSession();
-      }
+      await performConfirmedLeave();
     }
 
     async function returnToTrottlMenu() {
@@ -2280,6 +2343,8 @@
         void refreshRooms();
       } else if (!sessionScreen.hidden && state.snapshot) {
         if (state.snapshot.session.status === "playing") {
+          startLobbyHeartbeat(state.snapshot.session.id, { immediate: true });
+          startLobbyCleanup(state.snapshot.session.id, { immediate: true });
           void recoverSessionConnection();
         } else {
           startLobbyHeartbeat(state.snapshot.session.id, { immediate: true });
@@ -2307,6 +2372,12 @@
       if (event.target === kickModal) closeKickModal();
     });
     document.addEventListener("keydown", handleKickModalKeydown);
+    leaveCancelButton.addEventListener("click", () => closeLeaveModal());
+    leaveConfirmButton.addEventListener("click", () => void performConfirmedLeave());
+    leaveModal.addEventListener("click", (event) => {
+      if (event.target === leaveModal) closeLeaveModal();
+    });
+    document.addEventListener("keydown", handleLeaveModalKeydown);
     gameDiceButton.addEventListener("click", () => void requestRoll());
     gameView.addEventListener("click", handleReactionTap);
     fourResetButton.addEventListener("click", resetFourSips);

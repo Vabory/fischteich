@@ -3,7 +3,7 @@
 (function installTrottlClassicService(global) {
   const MODE = "classic";
   const ROOM_SLOTS = Object.freeze([1, 2]);
-  const MIN_PLAYERS = 3;
+  const MIN_PLAYERS = 2;
   const MAX_PLAYERS = 8;
   const INITIAL_ACTIVE_SEAT_INDEX = 0;
   const MIN_FULL_ROLL_WINDOW_MS = 2100;
@@ -22,6 +22,7 @@
     "shot_ack",
   ]);
   const SEAT_LAYOUTS = Object.freeze({
+    2: freezeSeatLayout([[0, 1], [0, -1]]),
     3: freezeSeatLayout([[0, 1], [0.72, -0.54], [-0.72, -0.54]]),
     4: freezeSeatLayout([[0, 1], [0.78, 0], [0, -1], [-0.78, 0]]),
     5: freezeSeatLayout([[0, 1], [0.74, 0.45], [0.65, -0.62], [-0.65, -0.62], [-0.74, 0.45]]),
@@ -259,20 +260,33 @@
     }
   }
 
-  function nextSeat(currentSeat, playerCount) {
-    validatePlayerCount(playerCount);
-    if (!Number.isInteger(currentSeat) || currentSeat < 0 || currentSeat >= playerCount) {
-      throw new RangeError("Current seat is outside the player cycle");
+  function normalizeActiveSeats(activeSeats) {
+    if (Number.isInteger(activeSeats)) {
+      validatePlayerCount(activeSeats);
+      return Array.from({ length: activeSeats }, (_, seatIndex) => seatIndex);
     }
-    return (currentSeat + 1) % playerCount;
+    if (!Array.isArray(activeSeats)) throw new TypeError("Active seats must be a player count or array");
+    const seats = [...new Set(activeSeats.map((entry) => Number(entry?.seatIndex ?? entry)))]
+      .filter((seat) => Number.isInteger(seat) && seat >= 0 && seat < MAX_PLAYERS)
+      .sort((first, second) => first - second);
+    validatePlayerCount(seats.length);
+    return seats;
   }
 
-  function previousSeat(currentSeat, playerCount) {
-    validatePlayerCount(playerCount);
-    if (!Number.isInteger(currentSeat) || currentSeat < 0 || currentSeat >= playerCount) {
+  function nextSeat(currentSeat, activeSeats) {
+    const seats = normalizeActiveSeats(activeSeats);
+    if (!Number.isInteger(currentSeat) || !seats.includes(currentSeat)) {
       throw new RangeError("Current seat is outside the player cycle");
     }
-    return (currentSeat - 1 + playerCount) % playerCount;
+    return seats[(seats.indexOf(currentSeat) + 1) % seats.length];
+  }
+
+  function previousSeat(currentSeat, activeSeats) {
+    const seats = normalizeActiveSeats(activeSeats);
+    if (!Number.isInteger(currentSeat) || !seats.includes(currentSeat)) {
+      throw new RangeError("Current seat is outside the player cycle");
+    }
+    return seats[(seats.indexOf(currentSeat) - 1 + seats.length) % seats.length];
   }
 
   function getRelativeSeats(players, ownUserId) {
@@ -300,9 +314,7 @@
     const layout = SEAT_LAYOUTS[playerCount];
     if (layout) return layout[relativeIndex];
 
-    // A running session can temporarily render fewer than three memberships
-    // after an explicit leave. Keep that recovery state deterministic without
-    // adding it to the deliberately designed 3–8 player layouts.
+    // A one-player lobby can briefly render after gameplay auto-end.
     return Object.freeze({ x: 0, y: relativeIndex === 0 ? 1 : -1 });
   }
 

@@ -18,7 +18,7 @@ const trottlAssets = [
   ["text-spielmodus-wählen.png", 2172, 724],
   ["button-fischteich-würfel.png", 2172, 724],
   ["button-dice-game-classic.png", 2172, 724],
-  ["button-dice-game-special.png", 2172, 724],
+  ["button-dice-game-special.png", 2164, 727],
 ];
 
 function pngDimensions(file) {
@@ -114,6 +114,47 @@ test("the dedicated background shifts independently while the menu UI remains fi
   const shell = css.match(/\.trottl-menu-shell\s*\{[^}]*\}/s)?.[0] ?? "";
   assert.match(shell, /inset:\s*0/);
   assert.doesNotMatch(shell, /59px|translate|transform/);
+});
+
+test("Trottl menu polish strengthens the title hierarchy and preserves responsive subtitle placement", () => {
+  assert.match(css, /\.trottl-menu-title-asset\s*\{[^}]*width:\s*min\(54vw, 212px\)[^}]*transform:\s*translateY\(-14px\)/s);
+  assert.match(css, /\.trottl-menu-subtitle-asset\s*\{[^}]*width:\s*min\(70vw, 274px\)[^}]*margin-top:\s*calc\(min\(36vw, 141px\) - min\(40\.5vw, 159px\) - 10px\)/s);
+  assert.match(css, /\.trottl-menu-header\s*\{[^}]*top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 12px\), clamp\(30px, 4\.8dvh, 42px\)\)/s);
+});
+
+test("Trottl button rows move together while the second gap reuses the existing offset", () => {
+  assert.match(css, /\.trottl-menu-actions\s*\{[^}]*top:\s*clamp\(306px, 40dvh, 322px\)/s);
+  assert.match(css, /@media \(max-height: 700px\)[\s\S]*\.trottl-menu-actions\s*\{[^}]*top:\s*clamp\(254px, 40\.2dvh, 288px\)/s);
+  assert.match(css, /\.trottl-menu-actions #open-trottl-classic,[\s\S]*\.trottl-menu-actions #open-trottl-deluxe\s*\{[^}]*translate:\s*0 var\(--teams-menu-lower-buttons-offset\)/s);
+  assert.match(css, /\.trottl-menu-actions #open-trottl-deluxe\s*\{[^}]*translate:\s*0 calc\(var\(--teams-menu-lower-buttons-offset\) \* 2\)/s);
+  assert.match(css, /--teams-menu-visual-button-width:\s*min\(83vw, 326px\)/);
+  assert.match(css, /--teams-menu-button-row-height:\s*clamp\(74px, 9\.8dvh, 78px\)/);
+  assert.match(css, /\.trottl-menu-background\s*\{[^}]*translateY\(calc\(-1 \* var\(--trottl-menu-background-offset\)\)\)/s);
+});
+
+test("Trottl polish remains collision-free across the supported phone viewports", () => {
+  const viewports = [[375, 667], [390, 844], [393, 793], [393, 852], [430, 932]];
+  const clamp = (minimum, value, maximum) => Math.max(minimum, Math.min(value, maximum));
+  for (const [width, height] of viewports) {
+    const oldTitleWidth = Math.min(width * 0.48, 188);
+    const titleWidth = Math.min(width * 0.54, 212);
+    const oldSubtitleWidth = Math.min(width * 0.78, 306);
+    const subtitleWidth = Math.min(width * 0.70, 274);
+    const preservedSubtitleTop = oldTitleWidth * 0.75 - 10;
+    const titleVisibleBottom = -14 + titleWidth * 0.75 * (1054 / 1086);
+    const subtitleVisibleTop = preservedSubtitleTop + (subtitleWidth / 3) * (112 / 724);
+    const short = height <= 700;
+    const oldButtonTop = short
+      ? clamp(266, height * 0.42, 300)
+      : clamp(318, height * 0.416, 334);
+    const buttonTop = short
+      ? clamp(254, height * 0.402, 288)
+      : clamp(306, height * 0.4, 322);
+    assert.ok(titleWidth > oldTitleWidth);
+    assert.ok(subtitleWidth < oldSubtitleWidth);
+    assert.ok(subtitleVisibleTop - titleVisibleBottom >= 4);
+    assert.ok(oldButtonTop - buttonTop >= 11.9 && oldButtonTop - buttonTop <= 12.8);
+  }
 });
 
 test("Spieler Aufteilen keeps its original assets and per-button alignment corrections", () => {

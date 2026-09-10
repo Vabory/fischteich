@@ -283,16 +283,25 @@ button:focus-visible {
 }
 
 .trottl-menu-title-asset {
-  width: min(48vw, 188px);
+  width: min(54vw, 212px);
+  transform: translateY(-14px);
 }
 
 .trottl-menu-subtitle-asset {
-  width: min(78vw, 306px);
-  margin-top: -10px;
+  width: min(70vw, 274px);
+  margin-top: calc(min(36vw, 141px) - min(40.5vw, 159px) - 10px);
+}
+
+.trottl-menu-actions {
+  top: clamp(306px, 40dvh, 322px);
 }
 
 .trottl-menu-actions img {
   aspect-ratio: 2172 / 724;
+}
+
+.trottl-menu-actions #open-trottl-deluxe {
+  translate: 0 calc(var(--teams-menu-lower-buttons-offset) * 2);
 }
 
 .trottl-menu-feedback {
@@ -6101,6 +6110,10 @@ button.is-release-pressed {
     --teams-menu-button-row-height: clamp(67px, 10.5dvh, 74px);
 
     top: clamp(266px, 42dvh, 300px);
+  }
+
+  .trottl-menu-actions {
+    top: clamp(254px, 40.2dvh, 288px);
   }
 
   .menu-card {

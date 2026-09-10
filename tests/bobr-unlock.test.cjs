@@ -152,3 +152,43 @@ test("avatar registry remains hidden but exposes the shared Mystical Bobr unlock
   assert.match(source, /isMysticalBobrUnlocked\(profile\)/);
   assert.doesNotMatch(script, /getDefaultVisibleTrottlAvatars|getAllTrottlAvatars/);
 });
+
+test("temporary Bobr debug panel exposes the complete live diagnostic state", () => {
+  assert.match(html, /id="bobr-debug-panel"[^>]*aria-live="polite"/);
+  assert.match(html, />BOBR DEBUG</);
+  for (const id of ["state", "last", "taps", "rpc", "auth", "profile", "unlocked", "listeners"]) {
+    assert.match(html, new RegExp(`id="bobr-debug-${id}"`));
+  }
+  assert.match(script, /function renderBobrDebug\(auth = getAppAuthState\(\)\)/);
+  assert.match(script, /bobrDebugAuth\.textContent = auth\.currentAuthUser \? "ready" : "not-ready"/);
+  assert.match(script, /bobrDebugProfile\.textContent = auth\.currentProfile \? "ready" : "not-ready"/);
+  assert.match(script, /bobrDebugUnlocked\.textContent = String\(unlocked\)/);
+});
+
+test("left and right pointerups, visible tap totals and sequence resets update debug output", () => {
+  assert.match(html, /data-bobr-side="left"/);
+  assert.match(html, /data-bobr-side="right"/);
+  assert.match(script, /event\.currentTarget\.dataset\.bobrSide === "right" \? "right" : "left"/);
+  assert.match(script, /state\.bobrDebugLast = `\$\{side\} pointerup`/);
+  assert.match(script, /state\.bobrDebugTapCount = tapCount/);
+  assert.match(script, /state\.bobrDebugLast = "sequence reset"/);
+  assert.match(script, /state\.bobrDebugLast = "threshold reached"/);
+  assert.match(script, /bobrDebugTaps\.textContent = `\$\{state\.bobrDebugTapCount\}\/\$\{window\.bobrUnlockService\.requiredTaps\}`/);
+});
+
+test("RPC starting, success and failure remain visible without sensitive error details", () => {
+  assert.match(script, /state\.bobrDebugRpc = "starting"/);
+  assert.match(script, /state\.bobrDebugRpc = "success"/);
+  assert.match(script, /state\.bobrDebugRpc = "failed"/);
+  assert.match(script, /bobrDebugRpc\.textContent = state\.bobrDebugRpc/);
+  assert.doesNotMatch(html, /bobr-debug-(?:uuid|token|user-id|error-detail)/i);
+});
+
+test("debug hit boxes and current listener binding are directly visible on device", () => {
+  assert.match(css, /\.version-beaver-scene::before\s*\{[^}]*border:\s*1px solid #ff4f61[^}]*background:\s*rgb\(255 50 70 \/ 14%\)/s);
+  assert.match(css, /\.version-beaver-scene::after\s*\{[^}]*content:\s*"LEFT HIT"/s);
+  assert.match(css, /\.version-beaver-scene--right::after\s*\{[^}]*content:\s*"RIGHT HIT"/s);
+  assert.match(css, /\.version-beaver-scene\s*\{[^}]*z-index:\s*4/s);
+  assert.match(script, /bobrDebugListeners\.textContent = state\.bobrTapTargets\.length === 2[\s\S]*"2 bound"[\s\S]*"missing"/);
+  assert.match(script, /activateBobrTapListeners\(\)[\s\S]*settingsAppVersion\.querySelectorAll/);
+});

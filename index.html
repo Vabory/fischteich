@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260910.5">
+    <meta name="fischteich-build" content="20260910.6">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=145">
+    <link rel="stylesheet" href="./style.css?v=146">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -33,7 +33,7 @@
     <script src="./trottl-classic-preview.js?v=2" defer></script>
     <script src="./trottl-classic-ui.js?v=15" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=81" defer></script>
+    <script src="./script.js?v=82" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -739,31 +739,20 @@
           </div>
         </div>
         <p class="settings-app-version" id="settings-app-version">
-          <span class="version-beaver-scene" data-bobr-tap-target data-bobr-side="left" aria-hidden="true">
+          <span class="version-beaver-scene" data-bobr-tap-target aria-hidden="true">
             <span class="version-beaver-scene-inner">
               <img class="version-beaver" src="./assets/settings/beaver.png?v=1" alt="">
               <img class="version-water" src="./assets/settings/water.png?v=1" alt="">
             </span>
           </span>
           <span class="settings-app-version-text" id="settings-app-version-text"></span>
-          <span class="version-beaver-scene version-beaver-scene--right" data-bobr-tap-target data-bobr-side="right" aria-hidden="true">
+          <span class="version-beaver-scene version-beaver-scene--right" data-bobr-tap-target aria-hidden="true">
             <span class="version-beaver-scene-inner">
               <img class="version-beaver" src="./assets/settings/beaver.png?v=1" alt="">
               <img class="version-water" src="./assets/settings/water.png?v=1" alt="">
             </span>
           </span>
         </p>
-        <aside class="bobr-debug-panel" id="bobr-debug-panel" aria-live="polite">
-          <strong>BOBR DEBUG</strong>
-          <span>state: <b id="bobr-debug-state">locked</b></span>
-          <span>last: <b id="bobr-debug-last">none</b></span>
-          <span>taps: <b id="bobr-debug-taps">0/15</b></span>
-          <span>rpc: <b id="bobr-debug-rpc">idle</b></span>
-          <span>auth: <b id="bobr-debug-auth">not-ready</b></span>
-          <span>profile: <b id="bobr-debug-profile">not-ready</b></span>
-          <span>bobr_unlocked: <b id="bobr-debug-unlocked">false</b></span>
-          <span>listeners: <b id="bobr-debug-listeners">missing</b></span>
-        </aside>
       </section>
     </div>
 

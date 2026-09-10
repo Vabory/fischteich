@@ -904,7 +904,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=14[\s\S]*script\.js\?v=78/);
+  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=15[\s\S]*script\.js\?v=78/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -949,9 +949,9 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.doesNotMatch(ui, /trottl-classic-player-confirm|confirmButton/);
   assert.match(css, /\.trottl-classic-seat-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*clip[^}]*white-space:\s*nowrap/s);
   assert.doesNotMatch(css, /\.trottl-classic-seat-name\s*\{[^}]*text-overflow:\s*ellipsis/s);
-  assert.match(css, /data-player-count="3"[\s\S]*data-player-count="4"[\s\S]*width:\s*clamp\(94px, 26vw, 108px\)/);
-  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*width:\s*clamp\(72px, 20vw, 82px\)/);
-  assert.match(css, /\.trottl-classic-avatar-wrap\s*\{[^}]*width:\s*60px[^}]*height:\s*60px/s);
+  assert.match(css, /data-player-count="3"[\s\S]*data-player-count="4"[\s\S]*width:\s*clamp\(98px, 27vw, 112px\)/);
+  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*width:\s*clamp\(72px, 20vw, 84px\)/);
+  assert.match(css, /\.trottl-classic-avatar-wrap\s*\{[^}]*width:\s*clamp\(70px, 20vw, 78px\)[^}]*height:\s*clamp\(70px, 20vw, 78px\)/s);
   assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active[\s\S]*255 255 255/);
   assert.match(css, /\.trottl-classic-situation\.is-reaction-prompt[\s\S]*--reaction-progress/);
   assert.match(css, /\.trottl-classic-sip-markers i\.is-assigned/);
@@ -966,7 +966,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-dice-mount\.is-reroll-ready::after/);
   assert.match(css, /\.trottl-classic-player--reaction-timer \.trottl-classic-avatar-wrap::before[\s\S]*display:\s*block/);
   assert.match(css, /--seat-reaction-progress[\s\S]*conic-gradient/);
-  assert.match(ui, /querySelector\("\.trottl-classic-player--reaction-timer"\)[\s\S]*--seat-reaction-progress/);
+  assert.match(ui, /querySelectorAll\("\.trottl-classic-game-seat"\)[\s\S]*--seat-reaction-progress/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*trottl-classic-player--action-impact[\s\S]*trottl-classic-table::after/);
   assert.match(shotGlass, /<svg[^>]*viewBox="0 0 24 24"/);
   assert.match(shotGlass, /fill="none"/);
@@ -974,13 +974,13 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(trottlBadge, /<svg[^>]*viewBox="0 0 46 24"/);
   assert.match(trottlBadge, />TROTTL<\/text>/);
   assert.doesNotMatch(trottlBadge, /<script|<image|(?:href|src)=|data:/i);
-  assert.match(ui, /assets\/trottl-classic\/trottl-badge\.svg/);
+  assert.match(ui, /trottlBadge\.textContent = "3ER"/);
   assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*90px/);
   assert.match(css, /\.trottl-classic-event-main\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
   assert.match(css, /\.trottl-classic-event-action\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
-  assert.match(css, /\.trottl-classic-card-status-label\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums/);
+  assert.match(css, /\.trottl-classic-seat-status-overlay\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums/);
   assert.match(css, /\.trottl-classic-player--context-muted\s*\{[^}]*opacity:\s*0\.82[^}]*saturate\(0\.84\)/s);
-  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*\.trottl-classic-avatar-wrap[\s\S]*width:\s*52px/);
+  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*\.trottl-classic-avatar-wrap[\s\S]*width:\s*clamp\(58px, 16\.5vw, 64px\)/);
   assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*max-width:\s*100%[^}]*flex-wrap:\s*wrap/s);
   assert.match(css, /\.trottl-classic-rule-controls \.trottl-classic-global-confirm\s*\{[^}]*width:\s*100%[^}]*min-height:\s*50px/s);
   assert.match(ui, /globalConfirmButton\.hidden = !localNeedsConfirmation/);
@@ -1073,7 +1073,7 @@ test("Klassik event presentation separates headline, action and contextual meta 
   assert.doesNotMatch(ui, /OFFEN|REAKTION WIRD VORBEREITET|BESTÄTIGT – WARTE/);
 });
 
-test("Klassik player cards apply semantic state priority and stable status text", () => {
+test("Klassik player seats apply semantic state priority and stable status text", () => {
   const context = vm.createContext({ window: {} });
   vm.runInContext(ui, context, { filename: "trottl-classic-ui.js" });
   const present = (value) => JSON.parse(JSON.stringify(context.window.TrottlClassicUI.createPlayerCardPresentation(value)));

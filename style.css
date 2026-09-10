@@ -1364,7 +1364,7 @@ button:focus-visible {
   top: var(--seat-top);
   left: var(--seat-left);
   display: flex;
-  width: clamp(84px, 23vw, 96px);
+  width: clamp(88px, 24vw, 104px);
   min-height: 0;
   padding: 0;
   align-items: center;
@@ -1383,11 +1383,13 @@ button:focus-visible {
   position: relative;
   display: block;
   z-index: 1;
-  width: 60px;
-  height: 60px;
+  width: clamp(70px, 20vw, 78px);
+  height: clamp(70px, 20vw, 78px);
+  border: 2px solid var(--player-border);
   border-radius: 50%;
-  box-shadow: 0 0 16px var(--player-glow);
-  transition: box-shadow 180ms ease;
+  background: transparent;
+  box-shadow: 0 0 13px var(--player-glow);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .trottl-classic-avatar-wrap::before {
@@ -1412,24 +1414,25 @@ button:focus-visible {
 }
 
 .trottl-classic-game-avatar {
-  position: relative;
   display: block;
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  border: 2px solid var(--player-border);
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at 35% 28%, rgb(237 248 252 / 19%), transparent 38%),
-    linear-gradient(145deg, rgb(183 215 228 / 16%), var(--player-background));
-  box-shadow:
-    0 8px 18px rgb(0 0 0 / 42%),
-    inset 0 1px rgb(255 255 255 / 10%),
-    inset 0 0 18px var(--player-highlight);
-  transition: border-color 180ms ease, background-color 180ms ease;
+  border-radius: 50%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
-.trottl-classic-game-avatar::before {
+.trottl-classic-game-avatar--fallback {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 35% 28%, rgb(237 248 252 / 13%), transparent 38%),
+    linear-gradient(145deg, rgb(183 215 228 / 12%), rgb(6 13 24 / 78%));
+  box-shadow: inset 0 1px rgb(255 255 255 / 8%);
+}
+
+.trottl-classic-game-avatar--fallback::before {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1441,7 +1444,7 @@ button:focus-visible {
   transform: translate(-58%, -50%);
 }
 
-.trottl-classic-game-avatar::after {
+.trottl-classic-game-avatar--fallback::after {
   position: absolute;
   top: 50%;
   left: 66%;
@@ -1459,28 +1462,28 @@ button:focus-visible {
   z-index: 2;
   width: 100%;
   min-width: 0;
-  margin-top: -3px;
-  padding: 6px 7px 5px;
+  max-width: 12ch;
+  margin-top: 5px;
+  padding: 0;
   overflow: hidden;
-  border: 1px solid var(--player-border);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgb(18 31 46 / 96%), var(--player-background));
-  box-shadow: 0 6px 14px rgb(0 0 0 / 36%), 0 0 10px var(--player-glow), inset 0 1px rgb(255 255 255 / 6%);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   color: #f5faff;
-  font-size: clamp(0.66rem, 2.75vw, 0.76rem);
+  font-size: clamp(0.65rem, 2.65vw, 0.75rem);
   font-weight: 850;
   letter-spacing: 0.01em;
   line-height: 1;
   text-align: center;
   text-overflow: clip;
+  text-shadow: 0 2px 7px rgb(0 0 0 / 88%);
   white-space: nowrap;
 }
 
-.trottl-classic-card-status-label {
+.trottl-classic-seat-status-overlay {
   position: absolute;
   z-index: 4;
-  bottom: -3px;
+  bottom: -5px;
   left: 50%;
   max-width: calc(100% + 18px);
   padding: 3px 6px;
@@ -1505,13 +1508,33 @@ button:focus-visible {
 .trottl-classic-trottl-badge {
   position: absolute;
   z-index: 5;
-  top: -7px;
-  right: -5px;
-  display: block;
-  width: 38px;
-  height: auto;
-  filter: drop-shadow(0 0 6px rgb(190 128 255 / 34%));
+  top: -5px;
+  right: -8px;
+  display: grid;
+  min-width: 34px;
+  min-height: 19px;
+  padding: 3px 6px;
+  border: 1px solid rgb(224 197 255 / 78%);
+  border-radius: 999px;
+  background: rgb(48 22 78 / 96%);
+  box-shadow: 0 0 8px rgb(183 113 255 / 24%);
+  color: #ead8ff;
+  font-size: 0.49rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  place-items: center;
   pointer-events: none;
+}
+
+.trottl-classic-seat-self-marker {
+  margin-top: 3px;
+  color: rgb(219 241 250 / 78%);
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-shadow: 0 2px 6px rgb(0 0 0 / 80%);
 }
 
 .trottl-classic-player--self {
@@ -1605,7 +1628,7 @@ button:focus-visible {
   animation: trottl-classic-allocation-impact 160ms ease-out;
 }
 
-.trottl-classic-player--allocation-impact .trottl-classic-card-status-label {
+.trottl-classic-player--allocation-impact .trottl-classic-seat-status-overlay {
   animation: trottl-classic-count-impact 160ms ease-out;
 }
 
@@ -1617,17 +1640,17 @@ button:focus-visible {
   animation: trottl-classic-penalty-impact 260ms ease-out;
 }
 
-.trottl-classic-player--selected .trottl-classic-card-status-label {
+.trottl-classic-player--selected .trottl-classic-seat-status-overlay {
   font-size: 0.5rem;
   font-weight: 950;
   letter-spacing: 0.075em;
 }
 
-.trottl-classic-player--drink-target .trottl-classic-card-status-label {
+.trottl-classic-player--drink-target .trottl-classic-seat-status-overlay {
   font-weight: 950;
 }
 
-.trottl-classic-player--shot-target .trottl-classic-card-status-label {
+.trottl-classic-player--shot-target .trottl-classic-seat-status-overlay {
   font-size: 0.54rem;
   font-weight: 1000;
   letter-spacing: 0.12em;
@@ -1636,50 +1659,49 @@ button:focus-visible {
 
 .trottl-classic-table-stage[data-player-count="3"] .trottl-classic-game-seat,
 .trottl-classic-table-stage[data-player-count="4"] .trottl-classic-game-seat {
-  width: clamp(94px, 26vw, 108px);
+  width: clamp(98px, 27vw, 112px);
 }
 
 .trottl-classic-table-stage[data-player-count="3"] .trottl-classic-avatar-wrap,
 .trottl-classic-table-stage[data-player-count="4"] .trottl-classic-avatar-wrap {
-  width: 68px;
-  height: 68px;
+  width: clamp(80px, 23vw, 88px);
+  height: clamp(80px, 23vw, 88px);
 }
 
 .trottl-classic-table-stage[data-player-count="7"] .trottl-classic-game-seat,
 .trottl-classic-table-stage[data-player-count="8"] .trottl-classic-game-seat {
-  width: clamp(72px, 20vw, 82px);
+  width: clamp(72px, 20vw, 84px);
 }
 
 .trottl-classic-table-stage[data-player-count="7"] .trottl-classic-avatar-wrap,
 .trottl-classic-table-stage[data-player-count="8"] .trottl-classic-avatar-wrap {
-  width: 52px;
-  height: 52px;
+  width: clamp(58px, 16.5vw, 64px);
+  height: clamp(58px, 16.5vw, 64px);
 }
 
 .trottl-classic-table-stage[data-player-count="7"] .trottl-classic-seat-name,
 .trottl-classic-table-stage[data-player-count="8"] .trottl-classic-seat-name {
-  padding-inline: 5px;
   font-size: clamp(0.6rem, 2.5vw, 0.69rem);
 }
 
-.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-card-status-label,
-.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-card-status-label {
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-seat-status-overlay,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-seat-status-overlay {
   font-size: 0.44rem;
   letter-spacing: 0.04em;
 }
 
 .trottl-classic-table-stage[data-player-count="7"] .trottl-classic-trottl-badge,
 .trottl-classic-table-stage[data-player-count="8"] .trottl-classic-trottl-badge {
-  width: 32px;
+  min-width: 31px;
 }
 
-.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player--selected .trottl-classic-card-status-label,
-.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player--selected .trottl-classic-card-status-label {
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player--selected .trottl-classic-seat-status-overlay,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player--selected .trottl-classic-seat-status-overlay {
   font-size: 0.49rem;
 }
 
-.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player--shot-target .trottl-classic-card-status-label,
-.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player--shot-target .trottl-classic-card-status-label {
+.trottl-classic-table-stage[data-player-count="7"] .trottl-classic-player--shot-target .trottl-classic-seat-status-overlay,
+.trottl-classic-table-stage[data-player-count="8"] .trottl-classic-player--shot-target .trottl-classic-seat-status-overlay {
   font-size: 0.55rem;
 }
 

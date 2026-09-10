@@ -8,6 +8,32 @@
     return avatarService.getTrottlAvatarById(avatarId);
   }
 
+  function createGameAvatarPresentation(player, avatarService = global.trottlAvatarService) {
+    const avatar = getLobbyAvatarById(player?.avatarId, avatarService);
+    return Object.freeze({
+      avatar,
+      hasAvatar: avatar !== null,
+      src: avatar?.src ?? "",
+      alt: avatar ? `${avatar.displayName}, Avatar von ${player?.displayName ?? "Spieler"}` : "",
+    });
+  }
+
+  function createPersonalReactionRingPresentation({ status, startedAt, deadlineAt, remainingMs }) {
+    const startedMs = Date.parse(startedAt ?? "");
+    const deadlineMs = Date.parse(deadlineAt ?? "");
+    const durationMs = deadlineMs - startedMs;
+    const remaining = Number(remainingMs);
+    const active = status === "pending"
+      && Number.isFinite(durationMs)
+      && durationMs > 0
+      && Number.isFinite(remaining)
+      && remaining > 0;
+    return Object.freeze({
+      active,
+      progress: active ? Math.min(100, Math.max(0, (remaining / durationMs) * 100)) : 0,
+    });
+  }
+
   function createLobbyPresentation({ players, localUserId, hostUserId, minPlayers = 3 }) {
     const source = Array.isArray(players) ? players : [];
     const others = source.filter((player) => player.userId !== localUserId);
@@ -749,9 +775,9 @@
       const position = service.getSeatPosition(relativeIndex, snapshot.players.length);
       const seat = document.createElement("article");
       const avatarWrap = document.createElement("span");
-      const avatar = document.createElement("span");
       const name = document.createElement("strong");
       const isSelf = player.userId === snapshot.identity.userId;
+      const avatarPresentation = createGameAvatarPresentation(player);
       const isActive = player.seatIndex === activeSeatIndex;
       const allocation = Number(ruleView.allocations[player.seatIndex] ?? 0);
       const isSelectable = isSeatSelectable(player.seatIndex, snapshot, ruleView);
@@ -771,6 +797,19 @@
       );
       const isReactionSuccess = reaction?.status === "reacted" && !isReactionLoser;
       const isPenaltyAcknowledged = isReactionLoser && ruleView.penaltyAcks.has(player.seatIndex);
+      const reactionIntent = isSelf && state.personalReactionIntent?.sessionId === snapshot.session.id
+        && state.personalReactionIntent?.rollSeq === snapshot.session.rollSeq
+        && state.personalReactionIntent?.reactionId === snapshot.session.reactionId
+        ? state.personalReactionIntent
+        : null;
+      const reactionRemainingMs = service.getPersonalReactionRemainingMs(snapshot.session, player.seatIndex)
+        ?? (reactionIntent ? Math.max(0, reactionIntent.deadlineMs - service.getCorrectedNow()) : null);
+      const reactionRing = createPersonalReactionRingPresentation({
+        status: reaction?.status ?? (reactionIntent ? "pending" : ""),
+        startedAt: reaction?.started_at ?? reactionIntent?.startedAt,
+        deadlineAt: reaction?.deadline_at ?? (reactionIntent ? new Date(reactionIntent.deadlineMs).toISOString() : null),
+        remainingMs: reactionRemainingMs,
+      });
       const focusedSeat = ruleView.phase === "awaiting_drink_ack"
         ? snapshot.session.actionTargetSeat
         : ruleView.phase === "shot_ack"
@@ -800,7 +839,7 @@
         isAllocationImpact: effects.allocationImpactSeats.has(player.seatIndex),
         isReactionSuccessImpact: effects.successImpactSeats.has(player.seatIndex),
         isPenaltyImpact: effects.penaltyImpactSeats.has(player.seatIndex),
-        isReactionTimerActive: isSelf && ruleView.localReactionActive,
+        isReactionTimerActive: reactionRing.active,
         allocation,
         reactionStatus: reaction?.status,
         reactionDurationMs: Number(reaction?.duration_ms),
@@ -811,6 +850,7 @@
       seat.className = cardPresentation.classes.join(" ");
       seat.dataset.globalSeat = String(player.seatIndex);
       seat.dataset.relativeSeat = String(relativeIndex);
+      seat.dataset.avatarState = avatarPresentation.hasAvatar ? "resolved" : "fallback";
       seat.style.setProperty("--seat-x", position.x.toFixed(6));
       seat.style.setProperty("--seat-y", position.y.toFixed(6));
       // The fixed geometry is authored from bottom-center around the table.
@@ -828,26 +868,44 @@
       seat.setAttribute("aria-label", seatDescription);
 
       avatarWrap.className = "trottl-classic-avatar-wrap";
-      avatar.className = "trottl-classic-game-avatar";
-      avatar.setAttribute("aria-hidden", "true");
+      if (reactionRing.active) {
+        avatarWrap.style.setProperty("--seat-reaction-progress", `${reactionRing.progress.toFixed(1)}%`);
+      }
+      const avatar = document.createElement(avatarPresentation.hasAvatar ? "img" : "span");
+      avatar.className = avatarPresentation.hasAvatar
+        ? "trottl-classic-game-avatar"
+        : "trottl-classic-game-avatar trottl-classic-game-avatar--fallback";
+      if (avatarPresentation.hasAvatar) {
+        avatar.src = avatarPresentation.src;
+        avatar.alt = avatarPresentation.alt;
+        avatar.draggable = false;
+        avatar.decoding = "async";
+      } else {
+        avatar.setAttribute("aria-hidden", "true");
+      }
       name.className = "trottl-classic-seat-name";
       name.textContent = player.displayName;
       if (isTrottl) {
-        const trottlBadge = document.createElement("img");
+        const trottlBadge = document.createElement("span");
         trottlBadge.className = "trottl-classic-trottl-badge";
-        trottlBadge.src = "./assets/trottl-classic/trottl-badge.svg";
-        trottlBadge.alt = "";
         trottlBadge.setAttribute("aria-hidden", "true");
-        seat.append(trottlBadge);
+        trottlBadge.textContent = "3ER";
+        avatarWrap.append(trottlBadge);
       }
       if (cardPresentation.status) {
         const statusLabel = document.createElement("small");
-        statusLabel.className = "trottl-classic-card-status-label";
+        statusLabel.className = "trottl-classic-seat-status-overlay";
         statusLabel.textContent = cardPresentation.status;
         avatarWrap.append(statusLabel);
       }
       avatarWrap.prepend(avatar);
       seat.append(avatarWrap, name);
+      if (isSelf) {
+        const selfMarker = document.createElement("small");
+        selfMarker.className = "trottl-classic-seat-self-marker";
+        selfMarker.textContent = "DU";
+        seat.append(selfMarker);
+      }
       if (isSelectable) {
         seat.addEventListener("click", (event) => {
           event.stopPropagation();
@@ -927,28 +985,74 @@
 
     function renderReactionCountdown(snapshot, ruleView) {
       clearReactionCountdownTimer();
-      if (state.preview || !ruleView.localReactionActive) {
+      if (state.preview) {
         situation.style.removeProperty("--reaction-progress");
         situation.classList.remove("is-reaction-urgent");
         return;
       }
+      let hadLocalReactionActive = ruleView.localReactionActive;
       const update = () => {
         if (state.snapshot?.session.id !== snapshot.session.id
           || state.snapshot?.session.rollSeq !== snapshot.session.rollSeq) return;
         const currentView = getRuleView(state.snapshot);
         const remainingMs = currentView.localRemainingMs;
-        if (!currentView.localReactionActive || remainingMs === null || remainingMs <= 0) {
+        if (hadLocalReactionActive && currentView.localReaction?.status === "pending" && remainingMs === 0) {
+          hadLocalReactionActive = false;
           state.reactionCountdownTimer = null;
           renderSession("passive");
           return;
         }
-        situationAction.textContent = `${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
-        situationAction.hidden = false;
-        const reactionProgress = `${Math.min(100, (remainingMs / 10000) * 100).toFixed(1)}%`;
-        situation.style.setProperty("--reaction-progress", reactionProgress);
-        seatLayer.querySelector(".trottl-classic-player--reaction-timer")
-          ?.style.setProperty("--seat-reaction-progress", reactionProgress);
-        situation.classList.toggle("is-reaction-urgent", remainingMs <= 3000);
+        let hasActiveReactionRing = false;
+        const reactionSeats = new Map([...seatLayer.querySelectorAll(".trottl-classic-game-seat")]
+          .map((seat) => [Number(seat.dataset.globalSeat), seat]));
+        for (const player of state.snapshot.players) {
+          const reaction = service.getReactionPlayer(state.snapshot.session, player.seatIndex);
+          const isSelf = player.userId === state.snapshot.identity.userId;
+          const intent = isSelf && state.personalReactionIntent?.sessionId === state.snapshot.session.id
+            && state.personalReactionIntent?.rollSeq === state.snapshot.session.rollSeq
+            && state.personalReactionIntent?.reactionId === state.snapshot.session.reactionId
+            ? state.personalReactionIntent
+            : null;
+          const personalRemainingMs = service.getPersonalReactionRemainingMs(
+            state.snapshot.session,
+            player.seatIndex,
+          ) ?? (intent ? Math.max(0, intent.deadlineMs - service.getCorrectedNow()) : null);
+          const ring = createPersonalReactionRingPresentation({
+            status: reaction?.status ?? (intent ? "pending" : ""),
+            startedAt: reaction?.started_at ?? intent?.startedAt,
+            deadlineAt: reaction?.deadline_at ?? (intent ? new Date(intent.deadlineMs).toISOString() : null),
+            remainingMs: personalRemainingMs,
+          });
+          const seat = reactionSeats.get(player.seatIndex);
+          seat?.classList.toggle("trottl-classic-player--reaction-timer", ring.active);
+          if (ring.active && seat) {
+            hasActiveReactionRing = true;
+            seat.style.setProperty("--seat-reaction-progress", `${ring.progress.toFixed(1)}%`);
+          } else seat?.style.removeProperty("--seat-reaction-progress");
+        }
+        if (!currentView.localReactionActive && !hasActiveReactionRing) {
+          state.reactionCountdownTimer = null;
+          situation.style.removeProperty("--reaction-progress");
+          situation.classList.remove("is-reaction-urgent");
+          return;
+        }
+        if (currentView.localReactionActive && remainingMs !== null && remainingMs > 0) {
+          situationAction.textContent = `${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
+          situationAction.hidden = false;
+          const localReaction = currentView.localReaction;
+          const localStartedMs = Date.parse(localReaction?.started_at ?? state.personalReactionIntent?.startedAt ?? "");
+          const localDeadlineMs = Date.parse(localReaction?.deadline_at ?? "")
+            || state.personalReactionIntent?.deadlineMs;
+          const localDurationMs = localDeadlineMs - localStartedMs;
+          const reactionProgress = Number.isFinite(localDurationMs) && localDurationMs > 0
+            ? `${Math.min(100, (remainingMs / localDurationMs) * 100).toFixed(1)}%`
+            : "0%";
+          situation.style.setProperty("--reaction-progress", reactionProgress);
+          situation.classList.toggle("is-reaction-urgent", remainingMs <= 3000);
+        } else {
+          situation.style.removeProperty("--reaction-progress");
+          situation.classList.remove("is-reaction-urgent");
+        }
         state.reactionCountdownTimer = global.setTimeout(update, 100);
       };
       update();
@@ -1725,6 +1829,8 @@
     create,
     createEventPresentation,
     createPlayerCardPresentation,
+    createGameAvatarPresentation,
+    createPersonalReactionRingPresentation,
     createLobbyPresentation,
     createAvatarModalPresentation,
     getLobbyAvatarById,

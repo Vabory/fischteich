@@ -41,10 +41,15 @@
     return Object.freeze(AVATAR_DEFINITIONS.map(createAvatarSnapshot));
   }
 
-  function getDefaultVisibleTrottlAvatars() {
+  function getVisibleTrottlAvatars({ mysticalBobrUnlocked = false } = {}) {
     return Object.freeze(AVATAR_DEFINITIONS
-      .filter((avatar) => !avatar.hiddenByDefault)
+      .filter((avatar) => !avatar.hiddenByDefault
+        || (avatar.unlockKey === "mystical-bobr" && mysticalBobrUnlocked === true))
       .map(createAvatarSnapshot));
+  }
+
+  function getDefaultVisibleTrottlAvatars() {
+    return getVisibleTrottlAvatars();
   }
 
   function isValidTrottlAvatarId(id) {
@@ -54,6 +59,7 @@
   global.trottlAvatarService = Object.freeze({
     getTrottlAvatarById,
     getAllTrottlAvatars,
+    getVisibleTrottlAvatars,
     getDefaultVisibleTrottlAvatars,
     isValidTrottlAvatarId,
   });

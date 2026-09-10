@@ -272,6 +272,22 @@ test("avatar and ready wrappers update and reload the authoritative lobby snapsh
   );
 });
 
+test("Mystical Bobr uses the normal avatar RPC without changing ready state", async () => {
+  const { service, rpcCalls } = createHarness();
+  const snapshot = await service.setAvatar(SESSION_ID, "mystical-bobr");
+  assert.equal(snapshot.players[0].avatarId, "mystical-bobr");
+  assert.equal(snapshot.players[0].isReady, false);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rpcCalls
+      .filter(({ name }) => name.startsWith("set_trottl_classic_"))
+      .map(({ name, parameters }) => ({ name, parameters })))),
+    [{
+      name: "set_trottl_classic_avatar",
+      parameters: { p_session_id: SESSION_ID, p_avatar_id: "mystical-bobr" },
+    }],
+  );
+});
+
 test("start and leave use narrow server-authoritative RPCs", async () => {
   const { service, rpcCalls } = createHarness();
   const started = await service.startSession(SESSION_ID);
@@ -904,7 +920,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=15[\s\S]*script\.js\?v=82/);
+  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=16[\s\S]*script\.js\?v=82/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

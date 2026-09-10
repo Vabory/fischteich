@@ -22,7 +22,7 @@ function loadServices() {
   return { avatarService: window.trottlAvatarService, ui: window.TrottlClassicUI };
 }
 
-test("avatar modal presents exactly the fifteen default-visible registry entries", () => {
+test("avatar modal presents exactly the fifteen default-visible registry entries while locked", () => {
   const { avatarService, ui } = loadServices();
   const presentation = ui.createAvatarModalPresentation({
     avatars: avatarService.getDefaultVisibleTrottlAvatars(),
@@ -30,8 +30,45 @@ test("avatar modal presents exactly the fifteen default-visible registry entries
   assert.equal(presentation.visibleAvatars.length, 15);
   assert.equal(presentation.visibleAvatars.some((avatar) => avatar.id === "mystical-bobr"), false);
   assert.ok(presentation.visibleAvatars.every((avatar) => avatar.displayName.length > 0));
-  assert.match(uiSource, /getDefaultVisibleTrottlAvatars\(\)/);
+  assert.match(uiSource, /getVisibleTrottlAvatars\(\{ mysticalBobrUnlocked \}\)/);
+  assert.match(uiSource, /bobrUnlockService[\s\S]*isMysticalBobrUnlocked\(profile\)/);
+  assert.match(uiSource, /getAppAuthState\(\)\.currentProfile/);
   assert.doesNotMatch(uiSource, /assets\/avatars\//);
+});
+
+test("unlocked Mystical Bobr uses the normal registry presentation and selection flow", () => {
+  const { avatarService, ui } = loadServices();
+  const avatars = avatarService.getVisibleTrottlAvatars({ mysticalBobrUnlocked: true });
+  const presentation = ui.createAvatarModalPresentation({
+    avatars,
+    currentAvatarId: "mystical-bobr",
+    pendingAvatarId: "mystical-bobr",
+  });
+  assert.equal(presentation.visibleAvatars.length, 16);
+  assert.equal(presentation.visibleAvatars.at(-1).id, "mystical-bobr");
+  assert.equal(presentation.visibleAvatars.at(-1).displayName, "Mystical Bobr");
+  assert.equal(presentation.visibleAvatars.at(-1).src, "./assets/avatars/mystical-bobr.png");
+  assert.equal(presentation.currentAvatarId, "mystical-bobr");
+  assert.equal(presentation.selectedAvatarId, "mystical-bobr");
+  assert.equal(presentation.canConfirm, true);
+  assert.match(uiSource, /state\.pendingAvatarId = avatar\.id/);
+  assert.match(uiSource, /service\.setAvatar\(snapshot\.session\.id, presentation\.selectedAvatarId\)/);
+});
+
+test("locked profile with an existing Bobr remains defensive and never repairs the avatar", () => {
+  const { avatarService, ui } = loadServices();
+  const presentation = ui.createAvatarModalPresentation({
+    avatars: avatarService.getVisibleTrottlAvatars({ mysticalBobrUnlocked: false }),
+    currentAvatarId: "mystical-bobr",
+    pendingAvatarId: "mystical-bobr",
+  });
+  assert.equal(presentation.visibleAvatars.length, 15);
+  assert.equal(presentation.visibleAvatars.some((avatar) => avatar.id === "mystical-bobr"), false);
+  assert.equal(presentation.currentAvatarId, "mystical-bobr");
+  assert.equal(presentation.selectedAvatarId, null);
+  assert.equal(presentation.canConfirm, false);
+  assert.doesNotThrow(() => presentation.visibleAvatars.map((avatar) => avatar.src));
+  assert.doesNotMatch(uiSource, /localStorage|sessionStorage|unlock_mystical_bobr|bobr_unlocked_at/i);
 });
 
 test("current and pending avatar selection remain local until explicit confirmation", () => {

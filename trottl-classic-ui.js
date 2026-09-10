@@ -70,7 +70,7 @@
     isReady = false,
   }) {
     const visibleAvatars = Object.freeze((Array.isArray(avatars) ? avatars : [])
-      .filter((avatar) => avatar && avatar.hiddenByDefault !== true));
+      .filter(Boolean));
     const selectedAvatar = visibleAvatars.find((avatar) => avatar.id === pendingAvatarId) ?? null;
     return Object.freeze({
       visibleAvatars,
@@ -375,9 +375,18 @@
       return snapshot?.players.find((player) => player.userId === snapshot.identity.userId) ?? null;
     }
 
+    function getAvailableAvatarChoices() {
+      const profile = typeof global.getAppAuthState === "function"
+        ? global.getAppAuthState().currentProfile
+        : null;
+      const mysticalBobrUnlocked = global.bobrUnlockService
+        ?.isMysticalBobrUnlocked(profile) === true;
+      return global.trottlAvatarService.getVisibleTrottlAvatars({ mysticalBobrUnlocked });
+    }
+
     function getAvatarModalPresentation() {
       return createAvatarModalPresentation({
-        avatars: global.trottlAvatarService.getDefaultVisibleTrottlAvatars(),
+        avatars: getAvailableAvatarChoices(),
         currentAvatarId: state.avatarModalServerAvatarId,
         pendingAvatarId: state.pendingAvatarId,
         required: state.avatarModalRequired,
@@ -470,8 +479,7 @@
 
     function selectPendingAvatar(avatarId) {
       if (!state.avatarModalOpen || state.avatarSubmitting || localLobbyPlayer()?.isReady) return;
-      const avatar = global.trottlAvatarService
-        .getDefaultVisibleTrottlAvatars()
+      const avatar = getAvailableAvatarChoices()
         .find((candidate) => candidate.id === avatarId);
       if (!avatar) return;
       state.pendingAvatarId = avatar.id;

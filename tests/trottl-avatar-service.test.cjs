@@ -55,6 +55,26 @@ test("Trottl avatar resolver handles hidden and unknown avatar IDs safely", () =
   assert.equal(service.getTrottlAvatarById(null), null);
 });
 
+test("visible avatar filtering adds an unlocked Mystical Bobr last without reordering defaults", () => {
+  const service = loadService();
+  const locked = service.getVisibleTrottlAvatars({ mysticalBobrUnlocked: false });
+  const unlocked = service.getVisibleTrottlAvatars({ mysticalBobrUnlocked: true });
+  assert.equal(locked.length, 15);
+  assert.equal(locked.some((avatar) => avatar.id === "mystical-bobr"), false);
+  assert.equal(unlocked.length, 16);
+  assert.deepEqual(Array.from(locked, (avatar) => avatar.id), expectedIds.slice(0, 15));
+  assert.deepEqual(Array.from(unlocked, (avatar) => avatar.id), expectedIds);
+  assert.deepEqual(JSON.parse(JSON.stringify(unlocked.at(-1))), {
+    id: "mystical-bobr",
+    displayName: "Mystical Bobr",
+    src: "./assets/avatars/mystical-bobr.png",
+    hiddenByDefault: true,
+    unlockKey: "mystical-bobr",
+  });
+  assert.ok(Object.isFrozen(locked));
+  assert.ok(Object.isFrozen(unlocked));
+});
+
 test("Trottl avatar registry snapshots cannot be mutated by consumers", () => {
   const service = loadService();
   const first = service.getTrottlAvatarById("turbo-lachs");

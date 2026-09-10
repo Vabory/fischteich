@@ -151,7 +151,7 @@ test("first successful unlock sparkles both beavers once, then enables faster mo
 
 test("avatar registry remains hidden but exposes the shared Mystical Bobr unlock key", () => {
   assert.match(avatarService, /\["mystical-bobr", "Mystical Bobr", true, "mystical-bobr"\]/);
-  assert.match(avatarService, /\.filter\(\(avatar\) => !avatar\.hiddenByDefault\)/);
+  assert.match(avatarService, /\.filter\(\(avatar\) => !avatar\.hiddenByDefault[\s\S]*avatar\.unlockKey === "mystical-bobr"/);
   assert.match(source, /isMysticalBobrUnlocked\(profile\)/);
   assert.doesNotMatch(script, /getDefaultVisibleTrottlAvatars|getAllTrottlAvatars/);
 });

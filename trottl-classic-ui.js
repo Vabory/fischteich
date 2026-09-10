@@ -1935,6 +1935,18 @@
       roomFeedback.textContent = "Du wurdest aus der Lobby entfernt.";
     }
 
+    async function handleAdminRoomReset(sessionId) {
+      if (state.snapshot?.session.id !== sessionId) return;
+      stopLobbyHeartbeat();
+      stopLobbyCleanup();
+      closeKickModal({ force: true, restoreFocus: false });
+      closeAvatarModal({ force: true, restoreFocus: false });
+      state.snapshot = null;
+      await stopSessionRealtime();
+      await openRooms();
+      roomFeedback.textContent = "Der Raum wurde zurückgesetzt.";
+    }
+
     async function refreshSession({ rollSource = "recovery" } = {}) {
       if (!state.snapshot) return null;
       if (state.sessionRefreshPromise) {
@@ -1961,7 +1973,14 @@
           renderSession(rollSource);
           return snapshot;
         })
-        .catch((error) => {
+        .catch(async (error) => {
+          if (
+            String(error?.message ?? "").includes("TROTTL_CLASSIC_SESSION_NOT_FOUND")
+            && state.snapshot?.session.id === sessionId
+          ) {
+            await handleAdminRoomReset(sessionId);
+            return null;
+          }
           console.warn("3er-Trottl-Lobby konnte nicht aktualisiert werden.", error);
           sessionFeedback.textContent = "Lobby konnte nicht aktualisiert werden. Bitte Verbindung prüfen.";
           return state.snapshot;

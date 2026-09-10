@@ -95,6 +95,9 @@ function createHarness() {
       if (name === "kick_trottl_classic_player") {
         return { data: true, error: null };
       }
+      if (name === "admin_reset_trottl_classic_room") {
+        return { data: true, error: null };
+      }
       if (name === "start_trottl_classic_session") {
         sessionRow.status = "playing";
         sessionRow.player_count = 3;
@@ -314,6 +317,17 @@ test("kick wrapper submits one target intent and reloads server truth", async ()
       parameters: { p_session_id: SESSION_ID, p_target_player_id: targetPlayerId },
     }],
   );
+});
+
+test("admin reset wrapper submits one authenticated room-scoped RPC without joining", async () => {
+  const { service, rpcCalls } = createHarness();
+  const reset = await service.adminResetRoom(2);
+  assert.equal(reset, true);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rpcCalls)),
+    [{ name: "admin_reset_trottl_classic_room", parameters: { p_room_slot: 2 } }],
+  );
+  await assert.rejects(() => service.adminResetRoom(3), RangeError);
 });
 
 test("Mystical Bobr uses the normal avatar RPC without changing ready state", async () => {
@@ -964,7 +978,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=12[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=21[\s\S]*script\.js\?v=84/);
+  assert.match(html, /trottl-classic-service\.js\?v=13[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=22[\s\S]*script\.js\?v=85/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

@@ -232,6 +232,14 @@ const adminLoginEmail = document.querySelector("#admin-login-email");
 const adminLoginPassword = document.querySelector("#admin-login-password");
 const adminLoginError = document.querySelector("#admin-login-error");
 const submitAdminLoginButton = document.querySelector("#submit-admin-login");
+const adminTrottlResetButtons = [...document.querySelectorAll("[data-admin-reset-trottl-room]")];
+const adminTrottlResetSettingsFeedback = document.querySelector("#settings-trottl-admin-feedback");
+const adminTrottlResetModal = document.querySelector("#admin-trottl-reset-modal");
+const adminTrottlResetCard = adminTrottlResetModal.querySelector(".admin-trottl-reset-card");
+const adminTrottlResetTitle = document.querySelector("#admin-trottl-reset-title");
+const adminTrottlResetFeedback = document.querySelector("#admin-trottl-reset-feedback");
+const cancelAdminTrottlResetButton = document.querySelector("#cancel-admin-trottl-reset");
+const confirmAdminTrottlResetButton = document.querySelector("#confirm-admin-trottl-reset");
 const openDisplayNameRenameButton = document.querySelector("#open-display-name-rename");
 const displayNameRenameModal = document.querySelector("#display-name-rename-modal");
 const displayNameRenameForm = document.querySelector("#display-name-rename-form");
@@ -468,6 +476,9 @@ const state = {
   buffaloShortcutTokenVisible: false,
   buffaloShortcutSettingsRunning: false,
   buffaloShortcutSettingsRequestId: 0,
+  adminTrottlResetRoomSlot: null,
+  adminTrottlResetRunning: false,
+  adminTrottlResetReturnFocus: null,
 };
 
 let rouletteAssetPreloadPromise = null;
@@ -1634,6 +1645,63 @@ function renderSettingsAdmin(auth = getAppAuthState()) {
   settingsAdminStatus.classList.toggle("is-admin", isAdmin);
   openAdminLoginButton.hidden = isAdmin;
   settingsAdminActions.hidden = !isAdmin;
+  if (!isAdmin) closeAdminTrottlResetModal({ force: true, restoreFocus: false });
+}
+
+function setAdminTrottlResetRunning(running) {
+  state.adminTrottlResetRunning = running;
+  adminTrottlResetCard.setAttribute("aria-busy", String(running));
+  cancelAdminTrottlResetButton.disabled = running;
+  confirmAdminTrottlResetButton.disabled = running;
+  confirmAdminTrottlResetButton.textContent = running ? "Wird zurückgesetzt …" : "Raum zurücksetzen";
+  for (const button of adminTrottlResetButtons) button.disabled = running;
+}
+
+function openAdminTrottlResetModal(roomSlot, returnFocus = document.activeElement) {
+  const normalizedRoomSlot = Number(roomSlot);
+  if (
+    !getAppAuthState().isAdmin
+    || state.adminTrottlResetRunning
+    || ![1, 2].includes(normalizedRoomSlot)
+  ) return false;
+  state.adminTrottlResetRoomSlot = normalizedRoomSlot;
+  state.adminTrottlResetReturnFocus = returnFocus;
+  adminTrottlResetTitle.textContent = `Raum ${normalizedRoomSlot} zurücksetzen?`;
+  adminTrottlResetFeedback.textContent = "";
+  adminTrottlResetModal.hidden = false;
+  window.setTimeout(() => cancelAdminTrottlResetButton.focus({ preventScroll: true }), 0);
+  return true;
+}
+
+function closeAdminTrottlResetModal({ force = false, restoreFocus = true } = {}) {
+  if (adminTrottlResetModal.hidden || (state.adminTrottlResetRunning && !force)) return false;
+  const returnFocus = state.adminTrottlResetReturnFocus;
+  adminTrottlResetModal.hidden = true;
+  state.adminTrottlResetRoomSlot = null;
+  state.adminTrottlResetReturnFocus = null;
+  adminTrottlResetFeedback.textContent = "";
+  if (restoreFocus && returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+  return true;
+}
+
+async function submitAdminTrottlReset() {
+  const roomSlot = state.adminTrottlResetRoomSlot;
+  if (state.adminTrottlResetRunning || !getAppAuthState().isAdmin || ![1, 2].includes(roomSlot)) return;
+  setAdminTrottlResetRunning(true);
+  adminTrottlResetFeedback.textContent = "";
+  try {
+    const resetPerformed = await window.trottlClassicService.adminResetRoom(roomSlot);
+    setAdminTrottlResetRunning(false);
+    closeAdminTrottlResetModal({ restoreFocus: false });
+    adminTrottlResetSettingsFeedback.textContent = resetPerformed
+      ? `Raum ${roomSlot} wurde zurückgesetzt.`
+      : `Raum ${roomSlot} war bereits leer.`;
+  } catch (error) {
+    console.warn("3er-Trottl-Raum konnte nicht zurückgesetzt werden.", error);
+    adminTrottlResetFeedback.textContent = "Raum konnte nicht zurückgesetzt werden.";
+  } finally {
+    if (state.adminTrottlResetRunning) setAdminTrottlResetRunning(false);
+  }
 }
 
 function clearBobrUnlockSparkle() {
@@ -4872,6 +4940,28 @@ document.querySelector("#cancel-admin-login").addEventListener("click", () => cl
 adminLoginModal.addEventListener("click", (event) => {
   if (event.target === adminLoginModal) closeAdminLoginModal();
 });
+for (const button of adminTrottlResetButtons) {
+  button.addEventListener("click", () => {
+    openAdminTrottlResetModal(button.dataset.adminResetTrottlRoom, button);
+  });
+}
+cancelAdminTrottlResetButton.addEventListener("click", () => closeAdminTrottlResetModal());
+confirmAdminTrottlResetButton.addEventListener("click", () => void submitAdminTrottlReset());
+adminTrottlResetModal.addEventListener("click", (event) => {
+  if (event.target === adminTrottlResetModal) closeAdminTrottlResetModal();
+});
+adminTrottlResetModal.addEventListener("keydown", (event) => {
+  if (event.key !== "Tab" || state.adminTrottlResetRunning) return;
+  const first = cancelAdminTrottlResetButton;
+  const last = confirmAdminTrottlResetButton;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 adminLogoutButton.addEventListener("click", () => void logoutAdminFromSettings());
 openDisplayNameRenameButton.addEventListener("click", openDisplayNameRenameModal);
 displayNameRenameForm.addEventListener("submit", (event) => {
@@ -5245,6 +5335,8 @@ document.addEventListener("keydown", (event) => {
       closeShortcutSetup();
     } else if (!buffaloTimerModal.hidden) {
       closeBuffaloTimerModal();
+    } else if (!adminTrottlResetModal.hidden) {
+      closeAdminTrottlResetModal();
     } else if (!adminLoginModal.hidden) {
       closeAdminLoginModal();
     } else if (!displayNameRenameModal.hidden) {

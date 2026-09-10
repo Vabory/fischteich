@@ -351,6 +351,11 @@
     if (sessionResponse.error) throw sessionResponse.error;
     if (playersResponse.error) throw playersResponse.error;
     if (serverTimeResponse.error) throw serverTimeResponse.error;
+    if (sessionResponse.data === null) {
+      const error = new Error("TROTTL_CLASSIC_SESSION_NOT_FOUND");
+      error.code = "P0001";
+      throw error;
+    }
     updateServerClock(serverTimeResponse.data, clientStartedAt, clientReceivedAt);
     let session = normalizeSession(sessionResponse.data);
     const players = (playersResponse.data ?? []).map(normalizePlayer);
@@ -460,6 +465,19 @@
     if (error) throw error;
     if (typeof data !== "boolean") throw new Error("Kick returned an invalid result");
     return loadSession(sessionId);
+  }
+
+  async function adminResetRoom(roomSlot) {
+    if (!ROOM_SLOTS.includes(Number(roomSlot))) throw new RangeError("Room slot must be 1 or 2");
+    await initializeAppAuth();
+    const auth = getAppAuthState();
+    if (!auth.currentAuthUser) throw new Error("TROTTL_CLASSIC_AUTH_REQUIRED");
+    const { data, error } = await supabaseClient.rpc("admin_reset_trottl_classic_room", {
+      p_room_slot: Number(roomSlot),
+    });
+    if (error) throw error;
+    if (typeof data !== "boolean") throw new Error("Admin room reset returned an invalid result");
+    return data;
   }
 
   async function rollSession(sessionId) {
@@ -645,6 +663,7 @@
     heartbeat,
     cleanupLobby,
     kickPlayer,
+    adminResetRoom,
     rollSession,
     resolveRoll,
     acknowledgeDrink,

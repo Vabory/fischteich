@@ -5251,6 +5251,51 @@ button.is-release-pressed {
 .settings-admin-actions { display: grid; gap: 9px; }
 .settings-admin-login-button { min-height: 42px; font-size: 0.82rem; }
 
+.settings-trottl-admin-reset {
+  display: grid;
+  padding: 13px;
+  gap: 8px;
+  border: 1px solid rgb(255 190 109 / 16%);
+  border-radius: 14px;
+  background: rgb(44 29 20 / 24%);
+  text-align: left;
+}
+
+.settings-trottl-admin-reset > strong {
+  color: rgb(240 232 220 / 86%);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+}
+
+.settings-trottl-admin-room {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: rgb(220 225 237 / 72%);
+  font-size: 0.72rem;
+}
+
+.settings-trottl-admin-reset-button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgb(255 174 92 / 28%);
+  border-radius: 11px;
+  background: rgb(109 58 31 / 42%);
+  color: #ffe0bd;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.settings-trottl-admin-feedback {
+  min-height: 0;
+  margin: 0 !important;
+  color: #8de6c1 !important;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .settings-admin-logout-button {
   min-height: 40px;
   background: transparent;
@@ -5443,6 +5488,33 @@ button.is-release-pressed {
 
 .admin-login-card h2 { margin-bottom: 8px; text-align: center; }
 .admin-login-card .modal-actions { margin-top: 8px; }
+
+.admin-trottl-reset-backdrop { z-index: 55; }
+
+.admin-trottl-reset-card {
+  display: grid;
+  width: min(100%, 360px);
+  gap: 10px;
+}
+
+.admin-trottl-reset-card h2,
+.admin-trottl-reset-card p { margin-bottom: 0; }
+
+.admin-trottl-reset-feedback {
+  min-height: 1.35em;
+  color: #ffabb5 !important;
+  font-size: 0.75rem;
+}
+
+.admin-trottl-reset-actions { margin-top: 4px; }
+
+.admin-trottl-reset-confirm {
+  min-height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #9e3c36, #762b35);
+  color: #fff5f2;
+  font-weight: 800;
+}
 
 .modal-actions {
   display: grid;

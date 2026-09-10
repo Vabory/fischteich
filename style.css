@@ -156,7 +156,7 @@ button:focus-visible {
 
 .trottl-menu-background {
   height: calc(100% + var(--trottl-menu-background-offset));
-  filter: brightness(0.765);
+  filter: brightness(0.65025);
   transform: translateY(calc(-1 * var(--trottl-menu-background-offset)));
 }
 
@@ -289,8 +289,8 @@ button:focus-visible {
 }
 
 .trottl-menu-subtitle-asset {
-  width: min(70vw, 274px);
-  margin-top: calc(min(36vw, 141px) - min(44.25vw, 174px) + 8px);
+  width: min(65vw, 254px);
+  margin-top: calc(min(36vw, 141px) - min(44.25vw, 174px) + 20px);
 }
 
 .trottl-menu-actions {
@@ -306,7 +306,7 @@ button:focus-visible {
 }
 
 .trottl-menu-actions #open-trottl-deluxe img {
-  filter: brightness(0.95);
+  filter: brightness(0.9025);
 }
 
 .trottl-menu-feedback {

@@ -110,7 +110,7 @@ test("Trottl and Spieler Aufteilen share the exact three-button grid", () => {
 
 test("the dedicated background shifts independently while the menu UI remains fixed", () => {
   assert.match(css, /\.trottl-menu-screen\s*\{[^}]*--trottl-menu-background-offset:\s*59px/s);
-  assert.match(css, /\.trottl-menu-background\s*\{[^}]*height:\s*calc\(100% \+ var\(--trottl-menu-background-offset\)\)[^}]*filter:\s*brightness\(0\.765\)[^}]*translateY\(calc\(-1 \* var\(--trottl-menu-background-offset\)\)\)/s);
+  assert.match(css, /\.trottl-menu-background\s*\{[^}]*height:\s*calc\(100% \+ var\(--trottl-menu-background-offset\)\)[^}]*filter:\s*brightness\(0\.65025\)[^}]*translateY\(calc\(-1 \* var\(--trottl-menu-background-offset\)\)\)/s);
   const shell = css.match(/\.trottl-menu-shell\s*\{[^}]*\}/s)?.[0] ?? "";
   assert.match(shell, /inset:\s*0/);
   assert.doesNotMatch(shell, /59px|translate|transform/);
@@ -118,12 +118,12 @@ test("the dedicated background shifts independently while the menu UI remains fi
 
 test("Trottl menu polish strengthens the title hierarchy and preserves responsive subtitle placement", () => {
   assert.match(css, /\.trottl-menu-title-asset\s*\{[^}]*width:\s*min\(59vw, 232px\)[^}]*transform:\s*translateY\(-11px\)/s);
-  assert.match(css, /\.trottl-menu-subtitle-asset\s*\{[^}]*width:\s*min\(70vw, 274px\)[^}]*margin-top:\s*calc\(min\(36vw, 141px\) - min\(44\.25vw, 174px\) \+ 8px\)/s);
+  assert.match(css, /\.trottl-menu-subtitle-asset\s*\{[^}]*width:\s*min\(65vw, 254px\)[^}]*margin-top:\s*calc\(min\(36vw, 141px\) - min\(44\.25vw, 174px\) \+ 20px\)/s);
   assert.match(css, /\.trottl-menu-header\s*\{[^}]*top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 12px\), clamp\(30px, 4\.8dvh, 42px\)\)/s);
 });
 
 test("only the Special button receives the subtle brightness correction", () => {
-  assert.match(css, /\.trottl-menu-actions #open-trottl-deluxe img\s*\{[^}]*filter:\s*brightness\(0\.95\)/s);
+  assert.match(css, /\.trottl-menu-actions #open-trottl-deluxe img\s*\{[^}]*filter:\s*brightness\(0\.9025\)/s);
   assert.doesNotMatch(css, /#open-fischteich-dice img\s*\{[^}]*filter:/s);
   assert.doesNotMatch(css, /#open-trottl-classic img\s*\{[^}]*filter:/s);
 });
@@ -143,15 +143,11 @@ test("Trottl polish remains collision-free across the supported phone viewports"
   const clamp = (minimum, value, maximum) => Math.max(minimum, Math.min(value, maximum));
   const safeTops = [20, 47, 47, 59, 59];
   for (const [[width, height], safeTop] of viewports.map((viewport, index) => [viewport, safeTops[index]])) {
-    const previousTitleWidth = Math.min(width * 0.56, 220);
     const titleWidth = Math.min(width * 0.59, 232);
-    const subtitleWidth = Math.min(width * 0.70, 274);
-    const previousSubtitleTop = Math.min(width * 0.36, 141) - 4;
-    const subtitleTop = Math.min(width * 0.36, 141) + 8;
-    const previousTitleVisibleBottom = -14 + previousTitleWidth * 0.75 * (1054 / 1086);
-    const titleVisibleBottom = -11 + titleWidth * 0.75 * (1054 / 1086);
-    const previousSubtitleVisibleTop = previousSubtitleTop + (subtitleWidth / 3) * (112 / 724);
-    const subtitleVisibleTop = subtitleTop + (subtitleWidth / 3) * (112 / 724);
+    const previousSubtitleWidth = Math.min(width * 0.70, 274);
+    const subtitleWidth = Math.min(width * 0.65, 254);
+    const previousSubtitleTop = Math.min(width * 0.36, 141) + 8;
+    const subtitleTop = Math.min(width * 0.36, 141) + 20;
     const short = height <= 700;
     const oldButtonTop = short
       ? clamp(266, height * 0.42, 300)
@@ -162,16 +158,18 @@ test("Trottl polish remains collision-free across the supported phone viewports"
     const buttonTop = short
       ? clamp(250, (height * 0.402) - 4, 284)
       : clamp(298, (height * 0.4) - 8, 314);
+    const buttonWidth = short
+      ? Math.min(width * 0.83, height * 0.43, 301)
+      : Math.min(width * 0.83, 326);
     const headerTop = Math.max(safeTop + 12, clamp(30, height * 0.048, 42));
-    const subtitleBoxBottom = headerTop + subtitleTop + (subtitleWidth / 3);
-    assert.ok(titleWidth > previousTitleWidth);
+    const subtitleVisibleBottom = headerTop + subtitleTop + (subtitleWidth / 3) * (672 / 724);
+    const firstButtonVisibleTop = buttonTop + (buttonWidth / 3) * (22 / 724);
+    const shrinkPercent = (1 - (subtitleWidth / previousSubtitleWidth)) * 100;
+    assert.equal(titleWidth, Math.min(width * 0.59, 232));
     assert.equal(subtitleTop - previousSubtitleTop, 12);
-    assert.ok(
-      subtitleVisibleTop - titleVisibleBottom
-      > previousSubtitleVisibleTop - previousTitleVisibleBottom,
-    );
+    assert.ok(shrinkPercent >= 5 && shrinkPercent <= 8);
     assert.equal(previousButtonTop - buttonTop, short ? 4 : 8);
-    assert.ok(buttonTop - subtitleBoxBottom > 1);
+    assert.ok(firstButtonVisibleTop - subtitleVisibleBottom > 4);
     assert.ok(oldButtonTop > buttonTop);
   }
 });

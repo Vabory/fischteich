@@ -14,11 +14,12 @@ const MAX_BODY_BYTES = 4096;
 const DIAGNOSTIC_TEXT_LIMIT = 500;
 const REDACTED = "[redacted]";
 const TOKEN_ENCRYPTION_VERSION = "v1";
-const KNOWN_DIAGNOSTIC_ACTIONS = new Set(["status", "provision", "reveal", "rotate", "revoke", "start"]);
+const KNOWN_DIAGNOSTIC_ACTIONS = new Set(["status", "provision", "reveal", "rotate", "revoke", "start", "stop"]);
 
 type ShortcutRequest = {
   action?: unknown;
   deviceId?: unknown;
+  eventId?: unknown;
   target?: unknown;
 };
 
@@ -523,6 +524,54 @@ async function handleStartAction(
   });
 }
 
+async function handleStopAction(
+  request: Request,
+  body: ShortcutRequest,
+  service: ReturnType<typeof createClient>,
+  diagnostic: DiagnosticContext,
+): Promise<Response> {
+  const deviceId = typeof body.deviceId === "string" ? body.deviceId.trim() : "";
+  const eventId = typeof body.eventId === "string" ? body.eventId.trim() : "";
+  const deviceManagementKey = request.headers.get("x-buffalo-device-key")?.trim() ?? "";
+  rememberSensitive(diagnostic, deviceId);
+  rememberSensitive(diagnostic, eventId);
+  rememberSensitive(diagnostic, deviceManagementKey);
+  if (!UUID_PATTERN.test(deviceId) || !UUID_PATTERN.test(eventId)
+    || !DEVICE_MANAGEMENT_KEY_PATTERN.test(deviceManagementKey)) {
+    return json({ ok: false, error: "invalid_request" }, 400);
+  }
+
+  diagnostic.step = "hash_device_management_key";
+  const deviceManagementKeyHash = await sha256Hex(deviceManagementKey);
+  rememberSensitive(diagnostic, deviceManagementKeyHash);
+  diagnostic.step = "verify_device_management_key";
+  const { data: device, error: deviceError } = await service
+    .from("buffalo_shortcut_devices")
+    .select("device_management_key_hash")
+    .eq("device_id", deviceId)
+    .maybeSingle();
+  if (deviceError) throw deviceError;
+  if (!device?.device_management_key_hash
+    || !constantTimeEqual(deviceManagementKeyHash, device.device_management_key_hash)) {
+    return json({ ok: false, error: "device_ownership_failed" }, 403);
+  }
+
+  diagnostic.step = "stop_buffalo_event_for_device";
+  const { data, error } = await service.rpc("stop_buffalo_event_for_device", {
+    p_event_id: eventId,
+    p_caller_device_id: deviceId,
+  });
+  if (error?.code === "42501") {
+    return json({ ok: false, error: "device_ownership_failed" }, 403);
+  }
+  if (error?.code === "55000") {
+    return json({ ok: false, error: "55000" }, 409);
+  }
+  if (error) throw error;
+  diagnostic.step = "response";
+  return json({ ok: true, status: data === true ? "stopped" : "not_active", stopped: data === true });
+}
+
 async function handleRequest(request: Request): Promise<Response> {
   const diagnostic = createDiagnosticContext();
   try {
@@ -544,6 +593,7 @@ async function handleRequest(request: Request): Promise<Response> {
     });
 
     if (body.action === "start") return await handleStartAction(request, body, service, diagnostic);
+    if (body.action === "stop") return await handleStopAction(request, body, service, diagnostic);
     return await handleManagementAction(request, body, service, supabaseUrl, diagnostic);
   } catch (error) {
     logShortcutFailure(diagnostic, error);

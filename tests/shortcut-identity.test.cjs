@@ -114,7 +114,7 @@ test("missing app profile is repaired for auth.uid without replacing local ident
   assert.match(identitySource, /const DISPLAY_NAME_STORAGE_KEY = "fischteich_display_name"/);
 });
 
-function createShortcutHarness({ initiallyMissingSession = false } = {}) {
+function createShortcutHarness({ initiallyMissingSession = false, responseBody = { ok: true, status: "active" } } = {}) {
   let session = initiallyMissingSession ? null : { access_token: "valid-management-jwt" };
   let ensureAnonymousCalls = 0;
   let initializeCalls = 0;
@@ -142,7 +142,7 @@ function createShortcutHarness({ initiallyMissingSession = false } = {}) {
     getLocalIdentity: () => ({ deviceId: DEVICE_ID, displayName: "Fabian" }),
     fetch: async (url, options) => {
       requests.push({ url, options });
-      return { ok: true, status: 200, async json() { return { ok: true, status: "active" }; } };
+      return { ok: true, status: 200, async json() { return responseBody; } };
     },
     console,
     Promise,
@@ -199,6 +199,32 @@ test("repeated anonymous and admin transitions always use the latest persisted J
     harness.requests.map((request) => request.options.headers.authorization),
     ["Bearer anonymous-one", "Bearer admin", "Bearer anonymous-two", "Bearer admin-again"],
   );
+  assert.ok(harness.requests.every(
+    (request) => request.options.headers["x-buffalo-device-key"] === DEVICE_MANAGEMENT_KEY,
+  ));
+});
+
+test("device-owned stop survives Anonymous Admin Anonymous without using auth as ownership", async () => {
+  const harness = createShortcutHarness({ responseBody: { ok: true, status: "stopped", stopped: true } });
+  const eventIds = [
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222",
+    "33333333-3333-4333-8333-333333333333",
+  ];
+  for (const [accessToken, eventId] of [
+    ["anonymous-one", eventIds[0]],
+    ["admin", eventIds[1]],
+    ["anonymous-two", eventIds[2]],
+  ]) {
+    harness.setSession({ access_token: accessToken });
+    assert.equal(await harness.service.stopEvent(eventId), true);
+  }
+  assert.deepEqual(harness.requests.map((request) => JSON.parse(request.options.body)), eventIds.map((eventId) => ({
+    action: "stop",
+    deviceId: DEVICE_ID,
+    eventId,
+  })));
+  assert.ok(harness.requests.every((request) => !("authorization" in request.options.headers)));
   assert.ok(harness.requests.every(
     (request) => request.options.headers["x-buffalo-device-key"] === DEVICE_MANAGEMENT_KEY,
   ));

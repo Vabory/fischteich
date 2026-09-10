@@ -43,7 +43,7 @@ function normalizeBuffaloEvent(value) {
   if (value.version !== BUFFALO_EVENT_VERSION || typeof value.id !== "string" || !value.id
     || !selection || !Number.isFinite(startedAt) || !Number.isFinite(endsAt)
     || endsAt - startedAt !== BUFFALO_DURATION_MS) return null;
-  const caller = value.caller && typeof value.caller.deviceId === "string"
+  const caller = value.caller && (value.caller.deviceId === null || typeof value.caller.deviceId === "string")
     && typeof value.caller.displayName === "string"
     ? Object.freeze({ deviceId: value.caller.deviceId, displayName: value.caller.displayName }) : null;
   if (!caller) return null;
@@ -66,7 +66,7 @@ function normalizeBuffaloServerEvent(row) {
     startedAt: row.started_at,
     endsAt: row.ends_at,
     selection: { kind: row.target_kind, friendName: row.target_friend_name, displayName: row.target_display_name },
-    caller: { deviceId: row.caller_device_id, displayName: row.caller_display_name },
+    caller: { deviceId: row.caller_device_id ?? null, displayName: row.caller_display_name },
     serverOffsetMs: buffaloServerOffsetMs,
   });
 }
@@ -181,8 +181,9 @@ async function stopBuffaloEvent(eventId) {
   const { data, error } = await supabaseClient.rpc("stop_buffalo_event", {
     p_event_id: eventId, p_caller_device_id: identity.deviceId,
   });
-  if (error) throw error;
-  return data === true;
+  if (!error) return data === true;
+  if (error.code !== "42501" || !window.buffaloShortcutService?.stopEvent) throw error;
+  return window.buffaloShortcutService.stopEvent(eventId);
 }
 
 function notifyBuffaloRealtimeEvents(events) {

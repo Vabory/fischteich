@@ -152,6 +152,47 @@ function revokeBuffaloShortcut() {
   return requestShortcutManagement("revoke");
 }
 
+async function stopBuffaloEventForDevice(eventId) {
+  if (typeof eventId !== "string" || !eventId) throw new TypeError("A Buffalo event ID is required");
+  const identity = typeof getLocalIdentity === "function" ? getLocalIdentity() : null;
+  if (!identity) throw new Error("A local identity is required to stop a Buffalo event");
+  if (typeof getOrCreateDeviceManagementKey !== "function") {
+    throw new Error("Secure device credential storage is unavailable");
+  }
+  const deviceManagementKey = await getOrCreateDeviceManagementKey(identity.deviceId);
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timeoutId = typeof window.setTimeout === "function"
+    ? window.setTimeout(() => controller?.abort(), SHORTCUT_MANAGEMENT_TIMEOUT_MS)
+    : null;
+  let response;
+  try {
+    response = await fetch(BUFFALO_SHORTCUT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        "x-buffalo-device-key": deviceManagementKey,
+      },
+      body: JSON.stringify({ action: "stop", deviceId: identity.deviceId, eventId }),
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+  } finally {
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+  }
+
+  let result = null;
+  try { result = await response.json(); } catch { /* Use a generic client error. */ }
+  if (!response.ok || !result?.ok) {
+    const error = new Error("Buffalo device stop request failed");
+    error.code = typeof result?.error === "string" ? result.error : "request_failed";
+    error.status = response.status;
+    throw error;
+  }
+  return result.stopped === true;
+}
+
 window.buffaloShortcutService = Object.freeze({
   endpoint: BUFFALO_SHORTCUT_ENDPOINT,
   appleShortcutUrl: getConfiguredAppleShortcutUrl(),
@@ -162,4 +203,5 @@ window.buffaloShortcutService = Object.freeze({
   reveal: revealBuffaloShortcutToken,
   rotate: rotateBuffaloShortcut,
   revoke: revokeBuffaloShortcut,
+  stopEvent: stopBuffaloEventForDevice,
 });

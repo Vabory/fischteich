@@ -25,7 +25,7 @@ function makeRow({ id = "12345678-1234-4123-8123-123456789abc", startedAt = Date
   };
 }
 
-function harness(rpc = async () => ({ data: [makeRow()], error: null })) {
+function harness(rpc = async () => ({ data: [makeRow()], error: null }), shortcutStop = null) {
   const values = new Map();
   const calls = [];
   const channels = [];
@@ -44,7 +44,10 @@ function harness(rpc = async () => ({ data: [makeRow()], error: null })) {
     },
     async removeChannel(channel) { removed.push(channel); },
   };
-  const window = { localStorage };
+  const window = {
+    localStorage,
+    ...(shortcutStop ? { buffaloShortcutService: { stopEvent: shortcutStop } } : {}),
+  };
   vm.runInContext(serviceSource, vm.createContext({ window, supabaseClient,
     getLocalIdentity: () => ({ deviceId: DEVICE_ID, displayName: "Fabian" }), console, Date, Promise, Set,
     Map, Object, Array, JSON, Number, String, TypeError, Error }), { filename: "buffalo-service.js" });
@@ -110,6 +113,40 @@ test("stop RPC targets one exact event and does not optimistically clear it", as
   assert.equal(values.has(service.storageKey), true);
 });
 
+test("a creator-auth mismatch retries stop through the stable device credential", async () => {
+  const shortcutCalls = [];
+  const authMismatch = { code: "42501" };
+  const { service, calls } = harness(
+    async (name) => name === "stop_buffalo_event"
+      ? { data: null, error: authMismatch }
+      : { data: [], error: null },
+    async (eventId) => { shortcutCalls.push(eventId); return true; },
+  );
+  const event = service.normalizeServerEvent(makeRow());
+  assert.equal(await service.stopEvent(event.id), true);
+  assert.equal(calls.at(-1).parameters.p_caller_device_id, DEVICE_ID);
+  assert.deepEqual(shortcutCalls, [event.id]);
+});
+
+test("non-ownership RPC failures never use the device fallback", async () => {
+  let shortcutCalls = 0;
+  const offline = Object.assign(new Error("offline"), { code: "network_error" });
+  const { service } = harness(async () => ({ data: null, error: offline }), async () => {
+    shortcutCalls += 1;
+    return true;
+  });
+  await assert.rejects(service.stopEvent(makeRow().id), /offline/);
+  assert.equal(shortcutCalls, 0);
+});
+
+test("legacy rows without a device owner remain visible but never become locally owned", () => {
+  const { service } = harness();
+  const event = service.normalizeServerEvent({ ...makeRow(), caller_device_id: null });
+  assert.ok(event);
+  assert.equal(event.caller.deviceId, null);
+  assert.notEqual(event.caller.deviceId, DEVICE_ID);
+});
+
 test("migration defines plural ordering and an atomic global maximum of five", () => {
   assert.match(migration, /create function public\.get_active_buffalo_events\(\)/i);
   assert.match(migration, /started_at <= v_now[\s\S]*ends_at > v_now[\s\S]*stopped_at is null/i);
@@ -147,7 +184,7 @@ test("all countdowns derive from endsAt and expired timers are removed individua
 
 test("loads versioned assets and the service before the UI bundle", () => {
   assert.match(html, /style\.css\?v=155/);
-  assert.match(html, /buffalo-service\.js\?v=4[\s\S]*script\.js\?v=86/);
+  assert.match(html, /buffalo-service\.js\?v=5[\s\S]*script\.js\?v=86/);
 });
 
 test("server normalization preserves the exact three-minute interval", () => {

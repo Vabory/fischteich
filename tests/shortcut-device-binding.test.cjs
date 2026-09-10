@@ -119,12 +119,12 @@ test("migration preserves every existing shortcut token and removes Auth cascade
 });
 
 test("management combines fresh Auth with device proof while external start stays token-only", () => {
-  assert.match(html, /local-identity\.js\?v=2[\s\S]*device-credential\.js\?v=1[\s\S]*auth\.js\?v=4[\s\S]*shortcut-service\.js\?v=6/);
+  assert.match(html, /local-identity\.js\?v=2[\s\S]*device-credential\.js\?v=1[\s\S]*auth\.js\?v=4[\s\S]*shortcut-service\.js\?v=7/);
   assert.match(shortcutSource, /supabaseClient\.auth\.getSession\(\)/);
   assert.match(shortcutSource, /getOrCreateDeviceManagementKey\(identity\.deviceId\)/);
   assert.match(shortcutSource, /"x-buffalo-device-key": deviceManagementKey/);
   assert.match(shortcutSource, /SHORTCUT_MANAGEMENT_TIMEOUT_MS = 12000/);
-  const start = edge.slice(edge.indexOf("async function handleStartAction"), edge.indexOf("async function handleRequest"));
+  const start = edge.slice(edge.indexOf("async function handleStartAction"), edge.indexOf("async function handleStopAction"));
   assert.match(start, /x-buffalo-shortcut-token/);
   assert.doesNotMatch(start, /x-buffalo-device-key|getBearerToken|auth\.getUser/);
 });

@@ -384,6 +384,10 @@
       return global.trottlAvatarService.getVisibleTrottlAvatars({ mysticalBobrUnlocked });
     }
 
+    function preloadAvailableAvatarChoices() {
+      void global.trottlAvatarService.preloadTrottlAvatars(getAvailableAvatarChoices());
+    }
+
     function getAvatarModalPresentation() {
       return createAvatarModalPresentation({
         avatars: getAvailableAvatarChoices(),
@@ -452,6 +456,7 @@
       state.avatarReadyConflict = false;
       state.avatarModalReturnFocus = document.activeElement;
       avatarModalFeedback.textContent = "";
+      preloadAvailableAvatarChoices();
       renderAvatarModal();
       requestAnimationFrame(() => {
         const target = avatarGrid.querySelector(".is-selected")
@@ -678,6 +683,7 @@
       startButton.textContent = presentation.startLabel;
       leaveButton.disabled = state.busy;
       syncAvatarModalWithSnapshot(snapshot);
+      preloadAvailableAvatarChoices();
     }
 
     function requestAvatarSelection(player) {

@@ -283,17 +283,17 @@ button:focus-visible {
 }
 
 .trottl-menu-title-asset {
-  width: min(54vw, 212px);
+  width: min(56vw, 220px);
   transform: translateY(-14px);
 }
 
 .trottl-menu-subtitle-asset {
   width: min(70vw, 274px);
-  margin-top: calc(min(36vw, 141px) - min(40.5vw, 159px) - 10px);
+  margin-top: calc(min(36vw, 141px) - min(42vw, 165px) - 4px);
 }
 
 .trottl-menu-actions {
-  top: clamp(306px, 40dvh, 322px);
+  top: clamp(298px, calc(40dvh - 8px), 314px);
 }
 
 .trottl-menu-actions img {
@@ -6213,7 +6213,7 @@ button.is-release-pressed {
   }
 
   .trottl-menu-actions {
-    top: clamp(254px, 40.2dvh, 288px);
+    top: clamp(250px, calc(40.2dvh - 4px), 284px);
   }
 
   .menu-card {

@@ -117,14 +117,14 @@ test("the dedicated background shifts independently while the menu UI remains fi
 });
 
 test("Trottl menu polish strengthens the title hierarchy and preserves responsive subtitle placement", () => {
-  assert.match(css, /\.trottl-menu-title-asset\s*\{[^}]*width:\s*min\(54vw, 212px\)[^}]*transform:\s*translateY\(-14px\)/s);
-  assert.match(css, /\.trottl-menu-subtitle-asset\s*\{[^}]*width:\s*min\(70vw, 274px\)[^}]*margin-top:\s*calc\(min\(36vw, 141px\) - min\(40\.5vw, 159px\) - 10px\)/s);
+  assert.match(css, /\.trottl-menu-title-asset\s*\{[^}]*width:\s*min\(56vw, 220px\)[^}]*transform:\s*translateY\(-14px\)/s);
+  assert.match(css, /\.trottl-menu-subtitle-asset\s*\{[^}]*width:\s*min\(70vw, 274px\)[^}]*margin-top:\s*calc\(min\(36vw, 141px\) - min\(42vw, 165px\) - 4px\)/s);
   assert.match(css, /\.trottl-menu-header\s*\{[^}]*top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 12px\), clamp\(30px, 4\.8dvh, 42px\)\)/s);
 });
 
 test("Trottl button rows move together while the second gap reuses the existing offset", () => {
-  assert.match(css, /\.trottl-menu-actions\s*\{[^}]*top:\s*clamp\(306px, 40dvh, 322px\)/s);
-  assert.match(css, /@media \(max-height: 700px\)[\s\S]*\.trottl-menu-actions\s*\{[^}]*top:\s*clamp\(254px, 40\.2dvh, 288px\)/s);
+  assert.match(css, /\.trottl-menu-actions\s*\{[^}]*top:\s*clamp\(298px, calc\(40dvh - 8px\), 314px\)/s);
+  assert.match(css, /@media \(max-height: 700px\)[\s\S]*\.trottl-menu-actions\s*\{[^}]*top:\s*clamp\(250px, calc\(40\.2dvh - 4px\), 284px\)/s);
   assert.match(css, /\.trottl-menu-actions #open-trottl-classic,[\s\S]*\.trottl-menu-actions #open-trottl-deluxe\s*\{[^}]*translate:\s*0 var\(--teams-menu-lower-buttons-offset\)/s);
   assert.match(css, /\.trottl-menu-actions #open-trottl-deluxe\s*\{[^}]*translate:\s*0 calc\(var\(--teams-menu-lower-buttons-offset\) \* 2\)/s);
   assert.match(css, /--teams-menu-visual-button-width:\s*min\(83vw, 326px\)/);
@@ -135,25 +135,34 @@ test("Trottl button rows move together while the second gap reuses the existing 
 test("Trottl polish remains collision-free across the supported phone viewports", () => {
   const viewports = [[375, 667], [390, 844], [393, 793], [393, 852], [430, 932]];
   const clamp = (minimum, value, maximum) => Math.max(minimum, Math.min(value, maximum));
-  for (const [width, height] of viewports) {
+  const safeTops = [20, 47, 47, 59, 59];
+  for (const [[width, height], safeTop] of viewports.map((viewport, index) => [viewport, safeTops[index]])) {
     const oldTitleWidth = Math.min(width * 0.48, 188);
-    const titleWidth = Math.min(width * 0.54, 212);
+    const previousTitleWidth = Math.min(width * 0.54, 212);
+    const titleWidth = Math.min(width * 0.56, 220);
     const oldSubtitleWidth = Math.min(width * 0.78, 306);
     const subtitleWidth = Math.min(width * 0.70, 274);
-    const preservedSubtitleTop = oldTitleWidth * 0.75 - 10;
+    const preservedSubtitleTop = oldTitleWidth * 0.75 - 4;
     const titleVisibleBottom = -14 + titleWidth * 0.75 * (1054 / 1086);
     const subtitleVisibleTop = preservedSubtitleTop + (subtitleWidth / 3) * (112 / 724);
     const short = height <= 700;
     const oldButtonTop = short
       ? clamp(266, height * 0.42, 300)
       : clamp(318, height * 0.416, 334);
-    const buttonTop = short
+    const previousButtonTop = short
       ? clamp(254, height * 0.402, 288)
       : clamp(306, height * 0.4, 322);
-    assert.ok(titleWidth > oldTitleWidth);
+    const buttonTop = short
+      ? clamp(250, (height * 0.402) - 4, 284)
+      : clamp(298, (height * 0.4) - 8, 314);
+    const headerTop = Math.max(safeTop + 12, clamp(30, height * 0.048, 42));
+    const subtitleBoxBottom = headerTop + preservedSubtitleTop + (subtitleWidth / 3);
+    assert.ok(titleWidth > previousTitleWidth);
     assert.ok(subtitleWidth < oldSubtitleWidth);
     assert.ok(subtitleVisibleTop - titleVisibleBottom >= 4);
-    assert.ok(oldButtonTop - buttonTop >= 11.9 && oldButtonTop - buttonTop <= 12.8);
+    assert.equal(previousButtonTop - buttonTop, short ? 4 : 8);
+    assert.ok(buttonTop - subtitleBoxBottom >= 10);
+    assert.ok(oldButtonTop > buttonTop);
   }
 });
 

@@ -349,20 +349,24 @@
     ]);
     const clientReceivedAt = Date.now();
     if (sessionResponse.error) throw sessionResponse.error;
-    if (playersResponse.error) throw playersResponse.error;
-    if (serverTimeResponse.error) throw serverTimeResponse.error;
     if (sessionResponse.data === null) {
       const error = new Error("TROTTL_CLASSIC_SESSION_NOT_FOUND");
       error.code = "P0001";
       throw error;
     }
-    updateServerClock(serverTimeResponse.data, clientStartedAt, clientReceivedAt);
-    let session = normalizeSession(sessionResponse.data);
+    if (playersResponse.error) throw playersResponse.error;
+    const session = normalizeSession(sessionResponse.data);
     const players = (playersResponse.data ?? []).map(normalizePlayer);
     if (!session || players.some((player) => player === null)) {
       throw new Error("Invalid classic session response");
     }
-    if (["reaction_pending", "reaction_active"].includes(session.actionPhase)) {
+    if (!players.some((player) => player.userId === identity.userId)) {
+      return Object.freeze({ session, players: Object.freeze(players), identity });
+    }
+    if (serverTimeResponse.error) throw serverTimeResponse.error;
+    updateServerClock(serverTimeResponse.data, clientStartedAt, clientReceivedAt);
+    let synchronizedSession = session;
+    if (["reaction_pending", "reaction_active"].includes(synchronizedSession.actionPhase)) {
       const { data: changed, error: syncError } = await supabaseClient.rpc("sync_trottl_classic_reaction", {
         p_session_id: sessionId,
       });
@@ -374,11 +378,11 @@
           .eq("id", sessionId)
           .maybeSingle();
         if (refreshed.error) throw refreshed.error;
-        session = normalizeSession(refreshed.data);
-        if (!session) throw new Error("Invalid classic reaction response");
+        synchronizedSession = normalizeSession(refreshed.data);
+        if (!synchronizedSession) throw new Error("Invalid classic reaction response");
       }
     }
-    return Object.freeze({ session, players: Object.freeze(players), identity });
+    return Object.freeze({ session: synchronizedSession, players: Object.freeze(players), identity });
   }
 
   async function joinRoom(roomSlot) {

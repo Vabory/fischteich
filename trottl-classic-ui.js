@@ -312,6 +312,7 @@
       sessionRefreshPromise: null,
       sessionRefreshQueued: false,
       sessionRefreshQueuedSource: null,
+      sessionRefreshQueuedRecoveryFallback: false,
       preview: previewEnabled ? preview.createState() : null,
       diceSessionId: null,
       animatingRollSeq: null,
@@ -356,6 +357,7 @@
       kickModalReturnFocus: null,
       connectionChecking: false,
       sessionRecoveryPromise: null,
+      sessionLifecycleGeneration: 0,
     };
 
     const gameDice = global.FischteichDice.mount({
@@ -1857,15 +1859,7 @@
       if (state.sessionUnsubscribe) return;
       state.sessionUnsubscribe = service.subscribeSession(
         sessionId,
-        () => {
-          const recovering = document.visibilityState === "hidden"
-            || state.connectionChecking
-            || state.sessionRecoveryPromise !== null;
-          void refreshSession({
-            rollSource: recovering ? "recovery" : "live",
-            recoveryFallback: recovering,
-          });
-        },
+        (payload) => handleSessionRealtimeChange(sessionId, payload),
         (status) => {
           if (status === "SUBSCRIBED" && state.snapshot?.session.id === sessionId) {
             setConnectionChecking(false);
@@ -1882,6 +1876,51 @@
           }
         },
       );
+    }
+
+    function handleSessionRealtimeChange(sessionId, payload) {
+      if (state.snapshot?.session.id !== sessionId) return;
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const table = payload?.table;
+      const oldRow = payload?.old ?? {};
+      const newRow = payload?.new ?? {};
+      if (
+        table === "trottl_classic_players"
+        && eventType === "DELETE"
+        && oldRow.session_id === sessionId
+        && oldRow.user_id === state.snapshot.identity.userId
+      ) {
+        const feedback = state.snapshot.session.status === "lobby"
+          ? "Du wurdest aus der Lobby entfernt."
+          : "Du bist nicht mehr Mitglied dieses Raums.";
+        void exitClassicSessionToRoomPicker(sessionId, feedback);
+        return;
+      }
+      if (
+        table === "trottl_classic_sessions"
+        && eventType === "DELETE"
+        && oldRow.id === sessionId
+      ) {
+        void exitClassicSessionToRoomPicker(sessionId, "Der Raum wurde zurückgesetzt.");
+        return;
+      }
+      if (
+        table === "trottl_classic_sessions"
+        && eventType === "UPDATE"
+        && newRow.id === sessionId
+        && newRow.status
+        && !["lobby", "playing"].includes(newRow.status)
+      ) {
+        void exitClassicSessionToRoomPicker(sessionId, "Dieses Spiel ist beendet.");
+        return;
+      }
+      const recovering = document.visibilityState === "hidden"
+        || state.connectionChecking
+        || state.sessionRecoveryPromise !== null;
+      void refreshSession({
+        rollSource: recovering ? "recovery" : "live",
+        recoveryFallback: recovering,
+      });
     }
 
     async function refreshRooms() {
@@ -1946,6 +1985,7 @@
 
     async function openSnapshot(snapshot) {
       await stopRoomRealtime();
+      state.sessionLifecycleGeneration += 1;
       stopLobbyHeartbeat();
       stopLobbyCleanup();
       resetDiceTracking(snapshot.session.id);
@@ -1983,27 +2023,47 @@
       return first === "live" || second === "live" ? "live" : "recovery";
     }
 
-    async function exitInvalidatedSession(sessionId, feedback) {
-      if (state.snapshot?.session.id !== sessionId) return;
+    async function exitClassicSessionToRoomPicker(sessionId, feedback = "") {
+      if (state.snapshot?.session.id !== sessionId) return false;
+      const exitGeneration = state.sessionLifecycleGeneration + 1;
+      state.sessionLifecycleGeneration = exitGeneration;
       setConnectionChecking(false);
       stopLobbyHeartbeat();
       stopLobbyCleanup();
+      resetRecoveryTransientState(sessionId);
+      state.busy = false;
+      state.rollRequestPending = false;
+      state.actionRequestPending = false;
+      state.reactionStartPending = false;
+      state.kickSubmitting = false;
+      state.avatarSubmitting = false;
+      state.sessionRefreshQueued = false;
+      state.sessionRefreshQueuedSource = null;
+      state.sessionRefreshQueuedRecoveryFallback = false;
+      state.sessionRefreshPromise = null;
+      state.sessionRecoveryPromise = null;
+      state.diceSessionId = null;
+      state.visualSessionId = null;
+      sessionFeedback.textContent = "";
+      gameFeedback.textContent = "";
       closeKickModal({ force: true, restoreFocus: false });
       closeAvatarModal({ force: true, restoreFocus: false });
       state.snapshot = null;
       await stopSessionRealtime();
+      if (state.sessionLifecycleGeneration !== exitGeneration) return false;
       await openRooms({ feedback });
+      return true;
     }
 
     async function handleMembershipRemoved(sessionId) {
       const feedback = state.snapshot?.session.status === "lobby"
         ? "Du wurdest aus der Lobby entfernt."
         : "Du bist nicht mehr Mitglied dieses Raums.";
-      await exitInvalidatedSession(sessionId, feedback);
+      await exitClassicSessionToRoomPicker(sessionId, feedback);
     }
 
     async function handleAdminRoomReset(sessionId) {
-      await exitInvalidatedSession(sessionId, "Der Raum wurde zurückgesetzt.");
+      await exitClassicSessionToRoomPicker(sessionId, "Der Raum wurde zurückgesetzt.");
     }
 
     async function refreshSession({ rollSource = "recovery", recoveryFallback = false } = {}) {
@@ -2011,14 +2071,20 @@
       if (state.sessionRefreshPromise) {
         state.sessionRefreshQueued = true;
         state.sessionRefreshQueuedSource = mergeRollSource(state.sessionRefreshQueuedSource, rollSource);
+        state.sessionRefreshQueuedRecoveryFallback ||= recoveryFallback;
         return state.sessionRefreshPromise;
       }
       const sessionId = state.snapshot.session.id;
-      state.sessionRefreshPromise = service.loadSession(sessionId)
+      const refreshGeneration = state.sessionLifecycleGeneration;
+      let refreshPromise;
+      refreshPromise = service.loadSession(sessionId)
         .then(async (snapshot) => {
-          if (state.snapshot?.session.id !== sessionId) return snapshot;
+          if (
+            state.sessionLifecycleGeneration !== refreshGeneration
+            || state.snapshot?.session.id !== sessionId
+          ) return null;
           if (!["lobby", "playing"].includes(snapshot.session.status)) {
-            await exitInvalidatedSession(sessionId, "Dieses Spiel ist beendet.");
+            await exitClassicSessionToRoomPicker(sessionId, "Dieses Spiel ist beendet.");
             return null;
           }
           if (!hasLocalMembership(snapshot)) {
@@ -2033,8 +2099,11 @@
         })
         .catch(async (error) => {
           if (
+            state.sessionLifecycleGeneration !== refreshGeneration
+            || state.snapshot?.session.id !== sessionId
+          ) return null;
+          if (
             String(error?.message ?? "").includes("TROTTL_CLASSIC_SESSION_NOT_FOUND")
-            && state.snapshot?.session.id === sessionId
           ) {
             await handleAdminRoomReset(sessionId);
             return null;
@@ -2044,14 +2113,21 @@
           return recoveryFallback ? null : state.snapshot;
         })
         .finally(() => {
+          if (state.sessionRefreshPromise !== refreshPromise) return;
           state.sessionRefreshPromise = null;
           if (state.sessionRefreshQueued) {
             state.sessionRefreshQueued = false;
             const queuedRollSource = state.sessionRefreshQueuedSource ?? "recovery";
+            const queuedRecoveryFallback = state.sessionRefreshQueuedRecoveryFallback;
             state.sessionRefreshQueuedSource = null;
-            void refreshSession({ rollSource: queuedRollSource });
+            state.sessionRefreshQueuedRecoveryFallback = false;
+            void refreshSession({
+              rollSource: queuedRollSource,
+              recoveryFallback: queuedRecoveryFallback,
+            });
           }
         });
+      state.sessionRefreshPromise = refreshPromise;
       return state.sessionRefreshPromise;
     }
 
@@ -2061,14 +2137,23 @@
         return Promise.resolve(false);
       }
       const sessionId = state.snapshot.session.id;
+      const recoveryGeneration = state.sessionLifecycleGeneration;
       setConnectionChecking(true);
       resetRecoveryTransientState(sessionId);
-      state.sessionRecoveryPromise = (async () => {
+      let recoveryPromise;
+      recoveryPromise = (async () => {
         await stopSessionRealtime();
-        if (state.snapshot?.session.id !== sessionId || sessionScreen.hidden) return false;
+        if (
+          state.sessionLifecycleGeneration !== recoveryGeneration
+          || state.snapshot?.session.id !== sessionId
+          || sessionScreen.hidden
+        ) return false;
         ensureSessionRealtime(sessionId);
         const recovered = await refreshSession({ rollSource: "recovery", recoveryFallback: true });
-        if (state.snapshot?.session.id !== sessionId) return false;
+        if (
+          state.sessionLifecycleGeneration !== recoveryGeneration
+          || state.snapshot?.session.id !== sessionId
+        ) return false;
         if (recovered) {
           setConnectionChecking(false);
           renderSession("recovery");
@@ -2078,8 +2163,9 @@
         await openRooms({ feedback: "Verbindung konnte nicht wiederhergestellt werden. Raum bitte erneut öffnen." });
         return false;
       })().finally(() => {
-        state.sessionRecoveryPromise = null;
+        if (state.sessionRecoveryPromise === recoveryPromise) state.sessionRecoveryPromise = null;
       });
+      state.sessionRecoveryPromise = recoveryPromise;
       return state.sessionRecoveryPromise;
     }
 

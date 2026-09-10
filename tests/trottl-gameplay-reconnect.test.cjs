@@ -48,7 +48,7 @@ test("connection checking has explicit start and every success path clears it", 
 test("failed recovery, membership loss and session end clear state and return to rooms", () => {
   assert.match(ui, /recoveryFallback \? null : state\.snapshot/);
   assert.match(ui, /setConnectionChecking\(false\)[\s\S]*openRooms\(\{ feedback: "Verbindung konnte nicht wiederhergestellt werden/);
-  assert.match(ui, /!\["lobby", "playing"\]\.includes\(snapshot\.session\.status\)[\s\S]*exitInvalidatedSession/);
+  assert.match(ui, /!\["lobby", "playing"\]\.includes\(snapshot\.session\.status\)[\s\S]*exitClassicSessionToRoomPicker/);
   assert.match(ui, /if \(!hasLocalMembership\(snapshot\)\)[\s\S]*handleMembershipRemoved/);
 });
 

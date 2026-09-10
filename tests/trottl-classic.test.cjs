@@ -62,6 +62,7 @@ function createHarness() {
     avatar_id: null,
     is_ready: false,
     joined_at: "2026-09-06T10:00:00Z",
+    last_seen_at: "2026-09-06T10:00:00Z",
   }];
   const roomRows = [
     { room_slot: 1, session_id: SESSION_ID, session_status: "lobby", player_count: 1, is_member: true },
@@ -84,6 +85,9 @@ function createHarness() {
       if (name === "set_trottl_classic_ready") {
         playerRows[0].is_ready = parameters.p_ready;
         return { data: parameters.p_ready, error: null };
+      }
+      if (name === "heartbeat_trottl_classic_lobby") {
+        return { data: "2026-09-06T10:00:30Z", error: null };
       }
       if (name === "start_trottl_classic_session") {
         sessionRow.status = "playing";
@@ -269,6 +273,16 @@ test("avatar and ready wrappers update and reload the authoritative lobby snapsh
         parameters: { p_session_id: SESSION_ID, p_ready: true },
       },
     ],
+  );
+});
+
+test("heartbeat wrapper sends only the current lobby session and validates server time", async () => {
+  const { service, rpcCalls } = createHarness();
+  const serverTime = await service.heartbeat(SESSION_ID);
+  assert.equal(serverTime, "2026-09-06T10:00:30Z");
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rpcCalls.filter(({ name }) => name === "heartbeat_trottl_classic_lobby"))),
+    [{ name: "heartbeat_trottl_classic_lobby", parameters: { p_session_id: SESSION_ID } }],
   );
 });
 
@@ -920,7 +934,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=9[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=18[\s\S]*script\.js\?v=83/);
+  assert.match(html, /trottl-classic-service\.js\?v=10[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=19[\s\S]*script\.js\?v=83/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);

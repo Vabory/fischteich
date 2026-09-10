@@ -92,9 +92,12 @@ test("current and pending avatar selection remain local until explicit confirmat
   assert.doesNotMatch(tapHandler, /service\.|setAvatar|setReady/);
 });
 
-test("required mode auto-opens for null avatar and cannot be dismissed normally", () => {
-  assert.match(uiSource, /player\.avatarId === null[\s\S]*openAvatarModal\(\{ required: true \}\)/);
-  assert.match(uiSource, /state\.avatarModalRequired = required \|\| player\.avatarId === null/);
+test("legacy null avatars remain manually selectable without forcing the modal", () => {
+  assert.doesNotMatch(uiSource, /player\.avatarId === null[\s\S]*openAvatarModal\(\{ required: true \}\)/);
+  assert.match(uiSource, /state\.avatarModalRequired = required;/);
+  assert.doesNotMatch(uiSource, /state\.avatarModalRequired = required \|\| player\.avatarId === null/);
+  assert.match(uiSource, /player\.avatarId === null \? "Avatar wählen" : "Avatar ändern"/);
+  assert.match(uiSource, /readyButton\.disabled = state\.busy \|\| \(!player\.isReady && player\.avatarId === null\)/);
   assert.match(uiSource, /state\.avatarModalRequired && !force/);
   assert.match(uiSource, /avatarCancelButton\.hidden = state\.avatarModalRequired/);
   assert.match(uiSource, /event\.key === "Escape"[\s\S]*stopImmediatePropagation\(\)[\s\S]*closeAvatarModal\(\)/);

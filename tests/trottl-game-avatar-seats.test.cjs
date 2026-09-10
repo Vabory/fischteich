@@ -106,7 +106,7 @@ test("personal reaction rings derive progress from each persisted timing window"
   }).active, false);
   assert.match(uiSource, /service\.getPersonalReactionRemainingMs\([\s\S]*player\.seatIndex/);
   assert.match(uiSource, /reaction\?\.started_at[\s\S]*reaction\?\.deadline_at/);
-  assert.doesNotMatch(uiSource, /setInterval\(/);
+  assert.doesNotMatch(uiSource, /reactionCountdownTimer\s*=\s*global\.setInterval\(/);
   assert.match(css, /--seat-reaction-progress[\s\S]*conic-gradient/);
 });
 

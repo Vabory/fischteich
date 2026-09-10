@@ -67,10 +67,10 @@ test("start and ready mutations share the room lock and validate the locked memb
 });
 
 test("existing snapshot and Realtime path expose avatar and ready without new UI wiring", () => {
-  assert.match(service, /select\("session_id,user_id,display_name_snapshot,seat_index,avatar_id,is_ready,joined_at"\)/);
+  assert.match(service, /select\("session_id,user_id,display_name_snapshot,seat_index,avatar_id,is_ready,joined_at,last_seen_at"\)/);
   assert.match(service, /avatarId,[\s\S]*isReady: value\.is_ready === true/);
   assert.match(service, /setAvatar[\s\S]*set_trottl_classic_avatar[\s\S]*setReady[\s\S]*set_trottl_classic_ready/);
   assert.match(service, /table: "trottl_classic_players"/);
-  assert.match(html, /trottl-avatar-service\.js\?v=3[\s\S]*trottl-classic-service\.js\?v=9/);
+  assert.match(html, /trottl-avatar-service\.js\?v=3[\s\S]*trottl-classic-service\.js\?v=10/);
   assert.doesNotMatch(html, /id="[^"]*(?:avatar-select|ready-button)/i);
 });

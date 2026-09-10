@@ -243,6 +243,7 @@
       avatarId,
       isReady: value.is_ready === true,
       joinedAt: value.joined_at,
+      lastSeenAt: value.last_seen_at ?? null,
     });
   }
 
@@ -341,7 +342,7 @@
         .maybeSingle(),
       supabaseClient
         .from("trottl_classic_players")
-        .select("session_id,user_id,display_name_snapshot,seat_index,avatar_id,is_ready,joined_at")
+        .select("session_id,user_id,display_name_snapshot,seat_index,avatar_id,is_ready,joined_at,last_seen_at")
         .eq("session_id", sessionId)
         .order("seat_index", { ascending: true }),
       supabaseClient.rpc("get_trottl_classic_server_time", { p_session_id: sessionId }),
@@ -423,6 +424,18 @@
     });
     if (error) throw error;
     return loadSession(sessionId);
+  }
+
+  async function heartbeat(sessionId) {
+    await ensureIdentity();
+    const { data, error } = await supabaseClient.rpc("heartbeat_trottl_classic_lobby", {
+      p_session_id: sessionId,
+    });
+    if (error) throw error;
+    if (typeof data !== "string" || !Number.isFinite(Date.parse(data))) {
+      throw new Error("Heartbeat returned an invalid timestamp");
+    }
+    return data;
   }
 
   async function rollSession(sessionId) {
@@ -605,6 +618,7 @@
     startSession,
     setAvatar,
     setReady,
+    heartbeat,
     rollSession,
     resolveRoll,
     acknowledgeDrink,

@@ -5236,6 +5236,15 @@ button.is-release-pressed {
   width: 42px;
   height: 28px;
   opacity: 0.68;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.version-beaver-scene::before {
+  position: absolute;
+  z-index: 4;
+  inset: -8px;
+  content: "";
 }
 
 .version-beaver-scene--right { left: auto; right: 0; }
@@ -5269,7 +5278,6 @@ button.is-release-pressed {
   width: 36px;
   height: 27px;
   transform: translateX(-50%);
-  animation: version-beaver-float 3s ease-in-out infinite;
 }
 
 .version-water {
@@ -5278,7 +5286,49 @@ button.is-release-pressed {
   width: 43px;
   height: 14px;
   transform: translateX(-50%);
-  animation: version-water-ripple 2.6s ease-in-out infinite;
+}
+
+.settings-app-version.is-bobr-unlocked:not(.is-bobr-unlock-sparkling) .version-beaver {
+  animation: version-beaver-float 2.1s ease-in-out infinite;
+}
+
+.settings-app-version.is-bobr-unlocked:not(.is-bobr-unlock-sparkling) .version-water {
+  animation: version-water-ripple 1.82s ease-in-out infinite;
+}
+
+.version-beaver-scene-inner::before,
+.version-beaver-scene-inner::after {
+  position: absolute;
+  z-index: 5;
+  inset: -5px;
+  border-radius: 50%;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-app-version.is-bobr-unlock-sparkling .version-beaver-scene-inner::before {
+  background:
+    radial-gradient(circle at 18% 30%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 74% 12%, #fff 0 1.2px, transparent 2.2px),
+    radial-gradient(circle at 86% 68%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 34% 82%, #fff 0 1.2px, transparent 2.2px);
+  filter: drop-shadow(0 0 3px rgb(255 255 255 / 90%));
+  animation: version-bobr-sparkle 720ms ease-out both;
+}
+
+.settings-app-version.is-bobr-unlock-sparkling .version-beaver-scene-inner::after {
+  top: -2px;
+  right: 3px;
+  bottom: auto;
+  left: auto;
+  width: 11px;
+  height: 11px;
+  background:
+    linear-gradient(90deg, transparent 44%, #fff 45% 55%, transparent 56%),
+    linear-gradient(0deg, transparent 44%, #fff 45% 55%, transparent 56%);
+  filter: drop-shadow(0 0 4px #fff);
+  animation: version-bobr-glint 720ms ease-out both;
 }
 
 .settings-app-version-text {
@@ -5294,6 +5344,18 @@ button.is-release-pressed {
   50% { transform: translateX(calc(-50% + 0.5px)) scaleX(1.018); }
 }
 
+@keyframes version-bobr-sparkle {
+  0% { opacity: 0; transform: scale(0.72); }
+  32% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+@keyframes version-bobr-glint {
+  0%, 12% { opacity: 0; transform: rotate(0deg) scale(0.55); }
+  38% { opacity: 1; transform: rotate(24deg) scale(1); }
+  100% { opacity: 0; transform: rotate(42deg) scale(0.76); }
+}
+
 @media (max-width: 360px) {
   .version-beaver-scene { width: 36px; height: 25px; }
   .version-beaver { width: 31px; height: 24px; }
@@ -5302,7 +5364,17 @@ button.is-release-pressed {
 
 @media (prefers-reduced-motion: reduce) {
   .version-beaver,
-  .version-water { animation: none; }
+  .version-water,
+  .version-beaver-scene-inner::before,
+  .version-beaver-scene-inner::after { animation: none !important; }
+
+  .settings-app-version.is-bobr-unlock-sparkling .version-beaver-scene-inner {
+    filter: brightness(1.35) drop-shadow(0 0 4px rgb(255 255 255 / 82%));
+  }
+
+  .settings-app-version.is-bobr-unlock-sparkling .version-beaver-scene-inner::before {
+    opacity: 0.9;
+  }
 }
 
 .admin-login-card {

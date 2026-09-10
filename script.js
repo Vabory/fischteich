@@ -222,7 +222,9 @@ const shortcutInlineFeedback = document.querySelector("#shortcut-inline-feedback
 const shortcutSetupError = document.querySelector("#shortcut-setup-error");
 const settingsAdminStatus = document.querySelector("#settings-admin-status");
 const settingsAdminActions = document.querySelector("#settings-admin-actions");
+const settingsAppVersion = document.querySelector("#settings-app-version");
 const settingsAppVersionText = document.querySelector("#settings-app-version-text");
+const bobrTapTargets = Object.freeze([...document.querySelectorAll("[data-bobr-tap-target]")]);
 const openAdminLoginButton = document.querySelector("#open-admin-login");
 const adminLogoutButton = document.querySelector("#admin-logout");
 const adminLoginModal = document.querySelector("#admin-login-modal");
@@ -454,6 +456,9 @@ const state = {
   buffaloSyncError: null,
   buffaloNotice: null,
   buffaloRefreshPromise: null,
+  bobrTapSequence: window.bobrUnlockService.createBobrTapSequence(),
+  bobrUnlockRunning: false,
+  bobrSparkleTimer: null,
   buffaloRealtimeUnsubscribe: null,
   buffaloPushSettingsRunning: false,
   buffaloPushSettingsRequestId: 0,
@@ -1631,7 +1636,49 @@ function renderSettingsAdmin(auth = getAppAuthState()) {
   settingsAdminActions.hidden = !isAdmin;
 }
 
+function clearBobrUnlockSparkle() {
+  if (state.bobrSparkleTimer !== null) {
+    window.clearTimeout(state.bobrSparkleTimer);
+    state.bobrSparkleTimer = null;
+  }
+  settingsAppVersion.classList.remove("is-bobr-unlock-sparkling");
+}
+
+function renderBobrUnlockState(profile, { sparkle = false } = {}) {
+  const unlocked = window.bobrUnlockService.isMysticalBobrUnlocked(profile);
+  settingsAppVersion.classList.toggle("is-bobr-unlocked", unlocked);
+  if (unlocked) state.bobrTapSequence.disable();
+  else state.bobrTapSequence.enable();
+  if (!sparkle) return;
+  clearBobrUnlockSparkle();
+  settingsAppVersion.classList.add("is-bobr-unlock-sparkling");
+  state.bobrSparkleTimer = window.setTimeout(() => {
+    state.bobrSparkleTimer = null;
+    settingsAppVersion.classList.remove("is-bobr-unlock-sparkling");
+  }, 760);
+}
+
+async function handleBobrEasterEggTap(event) {
+  if (settingsModal.hidden || state.bobrUnlockRunning) return;
+  const tapTarget = event.target.closest("[data-bobr-tap-target]");
+  if (!tapTarget || !bobrTapTargets.includes(tapTarget)) return;
+  if (window.bobrUnlockService.isMysticalBobrUnlocked(getAppAuthState().currentProfile)) return;
+  if (!state.bobrTapSequence.recordTap(window.performance.now())) return;
+
+  state.bobrUnlockRunning = true;
+  try {
+    const profile = await window.bobrUnlockService.unlockMysticalBobr();
+    renderBobrUnlockState(profile, { sparkle: !settingsModal.hidden });
+  } catch (error) {
+    state.bobrTapSequence.enable();
+    console.warn("Mystical Bobr konnte nicht freigeschaltet werden.", error);
+  } finally {
+    state.bobrUnlockRunning = false;
+  }
+}
+
 function openSettingsModal() {
+  renderBobrUnlockState(getAppAuthState().currentProfile);
   renderSettingsIdentity();
   renderSettingsAdmin();
   renderBuffaloShortcutPlatform();
@@ -1715,6 +1762,8 @@ async function logoutAdminFromSettings() {
 }
 
 function closeSettingsModal() {
+  state.bobrTapSequence.reset();
+  clearBobrUnlockSparkle();
   settingsModal.hidden = true;
   appElement.inert = false;
   openSettingsButton.focus({ preventScroll: true });
@@ -4760,6 +4809,7 @@ document.querySelector("#start-manual-participants").addEventListener("click", (
 });
 openSettingsButton.addEventListener("click", openSettingsModal);
 document.querySelector("#close-settings").addEventListener("click", closeSettingsModal);
+settingsAppVersion.addEventListener("click", (event) => void handleBobrEasterEggTap(event));
 buffaloPushToggle.addEventListener("click", () => {
   void toggleBuffaloPushSettings();
 });
@@ -5210,5 +5260,8 @@ renderRouletteStats();
 initializeLocalIdentity();
 initializeBuffaloTimer();
 void initializeBuffaloPush();
-subscribeToAppAuthState((auth) => renderSettingsAdmin(auth));
+subscribeToAppAuthState((auth) => {
+  renderSettingsAdmin(auth);
+  if (!state.bobrUnlockRunning) renderBobrUnlockState(auth.currentProfile);
+});
 void initializeAppAuth().then(() => trottlClassic.restoreMembership());

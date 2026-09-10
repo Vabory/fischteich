@@ -56,13 +56,18 @@ function normalizeAppProfile(value) {
     userId: profile.user_id,
     displayName: profile.display_name,
     appRole: profile.app_role,
+    bobrUnlocked: profile.bobr_unlocked === true,
+    bobrUnlockedAt: typeof profile.bobr_unlocked_at === "string"
+      && Number.isFinite(Date.parse(profile.bobr_unlocked_at))
+      ? new Date(profile.bobr_unlocked_at).toISOString()
+      : null,
   });
 }
 
 async function loadAppProfile(userId) {
   const { data, error } = await supabaseClient
     .from("app_profiles")
-    .select("user_id,display_name,app_role")
+    .select("user_id,display_name,app_role,bobr_unlocked,bobr_unlocked_at")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -110,6 +115,27 @@ async function updateAuthenticatedProfileDisplayName(displayName) {
     throw new Error("Profile update returned no valid app profile");
   }
 
+  return profile;
+}
+
+async function unlockMyMysticalBobrProfile() {
+  await initializeAppAuth();
+  if (!appAuthState.currentAuthUser || !appAuthState.currentProfile) {
+    throw new Error("An authenticated app profile is required");
+  }
+
+  const { data, error } = await supabaseClient.rpc("unlock_mystical_bobr");
+  if (error) throw error;
+
+  const profile = normalizeAppProfile(data);
+  if (!profile || profile.userId !== appAuthState.currentAuthUser.id || !profile.bobrUnlocked) {
+    throw new Error("Bobr unlock returned no valid app profile");
+  }
+
+  appAuthState.currentProfile = profile;
+  appAuthState.isAdmin = profile.appRole === "admin";
+  appAuthState.lastError = null;
+  publishAppAuthState();
   return profile;
 }
 

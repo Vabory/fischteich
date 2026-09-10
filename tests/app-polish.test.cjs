@@ -12,10 +12,10 @@ const css = read("style.css");
 const script = read("script.js");
 const service = read("roulette-service.js");
 
-assert.match(html, /style\.css\?v=142/);
+assert.match(html, /style\.css\?v=143/);
 assert.match(html, /roulette-service\.js\?v=6/);
 assert.match(html, /button-release\.js\?v=1/);
-assert.match(html, /script\.js\?v=78/);
+assert.match(html, /script\.js\?v=79/);
 
 assert.match(html, /class="version-beaver-scene"/);
 assert.match(html, /class="version-beaver" src="\.\/assets\/settings\/beaver\.png\?v=1"/);

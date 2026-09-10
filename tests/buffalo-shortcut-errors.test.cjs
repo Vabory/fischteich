@@ -17,6 +17,7 @@ const SERVICE_ROLE_KEY = "service-role-key-that-must-never-be-logged";
 const DISPLAY_NAME = "Fabian";
 const TARGET_NAME = "Tobi";
 const SHORTCUT_TOKEN = "c".repeat(43);
+const DEVICE_MANAGEMENT_KEY = "d".repeat(43);
 const SHORTCUT_TOKEN_HASH = createHash("sha256").update(SHORTCUT_TOKEN).digest("hex");
 const ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
 
@@ -49,7 +50,7 @@ function createHarness({
           select() { return this; },
           eq() { return this; },
           async maybeSingle() {
-            return { data: { display_name: DISPLAY_NAME }, error: null };
+            return { data: { display_name: DISPLAY_NAME, app_role: "user" }, error: null };
           },
         };
       }
@@ -150,6 +151,7 @@ function createHarness({
           authorization: `Bearer ${ACCESS_JWT}`,
           apikey: "public-browser-key",
           "content-type": "application/json",
+          "x-buffalo-device-key": DEVICE_MANAGEMENT_KEY,
         },
         body: JSON.stringify({ action, deviceId: DEVICE_ID }),
       }));
@@ -186,6 +188,7 @@ test("provision stores a token hash and encrypted reveal representation", async 
   assert.notEqual(stored.token_hash, body.token);
   assert.match(stored.token_ciphertext, /^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{79}$/);
   assert.equal(stored.token_ciphertext.includes(body.token), false);
+  assert.equal(stored.device_management_key_hash, createHash("sha256").update(DEVICE_MANAGEMENT_KEY).digest("hex"));
   assert.equal(harness.errorLogs.length, 0);
 });
 

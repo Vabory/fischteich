@@ -3,12 +3,13 @@ import { createClient } from "@supabase/supabase-js";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-headers": "authorization, apikey, content-type, x-buffalo-shortcut-token",
+  "access-control-allow-headers": "authorization, apikey, content-type, x-buffalo-device-key, x-buffalo-shortcut-token",
   "access-control-allow-methods": "POST, OPTIONS",
   "access-control-max-age": "86400",
 };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const DEVICE_MANAGEMENT_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const MAX_BODY_BYTES = 4096;
 const DIAGNOSTIC_TEXT_LIMIT = 500;
 const REDACTED = "[redacted]";
@@ -27,6 +28,8 @@ type ShortcutDevice = {
   display_name: string;
   token_hash: string | null;
   token_ciphertext: string | null;
+  device_management_key_hash: string | null;
+  device_management_key_bound_at: string | null;
   enabled: boolean;
 };
 
@@ -238,13 +241,20 @@ async function handleManagementAction(
   rememberSensitive(diagnostic, authData.user.id);
 
   const deviceId = typeof body.deviceId === "string" ? body.deviceId.trim() : "";
+  const deviceManagementKey = request.headers.get("x-buffalo-device-key")?.trim() ?? "";
   rememberSensitive(diagnostic, deviceId);
-  if (!UUID_PATTERN.test(deviceId)) return json({ ok: false, error: "invalid_request" }, 400);
+  rememberSensitive(diagnostic, deviceManagementKey);
+  if (!UUID_PATTERN.test(deviceId) || !DEVICE_MANAGEMENT_KEY_PATTERN.test(deviceManagementKey)) {
+    return json({ ok: false, error: "invalid_request" }, 400);
+  }
+  diagnostic.step = "hash_device_management_key";
+  const deviceManagementKeyHash = await sha256Hex(deviceManagementKey);
+  rememberSensitive(diagnostic, deviceManagementKeyHash);
 
   diagnostic.step = "load_app_profile";
   const { data: profile, error: profileError } = await service
     .from("app_profiles")
-    .select("display_name")
+    .select("display_name,app_role")
     .eq("user_id", authData.user.id)
     .maybeSingle();
   if (profileError) throw profileError;
@@ -256,15 +266,64 @@ async function handleManagementAction(
   diagnostic.step = "load_shortcut_device";
   const { data: existing, error: existingError } = await service
     .from("buffalo_shortcut_devices")
-    .select("device_id,owner_user_id,display_name,token_hash,token_ciphertext,enabled")
+    .select("device_id,owner_user_id,display_name,token_hash,token_ciphertext,device_management_key_hash,device_management_key_bound_at,enabled")
     .eq("device_id", deviceId)
     .maybeSingle();
   if (existingError) throw existingError;
   rememberSensitive(diagnostic, existing?.device_id);
   rememberSensitive(diagnostic, existing?.owner_user_id);
   rememberSensitive(diagnostic, existing?.display_name, 1);
-  if (existing && existing.owner_user_id !== authData.user.id) {
-    return json({ ok: false, error: "device_already_registered" }, 409);
+  if (existing?.device_management_key_hash) {
+    if (!constantTimeEqual(deviceManagementKeyHash, existing.device_management_key_hash)) {
+      return json({ ok: false, error: "device_ownership_failed" }, 403);
+    }
+  } else if (existing) {
+    const originalOwner = existing.owner_user_id === authData.user.id;
+    const trustedAdminRepair = profile.app_role === "admin"
+      && existing.display_name === profile.display_name;
+    if (!originalOwner && !trustedAdminRepair) {
+      return json({ ok: false, error: "device_recovery_required" }, 409);
+    }
+    diagnostic.step = trustedAdminRepair
+      ? "repair_legacy_device_management_key"
+      : "bind_device_management_key";
+    const bindingTime = new Date().toISOString();
+    const { error: bindingError } = await service
+      .from("buffalo_shortcut_devices")
+      .update({
+        device_management_key_hash: deviceManagementKeyHash,
+        device_management_key_bound_at: bindingTime,
+        last_authenticated_user_id: authData.user.id,
+        last_authenticated_at: bindingTime,
+      })
+      .eq("device_id", deviceId)
+      .is("device_management_key_hash", null);
+    if (bindingError) throw bindingError;
+    const { data: boundDevice, error: boundDeviceError } = await service
+      .from("buffalo_shortcut_devices")
+      .select("device_management_key_hash,device_management_key_bound_at")
+      .eq("device_id", deviceId)
+      .maybeSingle();
+    if (boundDeviceError) throw boundDeviceError;
+    if (!boundDevice?.device_management_key_hash
+      || !constantTimeEqual(boundDevice.device_management_key_hash, deviceManagementKeyHash)) {
+      return json({ ok: false, error: "device_ownership_failed" }, 403);
+    }
+    existing.device_management_key_hash = boundDevice.device_management_key_hash;
+    existing.device_management_key_bound_at = boundDevice.device_management_key_bound_at;
+  }
+
+  if (existing) {
+    diagnostic.step = "audit_device_management";
+    const { error: auditError } = await service
+      .from("buffalo_shortcut_devices")
+      .update({
+        last_authenticated_user_id: authData.user.id,
+        last_authenticated_at: new Date().toISOString(),
+      })
+      .eq("device_id", deviceId)
+      .eq("device_management_key_hash", deviceManagementKeyHash);
+    if (auditError) throw auditError;
   }
 
   if (body.action === "status") {
@@ -287,7 +346,7 @@ async function handleManagementAction(
     diagnostic.step = "decrypt_token";
     const token = await decryptShortcutToken(
       existing.token_ciphertext,
-      authData.user.id,
+      existing.owner_user_id,
       deviceId,
       diagnostic,
     );
@@ -314,7 +373,7 @@ async function handleManagementAction(
         updated_at: new Date().toISOString(),
       })
       .eq("device_id", deviceId)
-      .eq("owner_user_id", authData.user.id);
+      .eq("device_management_key_hash", deviceManagementKeyHash);
     if (error) throw error;
     diagnostic.step = "response";
     return json({ ok: true, status: "revoked" });
@@ -341,7 +400,7 @@ async function handleManagementAction(
   diagnostic.step = "encrypt_token";
   const tokenCiphertext = await encryptShortcutToken(
     token,
-    authData.user.id,
+    existing?.owner_user_id ?? authData.user.id,
     deviceId,
     diagnostic,
   );
@@ -353,6 +412,10 @@ async function handleManagementAction(
     display_name: profile.display_name,
     token_hash: tokenHash,
     token_ciphertext: tokenCiphertext,
+    device_management_key_hash: deviceManagementKeyHash,
+    device_management_key_bound_at: existing?.device_management_key_bound_at ?? now,
+    last_authenticated_user_id: authData.user.id,
+    last_authenticated_at: now,
     enabled: true,
     updated_at: now,
     rate_window_started_at: null,
@@ -362,9 +425,12 @@ async function handleManagementAction(
     ? "rotate_shortcut_device"
     : "provision_shortcut_device";
   const writeQuery = existing
-    ? service.from("buffalo_shortcut_devices").update(deviceValues)
+    ? service.from("buffalo_shortcut_devices").update({
+      ...deviceValues,
+      owner_user_id: existing.owner_user_id,
+    })
       .eq("device_id", deviceId)
-      .eq("owner_user_id", authData.user.id)
+      .eq("device_management_key_hash", deviceManagementKeyHash)
     : service.from("buffalo_shortcut_devices").insert(deviceValues);
   const { error: writeError } = await writeQuery;
   if (writeError) throw writeError;

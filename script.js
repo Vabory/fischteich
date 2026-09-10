@@ -476,6 +476,7 @@ const state = {
   buffaloShortcutTokenVisible: false,
   buffaloShortcutSettingsRunning: false,
   buffaloShortcutSettingsRequestId: 0,
+  buffaloShortcutSetupRequestId: 0,
   adminTrottlResetRoomSlot: null,
   adminTrottlResetRunning: false,
   adminTrottlResetReturnFocus: null,
@@ -1339,9 +1340,11 @@ async function renderBuffaloShortcutStatus() {
       status: error?.status ?? null,
     });
     setBuffaloShortcutStatus(
-      error?.code === "device_already_registered"
-        ? "Der Schnellzugriff muss neu verbunden werden."
-        : "Verbindung zu Supabase fehlgeschlagen.",
+      error?.code === "device_recovery_required"
+        ? "Einmalige Gerätebestätigung erforderlich."
+        : error?.code === "device_ownership_failed"
+          ? "Gerätenachweis wurde abgelehnt."
+          : "Verbindung zu Supabase fehlgeschlagen.",
       { error: true },
     );
   }
@@ -1412,20 +1415,32 @@ function renderShortcutSetupAccessState(result) {
 }
 
 async function refreshShortcutSetupAccessState() {
+  const requestId = state.buffaloShortcutSetupRequestId + 1;
+  state.buffaloShortcutSetupRequestId = requestId;
+  shortcutSetupError.hidden = true;
+  shortcutAccessStatus.textContent = "Status wird geprüft …";
+  createShortcutAccessButton.hidden = false;
+  createShortcutAccessButton.textContent = "Status wird geprüft …";
+  createShortcutAccessButton.disabled = true;
   try {
     const result = await window.buffaloShortcutService.getStatus();
-    if (shortcutSetupModal.hidden) return;
+    if (requestId !== state.buffaloShortcutSetupRequestId || shortcutSetupModal.hidden) return;
     renderShortcutSetupAccessState(result);
   } catch (error) {
-    if (shortcutSetupModal.hidden) return;
+    if (requestId !== state.buffaloShortcutSetupRequestId || shortcutSetupModal.hidden) return;
     console.warn("Buffalo-Schnellzugriffstatus konnte nicht geladen werden.", {
       code: error?.code ?? "request_failed",
       status: error?.status ?? null,
     });
-    shortcutSetupError.textContent = "Status konnte nicht geladen werden. Bitte Verbindung prüfen.";
+    shortcutSetupError.textContent = error?.code === "device_recovery_required"
+      ? "Bestehendes Gerät noch nicht gebunden. Bitte melde dich einmal als Admin an und versuche es erneut."
+      : error?.code === "device_ownership_failed"
+        ? "Der sichere Gerätenachweis passt nicht zu diesem Gerät."
+        : "Status konnte nicht geladen werden. Bitte Verbindung prüfen.";
     shortcutSetupError.hidden = false;
     createShortcutAccessButton.hidden = false;
-    createShortcutAccessButton.disabled = true;
+    createShortcutAccessButton.disabled = false;
+    createShortcutAccessButton.textContent = "Erneut versuchen";
     rotateShortcutAccessButton.hidden = true;
     shortcutAccessStatus.textContent = "Status konnte nicht geladen werden.";
   }
@@ -1505,9 +1520,11 @@ async function createShortcutAccess() {
       code: error?.code ?? "request_failed",
       status: error?.status ?? null,
     });
-    shortcutSetupError.textContent = error?.code === "device_already_registered"
-      ? "Dieses Gerät ist bereits mit einer anderen App-Sitzung verbunden."
-      : "Schnellzugriff konnte nicht eingerichtet werden. Bitte Verbindung prüfen.";
+    shortcutSetupError.textContent = error?.code === "device_recovery_required"
+      ? "Bestehendes Gerät noch nicht gebunden. Bitte melde dich einmal als Admin an und versuche es erneut."
+      : error?.code === "device_ownership_failed"
+        ? "Der sichere Gerätenachweis passt nicht zu diesem Gerät."
+        : "Schnellzugriff konnte nicht eingerichtet werden. Bitte Verbindung prüfen.";
     shortcutSetupError.hidden = false;
     createShortcutAccessButton.textContent = "Erneut versuchen";
   } finally {
@@ -5391,6 +5408,12 @@ subscribeToAppAuthState((auth) => {
       deactivateBobrTapListeners();
     } else {
       activateBobrTapListeners();
+    }
+  }
+  if (auth.isInitialized && auth.currentAuthUser && !settingsModal.hidden) {
+    void renderBuffaloShortcutStatus();
+    if (!shortcutSetupModal.hidden && !state.buffaloShortcutSettingsRunning) {
+      void refreshShortcutSetupAccessState();
     }
   }
 });

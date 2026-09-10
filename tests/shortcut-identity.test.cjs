@@ -16,6 +16,7 @@ const originalMigration = read("supabase/migrations/20260902000000_create_buffal
 const repairMigration = read("supabase/migrations/20260902010000_repair_shortcut_auth_profiles.sql");
 const DEVICE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const DEVICE_MANAGEMENT_KEY = "d".repeat(43);
 
 function createAuthHarness({ initialSession = null, profileExists = true } = {}) {
   let session = initialSession;
@@ -137,6 +138,7 @@ function createShortcutHarness({ initiallyMissingSession = false } = {}) {
       session = { access_token: "valid-management-jwt" };
     },
     ensureCurrentAppProfile: async (displayName) => { ensureProfileCalls.push(displayName); },
+    getOrCreateDeviceManagementKey: async () => DEVICE_MANAGEMENT_KEY,
     getLocalIdentity: () => ({ deviceId: DEVICE_ID, displayName: "Fabian" }),
     fetch: async (url, options) => {
       requests.push({ url, options });
@@ -155,6 +157,7 @@ function createShortcutHarness({ initiallyMissingSession = false } = {}) {
     ensureProfileCalls,
     getEnsureAnonymousCalls: () => ensureAnonymousCalls,
     getInitializeCalls: () => initializeCalls,
+    setSession(nextSession) { session = nextSession; },
   };
 }
 
@@ -171,6 +174,7 @@ test("status, provision, reveal, rotate and revoke repair identity and send the 
   ]);
   for (const request of harness.requests) {
     assert.equal(request.options.headers.authorization, "Bearer valid-management-jwt");
+    assert.equal(request.options.headers["x-buffalo-device-key"], DEVICE_MANAGEMENT_KEY);
     assert.equal(JSON.parse(request.options.body).deviceId, DEVICE_ID);
   }
   assert.deepEqual(harness.ensureProfileCalls, ["Fabian", "Fabian", "Fabian", "Fabian", "Fabian"]);
@@ -183,6 +187,21 @@ test("shortcut management retries anonymous auth only when the session is absent
   assert.equal(harness.getInitializeCalls(), 1);
   assert.equal(harness.getEnsureAnonymousCalls(), 1);
   assert.equal(harness.requests[0].options.headers.authorization, "Bearer valid-management-jwt");
+});
+
+test("repeated anonymous and admin transitions always use the latest persisted JWT", async () => {
+  const harness = createShortcutHarness();
+  for (const accessToken of ["anonymous-one", "admin", "anonymous-two", "admin-again"]) {
+    harness.setSession({ access_token: accessToken });
+    await harness.service.getStatus();
+  }
+  assert.deepEqual(
+    harness.requests.map((request) => request.options.headers.authorization),
+    ["Bearer anonymous-one", "Bearer admin", "Bearer anonymous-two", "Bearer admin-again"],
+  );
+  assert.ok(harness.requests.every(
+    (request) => request.options.headers["x-buffalo-device-key"] === DEVICE_MANAGEMENT_KEY,
+  ));
 });
 
 test("follow-up migration repairs orphans and binds profile creation to auth.uid", () => {
@@ -200,11 +219,13 @@ test("local Supabase explicitly enables the anonymous-auth flow", () => {
   assert.match(config, /\[auth\][\s\S]*enable_anonymous_sign_ins = true/);
 });
 
-test("foreign identities still cannot take over a registered shortcut device", () => {
+test("foreign identities cannot take over a registered shortcut without its device key", () => {
   assert.match(originalMigration, /device_id uuid primary key/);
   assert.match(originalMigration, /owner_user_id uuid not null references auth\.users/);
-  assert.match(edgeFunction, /existing && existing\.owner_user_id !== authData\.user\.id/);
-  assert.match(edgeFunction, /device_already_registered/);
+  assert.match(edgeFunction, /constantTimeEqual\(deviceManagementKeyHash, existing\.device_management_key_hash\)/);
+  assert.match(edgeFunction, /device_ownership_failed/);
+  assert.match(edgeFunction, /\.eq\("device_management_key_hash", deviceManagementKeyHash\)/);
+  assert.doesNotMatch(shortcutSource, /localStorage.*(?:deviceManagement|device_management|shortcut.*key)/is);
 });
 
 test("standalone shortcut start still needs no browser JWT and requires its device token", () => {

@@ -3,6 +3,7 @@
 // Official reviewed share URL for the universal Buffalo shortcut template.
 const APPLE_BUFFALO_SHORTCUT_URL = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
 const BUFFALO_SHORTCUT_ENDPOINT = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/buffalo-shortcut`;
+const SHORTCUT_MANAGEMENT_TIMEOUT_MS = 12000;
 
 function detectShortcutPlatform(navigatorLike = window.navigator) {
   const userAgent = typeof navigatorLike?.userAgent === "string"
@@ -67,22 +68,37 @@ async function getShortcutManagementIdentity() {
   if (error) throw error;
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("Shortcut setup requires an authenticated app session");
-  return Object.freeze({ accessToken, identity });
+  if (typeof getOrCreateDeviceManagementKey !== "function") {
+    throw new Error("Secure device credential storage is unavailable");
+  }
+  const deviceManagementKey = await getOrCreateDeviceManagementKey(identity.deviceId);
+  return Object.freeze({ accessToken, deviceManagementKey, identity });
 }
 
-async function requestShortcutManagement(action) {
-  const { accessToken, identity } = await getShortcutManagementIdentity();
-  const response = await fetch(BUFFALO_SHORTCUT_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${accessToken}`,
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-    },
-    body: JSON.stringify({ action, deviceId: identity.deviceId }),
-    cache: "no-store",
-    referrerPolicy: "no-referrer",
-  });
+async function sendShortcutManagementRequest(action) {
+  const { accessToken, deviceManagementKey, identity } = await getShortcutManagementIdentity();
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timeoutId = typeof window.setTimeout === "function"
+    ? window.setTimeout(() => controller?.abort(), SHORTCUT_MANAGEMENT_TIMEOUT_MS)
+    : null;
+  let response;
+  try {
+    response = await fetch(BUFFALO_SHORTCUT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        "x-buffalo-device-key": deviceManagementKey,
+      },
+      body: JSON.stringify({ action, deviceId: identity.deviceId }),
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+  } finally {
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+  }
 
   let result = null;
   try {
@@ -97,6 +113,23 @@ async function requestShortcutManagement(action) {
     throw error;
   }
   return result;
+}
+
+async function requestShortcutManagement(action) {
+  try {
+    return await sendShortcutManagementRequest(action);
+  } catch (error) {
+    if (!['unauthorized', 'identity_unavailable'].includes(error?.code)) throw error;
+    if (error.code === "unauthorized" && typeof supabaseClient.auth.refreshSession === "function") {
+      const { error: refreshError } = await supabaseClient.auth.refreshSession();
+      if (refreshError) throw error;
+    }
+    const identity = getLocalIdentity();
+    if (identity && typeof ensureCurrentAppProfile === "function") {
+      await ensureCurrentAppProfile(identity.displayName);
+    }
+    return sendShortcutManagementRequest(action);
+  }
 }
 
 function getBuffaloShortcutStatus() {

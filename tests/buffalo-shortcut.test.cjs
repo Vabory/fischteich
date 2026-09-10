@@ -9,6 +9,7 @@ const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const serviceSource = read("shortcut-service.js");
+const deviceCredentialSource = read("device-credential.js");
 const script = read("script.js");
 const html = read("index.html");
 const style = read("style.css");
@@ -18,6 +19,9 @@ const tokenCiphertextMigration = read(
 );
 const serviceRoleGrantMigration = read(
   "supabase/migrations/20260902020000_grant_buffalo_shortcut_service_role_tables.sql",
+);
+const deviceBindingMigration = read(
+  "supabase/migrations/20260911000000_bind_buffalo_shortcut_to_device.sql",
 );
 const edgeFunction = read("supabase/functions/buffalo-shortcut/index.ts");
 const edgeConfig = read("supabase/config.toml");
@@ -119,15 +123,19 @@ test("shortcut modal gives the Apple template primary priority without weakening
 test("shortcut credentials use a private POST body and secret header", () => {
   assert.match(edgeFunction, /request\.method !== "POST"/);
   assert.match(edgeFunction, /x-buffalo-shortcut-token/);
+  assert.match(edgeFunction, /x-buffalo-device-key/);
   assert.match(edgeFunction, /body\.action === "start"/);
   assert.doesNotMatch(edgeFunction, /URLSearchParams|searchParams\.get/);
   assert.match(edgeFunction, /MAX_BODY_BYTES = 4096/);
 });
 
-test("provisioning requires a verified Supabase user and links the existing device ID", () => {
+test("management requires a verified Supabase user and device-bound proof", () => {
   assert.match(edgeFunction, /service\.auth\.getUser\(accessJwt\)/);
   assert.match(edgeFunction, /from\("app_profiles"\)/);
-  assert.match(edgeFunction, /device_already_registered/);
+  assert.match(edgeFunction, /device_ownership_failed/);
+  assert.match(edgeFunction, /device_management_key_hash/);
+  assert.match(deviceBindingMigration, /add column device_management_key_hash text/);
+  assert.match(deviceBindingMigration, /drop constraint buffalo_shortcut_devices_owner_user_id_fkey/);
   assert.match(migration, /owner_user_id uuid not null references auth\.users/);
   assert.match(edgeFunction, /body\.action === "status"[\s\S]*tokenRevealAvailable: active && Boolean\(existing\?\.token_ciphertext\)/);
   const statusBlock = edgeFunction.slice(
@@ -136,7 +144,9 @@ test("provisioning requires a verified Supabase user and links the existing devi
   );
   assert.doesNotMatch(statusBlock, /encryptShortcutToken|decryptShortcutToken|token:/);
   assert.doesNotMatch(edgeFunction, /sync_shortcut_device/);
-  assert.doesNotMatch(serviceSource, /randomUUID/);
+  assert.match(deviceCredentialSource, /window\.indexedDB/);
+  assert.match(deviceCredentialSource, /new Uint8Array\(32\)/);
+  assert.doesNotMatch(deviceCredentialSource, /localStorage|sessionStorage/);
 });
 
 test("tokens remain strongly hashed for start and are reversibly encrypted only on the server", () => {

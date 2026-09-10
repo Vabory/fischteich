@@ -19,6 +19,8 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const DEVICE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OWNER_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const FOREIGN_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const DEVICE_MANAGEMENT_KEY = "d".repeat(43);
+const FOREIGN_DEVICE_MANAGEMENT_KEY = "e".repeat(43);
 const ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 
 function thenable(run) {
@@ -28,6 +30,7 @@ function thenable(run) {
 function createLifecycleHarness({ initialDevice = null } = {}) {
   let servedHandler;
   let authUserId = OWNER_ID;
+  let authRole = "user";
   let device = initialDevice ? { ...initialDevice } : null;
 
   function deviceQuery() {
@@ -45,6 +48,7 @@ function createLifecycleHarness({ initialDevice = null } = {}) {
         });
       },
       eq(column, value) { filters.set(column, value); return this; },
+      is(column, value) { filters.set(column, value); return this; },
       maybeSingle() {
         const matches = device
           && [...filters].every(([column, value]) => device[column] === value);
@@ -71,7 +75,7 @@ function createLifecycleHarness({ initialDevice = null } = {}) {
         return {
           select() { return this; },
           eq() { return this; },
-          async maybeSingle() { return { data: { display_name: "Fabian" }, error: null }; },
+          async maybeSingle() { return { data: { display_name: "Fabian", app_role: authRole }, error: null }; },
         };
       }
       if (table === "buffalo_shortcut_devices") return deviceQuery();
@@ -141,12 +145,13 @@ function createLifecycleHarness({ initialDevice = null } = {}) {
     console: { error() {} },
   }), { filename: "buffalo-shortcut/index.ts" });
 
-  async function management(action, { authenticated = true } = {}) {
+  async function management(action, { authenticated = true, deviceManagementKey = DEVICE_MANAGEMENT_KEY } = {}) {
     return servedHandler(new Request("https://project.supabase.co/functions/v1/buffalo-shortcut", {
       method: "POST",
       headers: {
         ...(authenticated ? { authorization: "Bearer management-jwt" } : {}),
         "content-type": "application/json",
+        "x-buffalo-device-key": deviceManagementKey,
       },
       body: JSON.stringify({ action, deviceId: DEVICE_ID }),
     }));
@@ -166,6 +171,7 @@ function createLifecycleHarness({ initialDevice = null } = {}) {
     getDevice: () => device ? { ...device } : null,
     setDevice(value) { device = value ? { ...value } : null; },
     setAuthUserId(value) { authUserId = value; },
+    setAuthRole(value) { authRole = value; },
   };
 }
 
@@ -174,7 +180,7 @@ function decodeTokenBytes(token) {
   return Buffer.from(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="), "base64");
 }
 
-test("provision is one-time, status is read-only, and reload-style checks preserve the token", async () => {
+test("provision is one-time and reload-style checks preserve the token", async () => {
   const harness = createLifecycleHarness();
   const firstResponse = await harness.management("provision");
   const first = await firstResponse.json();
@@ -186,12 +192,14 @@ test("provision is one-time, status is read-only, and reload-style checks preser
   assert.notEqual(firstDevice.token_hash, first.token);
   assert.match(firstDevice.token_ciphertext, /^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{79}$/);
   assert.equal(firstDevice.token_ciphertext.includes(first.token), false);
+  assert.equal(firstDevice.device_management_key_hash, createHash("sha256").update(DEVICE_MANAGEMENT_KEY).digest("hex"));
 
   for (let check = 0; check < 3; check += 1) {
     const statusResponse = await harness.management("status");
     const status = await statusResponse.json();
     assert.deepEqual(status, { ok: true, status: "active", tokenRevealAvailable: true });
-    assert.deepEqual(harness.getDevice(), firstDevice);
+    assert.equal(harness.getDevice().token_hash, firstDevice.token_hash);
+    assert.equal(harness.getDevice().token_ciphertext, firstDevice.token_ciphertext);
   }
 
   const secondResponse = await harness.management("provision");
@@ -230,7 +238,9 @@ test("authenticated reveal returns the same token repeatedly without mutation", 
       deviceId: DEVICE_ID,
       token: created.token,
     });
-    assert.deepEqual(harness.getDevice(), stored);
+    assert.equal(harness.getDevice().token_hash, stored.token_hash);
+    assert.equal(harness.getDevice().token_ciphertext, stored.token_ciphertext);
+    assert.equal(harness.getDevice().owner_user_id, stored.owner_user_id);
   }
   assert.equal((await harness.management("reveal", { authenticated: false })).status, 401);
 });
@@ -248,15 +258,19 @@ test("revoke invalidates the token without changing the device identity", async 
   assert.equal((await harness.management("reveal")).status, 409);
 });
 
-test("a foreign authenticated user cannot provision, reveal, rotate, or revoke a device", async () => {
+test("auth session changes retain management only with the same device key", async () => {
   const harness = createLifecycleHarness();
-  await harness.management("provision");
+  const created = await (await harness.management("provision")).json();
   const originalHash = harness.getDevice().token_hash;
   harness.setAuthUserId(FOREIGN_ID);
+  assert.equal((await harness.management("status")).status, 200);
+  assert.equal((await (await harness.management("reveal")).json()).token, created.token);
+  assert.equal(harness.getDevice().owner_user_id, OWNER_ID);
+  assert.equal(harness.getDevice().last_authenticated_user_id, FOREIGN_ID);
   for (const action of ["provision", "reveal", "rotate", "revoke"]) {
-    const response = await harness.management(action);
-    assert.equal(response.status, 409);
-    assert.equal((await response.json()).error, "device_already_registered");
+    const response = await harness.management(action, { deviceManagementKey: FOREIGN_DEVICE_MANAGEMENT_KEY });
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).error, "device_ownership_failed");
     assert.equal(harness.getDevice().token_hash, originalHash);
   }
 });
@@ -270,6 +284,8 @@ test("legacy hashed tokens remain valid but cannot be revealed or silently rotat
     token_hash: createHash("sha256").update(legacyToken).digest("hex"),
     token_ciphertext: null,
     enabled: true,
+    device_management_key_hash: null,
+    device_management_key_bound_at: null,
   };
   const harness = createLifecycleHarness({ initialDevice: legacyDevice });
   assert.deepEqual(await (await harness.management("status")).json(), {
@@ -282,7 +298,31 @@ test("legacy hashed tokens remain valid but cannot be revealed or silently rotat
     error: "token_not_revealable",
   });
   assert.equal((await (await harness.management("provision")).json()).status, "already_provisioned");
-  assert.deepEqual(harness.getDevice(), legacyDevice);
+  assert.equal(harness.getDevice().token_hash, legacyDevice.token_hash);
+  assert.equal(harness.getDevice().token_ciphertext, null);
+  assert.equal(harness.getDevice().device_management_key_hash, createHash("sha256").update(DEVICE_MANAGEMENT_KEY).digest("hex"));
+  assert.equal((await harness.start(legacyToken)).status, 200);
+});
+
+test("one trusted admin repair binds a legacy device without rotating its token", async () => {
+  const legacyToken = "r".repeat(43);
+  const harness = createLifecycleHarness({ initialDevice: {
+    device_id: DEVICE_ID,
+    owner_user_id: OWNER_ID,
+    display_name: "Fabian",
+    token_hash: createHash("sha256").update(legacyToken).digest("hex"),
+    token_ciphertext: null,
+    enabled: true,
+    device_management_key_hash: null,
+    device_management_key_bound_at: null,
+  } });
+  harness.setAuthUserId(FOREIGN_ID);
+  assert.equal((await harness.management("status")).status, 409);
+  harness.setAuthRole("admin");
+  const repaired = await (await harness.management("status")).json();
+  assert.equal(repaired.status, "active");
+  assert.equal(harness.getDevice().token_hash, createHash("sha256").update(legacyToken).digest("hex"));
+  assert.equal(harness.getDevice().device_management_key_hash, createHash("sha256").update(DEVICE_MANAGEMENT_KEY).digest("hex"));
   assert.equal((await harness.start(legacyToken)).status, 200);
 });
 

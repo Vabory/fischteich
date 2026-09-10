@@ -88,10 +88,10 @@ test("kick submit is single-flight and never mutates the players array optimisti
 });
 
 test("a realtime snapshot without the former local lobby membership exits cleanly", () => {
-  assert.match(ui, /hadLocalLobbyMembership[\s\S]*localLobbyPlayer\(snapshot\) === null[\s\S]*handleLobbyMembershipRemoved\(sessionId\)/);
-  assert.match(ui, /async function handleLobbyMembershipRemoved[\s\S]*stopLobbyHeartbeat\(\)[\s\S]*state\.snapshot = null[\s\S]*stopSessionRealtime\(\)[\s\S]*openRooms\(\)/);
+  assert.match(ui, /if \(!hasLocalMembership\(snapshot\)\)[\s\S]*handleMembershipRemoved\(sessionId\)/);
+  assert.match(ui, /async function exitInvalidatedSession[\s\S]*stopLobbyHeartbeat\(\)[\s\S]*state\.snapshot = null[\s\S]*stopSessionRealtime\(\)[\s\S]*openRooms\(\{ feedback \}\)/);
   assert.match(ui, /Du wurdest aus der Lobby entfernt\./);
-  assert.doesNotMatch(ui.match(/async function handleLobbyMembershipRemoved[\s\S]*?\n    }/)?.[0] ?? "", /joinRoom|service\.join/);
+  assert.doesNotMatch(ui.match(/async function exitInvalidatedSession[\s\S]*?\n    }/)?.[0] ?? "", /joinRoom|service\.join/);
   assert.match(service, /table: "trottl_classic_players"/);
 });
 

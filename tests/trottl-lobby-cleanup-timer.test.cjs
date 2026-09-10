@@ -57,7 +57,7 @@ test("leave, gameplay, session changes and kick removal stop cleanup", () => {
   assert.match(ui, /if \(isPlaying\) \{\s*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
   assert.match(ui, /async function openSnapshot[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
   assert.match(ui, /async function leaveCurrentSession[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
-  assert.match(ui, /async function handleLobbyMembershipRemoved[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
+  assert.match(ui, /async function exitInvalidatedSession[\s\S]*stopLobbyHeartbeat\(\);\s*stopLobbyCleanup\(\)/);
   assert.match(ui, /async function openRooms[\s\S]*stopLobbyCleanup\(\)/);
 });
 

@@ -4829,9 +4829,13 @@ button.is-release-pressed {
   font-size: 0.78rem;
 }
 
+.settings-modal-backdrop {
+  padding-top: max(32px, calc(env(safe-area-inset-top) + 8px));
+}
+
 .settings-card {
   position: relative;
-  max-height: min(92dvh, 720px);
+  max-height: min(87dvh, 680px);
   padding: 26px 26px 28px;
   overflow-y: auto;
   border-color: rgb(86 202 255 / 24%);
@@ -5392,11 +5396,11 @@ button.is-release-pressed {
 }
 
 .settings-app-version.is-bobr-unlocked:not(.is-bobr-unlock-sparkling) .version-beaver {
-  animation: version-beaver-float 2.1s ease-in-out infinite;
+  animation: version-beaver-float 2.05s ease-in-out infinite;
 }
 
 .settings-app-version.is-bobr-unlocked:not(.is-bobr-unlock-sparkling) .version-water {
-  animation: version-water-ripple 1.82s ease-in-out infinite;
+  animation: version-water-ripple 1.8s ease-in-out infinite;
 }
 
 .version-beaver-scene-inner::before,
@@ -5439,12 +5443,12 @@ button.is-release-pressed {
 
 @keyframes version-beaver-float {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-1px); }
+  50% { transform: translateX(-50%) translateY(2.25px); }
 }
 
 @keyframes version-water-ripple {
-  0%, 100% { transform: translateX(calc(-50% - 0.5px)) scaleX(1); }
-  50% { transform: translateX(calc(-50% + 0.5px)) scaleX(1.018); }
+  0%, 100% { transform: translateX(calc(-50% - 0.65px)) scaleX(1); }
+  50% { transform: translateX(calc(-50% + 0.65px)) scaleX(1.02); }
 }
 
 @keyframes version-bobr-sparkle {

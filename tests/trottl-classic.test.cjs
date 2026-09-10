@@ -978,7 +978,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=13[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=22[\s\S]*script\.js\?v=85/);
+  assert.match(html, /trottl-classic-service\.js\?v=13[\s\S]*trottl-classic-preview\.js\?v=2[\s\S]*trottl-classic-ui\.js\?v=23[\s\S]*script\.js\?v=85/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
@@ -1248,9 +1248,9 @@ test("Klassik UI renders and submits every rule phase through direct table inter
 test("roller, realtime spectators and recovery snapshots share one guarded roll consumer", () => {
   assert.match(ui, /function syncGameDice\(snapshot, rollSource = "passive"\)/);
   assert.match(ui, /renderSession\("live"\)/, "the roller's authoritative RPC snapshot uses the live consumer");
-  assert.match(ui, /subscribeSession\([\s\S]*document\.visibilityState === "hidden" \? "recovery" : "live"/);
+  assert.match(ui, /subscribeSession\([\s\S]*const recovering = document\.visibilityState === "hidden"[\s\S]*rollSource: recovering \? "recovery" : "live"/);
   assert.match(ui, /function openSnapshot\([\s\S]*renderSession\("recovery"\)/);
-  assert.match(ui, /function resume\([\s\S]*refreshSession\(\{ rollSource: "recovery" \}\)/);
+  assert.match(ui, /function resume\([\s\S]*state\.snapshot\.session\.status === "playing"[\s\S]*recoverSessionConnection\(\)[\s\S]*refreshSession\(\{ rollSource: "recovery" \}\)/);
   assert.match(ui, /animatingRollSeq:\s*state\.animatingRollSeq/);
   assert.match(ui, /lastSettledRollSeq:\s*state\.lastSettledRollSeq/);
   assert.match(ui, /const settledRollSeq = state\.animatingRollSeq[\s\S]*state\.lastSettledRollSeq = Math\.max/);

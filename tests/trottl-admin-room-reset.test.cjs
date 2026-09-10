@@ -118,10 +118,10 @@ test("confirmation is single-flight and invokes exactly the selected reset once"
 test("existing Realtime removal exits connected lobby and gameplay clients without auto-rejoin", () => {
   assert.match(service, /table: "trottl_classic_sessions"[\s\S]*table: "trottl_classic_players"/);
   assert.match(service, /sessionResponse\.data === null[\s\S]*TROTTL_CLASSIC_SESSION_NOT_FOUND/);
-  const handler = ui.match(/async function handleAdminRoomReset\(sessionId\)[\s\S]*?\n    }/)?.[0] ?? "";
+  const handler = ui.match(/async function exitInvalidatedSession\(sessionId, feedback\)[\s\S]*?\n    }/)?.[0] ?? "";
   assert.match(handler, /stopLobbyHeartbeat\(\)[\s\S]*stopLobbyCleanup\(\)/);
-  assert.match(handler, /state\.snapshot = null[\s\S]*stopSessionRealtime\(\)[\s\S]*openRooms\(\)/);
-  assert.match(handler, /Der Raum wurde zurückgesetzt/);
+  assert.match(handler, /state\.snapshot = null[\s\S]*stopSessionRealtime\(\)[\s\S]*openRooms\(\{ feedback \}\)/);
+  assert.match(ui, /handleAdminRoomReset\(sessionId\)[\s\S]*Der Raum wurde zurückgesetzt/);
   assert.doesNotMatch(handler, /joinRoom|startLobbyHeartbeat|startLobbyCleanup/);
   assert.match(ui, /TROTTL_CLASSIC_SESSION_NOT_FOUND[\s\S]*handleAdminRoomReset\(sessionId\)/);
 });

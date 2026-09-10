@@ -144,8 +144,8 @@ test("first successful unlock sparkles both beavers once, then enables faster mo
   assert.match(script, /clearBobrUnlockSparkle\(\)[\s\S]*classList\.add\("is-bobr-unlock-sparkling"\)/);
   assert.match(css, /\.is-bobr-unlock-sparkling \.version-beaver-scene-inner::before/);
   assert.match(css, /version-bobr-sparkle 720ms/);
-  assert.match(css, /version-beaver-float 2\.1s/);
-  assert.match(css, /version-water-ripple 1\.82s/);
+  assert.match(css, /version-beaver-float 2\.05s/);
+  assert.match(css, /version-water-ripple 1\.8s/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*is-bobr-unlock-sparkling/);
 });
 

@@ -354,6 +354,8 @@
       kickTargetName: "",
       kickSubmitting: false,
       kickModalReturnFocus: null,
+      connectionChecking: false,
+      sessionRecoveryPromise: null,
     };
 
     const gameDice = global.FischteichDice.mount({
@@ -392,6 +394,10 @@
 
     function localLobbyPlayer(snapshot = state.snapshot) {
       return snapshot?.players.find((player) => player.userId === snapshot.identity.userId) ?? null;
+    }
+
+    function hasLocalMembership(snapshot = state.snapshot) {
+      return localLobbyPlayer(snapshot) !== null;
     }
 
     function getAvailableAvatarChoices() {
@@ -809,7 +815,7 @@
         count.textContent = `${room.playerCount} / ${service.maxPlayers} Spieler`;
         status.className = "trottl-classic-room-status";
         status.textContent = room.isMember
-          ? "Weiter"
+          ? room.status === "playing" ? "Wieder beitreten" : "Weiter"
           : room.status === "playing" ? "Spiel läuft" : room.status === "lobby" ? "Lobby" : "Frei";
         button.disabled = state.busy || (room.status === "playing" && !room.isMember);
         button.append(title, count, status);
@@ -1760,6 +1766,7 @@
       const snapshot = state.snapshot;
       if (!snapshot) return;
       const isPlaying = snapshot.session.status === "playing";
+      sessionBackButton.setAttribute("aria-label", isPlaying ? "Zur Raumauswahl" : "Raum verlassen");
       sessionScreen.classList.toggle("is-playing", isPlaying);
       sessionHeader.hidden = isPlaying;
       lobbyView.hidden = isPlaying;
@@ -1792,6 +1799,48 @@
       if (unsubscribe) await unsubscribe();
     }
 
+    function resetRecoveryTransientState(sessionId) {
+      clearResolveTimer();
+      clearActionBoundaryTimer();
+      clearReactionCountdownTimer();
+      state.animatingRollSeq = null;
+      state.lastSettledRollSeq = 0;
+      state.deferredLiveRollSeq = null;
+      state.animatingReactionCanStart = false;
+      state.personalReactionIntent = null;
+      state.reactionStartPending = false;
+      state.queuedReactionAt = null;
+      state.hasRenderedGame = false;
+      state.visualSessionId = sessionId;
+      state.visualRollSeq = null;
+      state.visualPhase = null;
+      state.visualTrottlSeat = null;
+      state.visualAllocations = Object.freeze({});
+      state.visualReactionStatuses = Object.freeze({});
+      state.visualPenaltySeats = new Set();
+      state.visualFourTotal = 0;
+    }
+
+    function setConnectionChecking(checking) {
+      state.connectionChecking = checking;
+      if (!state.snapshot || state.snapshot.session.status !== "playing") return;
+      if (checking) {
+        sessionFeedback.textContent = "Verbindung wird geprüft …";
+        renderSituation(Object.freeze({
+          player: "",
+          copy: "VERBINDUNG WIRD GEPRÜFT",
+          roll: "",
+          action: "",
+          meta: "",
+          key: "connection-check",
+        }));
+        gameDiceButton.disabled = true;
+        ruleControls.classList.remove("has-actions", "has-four-actions", "has-confirm-action");
+        return;
+      }
+      sessionFeedback.textContent = "";
+    }
+
     function ensureRoomRealtime() {
       if (state.roomUnsubscribe) return;
       state.roomUnsubscribe = service.subscribeRooms(
@@ -1808,18 +1857,27 @@
       if (state.sessionUnsubscribe) return;
       state.sessionUnsubscribe = service.subscribeSession(
         sessionId,
-        () => void refreshSession({
-          rollSource: document.visibilityState === "hidden" ? "recovery" : "live",
-        }),
+        () => {
+          const recovering = document.visibilityState === "hidden"
+            || state.connectionChecking
+            || state.sessionRecoveryPromise !== null;
+          void refreshSession({
+            rollSource: recovering ? "recovery" : "live",
+            recoveryFallback: recovering,
+          });
+        },
         (status) => {
           if (status === "SUBSCRIBED" && state.snapshot?.session.id === sessionId) {
+            setConnectionChecking(false);
+            renderSession("passive");
             startLobbyHeartbeat(sessionId, { immediate: true });
             startLobbyCleanup(sessionId);
           }
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             sessionFeedback.textContent = "Live-Verbindung unterbrochen. Verbindung wird erneut geprüft.";
             if (state.snapshot?.session.status === "playing") {
-              situation.textContent = "VERBINDUNG WIRD GEPRÜFT";
+              setConnectionChecking(true);
+              void recoverSessionConnection();
             }
           }
         },
@@ -1868,6 +1926,7 @@
       showScreen(roomScreen);
       ensureRoomRealtime();
       await refreshRooms();
+      if (feedback) roomFeedback.textContent = feedback;
       roomBackButton.focus({ preventScroll: true });
     }
 
@@ -1891,6 +1950,7 @@
       stopLobbyCleanup();
       resetDiceTracking(snapshot.session.id);
       state.snapshot = snapshot;
+      setConnectionChecking(false);
       sessionFeedback.textContent = "";
       showScreen(sessionScreen);
       renderSession("recovery");
@@ -1923,31 +1983,30 @@
       return first === "live" || second === "live" ? "live" : "recovery";
     }
 
-    async function handleLobbyMembershipRemoved(sessionId) {
+    async function exitInvalidatedSession(sessionId, feedback) {
       if (state.snapshot?.session.id !== sessionId) return;
+      setConnectionChecking(false);
       stopLobbyHeartbeat();
       stopLobbyCleanup();
       closeKickModal({ force: true, restoreFocus: false });
       closeAvatarModal({ force: true, restoreFocus: false });
       state.snapshot = null;
       await stopSessionRealtime();
-      await openRooms();
-      roomFeedback.textContent = "Du wurdest aus der Lobby entfernt.";
+      await openRooms({ feedback });
+    }
+
+    async function handleMembershipRemoved(sessionId) {
+      const feedback = state.snapshot?.session.status === "lobby"
+        ? "Du wurdest aus der Lobby entfernt."
+        : "Du bist nicht mehr Mitglied dieses Raums.";
+      await exitInvalidatedSession(sessionId, feedback);
     }
 
     async function handleAdminRoomReset(sessionId) {
-      if (state.snapshot?.session.id !== sessionId) return;
-      stopLobbyHeartbeat();
-      stopLobbyCleanup();
-      closeKickModal({ force: true, restoreFocus: false });
-      closeAvatarModal({ force: true, restoreFocus: false });
-      state.snapshot = null;
-      await stopSessionRealtime();
-      await openRooms();
-      roomFeedback.textContent = "Der Raum wurde zurückgesetzt.";
+      await exitInvalidatedSession(sessionId, "Der Raum wurde zurückgesetzt.");
     }
 
-    async function refreshSession({ rollSource = "recovery" } = {}) {
+    async function refreshSession({ rollSource = "recovery", recoveryFallback = false } = {}) {
       if (!state.snapshot) return null;
       if (state.sessionRefreshPromise) {
         state.sessionRefreshQueued = true;
@@ -1955,20 +2014,19 @@
         return state.sessionRefreshPromise;
       }
       const sessionId = state.snapshot.session.id;
-      const hadLocalLobbyMembership = state.snapshot.session.status === "lobby"
-        && localLobbyPlayer(state.snapshot) !== null;
       state.sessionRefreshPromise = service.loadSession(sessionId)
         .then(async (snapshot) => {
           if (state.snapshot?.session.id !== sessionId) return snapshot;
-          if (
-            hadLocalLobbyMembership
-            && snapshot.session.status === "lobby"
-            && localLobbyPlayer(snapshot) === null
-          ) {
-            await handleLobbyMembershipRemoved(sessionId);
+          if (!["lobby", "playing"].includes(snapshot.session.status)) {
+            await exitInvalidatedSession(sessionId, "Dieses Spiel ist beendet.");
+            return null;
+          }
+          if (!hasLocalMembership(snapshot)) {
+            await handleMembershipRemoved(sessionId);
             return snapshot;
           }
           state.snapshot = snapshot;
+          setConnectionChecking(false);
           sessionFeedback.textContent = "";
           renderSession(rollSource);
           return snapshot;
@@ -1983,7 +2041,7 @@
           }
           console.warn("3er-Trottl-Lobby konnte nicht aktualisiert werden.", error);
           sessionFeedback.textContent = "Lobby konnte nicht aktualisiert werden. Bitte Verbindung prüfen.";
-          return state.snapshot;
+          return recoveryFallback ? null : state.snapshot;
         })
         .finally(() => {
           state.sessionRefreshPromise = null;
@@ -1995,6 +2053,34 @@
           }
         });
       return state.sessionRefreshPromise;
+    }
+
+    function recoverSessionConnection() {
+      if (state.sessionRecoveryPromise) return state.sessionRecoveryPromise;
+      if (sessionScreen.hidden || !state.snapshot || document.visibilityState === "hidden") {
+        return Promise.resolve(false);
+      }
+      const sessionId = state.snapshot.session.id;
+      setConnectionChecking(true);
+      resetRecoveryTransientState(sessionId);
+      state.sessionRecoveryPromise = (async () => {
+        await stopSessionRealtime();
+        if (state.snapshot?.session.id !== sessionId || sessionScreen.hidden) return false;
+        ensureSessionRealtime(sessionId);
+        const recovered = await refreshSession({ rollSource: "recovery", recoveryFallback: true });
+        if (state.snapshot?.session.id !== sessionId) return false;
+        if (recovered) {
+          setConnectionChecking(false);
+          renderSession("recovery");
+          return true;
+        }
+        setConnectionChecking(false);
+        await openRooms({ feedback: "Verbindung konnte nicht wiederhergestellt werden. Raum bitte erneut öffnen." });
+        return false;
+      })().finally(() => {
+        state.sessionRecoveryPromise = null;
+      });
+      return state.sessionRecoveryPromise;
     }
 
     async function startGame() {
@@ -2030,12 +2116,22 @@
         await returnToTrottlMenu();
         return;
       }
+      if (state.snapshot.session.status === "playing") {
+        state.busy = true;
+        setConnectionChecking(false);
+        stopLobbyHeartbeat();
+        stopLobbyCleanup();
+        closeKickModal({ force: true, restoreFocus: false });
+        await openRooms({ feedback: "Du kannst dem laufenden Spiel wieder beitreten." });
+        state.busy = false;
+        renderRooms();
+        return;
+      }
       state.busy = true;
       stopLobbyHeartbeat();
       stopLobbyCleanup();
       closeKickModal({ force: true, restoreFocus: false });
       sessionFeedback.textContent = "Raum wird verlassen …";
-      if (state.snapshot.session.status === "playing") situation.textContent = "RAUM WIRD VERLASSEN";
       renderSession();
       const sessionId = state.snapshot.session.id;
       try {
@@ -2097,12 +2193,14 @@
         ensureRoomRealtime();
         void refreshRooms();
       } else if (!sessionScreen.hidden && state.snapshot) {
-        if (state.snapshot.session.status === "lobby") {
+        if (state.snapshot.session.status === "playing") {
+          void recoverSessionConnection();
+        } else {
           startLobbyHeartbeat(state.snapshot.session.id, { immediate: true });
           startLobbyCleanup(state.snapshot.session.id, { immediate: true });
+          ensureSessionRealtime(state.snapshot.session.id);
+          void refreshSession({ rollSource: "recovery" });
         }
-        ensureSessionRealtime(state.snapshot.session.id);
-        void refreshSession({ rollSource: "recovery" });
       }
     }
 

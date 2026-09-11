@@ -265,14 +265,21 @@ test("network-controlled dice can disable local random click handling", async ()
   assert.equal(standalone.button.listeners.has("click"), true, "standalone behavior remains the default");
 });
 
-test("the dice screen mounts only the standalone component and keeps central navigation", () => {
+test("the dice screen uses the supplied assets and keeps central navigation", () => {
   const html = read("index.html");
   const script = read("script.js");
   const css = read("style.css");
   assert.match(html, /dice-service\.js\?v=3/);
   assert.match(html, /id="fischteich-dice-mount"/);
-  assert.match(html, />Würfel antippen</);
-  assert.match(script, /window\.FischteichDice\.mount\(\{/);
+  assert.match(html, /fischteich-würfel-background\.png/);
+  assert.match(html, /text-fischteich-würfel\.png/);
+  assert.match(html, /id="fischteich-dice-toggle"[\s\S]*button-2würfel\.png/);
+  assert.match(html, /id="fischteich-dice-second-mount"[\s\S]*hidden/);
+  assert.doesNotMatch(html, />Würfel antippen</);
+  assert.equal((script.match(/window\.FischteichDice\.mount\(\{/g) ?? []).length, 2);
+  assert.match(script, /rollOnClick:\s*false/);
+  assert.match(script, /function rollFischteichDice\(\)[\s\S]*fischteichDice\.rollRandom\(\)[\s\S]*fischteichSecondDice\.rollRandom\(\)/);
+  assert.match(script, /setFischteichSecondDiceEnabled\(!fischteichSecondDiceEnabled\)/);
   assert.match(script, /showScreen\(fischteichDiceScreen\)/);
   assert.match(script, /showTrottlMenu\(\{ focusSelector: "#open-fischteich-dice" \}\)/);
   assert.match(css, /transform-style:\s*preserve-3d/);
@@ -282,6 +289,9 @@ test("the dice screen mounts only the standalone component and keeps central nav
   assert.match(css, /\.fischteich-die\.is-landing::before[\s\S]*130ms/);
   assert.match(css, /\.fischteich-die\.is-landing::after[\s\S]*130ms/);
   assert.match(css, /\.fischteich-die\.is-rolling\s*\{[^}]*animation:\s*none/s);
+  assert.match(css, /\.fischteich-dice-background\s*\{[\s\S]*height:\s*calc\(100% \+ 59px\)[\s\S]*transform:\s*translateY\(-59px\)/);
+  assert.match(css, /\.fischteich-dice-stage\.has-second-die[\s\S]*transform:\s*translateY/);
+  assert.match(css, /\.fischteich-dice-toggle\.is-active[\s\S]*drop-shadow\(0 0 7px rgb\(255 255 255/);
   for (const transform of [
     /\.dice-face--front\s*\{\s*transform:\s*translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,
     /\.dice-face--back\s*\{\s*transform:\s*rotateY\(180deg\) translateZ\(calc\(var\(--dice-size\) \/ 2\)\)/,

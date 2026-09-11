@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260911.5">
+    <meta name="fischteich-build" content="20260911.6">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=157">
+    <link rel="stylesheet" href="./style.css?v=158">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -34,7 +34,7 @@
     <script src="./trottl-classic-preview.js?v=3" defer></script>
     <script src="./trottl-classic-ui.js?v=26" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=86" defer></script>
+    <script src="./script.js?v=87" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -191,8 +191,8 @@
 
       <section class="screen trottl-dice-screen" id="fischteich-dice-screen" aria-labelledby="fischteich-dice-title" hidden>
         <img
-          class="sidemenu-background"
-          src="./assets/sidemenu-background.png?v=2"
+          class="fischteich-dice-background"
+          src="./assets/fischteich-würfel-background.png"
           alt=""
           width="854"
           height="1842"
@@ -202,14 +202,17 @@
         <button class="close-button navigation-back-button" id="close-fischteich-dice" type="button" aria-label="Zurück zum 3er-Trottl-Menü">←</button>
         <main class="trottl-dice-shell" id="fischteich-dice-container">
           <header class="trottl-dice-header">
-            <p class="eyebrow">3er Trottl</p>
-            <h1 id="fischteich-dice-title">Fischteich Würfel</h1>
+            <h1 class="visually-hidden" id="fischteich-dice-title">Fischteich Würfel</h1>
+            <img class="fischteich-dice-title-asset" src="./assets/text-fischteich-würfel.png" alt="" width="640" height="240" draggable="false" aria-hidden="true">
           </header>
           <div class="fischteich-dice-stage">
             <div class="fischteich-dice-mount" id="fischteich-dice-mount"></div>
-            <p class="fischteich-dice-instruction">Würfel antippen</p>
+            <div class="fischteich-dice-mount fischteich-dice-second-mount" id="fischteich-dice-second-mount" hidden></div>
             <p class="visually-hidden" id="fischteich-dice-status" aria-live="polite"></p>
           </div>
+          <button class="fischteich-dice-toggle" id="fischteich-dice-toggle" type="button" aria-pressed="false" aria-label="Zweiten Würfel einschalten">
+            <img src="./assets/button-2würfel.png" alt="2. Würfel" width="256" height="256" draggable="false">
+          </button>
         </main>
       </section>
 

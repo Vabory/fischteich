@@ -101,10 +101,34 @@ const teamsMenuScreen = document.querySelector("#teams-menu-screen");
 const trottlMenuScreen = document.querySelector("#trottl-menu-screen");
 const fischteichDiceScreen = document.querySelector("#fischteich-dice-screen");
 const trottlMenuFeedback = document.querySelector("#trottl-menu-feedback");
+const fischteichDiceStage = document.querySelector(".fischteich-dice-stage");
+const fischteichDiceToggle = document.querySelector("#fischteich-dice-toggle");
+const fischteichSecondDiceMount = document.querySelector("#fischteich-dice-second-mount");
 const fischteichDice = window.FischteichDice.mount({
   mountPoint: document.querySelector("#fischteich-dice-mount"),
   status: document.querySelector("#fischteich-dice-status"),
+  rollOnClick: false,
 });
+const fischteichSecondDice = window.FischteichDice.mount({
+  mountPoint: fischteichSecondDiceMount,
+  rollOnClick: false,
+});
+let fischteichSecondDiceEnabled = false;
+
+function setFischteichSecondDiceEnabled(enabled) {
+  fischteichSecondDiceEnabled = enabled;
+  fischteichSecondDiceMount.hidden = !enabled;
+  fischteichDiceStage.classList.toggle("has-second-die", enabled);
+  fischteichDiceToggle.classList.toggle("is-active", enabled);
+  fischteichDiceToggle.setAttribute("aria-pressed", String(enabled));
+  fischteichDiceToggle.setAttribute("aria-label", enabled ? "Zweiten Würfel ausschalten" : "Zweiten Würfel einschalten");
+}
+
+function rollFischteichDice() {
+  if (fischteichDice.isRolling() || (fischteichSecondDiceEnabled && fischteichSecondDice.isRolling())) return;
+  fischteichDice.rollRandom();
+  if (fischteichSecondDiceEnabled) fischteichSecondDice.rollRandom();
+}
 const gameScreen = document.querySelector("#game-screen");
 const participantScreen = document.querySelector("#participant-screen");
 const manualTeamScreen = document.querySelector("#manual-team-screen");
@@ -4902,6 +4926,10 @@ document.querySelector("#close-teams-menu").addEventListener("click", showMenu);
 document.querySelector("#open-dice-game").addEventListener("click", () => showTrottlMenu());
 document.querySelector("#close-trottl-menu").addEventListener("click", showMenu);
 document.querySelector("#open-fischteich-dice").addEventListener("click", showFischteichDiceScreen);
+fischteichDiceStage.addEventListener("click", rollFischteichDice);
+fischteichDiceToggle.addEventListener("click", () => {
+  setFischteichSecondDiceEnabled(!fischteichSecondDiceEnabled);
+});
 document.querySelector("#close-fischteich-dice").addEventListener("click", () => {
   showTrottlMenu({ focusSelector: "#open-fischteich-dice" });
 });

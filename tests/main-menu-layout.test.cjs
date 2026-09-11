@@ -70,7 +70,7 @@ test("the menu uses the updated background composition and keeps decorative fish
     assert.equal(png.readUInt32BE(16), width);
     assert.equal(png.readUInt32BE(20), height);
   }
-  assert.match(html, /menu-background\.png\?v=5/);
+  assert.match(html, /menu-background\.png\?v=6/);
   assert.match(html, /main-turbo-lachs\.png\?v=1/);
   assert.match(html, /main-nitro-forelle\.png\?v=1/);
   assert.match(html, /button-buffalo-timer\.png\?v=1/);
@@ -78,10 +78,17 @@ test("the menu uses the updated background composition and keeps decorative fish
   const buffaloMarkup = html.match(/id="open-buffalo-timer"[\s\S]*?<\/button>/)?.[0] ?? "";
   assert.doesNotMatch(buffaloMarkup, />\s*Buffalo Timer\s*</);
   assert.match(buffaloMarkup, /button-buffalo-timer\.png\?v=1/);
-  assert.match(css, /\.menu-background[\s\S]*height:\s*calc\(100% \+ 59px\)[\s\S]*transform:\s*translateY\(-59px\)/);
+  const menuBackgroundRule = css.match(/\.menu-background\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(menuBackgroundRule, /height:\s*100%/);
+  assert.match(menuBackgroundRule, /object-fit:\s*cover/);
+  assert.match(menuBackgroundRule, /object-position:\s*center center/);
+  assert.doesNotMatch(menuBackgroundRule, /(?:translateY\(-59px\)|brightness\()/);
   assert.match(css, /\.main-menu-fish-composition[\s\S]*pointer-events:\s*none/);
-  assert.match(css, /\.main-menu-fish\s*\{[\s\S]*top:\s*calc\(28\.41dvh - 42px\)[\s\S]*pointer-events:\s*none/);
-  assert.match(css, /@media \(min-aspect-ratio: 6 \/ 11\)[\s\S]*\.main-menu-fish\s*\{[\s\S]*top:\s*calc\(100dvh - 143\.18vw\)/);
+  assert.match(css, /\.main-menu-fish\s*\{[\s\S]*top:\s*28\.41dvh[\s\S]*transform:\s*translate\(-50%, -50%\)[\s\S]*pointer-events:\s*none/);
+  assert.match(css, /\.main-menu-fish--turbo[\s\S]*width:\s*clamp\(173px, 48vw, 211px\)/);
+  assert.match(css, /\.main-menu-fish--nitro[\s\S]*width:\s*clamp\(150px, 43\.2vw, 186px\)/);
+  assert.match(css, /@media \(min-aspect-ratio: 6 \/ 11\)[\s\S]*\.main-menu-fish\s*\{[\s\S]*top:\s*calc\(50dvh - 43\.18vw\)/);
   assert.match(css, /\.buffalo-menu-button img\s*\{[\s\S]*width:\s*160px/);
+  assert.match(css, /\.buffalo-menu-button\s*\{[\s\S]*top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 4px\), 12px\)[\s\S]*right:\s*max\(calc\(env\(safe-area-inset-right\) \+ 40px\), 48px\)/);
   assert.match(script, /openBuffaloTimer|open-buffalo-timer/);
 });

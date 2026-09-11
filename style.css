@@ -675,13 +675,15 @@ button:focus-visible {
   display: block;
   width: clamp(210px, 60vw, 294px);
   height: auto;
-  margin: 3px auto 0;
+  margin: 0 auto;
+  filter: brightness(0.9);
   user-select: none;
   -webkit-user-drag: none;
 }
 
 .trottl-classic-room-shell {
-  padding-top: max(calc(env(safe-area-inset-top) + 54px), 72px);
+  padding-top: max(calc(env(safe-area-inset-top) + 26px), 46px);
+  padding-bottom: max(calc(env(safe-area-inset-bottom) + 36px), 42px);
 }
 
 .trottl-classic-room-list {
@@ -689,6 +691,16 @@ button:focus-visible {
   width: min(86vw, 360px);
   margin-top: clamp(54px, 10dvh, 88px);
   gap: 24px;
+}
+
+.trottl-classic-room-footer-asset {
+  display: block;
+  width: min(36vw, 142px);
+  height: auto;
+  margin: auto auto 0;
+  filter: brightness(0.9);
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .trottl-classic-room {

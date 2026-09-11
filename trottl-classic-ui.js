@@ -37,7 +37,8 @@
       && Number.isFinite(durationMs)
       && durationMs > 0
       && Number.isFinite(remaining)
-      && remaining > 0;
+      && remaining > 0
+      && remaining <= durationMs;
     return Object.freeze({
       active,
       progress: active ? Math.min(100, Math.max(0, (remaining / durationMs) * 100)) : 0,
@@ -179,10 +180,7 @@
     }
     if (phase === "reaction_pending" || phase === "reaction_active") {
       if (localReactionActive) {
-        const countdown = Number.isFinite(localRemainingMs)
-          ? `${(Math.max(0, localRemainingMs) / 1000).toFixed(1).replace(".", ",")} s`
-          : "";
-        return view("", "TIPPE AUF DEN BILDSCHIRM!", "", countdown, "", `${phase}:active`);
+        return view("", "TIPPE AUF DEN BILDSCHIRM!", "", "", "", `${phase}:active`);
       }
       if (localReactionStatus === "reacted") return view("", "BESTÄTIGT", "", "Warte auf die anderen");
       if (localReactionStatus === "timed_out" || localRemainingMs === 0) {
@@ -249,13 +247,15 @@
     if (isPenaltyAcknowledged) {
       status = "BESTÄTIGT";
     } else if (isReactionLoser) {
-      status = reactionStatus === "reacted" && Number.isFinite(reactionDurationMs)
-        ? `${(reactionDurationMs / 1000).toFixed(2).replace(".", ",")} s`
-        : "ZU LANGSAM";
+      status = !reactionEvaluated
+        ? ""
+        : reactionStatus === "reacted" && Number.isFinite(reactionDurationMs)
+          ? `${(reactionDurationMs / 1000).toFixed(2).replace(".", ",")} s`
+          : "-10s";
     } else if (isConfirmed || isReactionSuccess) {
       status = isReactionSuccess && reactionEvaluated && Number.isFinite(reactionDurationMs)
         ? `${(reactionDurationMs / 1000).toFixed(2).replace(".", ",")} s`
-        : "BESTÄTIGT";
+        : isReactionSuccess ? "" : "BESTÄTIGT";
     } else if (isShotTarget) {
       status = "SHOT";
     } else if (allocation > 0) {
@@ -354,11 +354,13 @@
       resolveTimer: null,
       actionBoundaryTimer: null,
       actionRequestPending: false,
+      fourMutationQueue: [],
+      fourMutationInFlight: false,
+      fourOptimisticAllocations: null,
+      fourOptimisticKey: null,
       reactionCountdownTimer: null,
-      personalReactionIntent: null,
-      reactionStartPending: false,
-      queuedReactionAt: null,
-      animatingReactionCanStart: false,
+      reactionFlashTimer: null,
+      reactionFlashId: null,
       hasRenderedGame: false,
       visualSessionId: null,
       visualRollSeq: null,
@@ -1068,20 +1070,19 @@
       const localSeat = localPlayerSeat(snapshot);
       const localReaction = service.getReactionPlayer(snapshot.session, localSeat);
       const localRemainingMs = service.getPersonalReactionRemainingMs(snapshot.session, localSeat);
-      const intentMatches = state.personalReactionIntent?.sessionId === snapshot.session.id
-        && state.personalReactionIntent?.rollSeq === snapshot.session.rollSeq
-        && state.personalReactionIntent?.reactionId === snapshot.session.reactionId;
-      const intentRemainingMs = intentMatches
-        ? Math.max(0, state.personalReactionIntent.deadlineMs - service.getCorrectedNow())
-        : null;
+      const fourKey = `${snapshot.session.id}:${snapshot.session.rollSeq}`;
+      const serverAllocations = service.getFourAllocations(snapshot.session);
+      const allocations = state.fourOptimisticKey === fourKey && state.fourOptimisticAllocations
+        ? state.fourOptimisticAllocations
+        : serverAllocations;
       return Object.freeze({
         phase,
         localSeat,
         localReaction,
-        localRemainingMs: localRemainingMs ?? intentRemainingMs,
-        localReactionActive: service.isPersonalReactionActive(snapshot.session, localSeat)
-          || (localReaction?.status === "pending" && !localReaction?.started_at && intentRemainingMs > 0),
-        allocations: service.getFourAllocations(snapshot.session),
+        localRemainingMs,
+        localReactionActive: service.isPersonalReactionActive(snapshot.session, localSeat),
+        allocations,
+        serverAllocations,
         acknowledgedSeats: service.getAcknowledgedSeats(snapshot.session),
         reactedSeats: service.getReactedSeats(snapshot.session),
         penaltySeats: service.getReactionPenaltySeats(snapshot.session),
@@ -1090,9 +1091,14 @@
     }
 
     function isSeatSelectable(seatIndex, snapshot, ruleView) {
-      if (state.preview || state.actionRequestPending || gameDice.isRolling()) return false;
+      if (state.preview || gameDice.isRolling()) return false;
       const session = snapshot.session;
-      if (ruleView.phase === "choosing_trottl" || ruleView.phase === "distributing_four") {
+      if (ruleView.phase === "choosing_trottl") {
+        return !state.actionRequestPending
+          && ruleView.localSeat === session.actionActorSeat
+          && seatIndex !== session.actionActorSeat;
+      }
+      if (ruleView.phase === "distributing_four") {
         return ruleView.localSeat === session.actionActorSeat && seatIndex !== session.actionActorSeat;
       }
       return false;
@@ -1132,24 +1138,21 @@
       ) || (
         ruleView.phase === "awaiting_four_acks" && allocation > 0 && !isConfirmed
       );
+      const reactionRemainingMs = service.getPersonalReactionRemainingMs(snapshot.session, player.seatIndex);
+      const reactionExpired = ["reaction_pending", "reaction_active"].includes(ruleView.phase)
+        && reaction?.status === "pending"
+        && reactionRemainingMs === 0;
       const isReactionLoser = (
         reaction?.status === "timed_out"
         || ruleView.penaltySeats.has(player.seatIndex)
-        || (player.seatIndex === ruleView.localSeat && reaction?.status === "pending" && ruleView.localRemainingMs === 0)
+        || reactionExpired
       );
       const isReactionSuccess = reaction?.status === "reacted" && !isReactionLoser;
       const isPenaltyAcknowledged = isReactionLoser && ruleView.penaltyAcks.has(player.seatIndex);
-      const reactionIntent = isSelf && state.personalReactionIntent?.sessionId === snapshot.session.id
-        && state.personalReactionIntent?.rollSeq === snapshot.session.rollSeq
-        && state.personalReactionIntent?.reactionId === snapshot.session.reactionId
-        ? state.personalReactionIntent
-        : null;
-      const reactionRemainingMs = service.getPersonalReactionRemainingMs(snapshot.session, player.seatIndex)
-        ?? (reactionIntent ? Math.max(0, reactionIntent.deadlineMs - service.getCorrectedNow()) : null);
       const reactionRing = createPersonalReactionRingPresentation({
-        status: reaction?.status ?? (reactionIntent ? "pending" : ""),
-        startedAt: reaction?.started_at ?? reactionIntent?.startedAt,
-        deadlineAt: reaction?.deadline_at ?? (reactionIntent ? new Date(reactionIntent.deadlineMs).toISOString() : null),
+        status: reaction?.status ?? "",
+        startedAt: reaction?.started_at,
+        deadlineAt: reaction?.deadline_at,
         remainingMs: reactionRemainingMs,
       });
       const focusedSeat = ruleView.phase === "awaiting_drink_ack"
@@ -1185,7 +1188,7 @@
         allocation,
         reactionStatus: reaction?.status,
         reactionDurationMs: Number(reaction?.duration_ms),
-        reactionEvaluated: ruleView.penaltySeats.size > 0,
+        reactionEvaluated: ["reaction_loser_lockout", "reaction_loser_ack"].includes(ruleView.phase),
         drinkSips: Number(snapshot.session.actionPayload.sips ?? 1),
       });
 
@@ -1210,9 +1213,6 @@
       seat.setAttribute("aria-label", seatDescription);
 
       avatarWrap.className = "trottl-classic-avatar-wrap";
-      if (reactionRing.active) {
-        avatarWrap.style.setProperty("--seat-reaction-progress", `${reactionRing.progress.toFixed(1)}%`);
-      }
       const avatar = document.createElement(avatarPresentation.hasAvatar ? "img" : "span");
       avatar.className = avatarPresentation.hasAvatar
         ? "trottl-classic-game-avatar"
@@ -1281,7 +1281,7 @@
         localReactionActive: ruleView.localReactionActive,
         localReactionStatus: ruleView.localReaction?.status,
         localRemainingMs: ruleView.localRemainingMs,
-        remainingSips: Math.max(0, 4 - service.getFourTotal(session)),
+        remainingSips: Math.max(0, 4 - getAllocationTotal(ruleView.allocations)),
         allocationSummary,
         confirmedCount,
         requiredConfirmationCount: requiredConfirmationSeats.length,
@@ -1325,76 +1325,82 @@
       state.reactionCountdownTimer = null;
     }
 
-    function renderReactionCountdown(snapshot, ruleView) {
-      clearReactionCountdownTimer();
-      if (state.preview) {
-        situation.style.removeProperty("--reaction-progress");
-        situation.classList.remove("is-reaction-urgent");
+    function clearReactionFlashTimer({ resetId = true } = {}) {
+      if (state.reactionFlashTimer !== null) global.clearTimeout(state.reactionFlashTimer);
+      state.reactionFlashTimer = null;
+      if (resetId) state.reactionFlashId = null;
+      gameView.classList.remove("is-reaction-active");
+    }
+
+    function syncReactionFlash(snapshot, ruleView) {
+      const reactionVisualPhase = ["reaction_pending", "reaction_active"].includes(ruleView.phase)
+        || (snapshot.session.rollPhase === "rolling" && snapshot.session.rollResult === 5);
+      if (state.preview || !reactionVisualPhase) {
+        clearReactionFlashTimer();
         return;
       }
-      let hadLocalReactionActive = ruleView.localReactionActive;
+      const startMs = Date.parse(snapshot.session.reactionStartAt ?? "");
+      if (!snapshot.session.reactionId || !Number.isFinite(startMs)) {
+        clearReactionFlashTimer();
+        return;
+      }
+      const flashId = `${snapshot.session.reactionId}:${startMs}`;
+      const activate = () => {
+        state.reactionFlashTimer = null;
+        if (state.snapshot?.session.reactionId !== snapshot.session.reactionId) return;
+        state.reactionFlashId = flashId;
+        gameView.classList.add("is-reaction-active");
+      };
+      if (state.reactionFlashId === flashId) {
+        if (service.getCorrectedNow() >= startMs) gameView.classList.add("is-reaction-active");
+        return;
+      }
+      clearReactionFlashTimer({ resetId: false });
+      state.reactionFlashId = flashId;
+      const delay = startMs - service.getCorrectedNow();
+      if (delay <= 0) activate();
+      else state.reactionFlashTimer = global.setTimeout(activate, delay);
+    }
+
+    function renderReactionCountdown(snapshot, ruleView) {
+      clearReactionCountdownTimer();
+      if (state.preview) return;
       const update = () => {
         if (state.snapshot?.session.id !== snapshot.session.id
           || state.snapshot?.session.rollSeq !== snapshot.session.rollSeq) return;
         const currentView = getRuleView(state.snapshot);
-        const remainingMs = currentView.localRemainingMs;
-        if (hadLocalReactionActive && currentView.localReaction?.status === "pending" && remainingMs === 0) {
-          hadLocalReactionActive = false;
-          state.reactionCountdownTimer = null;
-          renderSession("passive");
-          return;
-        }
         let hasActiveReactionRing = false;
+        let hasNewTimeout = false;
         const reactionSeats = new Map([...seatLayer.querySelectorAll(".trottl-classic-game-seat")]
           .map((seat) => [Number(seat.dataset.globalSeat), seat]));
         for (const player of state.snapshot.players) {
           const reaction = service.getReactionPlayer(state.snapshot.session, player.seatIndex);
-          const isSelf = player.userId === state.snapshot.identity.userId;
-          const intent = isSelf && state.personalReactionIntent?.sessionId === state.snapshot.session.id
-            && state.personalReactionIntent?.rollSeq === state.snapshot.session.rollSeq
-            && state.personalReactionIntent?.reactionId === state.snapshot.session.reactionId
-            ? state.personalReactionIntent
-            : null;
           const personalRemainingMs = service.getPersonalReactionRemainingMs(
             state.snapshot.session,
             player.seatIndex,
-          ) ?? (intent ? Math.max(0, intent.deadlineMs - service.getCorrectedNow()) : null);
+          );
           const ring = createPersonalReactionRingPresentation({
-            status: reaction?.status ?? (intent ? "pending" : ""),
-            startedAt: reaction?.started_at ?? intent?.startedAt,
-            deadlineAt: reaction?.deadline_at ?? (intent ? new Date(intent.deadlineMs).toISOString() : null),
+            status: reaction?.status ?? "",
+            startedAt: reaction?.started_at,
+            deadlineAt: reaction?.deadline_at,
             remainingMs: personalRemainingMs,
           });
           const seat = reactionSeats.get(player.seatIndex);
           seat?.classList.toggle("trottl-classic-player--reaction-timer", ring.active);
-          if (ring.active && seat) {
-            hasActiveReactionRing = true;
-            seat.style.setProperty("--seat-reaction-progress", `${ring.progress.toFixed(1)}%`);
-          } else seat?.style.removeProperty("--seat-reaction-progress");
+          if (ring.active && seat) hasActiveReactionRing = true;
+          const expired = reaction?.status === "pending" && personalRemainingMs === 0;
+          if (expired && seat && !seat.classList.contains("trottl-classic-player--reaction-loser")) hasNewTimeout = true;
+          seat?.classList.toggle("trottl-classic-player--reaction-loser", expired || reaction?.status === "timed_out");
         }
         const reactionEventActive = ["reaction_pending", "reaction_active"].includes(currentView.phase);
-        if (!reactionEventActive && !currentView.localReactionActive && !hasActiveReactionRing) {
+        if (hasNewTimeout) {
           state.reactionCountdownTimer = null;
-          situation.style.removeProperty("--reaction-progress");
-          situation.classList.remove("is-reaction-urgent");
+          renderSession("passive");
           return;
         }
-        if (currentView.localReactionActive && remainingMs !== null && remainingMs > 0) {
-          situationAction.textContent = `${(remainingMs / 1000).toFixed(1).replace(".", ",")} s`;
-          situationAction.hidden = false;
-          const localReaction = currentView.localReaction;
-          const localStartedMs = Date.parse(localReaction?.started_at ?? state.personalReactionIntent?.startedAt ?? "");
-          const localDeadlineMs = Date.parse(localReaction?.deadline_at ?? "")
-            || state.personalReactionIntent?.deadlineMs;
-          const localDurationMs = localDeadlineMs - localStartedMs;
-          const reactionProgress = Number.isFinite(localDurationMs) && localDurationMs > 0
-            ? `${Math.min(100, (remainingMs / localDurationMs) * 100).toFixed(1)}%`
-            : "0%";
-          situation.style.setProperty("--reaction-progress", reactionProgress);
-          situation.classList.toggle("is-reaction-urgent", remainingMs <= 3000);
-        } else {
-          situation.style.removeProperty("--reaction-progress");
-          situation.classList.remove("is-reaction-urgent");
+        if (!reactionEventActive && !hasActiveReactionRing) {
+          state.reactionCountdownTimer = null;
+          return;
         }
         state.reactionCountdownTimer = global.setTimeout(update, 100);
       };
@@ -1424,14 +1430,17 @@
     function renderRuleControls(snapshot, ruleView) {
       const mayDistribute = ruleView.phase === "distributing_four"
         && ruleView.localSeat === snapshot.session.actionActorSeat;
-      const total = service.getFourTotal(snapshot.session);
+      const total = Object.values(ruleView.allocations).reduce((sum, amount) => sum + Number(amount), 0);
+      const serverTotal = service.getFourTotal(snapshot.session);
+      const mutationsPending = state.fourMutationInFlight || state.fourMutationQueue.length > 0;
       const localNeedsConfirmation = needsConfirmation(ruleView.localSeat, snapshot, ruleView);
       actionProgress.hidden = !mayDistribute;
       actionProgressValue.textContent = `${total} / 4`;
       fourResetButton.hidden = !mayDistribute;
-      fourResetButton.disabled = state.actionRequestPending || total === 0;
-      fourConfirmButton.hidden = !mayDistribute || total !== 4;
-      fourConfirmButton.disabled = state.actionRequestPending;
+      fourResetButton.disabled = total === 0;
+      fourConfirmButton.hidden = !mayDistribute;
+      fourConfirmButton.classList.toggle("is-slot-hidden", mayDistribute && total !== 4);
+      fourConfirmButton.disabled = total !== 4 || mutationsPending || serverTotal !== 4;
       globalConfirmButton.hidden = !localNeedsConfirmation;
       globalConfirmButton.disabled = state.actionRequestPending;
       ruleControls.classList.toggle("has-actions", mayDistribute || localNeedsConfirmation);
@@ -1469,7 +1478,7 @@
         }
       }
 
-      const fourTotal = service.getFourTotal(session);
+      const fourTotal = getAllocationTotal(allocations);
       const effects = Object.freeze({
         actionImpactSeat: phaseEntered && ruleView.phase === "awaiting_drink_ack"
           ? session.actionTargetSeat
@@ -1506,10 +1515,12 @@
     function renderGame(snapshot, activeSeatIndex = service.initialActiveSeatIndex) {
       const relativeSeats = service.getRelativeSeats(snapshot.players, snapshot.identity.userId);
       const ruleView = getRuleView(snapshot);
+      if (ruleView.phase !== "distributing_four"
+        && !state.fourMutationInFlight
+        && state.fourMutationQueue.length === 0) clearFourMutationState();
       const effects = collectVisualEffects(snapshot, ruleView);
       tableStage.dataset.playerCount = String(snapshot.players.length);
-      const reactionEventActive = ["reaction_pending", "reaction_active"].includes(ruleView.phase);
-      gameView.classList.toggle("is-reaction-active", reactionEventActive);
+      syncReactionFlash(snapshot, ruleView);
       situation.classList.toggle("is-reaction-prompt", ruleView.localReactionActive);
       situation.classList.toggle("is-shot-event", ruleView.phase === "shot_ack");
       situation.classList.toggle("is-four-complete-impact", effects.fourCompleteImpact);
@@ -1540,10 +1551,10 @@
       state.lastSettledRollSeq = 0;
       state.deferredLiveRollSeq = null;
       state.rollRequestPending = false;
-      state.animatingReactionCanStart = false;
-      state.personalReactionIntent = null;
-      state.reactionStartPending = false;
-      state.queuedReactionAt = null;
+      state.fourMutationQueue = [];
+      state.fourMutationInFlight = false;
+      state.fourOptimisticAllocations = null;
+      state.fourOptimisticKey = null;
       state.hasRenderedGame = false;
       state.visualSessionId = sessionId;
       state.visualRollSeq = null;
@@ -1606,7 +1617,6 @@
           state.deferredLiveRollSeq = snapshot.session.rollSeq;
         } else {
           state.animatingRollSeq = snapshot.session.rollSeq;
-          state.animatingReactionCanStart = snapshot.session.rollResult === 5;
           state.deferredLiveRollSeq = null;
           const completion = gameDice.rollTo(snapshot.session.rollResult);
           if (!completion) state.animatingRollSeq = null;
@@ -1615,8 +1625,6 @@
         state.lastSettledRollSeq = Math.max(state.lastSettledRollSeq, snapshot.session.rollSeq);
         state.deferredLiveRollSeq = null;
         gameDice.setResultInstant(snapshot.session.rollResult);
-        state.animatingReactionCanStart = false;
-        notePersonalReactionPresentation(snapshot, snapshot.session.rollSeq);
       }
 
       scheduleRollResolution(snapshot);
@@ -1634,26 +1642,6 @@
       );
     }
 
-    function notePersonalReactionPresentation(snapshot, rollSeq) {
-      if (
-        snapshot.session.rollResult !== 5
-        || snapshot.session.rollSeq !== rollSeq
-        || !snapshot.session.reactionId
-      ) return;
-      const ownSeat = localPlayerSeat(snapshot);
-      const reaction = service.getReactionPlayer(snapshot.session, ownSeat);
-      if (!reaction || reaction.status !== "pending" || reaction.started_at) return;
-      const startedMs = service.getCorrectedNow();
-      state.personalReactionIntent = Object.freeze({
-        sessionId: snapshot.session.id,
-        rollSeq,
-        reactionId: snapshot.session.reactionId,
-        startedAt: new Date(startedMs).toISOString(),
-        deadlineMs: startedMs + 10000,
-      });
-      void registerPersonalReactionStart();
-    }
-
     function handleDiceSettled() {
       const snapshot = state.snapshot;
       if (!snapshot || state.preview) return;
@@ -1661,9 +1649,7 @@
       state.animatingRollSeq = null;
       if (settledRollSeq !== null) {
         state.lastSettledRollSeq = Math.max(state.lastSettledRollSeq, settledRollSeq);
-        if (state.animatingReactionCanStart) notePersonalReactionPresentation(snapshot, settledRollSeq);
       }
-      state.animatingReactionCanStart = false;
       const deferredIsCurrent = state.deferredLiveRollSeq === snapshot.session.rollSeq;
       state.deferredLiveRollSeq = null;
       renderSession(deferredIsCurrent ? "live" : "passive");
@@ -1725,35 +1711,90 @@
       }
     }
 
-    async function registerPersonalReactionStart() {
-      const intent = state.personalReactionIntent;
-      if (!intent || state.reactionStartPending || state.preview) return;
-      state.reactionStartPending = true;
+    function getFourMutationKey(session) {
+      return `${session.id}:${session.rollSeq}`;
+    }
+
+    function getAllocationTotal(allocations) {
+      return Object.values(allocations ?? {}).reduce((total, amount) => total + Number(amount), 0);
+    }
+
+    function ensureFourOptimisticState(snapshot) {
+      const key = getFourMutationKey(snapshot.session);
+      if (state.fourOptimisticKey !== key || !state.fourOptimisticAllocations) {
+        state.fourOptimisticKey = key;
+        state.fourOptimisticAllocations = { ...service.getFourAllocations(snapshot.session) };
+      }
+      return state.fourOptimisticAllocations;
+    }
+
+    function clearFourMutationState() {
+      state.fourMutationQueue = [];
+      state.fourMutationInFlight = false;
+      state.fourOptimisticAllocations = null;
+      state.fourOptimisticKey = null;
+    }
+
+    async function drainFourMutationQueue() {
+      if (state.fourMutationInFlight || state.preview) return;
+      const mutation = state.fourMutationQueue.shift();
+      if (!mutation) return;
+      state.fourMutationInFlight = true;
+      gameFeedback.textContent = "";
       renderSession("passive");
       try {
-        await service.startPersonalReaction(
-          intent.sessionId,
-          intent.rollSeq,
-          intent.reactionId,
-          intent.startedAt,
-        );
-        if (state.snapshot?.session.id !== intent.sessionId) return;
-        const queuedReactionAt = state.queuedReactionAt;
-        state.queuedReactionAt = null;
-        state.personalReactionIntent = null;
-        if (queuedReactionAt) {
-          await submitPersonalReaction(state.snapshot, queuedReactionAt);
-          return;
-        }
-        state.snapshot = await service.loadSession(intent.sessionId);
+        const nextSnapshot = mutation.kind === "assign"
+          ? await service.assignFourSip(mutation.sessionId, mutation.rollSeq, mutation.seatIndex)
+          : await service.resetFourSips(mutation.sessionId, mutation.rollSeq);
+        if (state.snapshot?.session.id !== mutation.sessionId
+          || state.snapshot.session.rollSeq !== mutation.rollSeq) return;
+        state.snapshot = nextSnapshot;
       } catch (error) {
-        console.warn("Persönliches Reaktionsfenster konnte nicht registriert werden.", error);
-        gameFeedback.textContent = describeError(error, "Reaktionsfenster konnte nicht synchronisiert werden.");
+        console.warn("3er-Trottl-Verteilung wurde abgelehnt.", error);
+        state.fourMutationQueue = [];
+        state.fourOptimisticAllocations = null;
+        state.fourOptimisticKey = null;
+        gameFeedback.textContent = describeError(error, "Verteilung konnte nicht gespeichert werden.");
         void refreshSession({ rollSource: "recovery" });
       } finally {
-        state.reactionStartPending = false;
-        if (state.snapshot?.session.id === intent.sessionId) renderSession("passive");
+        state.fourMutationInFlight = false;
+        if (state.snapshot?.session.id === mutation.sessionId) {
+          if (state.fourMutationQueue.length > 0) void drainFourMutationQueue();
+          else {
+            state.fourOptimisticAllocations = null;
+            state.fourOptimisticKey = null;
+          }
+          renderSession("passive");
+        }
       }
+    }
+
+    function enqueueFourAssignment(snapshot, seatIndex) {
+      const session = snapshot.session;
+      const allocations = ensureFourOptimisticState(snapshot);
+      if (getAllocationTotal(allocations) >= 4) return;
+      allocations[seatIndex] = Number(allocations[seatIndex] ?? 0) + 1;
+      state.fourMutationQueue.push(Object.freeze({
+        kind: "assign",
+        sessionId: session.id,
+        rollSeq: session.rollSeq,
+        seatIndex,
+      }));
+      renderSession("passive");
+      void drainFourMutationQueue();
+    }
+
+    function enqueueFourReset(snapshot) {
+      const session = snapshot.session;
+      ensureFourOptimisticState(snapshot);
+      state.fourOptimisticAllocations = {};
+      state.fourMutationQueue.push(Object.freeze({
+        kind: "reset",
+        sessionId: session.id,
+        rollSeq: session.rollSeq,
+      }));
+      renderSession("passive");
+      void drainFourMutationQueue();
     }
 
     async function submitPersonalReaction(snapshot, clientReactedAt) {
@@ -1777,8 +1818,8 @@
         phase === "distributing_four"
         && ownSeat === session.actionActorSeat
         && seatIndex !== ownSeat
-        && service.getFourTotal(session) < 4
-      ) return executeRuleAction(() => service.assignFourSip(session.id, session.rollSeq, seatIndex));
+        && getAllocationTotal(getRuleView(snapshot).allocations) < 4
+      ) return enqueueFourAssignment(snapshot, seatIndex);
       return undefined;
     }
 
@@ -1808,23 +1849,25 @@
       const ruleView = getRuleView(snapshot);
       if (!ruleView.localReactionActive || ruleView.localReaction?.status !== "pending") return;
       const clientReactedAt = new Date(service.getCorrectedNow()).toISOString();
-      if (!ruleView.localReaction?.started_at) {
-        if (!state.reactionStartPending) return;
-        state.queuedReactionAt ??= clientReactedAt;
-        return;
-      }
+      const { startedMs, deadlineMs } = service.getReactionWindow(session, ownSeat);
+      const nowMs = Date.parse(clientReactedAt);
+      if (startedMs === null || deadlineMs === null || nowMs < startedMs || nowMs > deadlineMs) return;
       void submitPersonalReaction(snapshot, clientReactedAt);
     }
 
     function resetFourSips() {
-      const session = state.snapshot?.session;
+      const snapshot = state.snapshot;
+      const session = snapshot?.session;
       if (!session || service.getEffectiveActionPhase(session) !== "distributing_four") return;
-      void executeRuleAction(() => service.resetFourSips(session.id, session.rollSeq));
+      if (getAllocationTotal(getRuleView(snapshot).allocations) === 0) return;
+      enqueueFourReset(snapshot);
     }
 
     function confirmFourSips() {
       const session = state.snapshot?.session;
       if (!session || service.getEffectiveActionPhase(session) !== "distributing_four") return;
+      if (state.fourMutationInFlight || state.fourMutationQueue.length > 0) return;
+      if (service.getFourTotal(session) !== 4) return;
       void executeRuleAction(() => service.confirmFourSips(session.id, session.rollSeq));
     }
 
@@ -1903,13 +1946,11 @@
       clearResolveTimer();
       clearActionBoundaryTimer();
       clearReactionCountdownTimer();
+      clearReactionFlashTimer();
+      clearFourMutationState();
       state.animatingRollSeq = null;
       state.lastSettledRollSeq = 0;
       state.deferredLiveRollSeq = null;
-      state.animatingReactionCanStart = false;
-      state.personalReactionIntent = null;
-      state.reactionStartPending = false;
-      state.queuedReactionAt = null;
       state.hasRenderedGame = false;
       state.visualSessionId = sessionId;
       state.visualRollSeq = null;
@@ -2131,7 +2172,6 @@
       state.busy = false;
       state.rollRequestPending = false;
       state.actionRequestPending = false;
-      state.reactionStartPending = false;
       state.kickSubmitting = false;
       state.avatarSubmitting = false;
       state.leaveSubmitting = false;

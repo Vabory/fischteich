@@ -198,7 +198,7 @@ button:focus-visible {
   height: 100%;
   object-position: center;
   filter: brightness(0.82);
-  transform: none;
+  transform: translateY(70px);
 }
 
 .sidemenu-fish-asset {
@@ -1194,7 +1194,8 @@ button:focus-visible {
   gap: clamp(7px, 1.3dvh, 11px);
 }
 
-.trottl-classic-game-view.is-reaction-active::before {
+.trottl-classic-game-view.is-reaction-active::before,
+.trottl-classic-game-view.is-reaction-active::after {
   position: fixed;
   z-index: 9;
   inset:
@@ -1208,6 +1209,17 @@ button:focus-visible {
   content: "";
   pointer-events: none;
   animation: trottl-classic-screen-reaction-flash 720ms ease-out both;
+}
+
+.trottl-classic-game-view.is-reaction-active::after {
+  inset:
+    max(9px, calc(env(safe-area-inset-top) + 6px))
+    max(9px, calc(env(safe-area-inset-right) + 6px))
+    max(9px, calc(env(safe-area-inset-bottom) + 6px))
+    max(9px, calc(env(safe-area-inset-left) + 6px));
+  border: 0;
+  box-shadow: inset 0 0 42px rgb(255 255 255 / 10%);
+  filter: blur(3px);
 }
 
 .trottl-classic-preview-panel {
@@ -1402,18 +1414,6 @@ button:focus-visible {
   overflow: hidden;
 }
 
-.trottl-classic-situation.is-reaction-prompt::after {
-  position: absolute;
-  right: 18px;
-  bottom: 5px;
-  left: 18px;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgb(220 246 255 / 90%) var(--reaction-progress, 100%), rgb(220 246 255 / 12%) 0);
-  box-shadow: 0 0 7px rgb(198 238 255 / 25%);
-  content: "";
-}
-
 .trottl-classic-situation.is-reaction-prompt .trottl-classic-event-action {
   min-height: 1.25em;
   color: #f7fcff;
@@ -1582,15 +1582,11 @@ button:focus-visible {
   inset: -5px;
   display: none;
   border-radius: 50%;
-  background: conic-gradient(
-    from -90deg,
-    rgb(247 253 255 / 100%) 0 var(--seat-reaction-progress, 100%),
-    rgb(247 253 255 / 14%) var(--seat-reaction-progress, 100%) 100%
-  );
+  border: 3px solid rgb(247 253 255 / 94%);
+  background: transparent;
+  box-shadow: 0 0 12px rgb(247 253 255 / 42%);
   content: "";
   pointer-events: none;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
 }
 
 .trottl-classic-player--reaction-timer .trottl-classic-avatar-wrap::before {
@@ -1978,6 +1974,11 @@ button:focus-visible {
   transform: translateX(-50%);
 }
 
+.trottl-classic-rule-controls.has-four-actions {
+  display: grid;
+  grid-template-columns: minmax(82px, 0.9fr) minmax(96px, 1fr) minmax(104px, 1.08fr);
+}
+
 .trottl-classic-rule-controls.has-actions {
   padding: 8px;
   border: 1px solid rgb(184 220 237 / 18%);
@@ -2001,6 +2002,12 @@ button:focus-visible {
   text-align: left;
 }
 
+.trottl-classic-rule-controls.has-four-actions .trottl-classic-action-progress,
+.trottl-classic-rule-controls.has-four-actions button {
+  width: 100%;
+  min-width: 0;
+}
+
 .trottl-classic-action-progress strong {
   color: #f5fbff;
   font-size: 0.78rem;
@@ -2008,6 +2015,8 @@ button:focus-visible {
 }
 
 .trottl-classic-rule-controls.has-confirm-action:not(.has-four-actions) {
+  position: fixed;
+  bottom: max(calc(env(safe-area-inset-bottom) + 8px), 12px);
   width: min(76vw, 270px);
   min-height: 54px;
   padding: 0;
@@ -2029,21 +2038,43 @@ button:focus-visible {
   color: rgb(225 239 246 / 72%);
 }
 
+.trottl-classic-rule-controls #trottl-classic-four-reset::before {
+  margin-right: 0.35em;
+  content: "↶";
+}
+
 .trottl-classic-rule-controls #trottl-classic-four-confirm {
-  flex: 1 1 112px;
   border-color: rgb(207 239 250 / 62%);
   background: linear-gradient(180deg, rgb(235 249 255 / 24%), rgb(170 224 243 / 13%));
   box-shadow: 0 0 15px rgb(177 226 246 / 16%);
   color: #f4fcff;
 }
 
+.trottl-classic-rule-controls #trottl-classic-four-confirm::before,
+.trottl-classic-rule-controls .trottl-classic-global-confirm::before {
+  margin-right: 0.35em;
+  color: #8ff0bd;
+  content: "✓";
+}
+
+.trottl-classic-rule-controls #trottl-classic-four-confirm.is-slot-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.trottl-classic-rule-controls #trottl-classic-four-confirm:not(:disabled) {
+  border-color: rgb(116 242 178 / 76%);
+  background: linear-gradient(180deg, rgb(35 120 86 / 82%), rgb(11 68 54 / 88%));
+  box-shadow: 0 0 18px rgb(66 224 144 / 27%), inset 0 1px rgb(255 255 255 / 10%);
+}
+
 .trottl-classic-rule-controls .trottl-classic-global-confirm {
   width: 100%;
   min-height: 50px;
-  border: 1px solid rgb(225 245 253 / 68%);
+  border: 1px solid rgb(123 225 255 / 72%);
   border-radius: 999px;
-  background: linear-gradient(180deg, rgb(235 249 255 / 24%), rgb(170 224 243 / 13%));
-  box-shadow: 0 8px 22px rgb(0 0 0 / 28%), 0 0 18px rgb(177 226 246 / 20%);
+  background: linear-gradient(180deg, rgb(16 47 72 / 91%), rgb(5 22 40 / 94%));
+  box-shadow: 0 8px 22px rgb(0 0 0 / 34%), 0 0 20px rgb(87 207 249 / 25%), inset 0 1px rgb(255 255 255 / 10%);
   color: #f7fdff;
   font-size: 0.72rem;
   font-weight: 950;
@@ -2066,7 +2097,11 @@ button:focus-visible {
 }
 
 .trottl-classic-rule-controls #trottl-classic-game-feedback {
-  width: 100%;
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% + 3px);
+  left: 8px;
+  width: auto;
   margin: 0;
   color: #ffd5df;
   font-size: 0.68rem;
@@ -2155,6 +2190,7 @@ button:focus-visible {
   .trottl-classic-situation.is-shot-event,
   .trottl-classic-situation.is-four-complete-impact .trottl-classic-event-meta,
   .trottl-classic-game-view.is-reaction-active::before,
+  .trottl-classic-game-view.is-reaction-active::after,
   .trottl-classic-rule-controls #trottl-classic-four-confirm.is-ready-impact,
   .trottl-classic-dice-mount.is-reroll-ready::after {
     animation: none;

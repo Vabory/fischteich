@@ -83,9 +83,10 @@ test("drink, allocation, shot and reaction overlays keep exact gameplay copy", (
   assert.equal(present({ isDrinkTarget: true, drinkSips: 3 }), "3 SCHLÜCKE");
   assert.equal(present({ allocation: 4 }), "4 SCHLÜCKE");
   assert.equal(present({ isShotTarget: true }), "SHOT");
-  assert.equal(present({ isReactionSuccess: true }), "BESTÄTIGT");
+  assert.equal(present({ isReactionSuccess: true }), "");
   assert.equal(present({ isReactionSuccess: true, reactionEvaluated: true, reactionDurationMs: 620 }), "0,62 s");
-  assert.equal(present({ isReactionLoser: true, reactionStatus: "timed_out" }), "ZU LANGSAM");
+  assert.equal(present({ isReactionLoser: true, reactionStatus: "timed_out" }), "");
+  assert.equal(present({ isReactionLoser: true, reactionStatus: "timed_out", reactionEvaluated: true }), "-10s");
 });
 
 test("personal reaction rings derive progress from each persisted timing window", () => {
@@ -107,7 +108,8 @@ test("personal reaction rings derive progress from each persisted timing window"
   assert.match(uiSource, /service\.getPersonalReactionRemainingMs\([\s\S]*player\.seatIndex/);
   assert.match(uiSource, /reaction\?\.started_at[\s\S]*reaction\?\.deadline_at/);
   assert.doesNotMatch(uiSource, /reactionCountdownTimer\s*=\s*global\.setInterval\(/);
-  assert.match(css, /--seat-reaction-progress[\s\S]*conic-gradient/);
+  assert.doesNotMatch(css, /--seat-reaction-progress/);
+  assert.match(css, /\.trottl-classic-player--reaction-timer \.trottl-classic-avatar-wrap::before[\s\S]*display:\s*block/);
 });
 
 test("avatar seats retain existing geometry, global controls, dimming and reduced motion", () => {

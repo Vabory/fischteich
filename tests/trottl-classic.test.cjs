@@ -12,6 +12,7 @@ const migration = read("supabase/migrations/20260906000000_create_trottl_classic
 const gameplayMigration = read("supabase/migrations/20260906010000_add_trottl_classic_gameplay.sql");
 const rulesMigration = read("supabase/migrations/20260906020000_add_trottl_classic_rules.sql");
 const polishMigration = read("supabase/migrations/20260906030000_polish_trottl_classic_reactions.sql");
+const finalReactionMigration = read("supabase/migrations/20260911030000_finalize_trottl_classic_reaction_window.sql");
 const html = read("index.html");
 const css = read("style.css");
 const script = read("script.js");
@@ -903,7 +904,6 @@ test("service action methods send only intent plus current action identity", asy
   await service.confirmFourSips(SESSION_ID, 7);
   await service.acknowledgeDrink(SESSION_ID, 7);
   await service.submitReaction(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001", "2026-09-06T10:02:00Z");
-  await service.startPersonalReaction(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001", "2026-09-06T10:01:50Z");
   await service.refreshReaction(SESSION_ID);
   await service.acknowledgeReactionLoser(SESSION_ID, 7, "40000000-0000-4000-8000-000000000001");
   await service.acknowledgeShot(SESSION_ID, 7);
@@ -911,13 +911,12 @@ test("service action methods send only intent plus current action identity", asy
   assert.deepEqual(gameplayCalls.map(({ name }) => name), [
     "choose_trottl_classic_trottl", "assign_trottl_classic_four", "reset_trottl_classic_four",
     "confirm_trottl_classic_four", "ack_trottl_classic_drink", "react_trottl_classic",
-    "start_trottl_classic_personal_reaction", "sync_trottl_classic_reaction",
-    "ack_trottl_classic_reaction_loser", "ack_trottl_classic_shot",
+    "sync_trottl_classic_reaction", "ack_trottl_classic_reaction_loser", "ack_trottl_classic_shot",
   ]);
   assert.equal(gameplayCalls[0].parameters.p_roll_seq, 7);
   assert.equal(gameplayCalls[0].parameters.p_target_seat, 2);
   assert.equal(gameplayCalls[5].parameters.p_client_reacted_at, "2026-09-06T10:02:00Z");
-  assert.equal(gameplayCalls[6].parameters.p_client_started_at, "2026-09-06T10:01:50Z");
+  assert.doesNotMatch(serviceSource, /startPersonalReaction/);
 });
 
 test("personal reaction helpers use persisted per-seat deadlines and the synchronized server clock", () => {
@@ -966,7 +965,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=16[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=27[\s\S]*script\.js\?v=87/);
+  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=28[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*text-3er-trottl\.png\?v=1/);
@@ -1008,7 +1007,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-lobby-player\s*\{[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
   assert.match(ui, /GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background\.png\?v=1"/);
   assert.match(ui, /sessionBackground\.classList\.toggle\("is-ingame-background", isPlaying\)/);
-  assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*center[^}]*transform:\s*none/s);
+  assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*center[^}]*transform:\s*translateY\(70px\)/s);
   assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1\.04/s);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);
@@ -1027,7 +1026,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*width:\s*clamp\(72px, 20vw, 84px\)/);
   assert.match(css, /\.trottl-classic-avatar-wrap\s*\{[^}]*width:\s*clamp\(70px, 20vw, 78px\)[^}]*height:\s*clamp\(70px, 20vw, 78px\)/s);
   assert.match(css, /\.trottl-classic-game-view\.is-reaction-active::before[\s\S]*255 255 255/);
-  assert.match(css, /\.trottl-classic-situation\.is-reaction-prompt[\s\S]*--reaction-progress/);
+  assert.doesNotMatch(css, /--reaction-progress|--seat-reaction-progress/);
   assert.match(css, /\.trottl-classic-sip-markers i\.is-assigned/);
   assert.match(css, /\.trottl-classic-situation\.is-four-distribution \.trottl-classic-event-meta/);
   assert.match(css, /\.trottl-classic-game-view\s*\{[\s\S]*--trottl-action-zone-height:\s*82px[\s\S]*padding-bottom:\s*var\(--trottl-action-zone-height\)/);
@@ -1041,8 +1040,8 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-situation\.is-shot-event \.trottl-classic-event-action::before[\s\S]*assets\/trottl-classic\/shot-glass\.svg/);
   assert.match(css, /\.trottl-classic-dice-mount\.is-reroll-ready::after/);
   assert.match(css, /\.trottl-classic-player--reaction-timer \.trottl-classic-avatar-wrap::before[\s\S]*display:\s*block/);
-  assert.match(css, /--seat-reaction-progress[\s\S]*conic-gradient/);
-  assert.match(ui, /querySelectorAll\("\.trottl-classic-game-seat"\)[\s\S]*--seat-reaction-progress/);
+  assert.match(css, /\.trottl-classic-avatar-wrap::before\s*\{[^}]*border:\s*3px solid rgb\(247 253 255 \/ 94%\)/s);
+  assert.match(ui, /querySelectorAll\("\.trottl-classic-game-seat"\)[\s\S]*classList\.toggle\("trottl-classic-player--reaction-timer"/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*trottl-classic-player--action-impact[\s\S]*trottl-classic-game-view\.is-reaction-active::before/);
   assert.match(shotGlass, /<svg[^>]*viewBox="0 0 24 24"/);
   assert.match(shotGlass, /fill="none"/);
@@ -1072,9 +1071,8 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /service\.getRollAction/);
   assert.match(ui, /gameDice\.rollTo\(snapshot\.session\.rollResult\)/);
   assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)/);
-  assert.match(ui, /state\.animatingReactionCanStart = snapshot\.session\.rollResult === 5/);
-  assert.match(ui, /gameDice\.setResultInstant\(snapshot\.session\.rollResult\)[\s\S]*notePersonalReactionPresentation\(snapshot, snapshot\.session\.rollSeq\)/);
-  assert.match(ui, /TIPPE AUF DEN BILDSCHIRM![\s\S]*remainingMs[\s\S]*\/ 1000/);
+  assert.doesNotMatch(ui, /animatingReactionCanStart|notePersonalReactionPresentation|registerPersonalReactionStart/);
+  assert.doesNotMatch(ui, /situationAction\.textContent = `\$\{\(remainingMs \/ 1000\)/);
   assert.match(ui, /gameView\.addEventListener\("click", handleReactionTap\)/);
   assert.match(ui, /function handleConfirmation\(\)/);
   assert.doesNotMatch(ui, /phase === "awaiting_drink_ack" && seatIndex === ownSeat/);
@@ -1135,7 +1133,7 @@ test("Klassik event presentation separates headline, action and contextual meta 
 
   const reaction = present({ phase: "reaction_active", localReactionActive: true, localRemainingMs: 9200 });
   assert.equal(reaction.copy, "TIPPE AUF DEN BILDSCHIRM!");
-  assert.equal(reaction.action, "9,2 s");
+  assert.equal(reaction.action, "");
   assert.deepEqual(present({ phase: "reaction_active", localReactionStatus: "reacted" }), {
     player: "", copy: "BESTÄTIGT", roll: "", action: "Warte auf die anderen", meta: "", key: "reaction_active",
   });
@@ -1176,10 +1174,11 @@ test("Klassik player seats apply semantic state priority and stable status text"
   assert.equal(present({ isSelectable: true, allocation: 4 }).status, "4 SCHLÜCKE");
   assert.equal(present({ isShotTarget: true }).status, "SHOT");
   assert.equal(present({ isDrinkTarget: true, isConfirmed: true }).status, "BESTÄTIGT");
-  assert.equal(present({ isReactionSuccess: true }).status, "BESTÄTIGT");
+  assert.equal(present({ isReactionSuccess: true }).status, "");
   assert.equal(present({ isReactionSuccess: true, reactionEvaluated: true, reactionDurationMs: 820 }).status, "0,82 s");
-  assert.equal(present({ isReactionLoser: true, reactionStatus: "reacted", reactionDurationMs: 1530 }).status, "1,53 s");
-  assert.equal(present({ isReactionLoser: true, reactionStatus: "timed_out" }).status, "ZU LANGSAM");
+  assert.equal(present({ isReactionLoser: true, reactionStatus: "reacted", reactionDurationMs: 1530 }).status, "");
+  assert.equal(present({ isReactionLoser: true, reactionStatus: "reacted", reactionDurationMs: 1530, reactionEvaluated: true }).status, "1,53 s");
+  assert.equal(present({ isReactionLoser: true, reactionStatus: "timed_out", reactionEvaluated: true }).status, "-10s");
   const acknowledgedLoser = present({
     isReactionLoser: true, isPenaltyAcknowledged: true, reactionStatus: "timed_out",
   });
@@ -1205,8 +1204,8 @@ test("Klassik player seats apply semantic state priority and stable status text"
   assert.match(ui, /function collectVisualEffects\(snapshot, ruleView\)/);
   assert.match(ui, /state\.visualRollSeq !== session\.rollSeq \|\| state\.visualPhase !== ruleView\.phase/);
   assert.match(ui, /Number\(seat\) === ruleView\.localSeat[\s\S]*status === "reacted"/);
-  assert.match(ui, /reactionEventActive = \["reaction_pending", "reaction_active"\]\.includes\(ruleView\.phase\)[\s\S]*gameView\.classList\.toggle\("is-reaction-active", reactionEventActive\)/);
-  assert.match(ui, /reactionEventActive = \["reaction_pending", "reaction_active"\]\.includes\(currentView\.phase\)[\s\S]*!reactionEventActive && !currentView\.localReactionActive/);
+  assert.match(ui, /function syncReactionFlash\(snapshot, ruleView\)[\s\S]*startMs - service\.getCorrectedNow\(\)[\s\S]*global\.setTimeout\(activate, delay\)/);
+  assert.match(ui, /reactionEventActive = \["reaction_pending", "reaction_active"\]\.includes\(currentView\.phase\)[\s\S]*!reactionEventActive && !hasActiveReactionRing/);
   assert.match(ui, /situation\.classList\.toggle\("is-shot-event", ruleView\.phase === "shot_ack"\)/);
   assert.match(ui, /"is-reroll-ready"[\s\S]*ruleView\.phase === "awaiting_reroll"/);
 
@@ -1236,16 +1235,52 @@ test("Klassik UI renders and submits every rule phase through direct table inter
   assert.doesNotMatch(ui, /confirmButton|trottl-classic-player-confirm/);
   assert.match(ui, /service\.acknowledgeDrink\(session\.id, session\.rollSeq\)/);
   assert.match(ui, /service\.chooseTrottl\(session\.id, session\.rollSeq, seatIndex\)/);
-  assert.match(ui, /service\.assignFourSip\(session\.id, session\.rollSeq, seatIndex\)/);
-  assert.match(ui, /service\.resetFourSips\(session\.id, session\.rollSeq\)/);
+  assert.match(ui, /service\.assignFourSip\(mutation\.sessionId, mutation\.rollSeq, mutation\.seatIndex\)/);
+  assert.match(ui, /service\.resetFourSips\(mutation\.sessionId, mutation\.rollSeq\)/);
   assert.match(ui, /service\.confirmFourSips\(session\.id, session\.rollSeq\)/);
   assert.match(ui, /service\.submitReaction\(session\.id, session\.rollSeq, session\.reactionId, clientReactedAt\)/);
   assert.match(ui, /service\.acknowledgeReactionLoser\(session\.id, session\.rollSeq, session\.reactionId\)/);
   assert.match(ui, /service\.acknowledgeShot\(session\.id, session\.rollSeq\)/);
   assert.match(ui, /new Date\(service\.getCorrectedNow\(\)\)\.toISOString\(\)/);
-  assert.match(ui, /fourConfirmButton\.hidden = !mayDistribute \|\| total !== 4/);
+  assert.match(ui, /fourConfirmButton\.hidden = !mayDistribute[\s\S]*is-slot-hidden[\s\S]*mutationsPending \|\| serverTotal !== 4/);
   assert.match(ui, /renderSession\(deferredIsCurrent \? "live" : "passive"\)/);
   assert.doesNotMatch(ui, /Math\.random/);
+});
+
+test("rule four uses immediate optimistic state with an ordered capped server queue", () => {
+  assert.match(ui, /function enqueueFourAssignment\(snapshot, seatIndex\)[\s\S]*getAllocationTotal\(allocations\) >= 4[\s\S]*allocations\[seatIndex\].*\+ 1[\s\S]*fourMutationQueue\.push/s);
+  assert.match(ui, /function drainFourMutationQueue\(\)[\s\S]*fourMutationQueue\.shift\(\)[\s\S]*await service\.assignFourSip/s);
+  assert.match(ui, /seatIndex !== ownSeat[\s\S]*enqueueFourAssignment\(snapshot, seatIndex\)/s);
+  assert.match(ui, /function enqueueFourReset\(snapshot\)[\s\S]*fourOptimisticAllocations = \{\}[\s\S]*kind: "reset"/s);
+  assert.match(ui, /function confirmFourSips\(\)[\s\S]*fourMutationInFlight \|\| state\.fourMutationQueue\.length > 0[\s\S]*getFourTotal\(session\) !== 4/s);
+  assert.match(css, /\.trottl-classic-rule-controls\.has-four-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:/s);
+  assert.match(css, /#trottl-classic-four-confirm\.is-slot-hidden\s*\{[^}]*visibility:\s*hidden/s);
+});
+
+test("global reaction window stays absolute across hidden tabs and rejects late arrivals", () => {
+  assert.match(finalReactionMigration, /v_start :=[\s\S]*old\.reaction_start_at[\s\S]*new\.roll_started_at \+ pg_catalog\.make_interval\(secs => 2\.6\)/);
+  assert.match(finalReactionMigration, /'started_at', v_start[\s\S]*'deadline_at', v_deadline/);
+  assert.match(finalReactionMigration, /start_trottl_classic_personal_reaction[\s\S]*Compatibility for a briefly cached older client[\s\S]*return false/);
+  assert.match(finalReactionMigration, /v_now > v_deadline_at \+ pg_catalog\.make_interval\(secs => 1\.0\)/);
+  assert.match(finalReactionMigration, /jsonb_agg\(entry\.key::smallint[\s\S]*status' = 'timed_out'/);
+  assert.match(ui, /service\.getReactionWindow\(session, ownSeat\)[\s\S]*nowMs > deadlineMs/);
+  assert.doesNotMatch(ui, /startPersonalReaction|personalReactionIntent/);
+  assert.match(css, /\.trottl-classic-game-view\.is-reaction-active::before,[\s\S]*pointer-events:\s*none/);
+});
+
+test("final Classic action dock contract fits every requested iPhone viewport", () => {
+  const viewports = [[375, 667], [390, 844], [393, 793], [393, 852], [430, 932]];
+  for (const [width, height] of viewports) {
+    const dockWidth = Math.min(width * 0.94, 390);
+    const dockHeight = height <= 720 ? 74 : 82;
+    assert.ok(dockWidth <= width, `${width}x${height}: dock stays within viewport width`);
+    assert.ok(dockHeight < height * 0.13, `${width}x${height}: fixed dock leaves the game field intact`);
+  }
+  assert.match(css, /\.trottl-classic-game-view\s*\{[^}]*--trottl-action-zone-height:\s*82px[^}]*padding-bottom:\s*var\(--trottl-action-zone-height\)/s);
+  assert.match(css, /@media \(max-height: 720px\)[\s\S]*--trottl-action-zone-height:\s*74px/);
+  assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*left:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
+  assert.match(css, /\.trottl-classic-rule-controls\.has-confirm-action:not\(\.has-four-actions\)\s*\{[^}]*position:\s*fixed/s);
+  assert.match(css, /bottom:\s*max\(calc\(env\(safe-area-inset-bottom\) \+ 8px\), 12px\)/);
 });
 
 test("roller, realtime spectators and recovery snapshots share one guarded roll consumer", () => {

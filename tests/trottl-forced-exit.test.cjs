@@ -45,7 +45,7 @@ test("forced exit discards requests, reconnects and every stale session referenc
   const exit = body("exitClassicSessionToRoomPicker");
   for (const reset of [
     "busy = false", "rollRequestPending = false", "actionRequestPending = false",
-    "reactionStartPending = false", "kickSubmitting = false", "avatarSubmitting = false",
+    "kickSubmitting = false", "avatarSubmitting = false",
     "sessionRefreshQueued = false", "sessionRefreshPromise = null", "sessionRecoveryPromise = null",
     "diceSessionId = null", "visualSessionId = null",
   ]) assert.match(exit, new RegExp(reset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), reset);

@@ -58,7 +58,7 @@ test("recovery resets only transient visuals before applying the full server sna
   const reset = ui.match(/function resetRecoveryTransientState\(sessionId\)[\s\S]*?\n    }/)?.[0] ?? "";
   assert.match(reset, /animatingRollSeq = null[\s\S]*deferredLiveRollSeq = null/);
   assert.match(reset, /clearActionBoundaryTimer\(\)[\s\S]*clearReactionCountdownTimer\(\)/);
-  assert.match(reset, /personalReactionIntent = null[\s\S]*hasRenderedGame = false/);
+  assert.match(reset, /clearReactionFlashTimer\(\)[\s\S]*clearFourMutationState\(\)[\s\S]*hasRenderedGame = false/);
   assert.doesNotMatch(reset, /state\.snapshot = null|service\.|reaction_start_at|deadline_at/);
   assert.match(ui, /service\.loadSession\(sessionId\)[\s\S]*state\.snapshot = snapshot/);
 });

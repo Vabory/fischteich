@@ -198,10 +198,25 @@
     return Number.isFinite(deadline) ? Math.max(0, deadline - nowMs) : null;
   }
 
+  function getReactionWindow(session, seatIndex) {
+    const reaction = getReactionPlayer(session, seatIndex);
+    const startedMs = Date.parse(reaction?.started_at ?? session?.reactionStartAt ?? "");
+    const deadlineMs = Date.parse(reaction?.deadline_at ?? "");
+    return Object.freeze({
+      startedMs: Number.isFinite(startedMs) ? startedMs : null,
+      deadlineMs: Number.isFinite(deadlineMs) ? deadlineMs : null,
+    });
+  }
+
   function isPersonalReactionActive(session, seatIndex, nowMs = getCorrectedNow()) {
     const reaction = getReactionPlayer(session, seatIndex);
+    const { startedMs } = getReactionWindow(session, seatIndex);
     const remainingMs = getPersonalReactionRemainingMs(session, seatIndex, nowMs);
-    return reaction?.status === "pending" && reaction.started_at && remainingMs !== null && remainingMs > 0;
+    return reaction?.status === "pending"
+      && startedMs !== null
+      && nowMs >= startedMs
+      && remainingMs !== null
+      && remainingMs > 0;
   }
 
   function getRecoveryRollPresentation(session, nowMs = Date.now()) {
@@ -557,19 +572,6 @@
     });
   }
 
-  async function startPersonalReaction(sessionId, rollSeq, reactionId, clientStartedAt) {
-    await ensureIdentity();
-    if (!Number.isSafeInteger(rollSeq) || rollSeq < 1) throw new RangeError("Valid roll sequence required");
-    const { data, error } = await supabaseClient.rpc("start_trottl_classic_personal_reaction", {
-      p_session_id: sessionId,
-      p_roll_seq: rollSeq,
-      p_reaction_id: reactionId,
-      p_client_started_at: clientStartedAt,
-    });
-    if (error) throw error;
-    return data === true;
-  }
-
   async function refreshReaction(sessionId) {
     await ensureIdentity();
     const { error } = await supabaseClient.rpc("sync_trottl_classic_reaction", { p_session_id: sessionId });
@@ -661,6 +663,7 @@
     getReactionPenaltySeats,
     getReactionPenaltyAcks,
     getPersonalReactionRemainingMs,
+    getReactionWindow,
     isPersonalReactionActive,
     getRecoveryRollPresentation,
     getRollAction,
@@ -688,7 +691,6 @@
     resetFourSips,
     confirmFourSips,
     submitReaction,
-    startPersonalReaction,
     refreshReaction,
     acknowledgeReactionLoser,
     acknowledgeShot,

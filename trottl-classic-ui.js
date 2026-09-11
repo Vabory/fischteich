@@ -5,6 +5,7 @@
   const LOBBY_HEARTBEAT_INTERVAL_MS = 30_000;
   const LOBBY_CLEANUP_INTERVAL_MS = 20_000;
   const LOBBY_BACKGROUND_ASSET = "./assets/lobby-room1-background.png";
+  const GAME_BACKGROUND_ASSET = "./assets/3er-trottl-ingame-background.png?v=1";
 
   function getLobbyHeaderAsset(roomSlot) {
     return Number(roomSlot) === 2
@@ -291,6 +292,8 @@
     const gameDiceMount = document.querySelector("#trottl-classic-dice-mount");
     const gameDiceStatus = document.querySelector("#trottl-classic-dice-status");
     const ruleControls = document.querySelector("#trottl-classic-rule-controls");
+    const actionProgress = document.querySelector("#trottl-classic-action-progress");
+    const actionProgressValue = document.querySelector("#trottl-classic-action-progress-value");
     const fourResetButton = document.querySelector("#trottl-classic-four-reset");
     const fourConfirmButton = document.querySelector("#trottl-classic-four-confirm");
     const globalConfirmButton = document.querySelector("#trottl-classic-global-confirm");
@@ -324,7 +327,7 @@
     const sessionBackButton = document.querySelector("#close-trottl-classic-session");
 
     if (typeof global.Image === "function") {
-      for (const source of [LOBBY_BACKGROUND_ASSET, getLobbyHeaderAsset(1), getLobbyHeaderAsset(2)]) {
+      for (const source of [LOBBY_BACKGROUND_ASSET, GAME_BACKGROUND_ASSET, getLobbyHeaderAsset(1), getLobbyHeaderAsset(2)]) {
         const image = new global.Image();
         image.src = source;
       }
@@ -1194,8 +1197,8 @@
       seat.style.setProperty("--seat-y", position.y.toFixed(6));
       // The fixed geometry is authored from bottom-center around the table.
       // Mirror only its screen X mapping so global +1 proceeds clockwise.
-      seat.style.setProperty("--seat-left", `${(50 - (position.x * 36)).toFixed(3)}%`);
-      seat.style.setProperty("--seat-top", `${(50 + (position.y * 42)).toFixed(3)}%`);
+      seat.style.setProperty("--seat-left", `${(50 - (position.x * 38)).toFixed(3)}%`);
+      seat.style.setProperty("--seat-top", `${(50 + (position.y * 34)).toFixed(3)}%`);
       const seatDescription = [
         player.displayName,
         isSelf ? "du" : "",
@@ -1369,7 +1372,8 @@
             seat.style.setProperty("--seat-reaction-progress", `${ring.progress.toFixed(1)}%`);
           } else seat?.style.removeProperty("--seat-reaction-progress");
         }
-        if (!currentView.localReactionActive && !hasActiveReactionRing) {
+        const reactionEventActive = ["reaction_pending", "reaction_active"].includes(currentView.phase);
+        if (!reactionEventActive && !currentView.localReactionActive && !hasActiveReactionRing) {
           state.reactionCountdownTimer = null;
           situation.style.removeProperty("--reaction-progress");
           situation.classList.remove("is-reaction-urgent");
@@ -1422,6 +1426,8 @@
         && ruleView.localSeat === snapshot.session.actionActorSeat;
       const total = service.getFourTotal(snapshot.session);
       const localNeedsConfirmation = needsConfirmation(ruleView.localSeat, snapshot, ruleView);
+      actionProgress.hidden = !mayDistribute;
+      actionProgressValue.textContent = `${total} / 4`;
       fourResetButton.hidden = !mayDistribute;
       fourResetButton.disabled = state.actionRequestPending || total === 0;
       fourConfirmButton.hidden = !mayDistribute || total !== 4;
@@ -1502,7 +1508,8 @@
       const ruleView = getRuleView(snapshot);
       const effects = collectVisualEffects(snapshot, ruleView);
       tableStage.dataset.playerCount = String(snapshot.players.length);
-      tableStage.classList.toggle("is-reaction-active", ruleView.localReactionActive);
+      const reactionEventActive = ["reaction_pending", "reaction_active"].includes(ruleView.phase);
+      gameView.classList.toggle("is-reaction-active", reactionEventActive);
       situation.classList.toggle("is-reaction-prompt", ruleView.localReactionActive);
       situation.classList.toggle("is-shot-event", ruleView.phase === "shot_ack");
       situation.classList.toggle("is-four-complete-impact", effects.fourCompleteImpact);
@@ -1856,8 +1863,9 @@
       const isPlaying = snapshot.session.status === "playing";
       sessionBackButton.setAttribute("aria-label", "Raum verlassen");
       sessionBackground.src = isPlaying
-        ? "./assets/sidemenu-background.png?v=2"
+        ? GAME_BACKGROUND_ASSET
         : LOBBY_BACKGROUND_ASSET;
+      sessionBackground.classList.toggle("is-ingame-background", isPlaying);
       sessionScreen.classList.toggle("is-playing", isPlaying);
       sessionHeader.hidden = isPlaying;
       lobbyView.hidden = isPlaying;

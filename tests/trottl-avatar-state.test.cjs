@@ -71,6 +71,6 @@ test("existing snapshot and Realtime path expose avatar and ready without new UI
   assert.match(service, /avatarId,[\s\S]*isReady: value\.is_ready === true/);
   assert.match(service, /setAvatar[\s\S]*set_trottl_classic_avatar[\s\S]*setReady[\s\S]*set_trottl_classic_ready/);
   assert.match(service, /table: "trottl_classic_players"/);
-  assert.match(html, /trottl-avatar-service\.js\?v=3[\s\S]*trottl-classic-service\.js\?v=15/);
+  assert.match(html, /trottl-avatar-service\.js\?v=3[\s\S]*trottl-classic-service\.js\?v=16/);
   assert.doesNotMatch(html, /id="[^"]*(?:avatar-select|ready-button)/i);
 });

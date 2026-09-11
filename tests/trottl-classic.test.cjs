@@ -598,13 +598,13 @@ test("clockwise global cycle is preserved for every perspective from three throu
   }
 });
 
-test("designed layouts use the requested top-center poker structures", () => {
+test("designed layouts keep the self seat below a circular table", () => {
   const { service } = createHarness();
   for (const playerCount of [4, 6, 8]) {
     const topCenter = service.getSeatPosition(playerCount / 2, playerCount);
     assert.equal(topCenter.x, 0);
     assert.equal(topCenter.y, -1);
-    assert.equal(50 + (topCenter.y * 42), 8, "top-center stays inside the table stage below the situation row");
+    assert.equal(50 + (topCenter.y * 34), 16, "top-center stays inside the circular table stage");
   }
   const sevenTopRight = service.getSeatPosition(3, 7);
   const sevenTopLeft = service.getSeatPosition(4, 7);
@@ -613,29 +613,18 @@ test("designed layouts use the requested top-center poker structures", () => {
   assert.notEqual(sevenTopRight.x, 0);
 });
 
-test("six through eight player side chains follow the oval instead of columns", () => {
+test("three through eight player positions sit on one evenly distributed unit circle", () => {
   const { service } = createHarness();
-  const six = service.seatLayouts[6];
-  assert.equal(six.filter(({ x }) => x > 0).length, 2);
-  assert.equal(six.filter(({ x }) => x < 0).length, 2);
-  assert.equal(six.filter(({ x, y }) => x === 0 && y === -1).length, 1);
-  assert.ok(Math.abs(six[1].x) > Math.abs(six[2].x), "lower six-player seats sit farther out than upper seats");
-  assert.ok(six[1].y > six[2].y);
-
-  const seven = service.seatLayouts[7];
-  assert.equal(seven.filter(({ x }) => x > 0).length, 3);
-  assert.equal(seven.filter(({ x }) => x < 0).length, 3);
-  assert.equal(seven.slice(1).filter(({ x }) => x === 0).length, 0);
-  assert.ok(Math.abs(seven[3].x) < Math.abs(seven[1].x));
-  assert.ok(Math.abs(seven[1].x) < Math.abs(seven[2].x));
-  assert.ok(seven[1].y > seven[2].y && seven[2].y > seven[3].y);
-
-  const eight = service.seatLayouts[8];
-  assert.equal(eight.filter(({ x }) => x > 0).length, 3);
-  assert.equal(eight.filter(({ x }) => x < 0).length, 3);
-  assert.equal(eight.filter(({ x, y }) => x === 0 && y === -1).length, 1);
-  assert.ok(Math.abs(eight[3].x) < Math.abs(eight[1].x));
-  assert.ok(Math.abs(eight[1].x) < Math.abs(eight[2].x));
+  for (let playerCount = 3; playerCount <= 8; playerCount += 1) {
+    const layout = service.seatLayouts[playerCount];
+    assert.ok(layout.every(({ x, y }) => Math.abs(Math.hypot(x, y) - 1) < 0.000001));
+    for (let index = 1; index < playerCount; index += 1) {
+      const previous = layout[index - 1];
+      const current = layout[index];
+      const dot = (previous.x * current.x) + (previous.y * current.y);
+      assert.ok(Math.abs(dot - Math.cos((2 * Math.PI) / playerCount)) < 0.000002);
+    }
+  }
 });
 
 test("three through five player layouts keep their intentional poker structures", () => {
@@ -653,16 +642,15 @@ test("three through five player layouts keep their intentional poker structures"
   assert.equal(service.seatLayouts[5].slice(1).filter(({ x }) => x === 0).length, 0);
 });
 
-test("eight-player lower neighbors leave the self seat visibly more space", () => {
+test("eight-player lower neighbors retain equal circular spacing around self", () => {
   const { service } = createHarness();
   const own = service.getSeatPosition(0, 8);
   const successor = service.getSeatPosition(1, 8);
   const predecessor = service.getSeatPosition(7, 8);
-  const previousUniformEllipseNeighborY = Math.SQRT1_2;
   assert.equal(successor.y, predecessor.y);
-  assert.ok(own.y - successor.y > own.y - previousUniformEllipseNeighborY);
-  assert.ok(successor.y <= 0.5);
-  assert.ok(predecessor.y <= 0.5);
+  assert.ok(Math.abs(successor.y - Math.SQRT1_2) < 0.000001);
+  assert.ok(Math.abs(Math.hypot(successor.x - own.x, successor.y - own.y)
+    - Math.hypot(predecessor.x - own.x, predecessor.y - own.y)) < 0.000001);
 });
 
 test("perspective and active state cannot mutate the shared position sets", () => {
@@ -978,7 +966,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=15[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=26[\s\S]*script\.js\?v=87/);
+  assert.match(html, /trottl-classic-service\.js\?v=16[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=27[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*text-3er-trottl\.png\?v=1/);
@@ -1006,6 +994,8 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /class="trottl-classic-dice-zone"/);
   assert.match(html, /id="trottl-classic-dice-mount"/);
   assert.match(html, /id="trottl-classic-seat-layer"/);
+  assert.doesNotMatch(html, /class="trottl-classic-table"|class="trottl-classic-table-rail"/);
+  assert.match(html, /id="trottl-classic-action-progress"[^>]*hidden[\s\S]*id="trottl-classic-action-progress-value">0 \/ 4/);
   assert.match(html, /id="trottl-classic-four-reset"/);
   assert.match(html, /id="trottl-classic-four-confirm"/);
   assert.match(html, /id="trottl-classic-global-confirm"[^>]*hidden/);
@@ -1016,7 +1006,9 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /hostUserId:\s*session\.hostUserId/);
   assert.doesNotMatch(html, /Pokertisch|Situationserklärer|Reaktionsspiel/);
   assert.match(css, /\.trottl-classic-lobby-player\s*\{[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
-  assert.match(css, /\.trottl-classic-table\s*\{[\s\S]*border-radius:\s*48% \/ 18%/);
+  assert.match(ui, /GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background\.png\?v=1"/);
+  assert.match(ui, /sessionBackground\.classList\.toggle\("is-ingame-background", isPlaying\)/);
+  assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*center[^}]*transform:\s*none/s);
   assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1\.04/s);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);
@@ -1034,22 +1026,24 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /data-player-count="3"[\s\S]*data-player-count="4"[\s\S]*width:\s*clamp\(98px, 27vw, 112px\)/);
   assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*width:\s*clamp\(72px, 20vw, 84px\)/);
   assert.match(css, /\.trottl-classic-avatar-wrap\s*\{[^}]*width:\s*clamp\(70px, 20vw, 78px\)[^}]*height:\s*clamp\(70px, 20vw, 78px\)/s);
-  assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active[\s\S]*255 255 255/);
+  assert.match(css, /\.trottl-classic-game-view\.is-reaction-active::before[\s\S]*255 255 255/);
   assert.match(css, /\.trottl-classic-situation\.is-reaction-prompt[\s\S]*--reaction-progress/);
   assert.match(css, /\.trottl-classic-sip-markers i\.is-assigned/);
   assert.match(css, /\.trottl-classic-situation\.is-four-distribution \.trottl-classic-event-meta/);
-  assert.match(css, /\.trottl-classic-rule-controls\.has-actions[\s\S]*min-height:\s*44px/);
+  assert.match(css, /\.trottl-classic-game-view\s*\{[\s\S]*--trottl-action-zone-height:\s*82px[\s\S]*padding-bottom:\s*var\(--trottl-action-zone-height\)/);
+  assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*position:\s*absolute[^}]*bottom:\s*0[^}]*height:\s*var\(--trottl-action-zone-height\)/s);
+  assert.match(css, /\.trottl-classic-action-progress\s*\{/);
   for (const effectClass of [
     "action-impact", "selectable-impact", "trottl-impact", "allocation-impact", "success-impact", "penalty-impact",
   ]) assert.match(css, new RegExp(`\\.trottl-classic-player--${effectClass}`));
-  assert.match(css, /\.trottl-classic-table-stage\.is-reaction-active \.trottl-classic-table::after[\s\S]*trottl-classic-reaction-rim 1\.1s/);
+  assert.match(css, /@keyframes trottl-classic-screen-reaction-flash[\s\S]*border-color:\s*rgb\(255 255 255 \/ 56%\)/);
   assert.match(css, /\.trottl-classic-situation\.is-reaction-urgent/);
   assert.match(css, /\.trottl-classic-situation\.is-shot-event \.trottl-classic-event-action::before[\s\S]*assets\/trottl-classic\/shot-glass\.svg/);
   assert.match(css, /\.trottl-classic-dice-mount\.is-reroll-ready::after/);
   assert.match(css, /\.trottl-classic-player--reaction-timer \.trottl-classic-avatar-wrap::before[\s\S]*display:\s*block/);
   assert.match(css, /--seat-reaction-progress[\s\S]*conic-gradient/);
   assert.match(ui, /querySelectorAll\("\.trottl-classic-game-seat"\)[\s\S]*--seat-reaction-progress/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*trottl-classic-player--action-impact[\s\S]*trottl-classic-table::after/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*trottl-classic-player--action-impact[\s\S]*trottl-classic-game-view\.is-reaction-active::before/);
   assert.match(shotGlass, /<svg[^>]*viewBox="0 0 24 24"/);
   assert.match(shotGlass, /fill="none"/);
   assert.doesNotMatch(shotGlass, /<script|<image|(?:href|src)=|data:/i);
@@ -1057,17 +1051,17 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(trottlBadge, />TROTTL<\/text>/);
   assert.doesNotMatch(trottlBadge, /<script|<image|(?:href|src)=|data:/i);
   assert.match(ui, /trottlBadge\.textContent = "3ER"/);
-  assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(92vw, 390px\)[\s\S]*min-height:\s*90px/);
+  assert.match(css, /\.trottl-classic-situation\s*\{[\s\S]*width:\s*min\(calc\(100vw - 128px\), 310px\)[\s\S]*min-height:\s*62px/);
   assert.match(css, /\.trottl-classic-event-main\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
   assert.match(css, /\.trottl-classic-event-action\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
   assert.match(css, /\.trottl-classic-seat-status-overlay\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums/);
   assert.match(css, /\.trottl-classic-player--context-muted\s*\{[^}]*opacity:\s*0\.82[^}]*saturate\(0\.84\)/s);
   assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*\.trottl-classic-avatar-wrap[\s\S]*width:\s*clamp\(58px, 16\.5vw, 64px\)/);
-  assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*max-width:\s*100%[^}]*flex-wrap:\s*wrap/s);
+  assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*max-width:\s*100%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(css, /\.trottl-classic-rule-controls \.trottl-classic-global-confirm\s*\{[^}]*width:\s*100%[^}]*min-height:\s*50px/s);
   assert.match(ui, /globalConfirmButton\.hidden = !localNeedsConfirmation/);
   assert.match(ui, /globalConfirmButton\.addEventListener\("click", handleConfirmation\)/);
-  assert.match(css, /@media \(max-height: 720px\)[\s\S]*\.trottl-classic-situation\s*\{[^}]*min-height:\s*76px/);
+  assert.match(css, /@media \(max-height: 720px\)[\s\S]*\.trottl-classic-situation\s*\{[^}]*min-height:\s*56px/);
   assert.match(css, /@keyframes trottl-classic-event-enter/);
   assert.match(css, /@media \(max-width: 360px\)[\s\S]*\.trottl-classic-event-main/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.trottl-classic-situation\.is-changing/);
@@ -1211,7 +1205,8 @@ test("Klassik player seats apply semantic state priority and stable status text"
   assert.match(ui, /function collectVisualEffects\(snapshot, ruleView\)/);
   assert.match(ui, /state\.visualRollSeq !== session\.rollSeq \|\| state\.visualPhase !== ruleView\.phase/);
   assert.match(ui, /Number\(seat\) === ruleView\.localSeat[\s\S]*status === "reacted"/);
-  assert.match(ui, /tableStage\.classList\.toggle\("is-reaction-active", ruleView\.localReactionActive\)/);
+  assert.match(ui, /reactionEventActive = \["reaction_pending", "reaction_active"\]\.includes\(ruleView\.phase\)[\s\S]*gameView\.classList\.toggle\("is-reaction-active", reactionEventActive\)/);
+  assert.match(ui, /reactionEventActive = \["reaction_pending", "reaction_active"\]\.includes\(currentView\.phase\)[\s\S]*!reactionEventActive && !currentView\.localReactionActive/);
   assert.match(ui, /situation\.classList\.toggle\("is-shot-event", ruleView\.phase === "shot_ack"\)/);
   assert.match(ui, /"is-reroll-ready"[\s\S]*ruleView\.phase === "awaiting_reroll"/);
 

@@ -338,7 +338,7 @@ button:focus-visible {
   display: flex;
   min-width: 0;
   padding:
-    max(calc(env(safe-area-inset-top) + 40px), 54px)
+    max(calc(env(safe-area-inset-top) + 20px), 36px)
     max(calc(env(safe-area-inset-right) + 24px), 24px)
     max(calc(env(safe-area-inset-bottom) + 28px), 32px)
     max(calc(env(safe-area-inset-left) + 24px), 24px);
@@ -389,7 +389,7 @@ button:focus-visible {
 }
 
 .fischteich-dice-stage.has-second-die {
-  gap: clamp(28px, 6dvh, 48px);
+  gap: clamp(40px, 7dvh, 62px);
   transform: translateY(clamp(-28px, -3dvh, -16px));
 }
 

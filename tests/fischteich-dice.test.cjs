@@ -292,8 +292,8 @@ test("the dice screen uses the supplied assets and keeps central navigation", ()
   assert.match(css, /\.fischteich-dice-background\s*\{[\s\S]*height:\s*calc\(100% \+ 59px\)[\s\S]*transform:\s*translateY\(-59px\)/);
   assert.match(css, /\.fischteich-dice-background[\s\S]*filter:\s*brightness\(0\.8\)/);
   assert.match(css, /\.fischteich-dice-title-asset[\s\S]*filter:\s*brightness\(0\.95\)/);
-  assert.match(css, /\.trottl-dice-shell[\s\S]*safe-area-inset-top\) \+ 40px\), 54px/);
-  assert.match(css, /\.fischteich-dice-stage\.has-second-die[\s\S]*gap:\s*clamp\(28px, 6dvh, 48px\)[\s\S]*transform:\s*translateY/);
+  assert.match(css, /\.trottl-dice-shell[\s\S]*safe-area-inset-top\) \+ 20px\), 36px/);
+  assert.match(css, /\.fischteich-dice-stage\.has-second-die[\s\S]*gap:\s*clamp\(40px, 7dvh, 62px\)[\s\S]*transform:\s*translateY/);
   assert.doesNotMatch(css, /\.fischteich-dice-second-mount\s*\{[^}]*--dice-size/s);
   assert.match(css, /\.fischteich-dice-toggle\.is-active\s*\{[^}]*filter:\s*none/s);
   assert.match(css, /\.fischteich-dice-toggle\.is-active::after[\s\S]*box-shadow:\s*0 0 7px rgb\(255 255 255/);

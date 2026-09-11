@@ -978,13 +978,13 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=15[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=25[\s\S]*script\.js\?v=86/);
+  assert.match(html, /trottl-classic-service\.js\?v=15[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=26[\s\S]*script\.js\?v=86/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
   assert.match(html, /id="trottl-classic-player-list"/);
   assert.match(html, /id="trottl-classic-start"/);
-  assert.match(html, /id="trottl-classic-leave"/);
+  assert.doesNotMatch(html, /id="trottl-classic-leave"/);
   assert.match(html, /id="trottl-classic-game-view"/);
   assert.match(html, /id="trottl-classic-situation"/);
   assert.match(html, /id="trottl-classic-event-player"/);

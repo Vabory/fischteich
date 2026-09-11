@@ -48,7 +48,7 @@ test("lobby avatars resolve only through the shared registry and null stays empt
   assert.doesNotMatch(uiSource, /assets\/avatars\//);
 });
 
-test("ready counter and host start states derive only from the current snapshot", () => {
+test("single lobby status control derives all four states from the current snapshot", () => {
   const ui = loadUi();
   const twoPlayers = [player("host", 0, { ready: true }), player("guest", 1, { ready: true })];
   const waiting = [
@@ -58,19 +58,45 @@ test("ready counter and host start states derive only from the current snapshot"
   ];
   const ready = waiting.map((entry) => player(entry.userId, entry.seatIndex, { ready: true }));
   const twoPlayerView = ui.createLobbyPresentation({ players: twoPlayers, localUserId: "host", hostUserId: "host" });
-  assert.equal(twoPlayerView.startLabel, "Spiel starten");
+  assert.equal(twoPlayerView.startLabel, "Spiel starten!");
   assert.equal(twoPlayerView.canStart, true);
+  assert.equal(twoPlayerView.statusState, "host-ready");
   const waitingView = ui.createLobbyPresentation({ players: waiting, localUserId: "host", hostUserId: "host" });
   assert.equal(waitingView.readyCount, 2);
   assert.equal(waitingView.playerCount, 3);
-  assert.equal(waitingView.startLabel, "Warten auf Bereitschaft");
+  assert.equal(waitingView.startLabel, "Warten auf Bereitschaft der Spieler…");
   assert.equal(waitingView.canStart, false);
+  assert.equal(waitingView.statusState, "waiting-ready");
   const hostView = ui.createLobbyPresentation({ players: ready, localUserId: "host", hostUserId: "host" });
-  assert.equal(hostView.startLabel, "Spiel starten");
+  assert.equal(hostView.startLabel, "Spiel starten!");
   assert.equal(hostView.canStart, true);
+  assert.equal(hostView.statusState, "host-ready");
   const guestView = ui.createLobbyPresentation({ players: ready, localUserId: "guest", hostUserId: "host" });
-  assert.equal(guestView.startLabel, "Warten auf Host");
+  assert.equal(guestView.startLabel, "Warten auf Spielstart vom Host!");
   assert.equal(guestView.canStart, false);
+  assert.equal(guestView.statusState, "waiting-host");
+  const shortView = ui.createLobbyPresentation({ players: [player("host", 0)], localUserId: "host", hostUserId: "host" });
+  assert.equal(shortView.startLabel, "Noch 1 Spieler benötigt");
+  assert.equal(shortView.canStart, false);
+  assert.equal(shortView.statusState, "needs-players");
+});
+
+test("classic lobby uses the supplied room assets and one accessible bottom status control", () => {
+  const ui = loadUi();
+  assert.equal(ui.lobbyBackgroundAsset, "./assets/lobby-room1-background.png");
+  assert.equal(ui.getLobbyHeaderAsset(1), "./assets/text-room1-lobby.png");
+  assert.equal(ui.getLobbyHeaderAsset(2), "./assets/text-room2-lobby.png");
+  assert.match(html, /id="trottl-classic-session-background"[\s\S]*lobby-room1-background\.png/);
+  assert.match(html, /id="trottl-classic-lobby-title-asset"[\s\S]*text-room1-lobby\.png/);
+  assert.doesNotMatch(html, /id="trottl-classic-leave"/);
+  assert.match(html, /id="close-trottl-classic-session"[\s\S]*aria-label="Raum verlassen"/);
+  assert.equal((html.match(/id="trottl-classic-start"/g) ?? []).length, 1);
+  const sessionMarkup = html.match(/id="trottl-classic-session-screen"[\s\S]*?<section class="trottl-classic-game-view"/)?.[0] ?? "";
+  assert.doesNotMatch(sessionMarkup, /<p class="eyebrow">3er Trottl Klassik<\/p>/i);
+  assert.match(css, /height:\s*calc\(100% \+ 59px\)[\s\S]*transform:\s*translateY\(-59px\)/);
+  assert.match(css, /\.trottl-classic-lobby-status-button\.is-host-ready[\s\S]*border-color:\s*rgb\(114 247 158/);
+  assert.match(css, /\.trottl-classic-lobby-status-button\.is-waiting-host[\s\S]*border-color/);
+  assert.match(uiSource, /startButton\.setAttribute\("aria-disabled", String\(startButton\.disabled\)\)/);
 });
 
 test("ready and avatar controls express every local server-backed state", () => {
@@ -118,5 +144,7 @@ test("lobby structure and responsive CSS support three through eight players wit
   assert.match(css, /\.trottl-classic-lobby-name-line strong[\s\S]*overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis[\s\S]*white-space:\s*nowrap/);
   assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*min-height:\s*42px/);
   assert.match(css, /\.trottl-classic-player-list[\s\S]*overflow-y:\s*auto/);
+  assert.match(css.match(/\.trottl-classic-player-panel\s*\{[\s\S]*?\n\}/)?.[0] ?? "", /min-height:\s*0;/);
+  assert.match(css, /data-player-count="7"[\s\S]*max-height:\s*min\(42dvh, 342px\)[\s\S]*overflow-y:\s*auto/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
 });

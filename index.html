@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260911.4">
+    <meta name="fischteich-build" content="20260911.5">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=156">
+    <link rel="stylesheet" href="./style.css?v=157">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -32,7 +32,7 @@
     <script src="./trottl-avatar-service.js?v=3" defer></script>
     <script src="./trottl-classic-service.js?v=15" defer></script>
     <script src="./trottl-classic-preview.js?v=3" defer></script>
-    <script src="./trottl-classic-ui.js?v=25" defer></script>
+    <script src="./trottl-classic-ui.js?v=26" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=86" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -230,13 +230,12 @@
       </section>
 
       <section class="screen trottl-classic-screen" id="trottl-classic-session-screen" aria-labelledby="trottl-classic-session-title" hidden>
-        <img class="sidemenu-background" src="./assets/sidemenu-background.png?v=2" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
+        <img class="trottl-classic-lobby-background" id="trottl-classic-session-background" src="./assets/lobby-room1-background.png" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
         <button class="close-button navigation-back-button" id="close-trottl-classic-session" type="button" aria-label="Raum verlassen">←</button>
         <main class="trottl-classic-shell trottl-classic-session-shell">
           <header class="trottl-classic-header" id="trottl-classic-session-header">
-            <p class="eyebrow">3er Trottl Klassik</p>
-            <h1 id="trottl-classic-session-title"><span id="trottl-classic-session-room">RAUM</span></h1>
-            <p class="trottl-classic-session-state" id="trottl-classic-session-state">Lobby</p>
+            <h1 id="trottl-classic-session-title" class="visually-hidden">3er Trottl Klassik Lobby</h1>
+            <img class="trottl-classic-lobby-title-asset" id="trottl-classic-lobby-title-asset" src="./assets/text-room1-lobby.png" alt="Raum 1 Lobby" width="640" height="240" draggable="false">
           </header>
           <div class="trottl-classic-lobby-view" id="trottl-classic-lobby-view">
             <section class="trottl-classic-player-panel" aria-labelledby="trottl-classic-player-title">
@@ -248,8 +247,7 @@
             </section>
             <p class="trottl-classic-feedback" id="trottl-classic-session-feedback" aria-live="polite"></p>
             <div class="trottl-classic-actions">
-              <button class="primary-button" id="trottl-classic-start" type="button" hidden>Spiel starten</button>
-              <button class="secondary-button" id="trottl-classic-leave" type="button">Raum verlassen</button>
+              <button class="trottl-classic-lobby-status-button is-inactive" id="trottl-classic-start" type="button" disabled aria-disabled="true">Noch 1 Spieler benötigt</button>
             </div>
           </div>
           <section class="trottl-classic-game-view" id="trottl-classic-game-view" aria-label="3er Trottl Klassik Spieltisch" hidden>

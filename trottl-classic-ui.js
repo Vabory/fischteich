@@ -4,6 +4,13 @@
   const AVATAR_SELECT_REQUEST_EVENT = "fischteich:trottl-avatar-select-request";
   const LOBBY_HEARTBEAT_INTERVAL_MS = 30_000;
   const LOBBY_CLEANUP_INTERVAL_MS = 20_000;
+  const LOBBY_BACKGROUND_ASSET = "./assets/lobby-room1-background.png";
+
+  function getLobbyHeaderAsset(roomSlot) {
+    return Number(roomSlot) === 2
+      ? "./assets/text-room2-lobby.png"
+      : "./assets/text-room1-lobby.png";
+  }
 
   function getLobbyAvatarById(avatarId, avatarService = global.trottlAvatarService) {
     if (typeof avatarId !== "string" || !avatarService) return null;
@@ -48,9 +55,20 @@
       && source.every((player) => player.isReady === true && player.avatarId !== null);
     const isHost = localUserId === hostUserId;
     let startLabel;
-    if (missingPlayers > 0) startLabel = `Noch ${missingPlayers} Spieler benötigt`;
-    else if (!allReady) startLabel = "Warten auf Bereitschaft";
-    else startLabel = isHost ? "Spiel starten" : "Warten auf Host";
+    let statusState;
+    if (missingPlayers > 0) {
+      startLabel = `Noch ${missingPlayers} Spieler benötigt`;
+      statusState = "needs-players";
+    } else if (!allReady) {
+      startLabel = "Warten auf Bereitschaft der Spieler…";
+      statusState = "waiting-ready";
+    } else if (isHost) {
+      startLabel = "Spiel starten!";
+      statusState = "host-ready";
+    } else {
+      startLabel = "Warten auf Spielstart vom Host!";
+      statusState = "waiting-host";
+    }
     return Object.freeze({
       orderedPlayers,
       self,
@@ -60,6 +78,7 @@
       isHost,
       canStart: isHost && missingPlayers === 0 && allReady,
       startLabel,
+      statusState,
     });
   }
 
@@ -254,9 +273,9 @@
     const sessionScreen = document.querySelector("#trottl-classic-session-screen");
     const roomList = document.querySelector("#trottl-classic-room-list");
     const roomFeedback = document.querySelector("#trottl-classic-room-feedback");
-    const sessionRoom = document.querySelector("#trottl-classic-session-room");
-    const sessionState = document.querySelector("#trottl-classic-session-state");
     const sessionHeader = document.querySelector("#trottl-classic-session-header");
+    const lobbyTitleAsset = document.querySelector("#trottl-classic-lobby-title-asset");
+    const sessionBackground = document.querySelector("#trottl-classic-session-background");
     const lobbyView = document.querySelector("#trottl-classic-lobby-view");
     const gameView = document.querySelector("#trottl-classic-game-view");
     const tableStage = document.querySelector("#trottl-classic-table-stage");
@@ -285,7 +304,6 @@
     const readyCountLabel = document.querySelector("#trottl-classic-ready-count");
     const sessionFeedback = document.querySelector("#trottl-classic-session-feedback");
     const startButton = document.querySelector("#trottl-classic-start");
-    const leaveButton = document.querySelector("#trottl-classic-leave");
     const avatarModal = document.querySelector("#trottl-avatar-modal");
     const avatarModalCard = avatarModal.querySelector(".trottl-avatar-modal-card");
     const avatarGrid = document.querySelector("#trottl-avatar-grid");
@@ -304,6 +322,13 @@
     const leaveConfirmButton = document.querySelector("#trottl-leave-confirm");
     const roomBackButton = document.querySelector("#close-trottl-classic-rooms");
     const sessionBackButton = document.querySelector("#close-trottl-classic-session");
+
+    if (typeof global.Image === "function") {
+      for (const source of [LOBBY_BACKGROUND_ASSET, getLobbyHeaderAsset(1), getLobbyHeaderAsset(2)]) {
+        const image = new global.Image();
+        image.src = source;
+      }
+    }
 
     const state = {
       rooms: [],
@@ -892,8 +917,9 @@
         hostUserId: session.hostUserId,
         minPlayers: service.minPlayers,
       });
-      sessionRoom.textContent = `RAUM ${session.roomSlot}`;
-      sessionState.textContent = "Lobby";
+      const headerAsset = getLobbyHeaderAsset(session.roomSlot);
+      lobbyTitleAsset.src = headerAsset;
+      lobbyTitleAsset.alt = `Raum ${session.roomSlot} Lobby`;
       playerCountLabel.textContent = `${presentation.playerCount} Spieler`;
       readyCountLabel.textContent = `${presentation.readyCount} / ${presentation.playerCount} bereit`;
       lobbyView.dataset.playerCount = String(presentation.playerCount);
@@ -988,7 +1014,9 @@
       startButton.hidden = session.status !== "lobby";
       startButton.disabled = state.busy || !presentation.canStart;
       startButton.textContent = presentation.startLabel;
-      leaveButton.disabled = state.busy;
+      startButton.className = `trottl-classic-lobby-status-button is-${presentation.statusState}`;
+      startButton.setAttribute("aria-disabled", String(startButton.disabled));
+      startButton.setAttribute("aria-label", presentation.startLabel);
       syncAvatarModalWithSnapshot(snapshot);
       syncKickModalWithSnapshot(snapshot);
       preloadAvailableAvatarChoices();
@@ -1827,6 +1855,9 @@
       if (!snapshot) return;
       const isPlaying = snapshot.session.status === "playing";
       sessionBackButton.setAttribute("aria-label", "Raum verlassen");
+      sessionBackground.src = isPlaying
+        ? "./assets/sidemenu-background.png?v=2"
+        : LOBBY_BACKGROUND_ASSET;
       sessionScreen.classList.toggle("is-playing", isPlaying);
       sessionHeader.hidden = isPlaying;
       lobbyView.hidden = isPlaying;
@@ -2357,7 +2388,6 @@
 
     roomBackButton.addEventListener("click", () => void returnToTrottlMenu());
     sessionBackButton.addEventListener("click", () => void leaveCurrentSession());
-    leaveButton.addEventListener("click", () => void leaveCurrentSession());
     startButton.addEventListener("click", () => void startGame());
     avatarCancelButton.addEventListener("click", () => closeAvatarModal());
     avatarConfirmButton.addEventListener("click", () => void submitAvatarSelection());
@@ -2418,6 +2448,8 @@
     createGameAvatarPresentation,
     createPersonalReactionRingPresentation,
     createLobbyPresentation,
+    getLobbyHeaderAsset,
+    lobbyBackgroundAsset: LOBBY_BACKGROUND_ASSET,
     createAvatarModalPresentation,
     getLobbyAvatarById,
     avatarSelectRequestEvent: AVATAR_SELECT_REQUEST_EVENT,

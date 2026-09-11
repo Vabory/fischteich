@@ -148,9 +148,10 @@ test("lobby structure and responsive CSS support three through eight players wit
   }
   assert.match(html, /id="trottl-classic-player-count"[\s\S]*id="trottl-classic-ready-count"/);
   assert.match(css, /\.trottl-classic-lobby-name-line strong[\s\S]*overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis[\s\S]*white-space:\s*nowrap/);
-  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*min-height:\s*42px/);
-  assert.match(css, /\.trottl-classic-player-list[\s\S]*overflow-y:\s*auto/);
+  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*min-height:\s*38px/);
+  assert.match(css, /data-player-count="7"[\s\S]*max-height:\s*none[\s\S]*overflow-y:\s*visible/);
   assert.match(css.match(/\.trottl-classic-player-panel\s*\{[\s\S]*?\n\}/)?.[0] ?? "", /min-height:\s*0;/);
-  assert.match(css, /data-player-count="7"[\s\S]*max-height:\s*min\(42dvh, 342px\)[\s\S]*overflow-y:\s*auto/);
+  assert.match(css, /data-player-count="8"[\s\S]*\.trottl-classic-lobby-player\.is-self[\s\S]*min-height:\s*64px/);
+  assert.match(css, /data-player-count="8"[\s\S]*\.trottl-classic-ready-button[\s\S]*min-height:\s*32px/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
 });

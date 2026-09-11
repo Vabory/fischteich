@@ -1085,22 +1085,41 @@ button:focus-visible {
 
 .trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-player-list,
 .trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-player-list {
-  gap: 4px;
-  max-height: min(42dvh, 342px);
-  overflow-y: auto;
+  gap: 3px;
+  max-height: none;
+  overflow-y: visible;
 }
 
 .trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-lobby-player:not(.is-self),
 .trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-lobby-player:not(.is-self) {
-  min-height: 42px;
-  padding-block: 2px;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  min-height: 38px;
+  padding-block: 1px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
 }
 
 .trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-lobby-player:not(.is-self) .trottl-classic-lobby-avatar,
 .trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-lobby-player:not(.is-self) .trottl-classic-lobby-avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
+}
+
+.trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-lobby-player.is-self,
+.trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-lobby-player.is-self {
+  min-height: 64px;
+  margin-top: 1px;
+  padding-block: 4px;
+}
+
+.trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-lobby-player.is-self .trottl-classic-lobby-avatar,
+.trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-lobby-player.is-self .trottl-classic-lobby-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.trottl-classic-lobby-view[data-player-count="7"] .trottl-classic-ready-button,
+.trottl-classic-lobby-view[data-player-count="8"] .trottl-classic-ready-button {
+  min-height: 32px;
+  padding-block: 5px;
 }
 
 .trottl-classic-screen.is-playing .trottl-classic-session-shell {

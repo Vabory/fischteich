@@ -338,7 +338,7 @@ button:focus-visible {
   display: flex;
   min-width: 0;
   padding:
-    max(calc(env(safe-area-inset-top) + 48px), 62px)
+    max(calc(env(safe-area-inset-top) + 40px), 54px)
     max(calc(env(safe-area-inset-right) + 24px), 24px)
     max(calc(env(safe-area-inset-bottom) + 28px), 32px)
     max(calc(env(safe-area-inset-left) + 24px), 24px);
@@ -349,7 +349,7 @@ button:focus-visible {
 
 .trottl-dice-header {
   width: min(70vw, 300px);
-  margin-top: clamp(4px, 1.4dvh, 14px);
+  margin-top: clamp(0px, 0.8dvh, 8px);
   text-align: center;
 }
 
@@ -361,6 +361,7 @@ button:focus-visible {
   height: calc(100% + 59px);
   object-fit: cover;
   object-position: center center;
+  filter: brightness(0.8);
   pointer-events: none;
   transform: translateY(-59px);
   user-select: none;
@@ -372,6 +373,7 @@ button:focus-visible {
   width: clamp(190px, 58vw, 290px);
   height: auto;
   margin-inline: auto;
+  filter: brightness(0.95);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -387,8 +389,8 @@ button:focus-visible {
 }
 
 .fischteich-dice-stage.has-second-die {
-  gap: clamp(4px, 1.2dvh, 10px);
-  transform: translateY(clamp(-26px, -4dvh, -14px));
+  gap: clamp(28px, 6dvh, 48px);
+  transform: translateY(clamp(-28px, -3dvh, -16px));
 }
 
 .fischteich-dice-mount {
@@ -398,10 +400,6 @@ button:focus-visible {
   height: var(--dice-size);
   perspective: 900px;
   place-items: center;
-}
-
-.fischteich-dice-second-mount {
-  --dice-size: clamp(112px, 32vw, 146px);
 }
 
 .fischteich-dice-toggle {
@@ -415,7 +413,20 @@ button:focus-visible {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  transition: filter 180ms ease, transform 180ms ease;
+  isolation: isolate;
+  transition: transform 180ms ease;
+}
+
+.fischteich-dice-toggle::after {
+  position: absolute;
+  z-index: -1;
+  inset: -5px;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  box-shadow: none;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
 }
 
 .fischteich-dice-toggle img {
@@ -428,7 +439,13 @@ button:focus-visible {
 }
 
 .fischteich-dice-toggle.is-active {
-  filter: drop-shadow(0 0 7px rgb(255 255 255 / 96%)) drop-shadow(0 0 17px rgb(232 247 255 / 74%));
+  filter: none;
+}
+
+.fischteich-dice-toggle.is-active::after {
+  border-color: rgb(255 255 255 / 68%);
+  box-shadow: 0 0 7px rgb(255 255 255 / 72%), 0 0 16px rgb(232 247 255 / 52%);
+  opacity: 1;
 }
 
 .fischteich-dice-toggle:active {

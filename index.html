@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260911.11">
+    <meta name="fischteich-build" content="20260911.12">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=163">
+    <link rel="stylesheet" href="./style.css?v=164">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -45,24 +45,19 @@
       <section class="screen menu-screen is-active" id="menu-screen" aria-label="Hauptmenü">
         <img
           class="menu-background"
-          src="./assets/menu-background.png?v=4"
+          src="./assets/menu-background.png?v=5"
           alt=""
           width="853"
           height="1844"
           draggable="false"
           aria-hidden="true"
         >
-        <img
-          class="menu-crest"
-          src="./assets/turbolachs-wappen.png?v=2"
-          alt=""
-          width="1236"
-          height="1273"
-          draggable="false"
-          aria-hidden="true"
-        >
+        <div class="main-menu-fish-composition" aria-hidden="true">
+          <img class="main-menu-fish main-menu-fish--turbo" src="./assets/main-turbo-lachs.png?v=1" alt="" width="1218" height="1292" draggable="false">
+          <img class="main-menu-fish main-menu-fish--nitro" src="./assets/main-nitro-forelle.png?v=1" alt="" width="1122" height="1402" draggable="false">
+        </div>
         <button class="buffalo-menu-button" id="open-buffalo-timer" type="button" aria-label="Buffalo Timer öffnen">
-          Buffalo Timer
+          <img src="./assets/button-buffalo-timer.png?v=1" alt="" width="2172" height="724" draggable="false">
         </button>
         <main class="menu-card">
           <div class="menu-actions">

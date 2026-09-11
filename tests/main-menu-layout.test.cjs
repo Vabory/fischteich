@@ -59,3 +59,29 @@ test("layout switching cannot restart or replace the Buffalo countdown", () => {
   assert.equal((html.match(/id="buffalo-live-track"/g) ?? []).length, 1);
   assert.doesNotMatch(setActiveTournament, /buffaloLive|initializeBuffalo|refreshBuffalo|countdown/i);
 });
+
+test("the menu uses the updated background composition and keeps decorative fish noninteractive", () => {
+  for (const [asset, width, height] of [
+    ["main-turbo-lachs.png", 1218, 1292],
+    ["main-nitro-forelle.png", 1122, 1402],
+    ["button-buffalo-timer.png", 2172, 724],
+  ]) {
+    const png = fs.readFileSync(path.join(root, "assets", asset));
+    assert.equal(png.readUInt32BE(16), width);
+    assert.equal(png.readUInt32BE(20), height);
+  }
+  assert.match(html, /menu-background\.png\?v=5/);
+  assert.match(html, /main-turbo-lachs\.png\?v=1/);
+  assert.match(html, /main-nitro-forelle\.png\?v=1/);
+  assert.match(html, /button-buffalo-timer\.png\?v=1/);
+  assert.equal((html.match(/id="open-buffalo-timer"/g) ?? []).length, 1);
+  const buffaloMarkup = html.match(/id="open-buffalo-timer"[\s\S]*?<\/button>/)?.[0] ?? "";
+  assert.doesNotMatch(buffaloMarkup, />\s*Buffalo Timer\s*</);
+  assert.match(buffaloMarkup, /button-buffalo-timer\.png\?v=1/);
+  assert.match(css, /\.menu-background[\s\S]*height:\s*calc\(100% \+ 59px\)[\s\S]*transform:\s*translateY\(-59px\)/);
+  assert.match(css, /\.main-menu-fish-composition[\s\S]*pointer-events:\s*none/);
+  assert.match(css, /\.main-menu-fish\s*\{[\s\S]*top:\s*calc\(28\.41dvh - 42px\)[\s\S]*pointer-events:\s*none/);
+  assert.match(css, /@media \(min-aspect-ratio: 6 \/ 11\)[\s\S]*\.main-menu-fish\s*\{[\s\S]*top:\s*calc\(100dvh - 143\.18vw\)/);
+  assert.match(css, /\.buffalo-menu-button img\s*\{[\s\S]*width:\s*160px/);
+  assert.match(script, /openBuffaloTimer|open-buffalo-timer/);
+});

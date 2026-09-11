@@ -126,40 +126,6 @@ button:focus-visible {
   -webkit-user-drag: none;
 }
 
-.main-menu-fish-composition {
-  position: absolute;
-  z-index: 1;
-  inset: 0;
-  pointer-events: none;
-}
-
-.main-menu-fish {
-  position: absolute;
-  top: 28.41dvh;
-  height: auto;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.main-menu-fish--turbo {
-  left: calc(50% - clamp(150px, 39vw, 168px) + clamp(54px, 15vw, 66px));
-  width: clamp(173px, 48vw, 211px);
-}
-
-.main-menu-fish--nitro {
-  left: calc(50% + clamp(40px, 10.3vw, 46px) + clamp(47px, 13.5vw, 58px));
-  width: clamp(150px, 43.2vw, 186px);
-}
-
-/* In short viewports cover crops vertically around the VS-centered composition. */
-@media (min-aspect-ratio: 6 / 11) {
-  .main-menu-fish {
-    top: calc(50dvh - 43.18vw);
-  }
-}
-
 .teams-menu-screen,
 .trottl-menu-screen,
 .trottl-dice-screen,

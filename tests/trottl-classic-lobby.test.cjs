@@ -94,6 +94,10 @@ test("classic lobby uses the supplied room assets and one accessible bottom stat
   const sessionMarkup = html.match(/id="trottl-classic-session-screen"[\s\S]*?<section class="trottl-classic-game-view"/)?.[0] ?? "";
   assert.doesNotMatch(sessionMarkup, /<p class="eyebrow">3er Trottl Klassik<\/p>/i);
   assert.match(css, /height:\s*calc\(100% \+ 59px\)[\s\S]*transform:\s*translateY\(-59px\)/);
+  assert.match(css, /\.trottl-classic-lobby-background[\s\S]*filter:\s*brightness\(0\.704\)/);
+  assert.match(css, /\.trottl-classic-session-shell:not\(\.is-playing\)[\s\S]*padding-top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 10px\), 24px\)/);
+  assert.match(css, /\.trottl-classic-lobby-title-asset[\s\S]*width:\s*clamp\(154px, 46vw, 226px\)[\s\S]*filter:\s*brightness\(0\.95\)/);
+  assert.match(css, /\.trottl-classic-lobby-status-button\s*\{[\s\S]*background:\s*linear-gradient\(135deg, rgb\(243 251 255 \/ 23%\)/);
   assert.match(css, /\.trottl-classic-lobby-status-button\.is-host-ready[\s\S]*border-color:\s*rgb\(114 247 158/);
   assert.match(css, /\.trottl-classic-lobby-status-button\.is-waiting-host[\s\S]*border-color/);
   assert.match(uiSource, /startButton\.setAttribute\("aria-disabled", String\(startButton\.disabled\)\)/);

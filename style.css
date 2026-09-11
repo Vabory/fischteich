@@ -121,7 +121,7 @@ button:focus-visible {
   height: 100%;
   object-fit: cover;
   object-position: center center;
-  filter: brightness(0.85);
+  filter: brightness(0.8075);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -130,9 +130,9 @@ button:focus-visible {
 .menu-crest {
   position: absolute;
   z-index: 1;
-  top: max(calc(env(safe-area-inset-top) + 8px), clamp(40px, 5.8dvh, 58px));
+  top: max(calc(env(safe-area-inset-top) + 4px), clamp(34px, 5dvh, 52px));
   left: 50%;
-  width: clamp(94px, 27vw, 122px);
+  width: clamp(85px, 24.3vw, 110px);
   height: auto;
   transform: translateX(-50%);
   pointer-events: none;

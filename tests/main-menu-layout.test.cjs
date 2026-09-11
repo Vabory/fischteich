@@ -81,10 +81,10 @@ test("the menu leaves its hero composition to the background and keeps the crest
   assert.match(menuBackgroundRule, /height:\s*100%/);
   assert.match(menuBackgroundRule, /object-fit:\s*cover/);
   assert.match(menuBackgroundRule, /object-position:\s*center center/);
-  assert.match(menuBackgroundRule, /filter:\s*brightness\(0\.85\)/);
+  assert.match(menuBackgroundRule, /filter:\s*brightness\(0\.8075\)/);
   assert.doesNotMatch(menuBackgroundRule, /translateY\(-59px\)/);
   assert.doesNotMatch(css, /main-menu-fish/);
-  assert.match(css, /\.menu-crest[\s\S]*z-index:\s*1[\s\S]*top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 8px\), clamp\(40px, 5\.8dvh, 58px\)\)[\s\S]*left:\s*50%[\s\S]*width:\s*clamp\(94px, 27vw, 122px\)[\s\S]*pointer-events:\s*none/);
+  assert.match(css, /\.menu-crest[\s\S]*z-index:\s*1[\s\S]*top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 4px\), clamp\(34px, 5dvh, 52px\)\)[\s\S]*left:\s*50%[\s\S]*width:\s*clamp\(85px, 24\.3vw, 110px\)[\s\S]*pointer-events:\s*none/);
   assert.match(css, /\.buffalo-menu-button img\s*\{[\s\S]*width:\s*160px/);
   assert.match(css, /\.buffalo-menu-button img\s*\{[\s\S]*filter:\s*brightness\(0\.9\)/);
   assert.match(css, /\.buffalo-menu-button\s*\{[\s\S]*top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 4px\), 12px\)[\s\S]*right:\s*max\(calc\(env\(safe-area-inset-right\) \+ 40px\), 48px\)/);

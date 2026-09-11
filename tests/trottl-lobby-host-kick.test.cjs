@@ -97,7 +97,7 @@ test("a realtime snapshot without the former local lobby membership exits cleanl
 
 test("kick stays secondary, touchable and compact for full lobbies", () => {
   assert.match(css, /\.trottl-classic-other-player-actions[\s\S]*display: flex/);
-  assert.match(css, /\.trottl-classic-kick-button[\s\S]*width: 42px[\s\S]*height: 42px/);
+  assert.match(css, /\.trottl-classic-kick-button[\s\S]*width: 42px[\s\S]*height: 42px[\s\S]*border-radius: 50%/);
   assert.match(css, /\.trottl-kick-modal-card[\s\S]*width: min\(100%, 326px\)/);
   assert.match(css, /\.trottl-kick-confirm[\s\S]*rgb\(174 88 67/);
   assert.match(css, /overflow-wrap: anywhere/);

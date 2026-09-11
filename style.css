@@ -772,7 +772,7 @@ button:focus-visible {
 .trottl-classic-lobby-title-asset {
   display: block;
   width: clamp(154px, 46vw, 226px);
-  filter: brightness(0.95);
+  filter: brightness(0.85);
   height: auto;
   margin-inline: auto;
   user-select: none;
@@ -965,7 +965,7 @@ button:focus-visible {
   padding: 0;
   place-items: center;
   border: 1px solid rgb(225 190 182 / 18%);
-  border-radius: 10px;
+  border-radius: 50%;
   background: rgb(164 104 91 / 7%);
   color: rgb(230 213 207 / 64%);
   font-size: 1.05rem;
@@ -1060,8 +1060,8 @@ button:focus-visible {
 }
 
 .trottl-classic-lobby-status-button {
-  min-height: 48px;
-  padding: 10px 16px;
+  min-height: 44px;
+  padding: 8px 14px;
   border: 1px solid rgb(215 237 247 / 44%);
   border-radius: 999px;
   background: linear-gradient(135deg, rgb(243 251 255 / 28%), rgb(100 160 192 / 22%));
@@ -1084,17 +1084,17 @@ button:focus-visible {
 }
 
 .trottl-classic-lobby-status-button.is-host-ready {
-  min-height: 52px;
+  min-height: 48px;
+  padding: 10px 16px;
   border-color: rgb(114 247 158 / 84%);
   background: linear-gradient(180deg, rgb(75 224 126 / 40%), rgb(20 119 65 / 33%));
   box-shadow: 0 0 22px rgb(75 231 127 / 34%), inset 0 1px rgb(237 255 241 / 34%);
   color: #effff3;
   cursor: pointer;
-  transform: scale(1.025);
 }
 
 .trottl-classic-lobby-status-button.is-host-ready:active:not(:disabled) {
-  transform: scale(0.995);
+  transform: scale(0.985);
 }
 
 .trottl-classic-lobby-status-button:focus-visible {

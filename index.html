@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260911.17">
+    <meta name="fischteich-build" content="20260911.18">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=169">
+    <link rel="stylesheet" href="./style.css?v=170">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -217,12 +217,13 @@
       </section>
 
       <section class="screen trottl-classic-screen" id="trottl-classic-rooms-screen" aria-labelledby="trottl-classic-rooms-title" hidden>
-        <img class="sidemenu-background" src="./assets/sidemenu-background.png?v=2" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
+        <img class="sidemenu-background trottl-classic-room-background" src="./assets/raum-wählen-background.png?v=1" alt="" width="887" height="1774" draggable="false" aria-hidden="true">
         <button class="close-button navigation-back-button" id="close-trottl-classic-rooms" type="button" aria-label="Zurück zum 3er-Trottl-Menü">←</button>
-        <main class="trottl-classic-shell">
+        <main class="trottl-classic-shell trottl-classic-room-shell">
           <header class="trottl-classic-header">
             <p class="eyebrow">3er Trottl Klassik</p>
-            <h1 id="trottl-classic-rooms-title">Raum wählen</h1>
+            <h1 class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen</h1>
+            <img class="trottl-classic-room-title-asset" src="./assets/text-raum-wählen.png?v=1" alt="" width="2172" height="724" draggable="false" aria-hidden="true">
           </header>
           <div class="trottl-classic-room-list" id="trottl-classic-room-list" aria-label="Verfügbare Räume">
             <button class="trottl-classic-room" type="button" data-room-slot="1" disabled><strong>RAUM 1</strong><span>Wird geladen …</span></button>

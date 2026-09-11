@@ -173,6 +173,12 @@ button:focus-visible {
   transform: translateY(calc(-1 * var(--trottl-menu-background-offset)));
 }
 
+.trottl-classic-room-background {
+  height: calc(100% + 59px);
+  filter: brightness(0.75);
+  transform: translateY(-59px);
+}
+
 .trottl-classic-lobby-background {
   position: absolute;
   z-index: 0;
@@ -665,11 +671,24 @@ button:focus-visible {
   line-height: 1.05;
 }
 
+.trottl-classic-room-title-asset {
+  display: block;
+  width: clamp(210px, 60vw, 294px);
+  height: auto;
+  margin: 3px auto 0;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.trottl-classic-room-shell {
+  padding-top: max(calc(env(safe-area-inset-top) + 54px), 72px);
+}
+
 .trottl-classic-room-list {
   display: grid;
   width: min(86vw, 360px);
-  margin-top: clamp(42px, 8dvh, 72px);
-  gap: 16px;
+  margin-top: clamp(54px, 10dvh, 88px);
+  gap: 24px;
 }
 
 .trottl-classic-room {

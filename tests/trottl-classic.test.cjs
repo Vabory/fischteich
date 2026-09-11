@@ -980,6 +980,11 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
   assert.match(html, /trottl-classic-service\.js\?v=15[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=26[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
+  assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
+  assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1/);
+  assert.match(css, /\.trottl-classic-room-background[\s\S]*height:\s*calc\(100% \+ 59px\)[\s\S]*filter:\s*brightness\(0\.75\)[\s\S]*transform:\s*translateY\(-59px\)/);
+  assert.match(css, /\.trottl-classic-room-title-asset[\s\S]*width:\s*clamp\(210px, 60vw, 294px\)/);
+  assert.match(css, /\.trottl-classic-room-list[\s\S]*margin-top:\s*clamp\(54px, 10dvh, 88px\)[\s\S]*gap:\s*24px/);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
   assert.match(html, /id="trottl-classic-player-list"/);

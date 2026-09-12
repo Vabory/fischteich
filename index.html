@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260912.12">
+    <meta name="fischteich-build" content="20260912.13">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=183">
+    <link rel="stylesheet" href="./style.css?v=184">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
@@ -33,7 +33,7 @@
     <script src="./trottl-classic-service.js?v=17" defer></script>
     <script src="./trottl-classic-preview.js?v=3" defer></script>
     <script src="./trottl-classic-ui.js?v=35" defer></script>
-    <script src="./classic-seat-debug.js?v=2" defer></script>
+    <script src="./classic-seat-debug.js?v=3" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./script.js?v=87" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
@@ -236,6 +236,7 @@
 
       <section class="screen trottl-classic-screen" id="trottl-classic-session-screen" aria-labelledby="trottl-classic-session-title" hidden>
         <img class="trottl-classic-lobby-background" id="trottl-classic-session-background" src="./assets/lobby-room1-background.png" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
+        <button id="classic-seat-debug-toggle" type="button" aria-controls="classic-seat-debug-panel" aria-expanded="false" aria-pressed="false">Debug</button>
         <button class="close-button navigation-back-button" id="close-trottl-classic-session" type="button" aria-label="Raum verlassen">←</button>
         <main class="trottl-classic-shell trottl-classic-session-shell">
           <header class="trottl-classic-header" id="trottl-classic-session-header">

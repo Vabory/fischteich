@@ -11,7 +11,9 @@ const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const reference = "81f1495c78d173ac2b0d1964202103231f0a433f";
 
 test("complete CSS cascade, including parents and media queries, equals deployment 258 except the frozen background fix", () => {
-  const css=read("style.css").replace(/\.trottl-classic-lobby-background\.is-ingame-background\s*\{[\s\S]*?\}/,"protected background");
+  const css=read("style.css")
+    .replace(/\n\/\* Temporary diagnostic entry point:[\s\S]*?#trottl-classic-session-screen:not\(\.is-playing\) > #classic-seat-debug-toggle\s*\{[^}]*\}\n/, "")
+    .replace(/\.trottl-classic-lobby-background\.is-ingame-background\s*\{[\s\S]*?\}/,"protected background");
   // Hash generated from the reference commit, not the current file.
   assert.equal(hash(css),"f6a6e1526534e94d3ac234555d975c949697abe8b6c573ce7a83e0855eff687b",reference);
 });
@@ -23,6 +25,7 @@ test("complete UI rendering, inline variables and perspective equal deployment 2
 
 test("HTML parent hierarchy equals deployment 258 apart from build and CSS/UI cache metadata", () => {
   const html=read("index.html")
+    .replace(/^        <button id="classic-seat-debug-toggle"[^\n]*\n/m, "")
     .replace(/^    <script src="\.\/classic-seat-debug\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/<meta name=.fischteich-build.[^>]+>/,"protected build")
     .replace(/style.css\?v=\d+/,"style.css?v=cache")

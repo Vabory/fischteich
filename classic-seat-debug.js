@@ -93,15 +93,10 @@
     const root = doc.querySelector("#trottl-classic-session-screen");
     const game = doc.querySelector("#trottl-classic-game-view");
     const layer = doc.querySelector("#trottl-classic-seat-layer");
-    if (!root || !game || !layer) return;
+    const toggle = doc.querySelector("#classic-seat-debug-toggle");
+    if (!root || !game || !layer || !toggle) return;
     let enabled = initiallyEnabled;
-    const toggle = doc.createElement("button");
-    toggle.id = "classic-seat-debug-toggle";
-    toggle.type = "button";
-    toggle.textContent = "Debug";
-    toggle.hidden = true;
     toggle.setAttribute("aria-controls", "classic-seat-debug-panel");
-    toggle.style.cssText = "position:fixed;z-index:10001;top:max(12px,calc(env(safe-area-inset-top) + 8px));right:max(12px,calc(env(safe-area-inset-right) + 8px));min-height:32px;padding:5px 7px;border:1px solid rgba(255,255,255,.35);border-radius:5px;background:rgba(0,0,0,.45);color:rgba(255,255,255,.75);font:11px/1.2 monospace;pointer-events:auto;";
     const panel = doc.createElement("aside");
     panel.id = "classic-seat-debug-panel";
     panel.hidden = true;
@@ -121,12 +116,11 @@
     output.setAttribute("aria-label", "Kopierbare Debugdaten");
     output.style.cssText = "display:block;width:100%;height:28dvh;min-height:100px;overflow:auto;resize:none;background:#080808;color:#fff;border:0;font:11px/1.3 monospace;user-select:text;-webkit-user-select:text;touch-action:auto;";
     panel.append(heading, refresh, copy, output);
-    doc.body.append(toggle, panel);
+    doc.body.append(panel);
     let frame = null;
     function update() {
       frame = null;
       const inGame = !root.hidden && !game.hidden && root.classList.contains("is-playing");
-      toggle.hidden = !inGame;
       toggle.setAttribute("aria-pressed", String(enabled));
       toggle.setAttribute("aria-expanded", String(inGame && enabled));
       panel.hidden = !inGame || !enabled;

@@ -60,6 +60,10 @@ function harness(search="?seatdebug=1") {
     MutationObserver:class {constructor(callback){this.callback=callback;observers.push(this);} observe(){}},
     screen:{width:390,height:844},visualViewport:{width:390,height:810,offsetTop:1,offsetLeft:2,scale:1,addEventListener:()=>{}},
     getComputedStyle:()=>({getPropertyValue:(key)=>key==="height"?"400px":key==="object-fit"?"cover":"none"})};
+  const toggle=document.createElement("button");
+  Object.assign(toggle,{id:"classic-seat-debug-toggle",textContent:"Debug",hidden:false,parentElement:root});
+  nodes["#classic-seat-debug-toggle"]=toggle;
+  children.push(toggle);
   vm.runInNewContext(source,{window,URLSearchParams});
   return {window,events,children,root,game,start:()=>events[0][1](),
     update:()=>{observers[0].callback();events.findLast(([name])=>name==="frame")[1]();}};
@@ -96,7 +100,7 @@ test("missing visualViewport is explicit and the panel cannot affect the game la
   window.visualViewport=null;
   assert.equal(window.FischteichClassicSeatDebug.collect().viewport.visualViewport,null);
   assert.match(source,/position:fixed/);
-  assert.match(source,/doc.body.append\(toggle, panel\)/);
+  assert.match(source,/doc.body.append\(panel\)/);
   assert.match(source,/navigator.clipboard.writeText\(text\)/);
   assert.match(source,/output.select\(\)/);
   assert.doesNotMatch(source,/setInterval|\.setProperty\(|supabase|service\.getSeatPosition/);
@@ -110,7 +114,8 @@ test("temporary button toggles only the fixed overlay and is hidden outside Clas
   assert.equal(toggle.textContent,"Debug");
   assert.equal(toggle.hidden,false);
   assert.equal(panel.hidden,true);
-  assert.match(toggle.style.cssText,/position:fixed/);
+  const css=fs.readFileSync(path.join(__dirname,"..","style.css"),"utf8");
+  assert.match(css,/#trottl-classic-session-screen > #classic-seat-debug-toggle\s*\{[^}]*position: fixed;[^}]*z-index: 10001;/s);
   assert.match(panel.style.cssText,/position:fixed/);
   const click=()=>toggle.listeners.click({stopPropagation(){}});
   click();
@@ -120,14 +125,23 @@ test("temporary button toggles only the fixed overlay and is hidden outside Clas
   assert.equal(panel.hidden,true);
   state.game.hidden=true;
   state.update();
-  assert.equal(toggle.hidden,true);
   assert.equal(panel.hidden,true);
   state.game.hidden=false;
   state.root.hidden=true;
   state.update();
-  assert.equal(toggle.hidden,true);
   assert.equal(panel.hidden,true);
+  assert.match(css,/#trottl-classic-session-screen:not\(\.is-playing\) > #classic-seat-debug-toggle\s*\{\s*display: none;/);
+  assert.doesNotMatch(source,/toggle.hidden\s*=/);
   assert.doesNotMatch(source,/localStorage|sessionStorage|supabase|admin|role|settings/i);
+});
+
+test("Debug entry point is present in Classic HTML even before JS initializes", () => {
+  const html=fs.readFileSync(path.join(__dirname,"..","index.html"),"utf8");
+  const root=html.slice(html.indexOf('id="trottl-classic-session-screen"'),html.indexOf('id="trottl-classic-session-title"'));
+  assert.match(root,/<button id="classic-seat-debug-toggle"[^>]*>Debug<\/button>/);
+  const button=html.match(/<button id="classic-seat-debug-toggle"[^>]*>/)[0];
+  assert.doesNotMatch(button,/hidden|seatdebug/);
+  assert.equal((html.match(/id="classic-seat-debug-toggle"/g)||[]).length,1);
 });
 
 test("query activation starts enabled, can still toggle, and a restart defaults to off", () => {

@@ -201,6 +201,26 @@ button:focus-visible {
   transform: translateY(-30px);
 }
 
+/* Temporary diagnostic entry point: visibility never depends on debug state. */
+#trottl-classic-session-screen > #classic-seat-debug-toggle {
+  position: fixed;
+  z-index: 10001;
+  top: max(12px, calc(env(safe-area-inset-top) + 8px));
+  right: max(12px, calc(env(safe-area-inset-right) + 8px));
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 5px;
+  background: rgb(0 0 0 / 45%);
+  color: rgb(255 255 255 / 75%);
+  font: 11px/1.2 monospace;
+  pointer-events: auto;
+}
+
+#trottl-classic-session-screen:not(.is-playing) > #classic-seat-debug-toggle {
+  display: none;
+}
+
 .sidemenu-fish-asset {
   position: absolute;
   z-index: 1;

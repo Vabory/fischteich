@@ -183,7 +183,7 @@ test("all countdowns derive from endsAt and expired timers are removed individua
 });
 
 test("loads versioned assets and the service before the UI bundle", () => {
-  assert.match(html, /style\.css\?v=178/);
+  assert.match(html, /style\.css\?v=179/);
   assert.match(html, /buffalo-service\.js\?v=5[\s\S]*script\.js\?v=87/);
 });
 

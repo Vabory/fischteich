@@ -965,7 +965,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=30[\s\S]*script\.js\?v=87/);
+  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=31[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*class="trottl-classic-room-context">3ER TROTTL Classic<\/p>/);
@@ -1007,7 +1007,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-lobby-player\s*\{[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
   assert.match(ui, /GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background\.png\?v=1"/);
   assert.match(ui, /sessionBackground\.classList\.toggle\("is-ingame-background", isPlaying\)/);
-  assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*center[^}]*transform:\s*translateY\(-30px\)/s);
+  assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*center[^}]*transform:\s*translateY\(-18px\)/s);
   assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1;/s);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);

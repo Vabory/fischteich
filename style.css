@@ -198,7 +198,7 @@ button:focus-visible {
   height: 100%;
   object-position: center;
   filter: brightness(0.82);
-  transform: translateY(-30px);
+  transform: translateY(-18px);
 }
 
 .sidemenu-fish-asset {

@@ -18,7 +18,7 @@ const targets = {
   4: [80, [[50,82],[20,47],[50,24],[80,47]]],
   5: [76, [[50,82],[24,62],[28,31],[72,31],[76,62]]],
   6: [72, [[50,82],[24,67],[20,45],[50,24],[80,45],[76,67]]],
-  7: [68, [[50,82],[29,74],[18,55],[29,31],[50,23],[71,31],[82,55]]],
+  7: [68, [[50,82],[29,73.5],[18,55],[29,31],[50,23],[71,31],[83,54]]],
   8: [64, [[50,82],[30,75],[18,58],[24,35],[50,23],[76,35],[82,58],[70,75]]],
 };
 
@@ -33,10 +33,10 @@ for (const [count, [size, coordinates]] of Object.entries(targets)) {
     assert.ok(Object.isFrozen(preset) && Object.isFrozen(preset.seats));
     for (const seat of preset.seats) {
       assert.ok(Object.isFrozen(seat));
-      assert.ok(seat.x >= 18 && seat.x <= 82 && seat.y >= 23 && seat.y <= 82);
-      // The requested seven-player arrangement intentionally has one extra
-      // lower-left seat. All other non-central seats retain their mirror.
-      if (!(Number(count) === 7 && seat.x === 29 && seat.y === 74)) {
+      assert.ok(seat.x >= 18 && seat.x <= 83 && seat.y >= 23 && seat.y <= 82);
+      // Seven players retain the manually asymmetric lower arc; only the
+      // central and upper paired seats are required to be mirrored.
+      if (Number(count) !== 7 || seat.x === 50 || seat.y === 31) {
         assert.ok(preset.seats.some(({x,y}) => x === 100-seat.x && y === seat.y));
       }
     }
@@ -89,7 +89,7 @@ test("local perspective is deterministic for every count, local seat and input o
 
 test("background, dice, status box and action dock base CSS remain byte-identical", () => {
   const frozen = {
-    ".trottl-classic-lobby-background.is-ingame-background":"deb01d95c1f53e60815dc0226da3cf0af9ad3a8357695c7e0b80e27dc4b1c779",
+    ".trottl-classic-lobby-background.is-ingame-background":"9550ac5fea90f3b5a522f02ccf335e9e2aa0b08169027de65a3afd7ea7b36d4c",
     ".trottl-classic-dice-zone":"985991ff86a49269ddc9a4b2706106165dcf5f068476617e8979ef8a3bfd7eec",
     ".trottl-classic-dice-mount":"a0157723de871cd43e3251bb8e8a6347bb1506618e8928172dde3e33433bc470",
     ".trottl-classic-situation":"16c49412cde1f31a4e70bd7ce42f47917402b4ea13b5f4c0543dbaf8ab713bc9",

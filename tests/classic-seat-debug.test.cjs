@@ -7,16 +7,15 @@ const path = require("node:path");
 const vm = require("node:vm");
 const source=fs.readFileSync(path.join(__dirname,"..","classic-seat-debug.js"),"utf8");
 
-test("diagnostic mode is completely inert without the exact query value 1", () => {
+test("without query activation the overlay is off by default", () => {
   for(const search of ["", "?seatdebug=0", "?seatdebug=true", "?other=1"]) {
-    const window={location:{search}};
-    Object.defineProperty(window,"document",{get(){throw new Error("No DOM access in normal mode");}});
-    vm.runInNewContext(source,{window,URLSearchParams});
-    assert.equal(window.FischteichClassicSeatDebug,undefined);
+    const {start,children}=harness(search);
+    start();
+    assert.equal(children.find((element)=>element.id==="classic-seat-debug-panel").hidden,true);
   }
 });
 
-function harness() {
+function harness(search="?seatdebug=1") {
   const events=[];
   function element(id,left,top,width,height) {
     return {id,tagName:"DIV",classList:[],parentElement:null,offsetParent:null,
@@ -24,7 +23,11 @@ function harness() {
       querySelector:()=>null,querySelectorAll:()=>[],style:{getPropertyValue:()=>""}};
   }
   const root=element("trottl-classic-session-screen",0,0,390,844);
+  root.hidden=false;
+  root.classList.push("is-playing");
+  root.classList.contains=(name)=>root.classList.includes(name);
   const game=element("trottl-classic-game-view",12,100,366,600);
+  game.hidden=false;
   game.parentElement=root;
   const stage=element("trottl-classic-table-stage",12,180,366,440);
   stage.parentElement=game;
@@ -42,14 +45,24 @@ function harness() {
     return seat;
   });
   layer.querySelectorAll=()=>seats;
-  const nodes={"#trottl-classic-session-screen":root,"#trottl-classic-seat-layer":layer,"#trottl-classic-session-background":background,"#trottl-classic-dice-mount":dice,'meta[name="fischteich-build"]':{content:"test-build"}};
+  const nodes={"#trottl-classic-session-screen":root,"#trottl-classic-game-view":game,"#trottl-classic-seat-layer":layer,"#trottl-classic-session-background":background,"#trottl-classic-dice-mount":dice,'meta[name="fischteich-build"]':{content:"test-build"}};
+  const children=[];
+  const observers=[];
   const document={readyState:"loading",querySelector:(key)=>nodes[key]??null,
-    documentElement:{clientWidth:390,clientHeight:844},addEventListener:(...args)=>events.push(args)};
-  const window={location:{search:"?seatdebug=1"},document,innerWidth:390,innerHeight:844,devicePixelRatio:3,
-    screen:{width:390,height:844},visualViewport:{width:390,height:810,offsetTop:1,offsetLeft:2,scale:1},
+    documentElement:{clientWidth:390,clientHeight:844},addEventListener:(...args)=>events.push(args),
+    body:{append:(...elements)=>children.push(...elements)},
+    createElement:(tag)=>({tagName:tag.toUpperCase(),style:{},attributes:{},listeners:{},children:[],
+      setAttribute(name,value){this.attributes[name]=value;},
+      append(...elements){this.children.push(...elements);},
+      addEventListener(name,callback){this.listeners[name]=callback;}})};
+  const window={location:{search},document,innerWidth:390,innerHeight:844,devicePixelRatio:3,
+    addEventListener:()=>{},requestAnimationFrame:(callback)=>{events.push(["frame",callback]);return events.length;},
+    MutationObserver:class {constructor(callback){this.callback=callback;observers.push(this);} observe(){}},
+    screen:{width:390,height:844},visualViewport:{width:390,height:810,offsetTop:1,offsetLeft:2,scale:1,addEventListener:()=>{}},
     getComputedStyle:()=>({getPropertyValue:(key)=>key==="height"?"400px":key==="object-fit"?"cover":"none"})};
   vm.runInNewContext(source,{window,URLSearchParams});
-  return {window,events};
+  return {window,events,children,root,game,start:()=>events[0][1](),
+    update:()=>{observers[0].callback();events.findLast(([name])=>name==="frame")[1]();}};
 }
 
 test("device rects, parent basis, viewport, background and measured deltas are reported", () => {
@@ -60,7 +73,7 @@ test("device rects, parent basis, viewport, background and measured deltas are r
   assert.equal(data.viewport.devicePixelRatio,3);
   assert.equal(data.viewport.visualViewport.offsetTop,1);
   assert.equal(data.viewport.clientHeight,844);
-  assert.equal(data.classicRoot.element,"div#trottl-classic-session-screen");
+  assert.equal(data.classicRoot.element,"div#trottl-classic-session-screen.is-playing");
   assert.equal(data.seatLayer.rect.height,400);
   assert.equal(data.seatLayer.computed.height,"400px");
   assert.equal(data.seatLayerParents.length,3);
@@ -83,8 +96,51 @@ test("missing visualViewport is explicit and the panel cannot affect the game la
   window.visualViewport=null;
   assert.equal(window.FischteichClassicSeatDebug.collect().viewport.visualViewport,null);
   assert.match(source,/position:fixed/);
-  assert.match(source,/doc.body.append\(panel\)/);
+  assert.match(source,/doc.body.append\(toggle, panel\)/);
   assert.match(source,/navigator.clipboard.writeText\(text\)/);
   assert.match(source,/output.select\(\)/);
   assert.doesNotMatch(source,/setInterval|\.setProperty\(|supabase|service\.getSeatPosition/);
+});
+
+test("temporary button toggles only the fixed overlay and is hidden outside Classic ingame", () => {
+  const state=harness("");
+  state.start();
+  const toggle=state.children.find((element)=>element.id==="classic-seat-debug-toggle");
+  const panel=state.children.find((element)=>element.id==="classic-seat-debug-panel");
+  assert.equal(toggle.textContent,"Debug");
+  assert.equal(toggle.hidden,false);
+  assert.equal(panel.hidden,true);
+  assert.match(toggle.style.cssText,/position:fixed/);
+  assert.match(panel.style.cssText,/position:fixed/);
+  const click=()=>toggle.listeners.click({stopPropagation(){}});
+  click();
+  assert.equal(panel.hidden,false);
+  assert.equal(toggle.attributes["aria-pressed"],"true");
+  click();
+  assert.equal(panel.hidden,true);
+  state.game.hidden=true;
+  state.update();
+  assert.equal(toggle.hidden,true);
+  assert.equal(panel.hidden,true);
+  state.game.hidden=false;
+  state.root.hidden=true;
+  state.update();
+  assert.equal(toggle.hidden,true);
+  assert.equal(panel.hidden,true);
+  assert.doesNotMatch(source,/localStorage|sessionStorage|supabase|admin|role|settings/i);
+});
+
+test("query activation starts enabled, can still toggle, and a restart defaults to off", () => {
+  const state=harness("?seatdebug=1");
+  state.start();
+  const panel=state.children.find((element)=>element.id==="classic-seat-debug-panel");
+  const toggle=state.children.find((element)=>element.id==="classic-seat-debug-toggle");
+  assert.equal(panel.hidden,false);
+  toggle.listeners.click({stopPropagation(){}});
+  assert.equal(panel.hidden,true);
+  toggle.listeners.click({stopPropagation(){}});
+  assert.equal(panel.hidden,false);
+  const restarted=harness("");
+  restarted.start();
+  assert.equal(restarted.children.find((element)=>element.id==="classic-seat-debug-panel").hidden,true);
 });

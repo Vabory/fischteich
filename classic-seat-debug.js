@@ -1,8 +1,7 @@
 "use strict";
 
 (function installClassicSeatDebug(global) {
-  // Deliberately do nothing, including no DOM reads/listeners, in normal mode.
-  if (new URLSearchParams(global.location.search).get("seatdebug") !== "1") return;
+  const initiallyEnabled = new URLSearchParams(global.location.search).get("seatdebug") === "1";
   const doc = global.document;
   const styleKeys = ["position", "width", "height", "top", "bottom", "left", "right",
     "transform", "transform-origin", "overflow", "overflow-x", "overflow-y",
@@ -95,8 +94,17 @@
     const game = doc.querySelector("#trottl-classic-game-view");
     const layer = doc.querySelector("#trottl-classic-seat-layer");
     if (!root || !game || !layer) return;
+    let enabled = initiallyEnabled;
+    const toggle = doc.createElement("button");
+    toggle.id = "classic-seat-debug-toggle";
+    toggle.type = "button";
+    toggle.textContent = "Debug";
+    toggle.hidden = true;
+    toggle.setAttribute("aria-controls", "classic-seat-debug-panel");
+    toggle.style.cssText = "position:fixed;z-index:10001;top:max(12px,calc(env(safe-area-inset-top) + 8px));right:max(12px,calc(env(safe-area-inset-right) + 8px));min-height:32px;padding:5px 7px;border:1px solid rgba(255,255,255,.35);border-radius:5px;background:rgba(0,0,0,.45);color:rgba(255,255,255,.75);font:11px/1.2 monospace;pointer-events:auto;";
     const panel = doc.createElement("aside");
     panel.id = "classic-seat-debug-panel";
+    panel.hidden = true;
     panel.setAttribute("aria-label", "Classic Seat Runtime-Diagnose");
     panel.style.cssText = "position:fixed;z-index:10000;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));max-height:42dvh;overflow:auto;padding:8px;border:1px solid #fff;border-radius:8px;background:rgba(0,0,0,.94);color:#fff;font:11px/1.3 monospace;pointer-events:auto;user-select:text;-webkit-user-select:text;";
     const heading = doc.createElement("div");
@@ -113,11 +121,15 @@
     output.setAttribute("aria-label", "Kopierbare Debugdaten");
     output.style.cssText = "display:block;width:100%;height:28dvh;min-height:100px;overflow:auto;resize:none;background:#080808;color:#fff;border:0;font:11px/1.3 monospace;user-select:text;-webkit-user-select:text;touch-action:auto;";
     panel.append(heading, refresh, copy, output);
-    doc.body.append(panel);
+    doc.body.append(toggle, panel);
     let frame = null;
     function update() {
       frame = null;
-      panel.hidden = root.hidden || game.hidden || !root.classList.contains("is-playing");
+      const inGame = !root.hidden && !game.hidden && root.classList.contains("is-playing");
+      toggle.hidden = !inGame;
+      toggle.setAttribute("aria-pressed", String(enabled));
+      toggle.setAttribute("aria-expanded", String(inGame && enabled));
+      panel.hidden = !inGame || !enabled;
       if (panel.hidden) return;
       // Keep selected text stable while the user is marking/copying it.
       if (doc.activeElement === output && output.selectionStart !== output.selectionEnd) return;
@@ -126,6 +138,11 @@
     function schedule() {
       if (frame === null) frame = global.requestAnimationFrame(update);
     }
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      enabled = !enabled;
+      update();
+    });
     refresh.addEventListener("click", update);
     copy.addEventListener("click", async () => {
       const text = JSON.stringify(collect(), null, 2);

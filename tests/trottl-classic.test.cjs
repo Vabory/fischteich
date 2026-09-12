@@ -965,7 +965,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=29[\s\S]*script\.js\?v=87/);
+  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=30[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*class="trottl-classic-room-context">3ER TROTTL Classic<\/p>/);
@@ -1055,8 +1055,8 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-seat-status-overlay\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums/);
   assert.match(css, /\.trottl-classic-player--context-muted\s*\{[^}]*opacity:\s*0\.82[^}]*saturate\(0\.84\)/s);
   assert.match(css, /--seat-avatar-size:\s*clamp\(/);
-  assert.match(ui, /7: \{ avatarSize: 66/);
-  assert.match(ui, /8: \{ avatarSize: 62/);
+  assert.match(ui, /7: \{ avatarSize: 68/);
+  assert.match(ui, /8: \{ avatarSize: 64/);
   assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*max-width:\s*100%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(css, /\.trottl-classic-rule-controls \.trottl-classic-global-confirm\s*\{[^}]*width:\s*100%[^}]*min-height:\s*50px/s);
   assert.match(ui, /globalConfirmButton\.hidden = !localNeedsConfirmation/);

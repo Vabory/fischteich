@@ -9,13 +9,13 @@
 
   // Screen coordinates in clockwise order, starting with the local bottom seat.
   const TABLE_SEAT_PRESETS = Object.freeze(Object.fromEntries(Object.entries({
-    2: { avatarSize: 84, seats: [[50, 87], [50, 13]] },
-    3: { avatarSize: 82, seats: [[50, 87], [18, 31], [82, 31]] },
-    4: { avatarSize: 80, seats: [[50, 87], [13, 50], [50, 13], [87, 50]] },
-    5: { avatarSize: 76, seats: [[50, 87], [15, 62], [28, 21], [72, 21], [85, 62]] },
-    6: { avatarSize: 72, seats: [[50, 87], [18, 69], [18, 31], [50, 13], [82, 31], [82, 69]] },
-    7: { avatarSize: 66, seats: [[50, 87], [27, 74], [13, 43], [33, 17], [67, 17], [87, 43], [73, 74]] },
-    8: { avatarSize: 62, seats: [[50, 87], [24, 76], [13, 50], [24, 24], [50, 13], [76, 24], [87, 50], [76, 76]] },
+    2: { avatarSize: 84, seats: [[50, 82], [50, 24]] },
+    3: { avatarSize: 82, seats: [[50, 82], [23, 37], [77, 37]] },
+    4: { avatarSize: 80, seats: [[50, 82], [20, 47], [50, 24], [80, 47]] },
+    5: { avatarSize: 76, seats: [[50, 82], [24, 62], [28, 31], [72, 31], [76, 62]] },
+    6: { avatarSize: 72, seats: [[50, 82], [24, 67], [20, 45], [50, 24], [80, 45], [76, 67]] },
+    7: { avatarSize: 68, seats: [[50, 82], [29, 74], [18, 55], [29, 31], [50, 23], [71, 31], [82, 55]] },
+    8: { avatarSize: 64, seats: [[50, 82], [30, 75], [18, 58], [24, 35], [50, 23], [76, 35], [82, 58], [70, 75]] },
   }).map(([count, preset]) => [count, Object.freeze({
     avatarSize: preset.avatarSize,
     seats: Object.freeze(preset.seats.map(([x, y]) => Object.freeze({ x, y }))),

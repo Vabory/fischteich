@@ -13,28 +13,32 @@ vm.runInContext(read("trottl-classic-ui.js"), context);
 const ui = context.window.TrottlClassicUI;
 const css = read("style.css").replace(/\r/g, "");
 const targets = {
-  2: [84, [[50,87],[50,13]]],
-  3: [82, [[50,87],[18,31],[82,31]]],
-  4: [80, [[50,87],[13,50],[50,13],[87,50]]],
-  5: [76, [[50,87],[15,62],[28,21],[72,21],[85,62]]],
-  6: [72, [[50,87],[18,69],[18,31],[50,13],[82,31],[82,69]]],
-  7: [66, [[50,87],[27,74],[13,43],[33,17],[67,17],[87,43],[73,74]]],
-  8: [62, [[50,87],[24,76],[13,50],[24,24],[50,13],[76,24],[87,50],[76,76]]],
+  2: [84, [[50,82],[50,24]]],
+  3: [82, [[50,82],[23,37],[77,37]]],
+  4: [80, [[50,82],[20,47],[50,24],[80,47]]],
+  5: [76, [[50,82],[24,62],[28,31],[72,31],[76,62]]],
+  6: [72, [[50,82],[24,67],[20,45],[50,24],[80,45],[76,67]]],
+  7: [68, [[50,82],[29,74],[18,55],[29,31],[50,23],[71,31],[82,55]]],
+  8: [64, [[50,82],[30,75],[18,58],[24,35],[50,23],[76,35],[82,58],[70,75]]],
 };
 
 for (const [count, [size, coordinates]] of Object.entries(targets)) {
-  test(`${count} players use exact symmetric, immutable seat and avatar targets`, () => {
+  test(`${count} players use exact manually authored, immutable seat and avatar targets`, () => {
     const preset = ui.getTableSeatPreset(Number(count));
     assert.equal(preset.avatarSize, size);
     assert.deepEqual(JSON.parse(JSON.stringify(preset.seats)), coordinates.map(([x,y]) => ({x,y})));
     assert.equal(preset.seats.length, Number(count));
-    assert.deepEqual(JSON.parse(JSON.stringify(preset.seats[0])), {x:50,y:87});
+    assert.deepEqual(JSON.parse(JSON.stringify(preset.seats[0])), {x:50,y:82});
     assert.equal(new Set(preset.seats.map(({x,y}) => `${x}:${y}`)).size, Number(count));
     assert.ok(Object.isFrozen(preset) && Object.isFrozen(preset.seats));
     for (const seat of preset.seats) {
       assert.ok(Object.isFrozen(seat));
-      assert.ok(seat.x >= 13 && seat.x <= 87 && seat.y >= 13 && seat.y <= 87);
-      assert.ok(preset.seats.some(({x,y}) => x === 100-seat.x && y === seat.y));
+      assert.ok(seat.x >= 18 && seat.x <= 82 && seat.y >= 23 && seat.y <= 82);
+      // The requested seven-player arrangement intentionally has one extra
+      // lower-left seat. All other non-central seats retain their mirror.
+      if (!(Number(count) === 7 && seat.x === 29 && seat.y === 74)) {
+        assert.ok(preset.seats.some(({x,y}) => x === 100-seat.x && y === seat.y));
+      }
     }
     // Clockwise on screen from bottom: left, top, right, back to bottom.
     const angles = preset.seats.map(({x,y}) => (Math.atan2(50-x, y-50)+2*Math.PI)%(2*Math.PI));
@@ -48,7 +52,7 @@ for (const [width,height] of [[375,667],[390,844],[393,793],[393,852],[430,932]]
     // an 80px status box, 11px gap and the unchanged 82px action zone.
     const stageWidth = width-24;
     const stageHeight = height-(44+16)-(34+8)-80-11-82;
-    const layerHeight = Math.min(stageHeight-60, stageWidth*1.15);
+    const layerHeight = Math.min(stageHeight-24, stageWidth*1.15);
     for (let count=2; count<=8; count++) {
       const preset=ui.getTableSeatPreset(count);
       const size=Math.max(preset.avatarSize-6, Math.min(preset.avatarSize, preset.avatarSize-(390-width)*0.2));
@@ -101,4 +105,15 @@ test("background, dice, status box and action dock base CSS remain byte-identica
   assert.match(css,/\.trottl-classic-seat-name\s*\{[^}]*position: absolute[^}]*top: 100%/s);
   assert.match(css,/\.trottl-classic-seat-self-marker\s*\{[^}]*position: absolute/s);
   assert.match(css,/\.trottl-classic-player--self\s*\{[^}]*--player-scale: 1;/s);
+});
+
+test("seat layer uses full stage width without local clipping and only the revised height reserve", () => {
+  const layer=css.match(/\.trottl-classic-seat-layer\s*\{([^}]+)\}/)[1];
+  assert.match(layer,/position: absolute/);
+  assert.match(layer,/width: 100%/);
+  assert.match(layer,/top: 50%/);
+  assert.match(layer,/left: 50%/);
+  assert.match(layer,/height: min\(calc\(100% - 24px\), calc\(\(100vw - 24px\) \* 1.15\)\)/);
+  assert.doesNotMatch(layer,/max-width|min-width|padding|margin|overflow|clip-path|mask|contain|scale\(/);
+  assert.match(css,/data-player-count="7"[^}]+data-player-count="8"[^}]+max-width: min\(100%, 9ch\)/s);
 });

@@ -968,13 +968,13 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=28[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
-  assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*text-3er-trottl\.png\?v=1/);
+  assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*class="trottl-classic-room-context">3ER TROTTL Classic<\/p>/);
   assert.doesNotMatch(html.match(/id="trottl-classic-rooms-screen"[\s\S]*?<\/section>/)?.[0] ?? "", /<p class="eyebrow">3er Trottl Klassik<\/p>/);
   assert.match(css, /\.trottl-classic-room-background[\s\S]*height:\s*calc\(100% \+ 59px\)[\s\S]*filter:\s*brightness\(0\.75\)[\s\S]*transform:\s*translateY\(-59px\)/);
   assert.match(css, /\.trottl-classic-room-title-asset[\s\S]*width:\s*clamp\(210px, 60vw, 294px\)[\s\S]*filter:\s*brightness\(0\.9\)/);
   assert.match(css, /\.trottl-classic-room-shell[\s\S]*padding-top:\s*max\(calc\(env\(safe-area-inset-top\) \+ 26px\), 46px\)/);
-  assert.match(css, /\.trottl-classic-room-footer-asset[\s\S]*margin:\s*auto auto 0[\s\S]*filter:\s*brightness\(0\.9\)/);
-  assert.match(css, /\.trottl-classic-room-list[\s\S]*margin-top:\s*clamp\(54px, 10dvh, 88px\)[\s\S]*gap:\s*24px/);
+  assert.doesNotMatch(html + css, /trottl-classic-room-footer-asset/);
+  assert.match(css, /\.trottl-classic-room-list[\s\S]*margin-top:\s*calc\(clamp\(54px, 10dvh, 88px\) \+ 26px\)[\s\S]*gap:\s*24px/);
   assert.match(html, /data-room-slot="1"/);
   assert.match(html, /data-room-slot="2"/);
   assert.match(html, /id="trottl-classic-player-list"/);

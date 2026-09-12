@@ -690,24 +690,29 @@ button:focus-visible {
 
 .trottl-classic-room-shell {
   padding-top: max(calc(env(safe-area-inset-top) + 26px), 46px);
-  padding-bottom: max(calc(env(safe-area-inset-bottom) + 36px), 42px);
+  padding-bottom: max(calc(env(safe-area-inset-bottom) + 24px), 30px);
+  overflow-y: hidden;
+}
+
+.trottl-classic-room-shell > .trottl-classic-header {
+  flex-shrink: 0;
+}
+
+.trottl-classic-room-context {
+  margin: 12px 0 0;
+  color: rgb(222 241 255 / 72%);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
 }
 
 .trottl-classic-room-list {
   display: grid;
   width: min(86vw, 360px);
-  margin-top: clamp(54px, 10dvh, 88px);
+  margin-top: calc(clamp(54px, 10dvh, 88px) + 26px);
   gap: 24px;
-}
-
-.trottl-classic-room-footer-asset {
-  display: block;
-  width: min(36vw, 142px);
-  height: auto;
-  margin: auto auto 0;
-  filter: brightness(0.9);
-  user-select: none;
-  -webkit-user-drag: none;
+  flex-shrink: 0;
 }
 
 .trottl-classic-room {

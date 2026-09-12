@@ -89,7 +89,7 @@ test("local perspective is deterministic for every count, local seat and input o
 
 test("corrected background and unchanged dice, status box and action dock CSS", () => {
   const frozen = {
-    ".trottl-classic-lobby-background.is-ingame-background":"dcb14d2422a6ed1803484dc4558daf0535b18674f120cf4d72c9fec1f651d6f2",
+    ".trottl-classic-lobby-background.is-ingame-background":"35f8da0c6d0d1bfe566cdbcc735a5ffecb5df6d73451eaeff076acba1eb26484",
     ".trottl-classic-dice-zone":"985991ff86a49269ddc9a4b2706106165dcf5f068476617e8979ef8a3bfd7eec",
     ".trottl-classic-dice-mount":"a0157723de871cd43e3251bb8e8a6347bb1506618e8928172dde3e33433bc470",
     ".trottl-classic-situation":"16c49412cde1f31a4e70bd7ce42f47917402b4ea13b5f4c0543dbaf8ab713bc9",

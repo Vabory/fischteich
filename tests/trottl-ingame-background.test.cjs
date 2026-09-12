@@ -35,7 +35,7 @@ test("fullscreen screen and compensating image height keep the -30px offset cove
   const ingame=rule(".trottl-classic-lobby-background.is-ingame-background");
   assert.match(ingame,/height: calc\(100% \+ 30px\)/);
   assert.match(ingame,/transform: translateY\(-30px\)/);
-  assert.match(ingame,/object-position: center/);
+  assert.match(ingame,/object-position: 50% 67\.12%/);
   assert.doesNotMatch(ingame,/scale\(|translateX|100vh/);
   for (const [width,height] of [[375,667],[390,844],[393,793],[393,852],[430,932]]) {
     const layerHeight=height+30;

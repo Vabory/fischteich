@@ -25,6 +25,7 @@ test("complete UI rendering, inline variables and perspective equal deployment 2
 
 test("HTML parent hierarchy equals deployment 258 apart from build and CSS/UI cache metadata", () => {
   const html=read("index.html")
+    .replace(/^    <script src="\.\/classic-background-fit\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/^        <button id="classic-seat-debug-toggle"[^\n]*\n/m, "")
     .replace(/^    <script src="\.\/classic-seat-debug\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/<meta name=.fischteich-build.[^>]+>/,"protected build")

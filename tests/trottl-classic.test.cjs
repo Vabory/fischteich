@@ -1007,7 +1007,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-lobby-player\s*\{[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
   assert.match(ui, /GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background-v2\.png\?v=2"/);
   assert.match(ui, /sessionBackground\.classList\.toggle\("is-ingame-background", isPlaying\)/);
-  assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*center[^}]*transform:\s*translateY\(-30px\)/s);
+  assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*50% 67\.12%[^}]*transform:\s*translateY\(-30px\)/s);
   assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1;/s);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);

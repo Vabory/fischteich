@@ -53,7 +53,7 @@ test("round seats render one avatar, one-line name, self marker and detached sta
   assert.match(uiSource, /trottlBadge\.textContent = "3ER"/);
   assert.match(uiSource, /statusLabel\.className = "trottl-classic-seat-status-overlay"/);
   assert.match(css, /\.trottl-classic-game-avatar\s*\{[^}]*border-radius:\s*50%[^}]*object-fit:\s*contain/s);
-  assert.match(css, /\.trottl-classic-seat-name\s*\{[^}]*max-width:\s*12ch[^}]*text-overflow:\s*clip[^}]*white-space:\s*nowrap/s);
+  assert.match(css, /\.trottl-classic-seat-name\s*\{[^}]*max-width:\s*12ch[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s);
   assert.match(css, /\.trottl-classic-seat-self-marker\s*\{/);
   assert.match(css, /\.trottl-classic-seat-name\s*\{[^}]*border:\s*0[^}]*background:\s*transparent/s);
 });
@@ -113,11 +113,10 @@ test("personal reaction rings derive progress from each persisted timing window"
 });
 
 test("avatar seats retain existing geometry, global controls, dimming and reduced motion", () => {
-  assert.match(uiSource, /service\.getSeatPosition\(relativeIndex, snapshot\.players\.length\)/);
+  assert.match(uiSource, /getTableSeatPreset\(snapshot.players.length\).seats\[relativeIndex\]/);
   assert.match(uiSource, /service\.getRelativeSeats\(snapshot\.players, snapshot\.identity\.userId\)/);
   assert.match(uiSource, /seat\.dataset\.globalSeat = String\(player\.seatIndex\)/);
-  assert.match(css, /data-player-count="3"[\s\S]*data-player-count="4"[\s\S]*\.trottl-classic-avatar-wrap/);
-  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*\.trottl-classic-avatar-wrap/);
+  assert.match(css, /\.trottl-classic-avatar-wrap\s*\{[^}]*width: var\(--seat-avatar-size\)/s);
   assert.match(css, /\.trottl-classic-player--context-muted\s*\{[^}]*opacity:\s*0\.82/s);
   assert.match(uiSource, /globalConfirmButton\.hidden = !localNeedsConfirmation/);
   assert.doesNotMatch(uiSource, /trottl-classic-player-confirm|confirmButton/);

@@ -965,7 +965,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=28[\s\S]*script\.js\?v=87/);
+  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=29[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*class="trottl-classic-room-context">3ER TROTTL Classic<\/p>/);
@@ -999,7 +999,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(html, /id="trottl-classic-four-confirm"/);
   assert.match(html, /id="trottl-classic-global-confirm"[^>]*hidden/);
   assert.match(ui, /service\.getRelativeSeats\(snapshot\.players, snapshot\.identity\.userId\)/);
-  assert.match(ui, /service\.getSeatPosition\(relativeIndex, snapshot\.players\.length\)/);
+  assert.match(ui, /getTableSeatPreset\(snapshot.players.length\).seats\[relativeIndex\]/);
   assert.match(ui, /player\.seatIndex === activeSeatIndex/);
   assert.match(ui, /state\.busy \|\| !presentation\.canStart/);
   assert.match(ui, /hostUserId:\s*session\.hostUserId/);
@@ -1008,7 +1008,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background\.png\?v=1"/);
   assert.match(ui, /sessionBackground\.classList\.toggle\("is-ingame-background", isPlaying\)/);
   assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*center[^}]*transform:\s*translateY\(-30px\)/s);
-  assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1\.04/s);
+  assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1;/s);
   assert.match(css, /\.trottl-classic-player--active/);
   assert.match(css, /\.trottl-classic-player--selectable/);
   assert.match(css, /\.trottl-classic-player--drink-target/);
@@ -1020,11 +1020,10 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-player--context-muted/);
   assert.doesNotMatch(css, /\.trottl-classic-player-confirm/);
   assert.doesNotMatch(ui, /trottl-classic-player-confirm|confirmButton/);
-  assert.match(css, /\.trottl-classic-seat-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*clip[^}]*white-space:\s*nowrap/s);
-  assert.doesNotMatch(css, /\.trottl-classic-seat-name\s*\{[^}]*text-overflow:\s*ellipsis/s);
-  assert.match(css, /data-player-count="3"[\s\S]*data-player-count="4"[\s\S]*width:\s*clamp\(98px, 27vw, 112px\)/);
-  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*width:\s*clamp\(72px, 20vw, 84px\)/);
-  assert.match(css, /\.trottl-classic-avatar-wrap\s*\{[^}]*width:\s*clamp\(70px, 20vw, 78px\)[^}]*height:\s*clamp\(70px, 20vw, 78px\)/s);
+  assert.match(css, /\.trottl-classic-seat-name\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s);
+  assert.match(css, /\.trottl-classic-avatar-wrap\s*\{[^}]*width:\s*var\(--seat-avatar-size\)[^}]*height:\s*var\(--seat-avatar-size\)/s);
+  assert.match(ui, /getTableSeatPreset\(snapshot.players.length\).seats\[relativeIndex\]/);
+  assert.doesNotMatch(ui, /service.getSeatPosition\(/);
   assert.match(css, /\.trottl-classic-game-view\.is-reaction-active::before[\s\S]*255 255 255/);
   assert.doesNotMatch(css, /--reaction-progress|--seat-reaction-progress/);
   assert.match(css, /\.trottl-classic-sip-markers i\.is-assigned/);
@@ -1055,7 +1054,9 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(css, /\.trottl-classic-event-action\s*\{[\s\S]*overflow-wrap:\s*anywhere[\s\S]*text-wrap:\s*balance/);
   assert.match(css, /\.trottl-classic-seat-status-overlay\s*\{[\s\S]*font-variant-numeric:\s*tabular-nums/);
   assert.match(css, /\.trottl-classic-player--context-muted\s*\{[^}]*opacity:\s*0\.82[^}]*saturate\(0\.84\)/s);
-  assert.match(css, /data-player-count="7"[\s\S]*data-player-count="8"[\s\S]*\.trottl-classic-avatar-wrap[\s\S]*width:\s*clamp\(58px, 16\.5vw, 64px\)/);
+  assert.match(css, /--seat-avatar-size:\s*clamp\(/);
+  assert.match(ui, /7: \{ avatarSize: 66/);
+  assert.match(ui, /8: \{ avatarSize: 62/);
   assert.match(css, /\.trottl-classic-rule-controls\s*\{[^}]*max-width:\s*100%[^}]*transform:\s*translateX\(-50%\)/s);
   assert.match(css, /\.trottl-classic-rule-controls \.trottl-classic-global-confirm\s*\{[^}]*width:\s*100%[^}]*min-height:\s*50px/s);
   assert.match(ui, /globalConfirmButton\.hidden = !localNeedsConfirmation/);

@@ -7,6 +7,25 @@
   const LOBBY_BACKGROUND_ASSET = "./assets/lobby-room1-background.png";
   const GAME_BACKGROUND_ASSET = "./assets/3er-trottl-ingame-background.png?v=1";
 
+  // Screen coordinates in clockwise order, starting with the local bottom seat.
+  const TABLE_SEAT_PRESETS = Object.freeze(Object.fromEntries(Object.entries({
+    2: { avatarSize: 84, seats: [[50, 87], [50, 13]] },
+    3: { avatarSize: 82, seats: [[50, 87], [18, 31], [82, 31]] },
+    4: { avatarSize: 80, seats: [[50, 87], [13, 50], [50, 13], [87, 50]] },
+    5: { avatarSize: 76, seats: [[50, 87], [15, 62], [28, 21], [72, 21], [85, 62]] },
+    6: { avatarSize: 72, seats: [[50, 87], [18, 69], [18, 31], [50, 13], [82, 31], [82, 69]] },
+    7: { avatarSize: 66, seats: [[50, 87], [27, 74], [13, 43], [33, 17], [67, 17], [87, 43], [73, 74]] },
+    8: { avatarSize: 62, seats: [[50, 87], [24, 76], [13, 50], [24, 24], [50, 13], [76, 24], [87, 50], [76, 76]] },
+  }).map(([count, preset]) => [count, Object.freeze({
+    avatarSize: preset.avatarSize,
+    seats: Object.freeze(preset.seats.map(([x, y]) => Object.freeze({ x, y }))),
+  })])));
+
+  function getTableSeatPreset(playerCount) {
+    // A one-player snapshot can briefly render when gameplay auto-ends.
+    return TABLE_SEAT_PRESETS[playerCount] ?? TABLE_SEAT_PRESETS[2];
+  }
+
   function getLobbyHeaderAsset(roomSlot) {
     return Number(roomSlot) === 2
       ? "./assets/text-room2-lobby.png"
@@ -1120,7 +1139,7 @@
 
     function createGameSeat(relativeSeat, snapshot, activeSeatIndex, ruleView, effects) {
       const { player, relativeIndex } = relativeSeat;
-      const position = service.getSeatPosition(relativeIndex, snapshot.players.length);
+      const position = getTableSeatPreset(snapshot.players.length).seats[relativeIndex];
       const seat = document.createElement("article");
       const avatarWrap = document.createElement("span");
       const name = document.createElement("strong");
@@ -1196,12 +1215,8 @@
       seat.dataset.globalSeat = String(player.seatIndex);
       seat.dataset.relativeSeat = String(relativeIndex);
       seat.dataset.avatarState = avatarPresentation.hasAvatar ? "resolved" : "fallback";
-      seat.style.setProperty("--seat-x", position.x.toFixed(6));
-      seat.style.setProperty("--seat-y", position.y.toFixed(6));
-      // The fixed geometry is authored from bottom-center around the table.
-      // Mirror only its screen X mapping so global +1 proceeds clockwise.
-      seat.style.setProperty("--seat-left", `${(50 - (position.x * 38)).toFixed(3)}%`);
-      seat.style.setProperty("--seat-top", `${(50 + (position.y * 34)).toFixed(3)}%`);
+      seat.style.setProperty("--seat-left", `${position.x}%`);
+      seat.style.setProperty("--seat-top", `${position.y}%`);
       const seatDescription = [
         player.displayName,
         isSelf ? "du" : "",
@@ -1520,6 +1535,7 @@
         && state.fourMutationQueue.length === 0) clearFourMutationState();
       const effects = collectVisualEffects(snapshot, ruleView);
       tableStage.dataset.playerCount = String(snapshot.players.length);
+      tableStage.style.setProperty("--seat-avatar-target", `${getTableSeatPreset(snapshot.players.length).avatarSize}px`);
       syncReactionFlash(snapshot, ruleView);
       situation.classList.toggle("is-reaction-prompt", ruleView.localReactionActive);
       situation.classList.toggle("is-shot-event", ruleView.phase === "shot_ack");
@@ -2490,6 +2506,7 @@
   }
 
   global.TrottlClassicUI = Object.freeze({
+    getTableSeatPreset,
     create,
     createEventPresentation,
     createPlayerCardPresentation,

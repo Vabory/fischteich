@@ -5,7 +5,7 @@
   const LOBBY_HEARTBEAT_INTERVAL_MS = 30_000;
   const LOBBY_CLEANUP_INTERVAL_MS = 20_000;
   const LOBBY_BACKGROUND_ASSET = "./assets/lobby-room1-background.png";
-  const GAME_BACKGROUND_ASSET = "./assets/3er-trottl-ingame-background.png?v=1";
+  const GAME_BACKGROUND_ASSET = "./assets/3er-trottl-ingame-background-v2.png?v=2";
 
   // Screen coordinates in clockwise order, starting with the local bottom seat.
   const TABLE_SEAT_PRESETS = Object.freeze(Object.fromEntries(Object.entries({

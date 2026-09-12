@@ -195,7 +195,7 @@ button:focus-visible {
 }
 
 .trottl-classic-lobby-background.is-ingame-background {
-  height: 100%;
+  height: calc(100% + 30px);
   object-position: center;
   filter: brightness(0.82);
   transform: translateY(-30px);

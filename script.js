@@ -534,6 +534,8 @@ const trottlClassic = window.TrottlClassicUI.create({
   showTrottlMenu,
 });
 
+const trottlSpecial = window.TrottlSpecialUI.create({ showScreen, showTrottlMenu });
+
 function showMenu() {
   stopRoulette();
   state.rouletteInitializationRun += 1;
@@ -4934,10 +4936,11 @@ document.querySelector("#close-fischteich-dice").addEventListener("click", () =>
   showTrottlMenu({ focusSelector: "#open-fischteich-dice" });
 });
 document.querySelector("#open-trottl-classic").addEventListener("click", () => {
+  window.TrottlSpecialUI.rememberMode("classic");
   void trottlClassic.openRooms();
 });
 document.querySelector("#open-trottl-deluxe").addEventListener("click", () => {
-  showTrottlPlaceholder("3er Trottl Special");
+  void trottlSpecial.openRooms();
 });
 document.querySelector("#start-finger-selection").addEventListener("click", () => {
   state.gameReturnTarget = "teams-menu";
@@ -5411,6 +5414,8 @@ document.addEventListener("keydown", (event) => {
       closeManualTeamScreen();
     } else if (!participantScreen.hidden) {
       closeParticipantSelection();
+    } else if (trottlSpecial.isSessionScreenActive() || trottlSpecial.isRoomScreenActive()) {
+      void trottlSpecial.goBack();
     } else if (trottlClassic.isSessionScreenActive() || trottlClassic.isRoomScreenActive()) {
       void trottlClassic.goBack();
     } else if (!fischteichDiceScreen.hidden) {
@@ -5445,4 +5450,10 @@ subscribeToAppAuthState((auth) => {
     }
   }
 });
-void initializeAppAuth().then(() => trottlClassic.restoreMembership());
+void initializeAppAuth().then(async () => {
+  if (window.TrottlSpecialUI.preferredMode() === "special") {
+    if (!(await trottlSpecial.restoreMembership())) void trottlSpecial.openRooms();
+    return;
+  }
+  await trottlClassic.restoreMembership();
+});

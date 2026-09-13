@@ -17,6 +17,8 @@ test("seat CSS geometry remains frozen after final polish", () => {
 
 test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI cache metadata", () => {
   const html=read("index.html")
+    .replace(/^    <(?:script|link)[^\n]*trottl-special[^\n]*\n/gm, "")
+    .replace("script.js?v=88", "script.js?v=87")
     .replace("3er Trottl<br>CLASSIC", "3ER TROTTL Classic")
     .replace(/^    <script src="\.\/classic-background-fit\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/<meta name=.fischteich-build.[^>]+>/,"protected build")

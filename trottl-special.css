@@ -1,0 +1,67 @@
+/* ID-scoped visual aliases only. Shared Classic class rules remain the master. */
+#trottl-special-room-list > .trottl-classic-room[data-room-slot="1"] {
+  position: relative;
+  top: 12px;
+}
+
+.trottl-classic-rule-controls #trottl-special-four-reset {
+  border-color: rgb(213 234 243 / 22%);
+  background: rgb(255 255 255 / 5%);
+  color: rgb(225 239 246 / 72%);
+}
+
+.trottl-classic-rule-controls #trottl-special-four-confirm {
+  border-color: rgb(207 239 250 / 62%);
+  background: linear-gradient(180deg, rgb(235 249 255 / 24%), rgb(170 224 243 / 13%));
+  box-shadow: 0 0 15px rgb(177 226 246 / 16%);
+  color: #f4fcff;
+}
+
+.trottl-classic-rule-controls #trottl-special-four-confirm::before {
+  margin-right: 0.35em;
+  color: #8ff0bd;
+  content: "✓";
+}
+
+.trottl-classic-rule-controls #trottl-special-four-confirm.is-incomplete {
+  border-color: rgb(213 234 243 / 22%);
+  background: rgb(255 255 255 / 5%);
+  box-shadow: none;
+  color: rgb(225 239 246 / 72%);
+}
+
+.trottl-classic-rule-controls #trottl-special-four-confirm:not(:disabled):not(.is-incomplete) {
+  border-color: rgb(116 242 178 / 76%);
+  background: linear-gradient(180deg, rgb(35 120 86 / 82%), rgb(11 68 54 / 88%));
+  box-shadow: 0 0 18px rgb(66 224 144 / 27%), inset 0 1px rgb(255 255 255 / 10%);
+}
+
+.trottl-classic-rule-controls #trottl-special-four-confirm.is-incomplete::before {
+  color: inherit;
+}
+
+.trottl-classic-rule-controls #trottl-special-four-confirm.is-ready-impact:not(.is-incomplete) {
+  animation: trottl-classic-four-button-ready 210ms ease-out;
+}
+
+.trottl-classic-rule-controls #trottl-special-game-feedback {
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% + 3px);
+  left: 8px;
+  width: auto;
+  margin: 0;
+  color: #ffd5df;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.trottl-special-start-confirm {
+  border-color: rgb(116 242 178 / 76%);
+  background: linear-gradient(180deg, rgb(35 120 86 / 82%), rgb(11 68 54 / 88%));
+  color: #f4fcff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #trottl-special-four-confirm.is-ready-impact { animation: none; }
+}

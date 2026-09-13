@@ -51,7 +51,7 @@ test("Fischteich Würfel has its own screen and returns to the Trottl menu", () 
   assert.match(script, /#close-fischteich-dice"\)\.addEventListener[\s\S]*showTrottlMenu\(\{ focusSelector: "#open-fischteich-dice" \}\)/);
 });
 
-test("Klassik opens its room selection while Special retains the harmless placeholder flow", () => {
+test("Classic and Special open their separate room selection flows", () => {
   const placeholderFunction = script.slice(
     script.indexOf("function showTrottlPlaceholder("),
     script.indexOf("function updateMarkerSize("),
@@ -59,7 +59,7 @@ test("Klassik opens its room selection while Special retains the harmless placeh
   assert.match(placeholderFunction, /textContent = `\$\{label\} ist noch nicht verfügbar\.`/);
   assert.doesNotMatch(placeholderFunction, /showScreen|fetch|supabase|startGame/);
   assert.match(script, /#open-trottl-classic"\)\.addEventListener[\s\S]*trottlClassic\.openRooms\(\)/);
-  assert.match(script, /#open-trottl-deluxe"\)\.addEventListener[\s\S]*showTrottlPlaceholder\("3er Trottl Special"\)/);
+  assert.match(script, /#open-trottl-deluxe"\)\.addEventListener[\s\S]*trottlSpecial\.openRooms\(\)/);
   assert.doesNotMatch(script, /3er Trottl Deluxe/);
 });
 

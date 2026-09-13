@@ -14,9 +14,19 @@
     const mount = q("dice-mount"), start = q("start");
     const state = { snapshot: null, rooms: [], busy: false, generation: 0, refreshPromise: null,
       refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null, spectatorRoom: null,
-      queue: [], processing: false, gameBusy: false, deadlineTimer: null, hintTimer: null, animatedKey: null };
+      queue: [], processing: false, gameBusy: false, deadlineTimer: null, hintTimer: null, animatedKey: null, resultRound: null, resultOpen: false };
     const dice = global.FischteichDice.mount({ mountPoint: mount, status: q("dice-status"), rollOnClick: false });
     const dieButton = mount.querySelector(".fischteich-die");
+    const resultPanel = doc.createElement("section");
+    resultPanel.className = "trottl-special-minigame-results"; resultPanel.hidden = true;
+    resultPanel.setAttribute("aria-label", "Minigame-Ergebnis");
+    resultPanel.innerHTML = '<h2>Minigame</h2><p></p><ol></ol>';
+    game.append(resultPanel);
+    const resultToggle = doc.createElement("button");
+    resultToggle.type = "button"; resultToggle.className = "trottl-special-minigame-result-toggle"; resultToggle.hidden = true;
+    resultToggle.textContent = "Ergebnis";
+    resultToggle.addEventListener("click", () => { state.resultOpen = !state.resultOpen; renderSession(); });
+    game.append(resultToggle);
     // Results and transitions come exclusively from the Special intent RPC.
     dieButton.disabled = true;
     dieButton.setAttribute("aria-label", "Special-Würfel werfen");
@@ -152,17 +162,40 @@
       const g = snapshot.session.gameState, local = snapshot.players.find(p => p.userId === snapshot.identity.userId);
       const playable = !spectator && local && local.lifecycle !== "eliminated";
       const actor = playable && g.actor === snapshot.identity.userId;
-      const distributing = actor && g.phase === "distribution";
+      const distribution = playable ? service.getGameDistribution(g, snapshot.identity.userId) : null;
+      const distributing = Boolean(distribution);
       const choosing = actor && g.phase === "choose_trottl";
       stage.dataset.playerCount = String(snapshot.players.length);
       stage.style.setProperty("--seat-avatar-target", `${preset.avatarSize}px`);
       q("event-player").textContent = snapshot.players.find(p => p.userId === g.actor)?.displayName ?? "";
       const messages = { awaiting_roll: "IST AM ZUG", rescue_roll: "MUSS EINE 6 WÜRFELN", rolling: g.rescue ? "LETZTE CHANCE!" : "WÜRFELT …",
         distribution: `${g.total} ${g.total === 1 ? "Schluck" : "Schlücke"} verteilen`, choose_trottl: "3ER TROTTL WÄHLEN",
-        drink_ack: "SCHLÜCKE BESTÄTIGEN", trottl_peak: "3/3 – EIN LEBEN VERLIEREN", placeholder: "Special-Regel folgt", awaiting_players: "KEIN SPIELBERECHTIGTER SPIELER" };
+        drink_ack: "SCHLÜCKE BESTÄTIGEN", trottl_peak: "3/3 – EIN LEBEN VERLIEREN", placeholder: "Special-Regel folgt", awaiting_players: "KEIN SPIELBERECHTIGTER SPIELER",
+        minigame_active: "MINIGAME LÄUFT", minigame_results: g.minigame?.draw ? "Unentschieden" : "MINIGAME-ERGEBNIS",
+        minigame_distribution: "GEWINNER VERTEILEN SCHLÜCKE" };
       q("event-copy").textContent = messages[g.phase] ?? "SPIEL LÄUFT";
       q("event-roll").hidden = true; q("event-action").hidden = true; q("event-meta").hidden = true;
       if (g.phase === "rescue_roll") { q("event-action").hidden = false; q("event-action").textContent = "Letzte Chance!"; }
+      if (state.resultRound !== g.minigame?.minigame_id) { state.resultRound = g.minigame?.minigame_id ?? null; state.resultOpen = false; }
+      resultToggle.hidden = !g.minigame || !["minigame_distribution", "drink_ack"].includes(g.phase);
+      resultToggle.textContent = state.resultOpen ? "Schließen" : "Ergebnis";
+      resultToggle.setAttribute("aria-expanded", String(state.resultOpen));
+      resultPanel.hidden = !(g.phase === "minigame_results" || (!resultToggle.hidden && state.resultOpen));
+      if (!resultPanel.hidden) {
+        const m = g.minigame;
+        resultPanel.querySelector("h2").textContent = m.title ?? m.minigame_type;
+        resultPanel.querySelector("p").textContent = m.draw ? "Unentschieden – keine Schlücke" : g.phase === "minigame_results" ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
+        resultPanel.querySelector("ol").replaceChildren(...(m.results ?? []).map(row => {
+          const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
+          const item = node("li", row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : "");
+          item.append(node("span", "", String(row.rank)), node("strong", "", name), node("span", "", row.display_value));
+          item.setAttribute("aria-label", `${row.rank}. ${name}: ${row.display_value}${row.is_winner ? ", Gewinner" : row.is_loser ? ", Verlierer" : ""}`);
+          return item;
+        }));
+      }
+      if (g.phase === "minigame_distribution" && g.minigame?.distributions?.[local?.userId]?.confirmed) {
+        q("event-action").hidden = false; q("event-action").textContent = "Verteilung bestätigt";
+      }
       const perspectiveUserId = spectator ? snapshot.session.hostUserId : snapshot.identity.userId;
       layer.replaceChildren(...(snapshot.players.length ? service.getRelativeSeats(snapshot.players, perspectiveUserId) : []).map(({ player, relativeIndex }) => {
         const self = !spectator && player.userId === snapshot.identity.userId && player.lifecycle !== "eliminated";
@@ -213,18 +246,19 @@
       q("rule-controls").hidden = !playable;
       const progress = q("action-progress"), reset = q("four-reset"), confirm = q("four-confirm"), ack = q("global-confirm");
       progress.hidden = reset.hidden = confirm.hidden = !distributing;
-      ack.hidden = !(playable && g.phase === "drink_ack" && Number(g.drinks?.[local.userId]) > 0 && !g.acks?.[local.userId]);
+      const resultAck = playable && g.phase === "minigame_results" && g.minigame.participants.some(p => p.player_id === local.userId) && !g.minigame.result_seen?.[local.userId];
+      ack.hidden = !(resultAck || (playable && g.phase === "drink_ack" && Number(g.drinks?.[local.userId]) > 0 && !g.acks?.[local.userId]));
       const received = Number(g.drinks?.[local?.userId] ?? 0);
-      ack.textContent = `${received} ${received === 1 ? "SCHLUCK" : "SCHLÜCKE"} BESTÄTIGEN`;
+      ack.textContent = resultAck ? "ERGEBNIS BESTÄTIGEN" : `${received} ${received === 1 ? "SCHLUCK" : "SCHLÜCKE"} BESTÄTIGEN`;
       ack.disabled = state.gameBusy;
       if (!ack.hidden) q("rule-controls").classList.add("has-confirm-action");
       if (distributing) {
         q("rule-controls").classList.add("has-four-actions");
         const count = distributionCount();
-        q("action-progress-value").textContent = `${count} / ${g.total}`;
-        progress.querySelector("span").textContent = g.total === 1 ? "Schluck verteilt" : "Schlücke verteilt";
-        confirm.classList.toggle("is-incomplete", count !== g.total || state.queue.length > 0 || state.processing);
-        confirm.classList.toggle("is-ready-impact", count === g.total && state.queue.length === 0 && !state.processing);
+        q("action-progress-value").textContent = `${count} / ${distribution.total}`;
+        progress.querySelector("span").textContent = distribution.total === 1 ? "Schluck verteilt" : "Schlücke verteilt";
+        confirm.classList.toggle("is-incomplete", count !== distribution.total || state.queue.length > 0 || state.processing);
+        confirm.classList.toggle("is-ready-impact", count === distribution.total && state.queue.length === 0 && !state.processing);
         confirm.disabled = state.gameBusy; reset.disabled = state.gameBusy || count === 0;
       }
       dieButton.disabled = !actor || !["awaiting_roll", "rescue_roll"].includes(g.phase) || state.gameBusy;
@@ -243,7 +277,8 @@
       }
     }
     function distributionCount() {
-      let count = Object.values(state.snapshot?.session.gameState.drinks ?? {}).reduce((sum, n) => sum + Number(n), 0);
+      const distribution = state.snapshot ? service.getGameDistribution(state.snapshot.session.gameState, state.snapshot.identity.userId) : null;
+      let count = Object.values(distribution?.drinks ?? {}).reduce((sum, n) => sum + Number(n), 0);
       for (const action of state.queue) count = action.action === "reset" ? 0 : count + 1;
       return count;
     }
@@ -263,8 +298,9 @@
     }
     function enqueueGame(action, target = null) {
       const g = state.snapshot?.session.gameState;
-      if (!g || g.phase !== "distribution" || g.actor !== state.snapshot.identity.userId || state.gameBusy) return;
-      if (action === "assign" && distributionCount() >= g.total) return;
+      const distribution = g ? service.getGameDistribution(g, state.snapshot.identity.userId) : null;
+      if (!distribution || state.gameBusy) return;
+      if (action === "assign" && distributionCount() >= distribution.total) return;
       state.queue.push({ action, target }); renderSession(); void drainGameQueue();
     }
     function acceptSnapshot(next) {
@@ -282,7 +318,7 @@
           const next = await service.actGame(id, item.action, seq, item.target);
           if (generation !== state.generation) return;
           state.queue.shift(); acceptSnapshot(next);
-          if (next.session.gameState.phase !== "distribution") state.queue.length = 0;
+          if (!service.getGameDistribution(next.session.gameState, next.identity.userId)) state.queue.length = 0;
           renderSession();
         }
       } catch (error) {
@@ -471,15 +507,16 @@
     q("four-reset").addEventListener("click", () => enqueueGame("reset"));
     q("four-confirm").addEventListener("click", () => {
       const g = state.snapshot?.session.gameState;
-      if (!g || g.phase !== "distribution") return;
-      const serverCount = Object.values(g.drinks ?? {}).reduce((sum, n) => sum + Number(n), 0);
-      if (serverCount !== g.total || state.processing || state.queue.length) {
+      const distribution = g ? service.getGameDistribution(g, state.snapshot.identity.userId) : null;
+      if (!distribution) return;
+      const serverCount = Object.values(distribution.drinks).reduce((sum, n) => sum + Number(n), 0);
+      if (serverCount !== distribution.total || state.processing || state.queue.length) {
         q("action-progress").classList.add("is-incomplete-hint");
         global.clearTimeout(state.hintTimer);
         state.hintTimer = global.setTimeout(() => q("action-progress").classList.remove("is-incomplete-hint"), 400);
       } else void gameAction("confirm");
     });
-    q("global-confirm").addEventListener("click", () => void gameAction("ack"));
+    q("global-confirm").addEventListener("click", () => void gameAction(state.snapshot?.session.gameState.phase === "minigame_results" ? "results_ack" : "ack"));
     cancelStart.addEventListener("click", closeModal);
     cancelSpectator.addEventListener("click", closeModal);
     confirmSpectator.addEventListener("click", async () => {

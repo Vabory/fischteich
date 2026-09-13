@@ -104,6 +104,27 @@
 #trottl-special-session-screen .trottl-special-peak { animation: trottl-special-point-peak 600ms ease-out; }
 @keyframes trottl-special-critical { 0%, 100% { rotate: -5deg; } 50% { rotate: 5deg; } }
 @keyframes trottl-special-point-peak { 50% { box-shadow: 0 0 16px #d9a6ff; } }
+
+#trottl-special-session-screen .trottl-special-minigame-results {
+  position: absolute;
+  z-index: 12;
+  inset: calc(max(10px, env(safe-area-inset-top)) + 115px) max(16px, env(safe-area-inset-right)) calc(max(16px, env(safe-area-inset-bottom)) + 105px) max(16px, env(safe-area-inset-left));
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid rgb(185 223 245 / 35%);
+  border-radius: 18px;
+  background: rgb(8 19 34 / 94%);
+  color: #f0f8ff;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 35%);
+}
+#trottl-special-session-screen .trottl-special-minigame-results h2 { margin: 0 0 8px; font-size: 1rem; }
+#trottl-special-session-screen .trottl-special-minigame-results p { font-size: 0.8rem; }
+#trottl-special-session-screen .trottl-special-minigame-results ol { padding: 0; list-style: none; }
+#trottl-special-session-screen .trottl-special-minigame-results li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; padding: 10px 4px; border-bottom: 1px solid rgb(255 255 255 / 10%); font-size: 0.8rem; }
+#trottl-special-session-screen .trottl-special-minigame-results strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#trottl-special-session-screen .trottl-special-minigame-results .is-winner { color: #91efbd; }
+#trottl-special-session-screen .trottl-special-minigame-results .is-loser { color: #ff9aad; }
+#trottl-special-session-screen .trottl-special-minigame-result-toggle { position: absolute; z-index: 13; top: calc(max(10px, env(safe-area-inset-top)) + 82px); right: max(16px, env(safe-area-inset-right)); min-width: 44px; min-height: 32px; padding: 5px 10px; border: 1px solid rgb(185 223 245 / 35%); border-radius: 999px; background: rgb(8 19 34 / 85%); color: #f0f8ff; font-size: 0.7rem; }
 @media (prefers-reduced-motion: reduce) {
   #trottl-special-session-screen .trottl-special-heart,
   #trottl-special-session-screen .trottl-special-peak { animation: none; }

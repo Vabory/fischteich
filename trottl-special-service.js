@@ -31,6 +31,13 @@
     // Pure room-summary normalizer, shared visual data shape, isolated RPC.
     return presentation.normalizeRooms(await rpc("get_trottl_special_rooms"));
   }
+  // Read-only dock model; ranking and amounts remain server-owned.
+  function getGameDistribution(gameState, userId) {
+    if (gameState.phase === "distribution" && gameState.actor === userId) return { total: gameState.total, drinks: gameState.drinks ?? {} };
+    const winner = gameState.minigame?.distributions?.[userId];
+    if (gameState.phase === "minigame_distribution" && winner && !winner.confirmed && !winner.cancelled) return { total: 2, drinks: winner.drinks ?? {} };
+    return null;
+  }
   async function loadSession(sessionId) {
     const identity = await ensureIdentity();
     const [s, p, membership] = await Promise.all([
@@ -99,7 +106,7 @@
   }
   global.trottlSpecialService = Object.freeze({
     mode: MODE, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, tables,
-    ensureIdentity, normalizeSession, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    ensureIdentity, normalizeSession, getGameDistribution, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
     actGame: async (id, action, rollSeq, target = null) => {
       await rpc("act_trottl_special_game", { p_session_id: id, p_action: action, p_roll_seq: rollSeq, p_target: target });
       return loadSession(id);

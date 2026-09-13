@@ -155,6 +155,137 @@ test("reconnect renders server distribution, ACK and Trottl points without local
  assert.equal(h.doc.querySelector(".trottl-classic-trottl-badge").textContent,"3ER 2/3");
 });
 const phaseSQL=read("supabase/migrations/20260913030000_add_trottl_special_phase_one.sql");
+const minigameSQL=read("supabase/migrations/20260913040000_add_trottl_special_minigame_framework.sql");
+function minigameFixture(h, overrides={}) {
+ return {minigame_id:"round-1",minigame_type:"special_minigame_01",ranking_direction:"higher_is_better",status:"distribution",draw:false,
+  participants:h.players.map(p=>({player_id:p.user_id,display_name:p.display_name_snapshot})),
+  results:[{player_id:"u0",raw_value:100,display_value:"100 Punkte",rank:1,is_winner:true,is_loser:false},
+   {player_id:"u1",raw_value:100,display_value:"100 Punkte",rank:1,is_winner:true,is_loser:false},
+   {player_id:"u3",raw_value:50,display_value:"50 Punkte",rank:3,is_winner:false,is_loser:false},
+   {player_id:"u2",raw_value:20,display_value:"20 Punkte",rank:4,is_winner:false,is_loser:true}],
+  winners:["u0","u1"],losers:["u2"],result_seen:{},automatic_drinks:{u2:2},
+  distributions:{u0:{drinks:{},confirmed:false,cancelled:false},u1:{drinks:{},confirmed:false,cancelled:false}},...overrides};
+}
+test("minigame result panel presents server ranking, ties and winner/loser flags without changing seat presets",async()=>{
+ const h=harness(4),m=minigameFixture(h);await openGame(h,{phase:"minigame_results",minigame:m});
+ const panel=h.doc.querySelector(".trottl-special-minigame-results");
+ assert.equal(panel.hidden,false);assert.equal(panel.querySelector("ol").children.length,4);
+ assert.equal(panel.querySelectorAll(".is-winner").length,2);assert.equal(panel.querySelectorAll(".is-loser").length,1);
+ assert.equal(h.doc.querySelector("#trottl-special-global-confirm").textContent,"ERGEBNIS BESTÄTIGEN");
+ const seats=h.doc.querySelector("#trottl-special-seat-layer").children;
+ assert.equal(seats[0].style["--seat-top"],"87%");
+});
+test("draw results use explicit outcome and never expose winner distribution or premature drink ACK",async()=>{
+ const h=harness(4);await openGame(h,{phase:"minigame_results",minigame:minigameFixture(h,{draw:true,winners:[],losers:[],distributions:{},automatic_drinks:{}}),drinks:{}});
+ assert.equal(h.doc.querySelector("#trottl-special-event-copy").textContent,"Unentschieden");
+ assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,0);
+ assert.equal(h.doc.querySelector("#trottl-special-four-confirm").hidden,true);
+ assert.equal(h.doc.querySelector("#trottl-special-global-confirm").textContent,"ERGEBNIS BESTÄTIGEN");
+});
+test("local winner dock tracks own allocation rather than aggregate or actor; other winner stays independently usable",async()=>{
+ const h=harness(4);const m=minigameFixture(h);
+ m.distributions.u0.drinks={u2:1};await openGame(h,{phase:"minigame_distribution",actor:"u3",minigame:m,drinks:{u2:3}});
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"1 / 2");
+ assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,4);
+ h.setUser("u1");await h.ui.refresh();await flush();
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"0 / 2");
+ assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,4);
+});
+test("confirmed winner loses its dock while unconfirmed winner retains it and losers cannot ACK yet",async()=>{
+ const h=harness(4),m=minigameFixture(h);m.distributions.u0={drinks:{u2:1,u3:1},confirmed:true,cancelled:false};
+ await openGame(h,{phase:"minigame_distribution",minigame:m,drinks:{u2:3,u3:1},acks:{}});
+ assert.equal(h.doc.querySelector("#trottl-special-four-confirm").hidden,true);
+ assert.equal(h.doc.querySelector("#trottl-special-event-action").textContent,"Verteilung bestätigt");
+ h.setUser("u2");await h.ui.refresh();await flush();assert.equal(h.doc.querySelector("#trottl-special-global-confirm").hidden,true);
+ h.setUser("u1");await h.ui.refresh();await flush();assert.equal(h.doc.querySelector("#trottl-special-four-confirm").hidden,false);
+});
+for(const phase of ["minigame_results","minigame_distribution","drink_ack"]) test(`spectator sees public minigame ${phase} without result/distribution/drink controls`,async()=>{
+ const h=harness(4);h.spectators.push({session_id:"special-1",user_id:"watcher"});h.setUser("watcher");
+ await openGame(h,{phase,minigame:minigameFixture(h),drinks:{u2:4,u3:1},acks:{}});
+ assert.equal(h.doc.querySelector("#trottl-special-rule-controls").hidden,true);
+ assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,0);
+ assert.equal(h.doc.querySelector("#trottl-special-global-confirm").hidden,true);
+ if(phase==="minigame_results") assert.equal(h.doc.querySelector(".trottl-special-minigame-results").hidden,false);
+});
+test("critical winner can distribute to self and critical recipients using the same dock",async()=>{
+ const h=harness(4);Object.assign(h.players[0],{lives:0,lifecycle_status:"critical",critical_used:true});
+ await openGame(h,{phase:"minigame_distribution",actor:"u3",minigame:minigameFixture(h),drinks:{u2:2}});
+ assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,4);
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"0 / 2");
+});
+test("late spectator can inspect stored ranking during distribution without any mutation intent",async()=>{
+ const h=harness(4);h.spectators.push({session_id:"special-1",user_id:"watcher"});h.setUser("watcher");
+ await openGame(h,{phase:"minigame_distribution",minigame:minigameFixture(h),drinks:{u2:2}});
+ const panel=h.doc.querySelector(".trottl-special-minigame-results"),toggle=h.doc.querySelector(".trottl-special-minigame-result-toggle");
+ assert.equal(panel.hidden,true);assert.equal(toggle.hidden,false);toggle.click();assert.equal(panel.hidden,false);
+ assert.equal(panel.querySelector("ol").children.length,4);toggle.click();assert.equal(panel.hidden,true);
+ assert.equal(h.calls.filter(x=>x.name==="act_trottl_special_game").length,0);
+});
+for(const step of ["results","partial","confirmed","ack"]) test(`reconnect restores minigame ${step} from server snapshot`,async()=>{
+ const h=harness(4),m=minigameFixture(h);let phase="minigame_distribution";
+ if(step==="results")phase="minigame_results";
+ if(step==="partial")m.distributions.u0.drinks={u2:1};
+ if(step==="confirmed")m.distributions.u0={drinks:{u2:1,u3:1},confirmed:true,cancelled:false};
+ if(step==="ack")phase="drink_ack";
+ await openGame(h,{phase,minigame:m,drinks:{u0:1,u2:4,u3:1},acks:{}});
+ assert.equal(await h.ui.restoreMembership(),true);await flush();
+ if(step==="partial")assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"1 / 2");
+ if(step==="confirmed")assert.equal(h.doc.querySelector("#trottl-special-four-confirm").hidden,true);
+ if(step==="results")assert.equal(h.doc.querySelector(".trottl-special-minigame-results").hidden,false);
+ if(step==="ack")assert.equal(h.doc.querySelector("#trottl-special-global-confirm").textContent,"1 SCHLUCK BESTÄTIGEN");
+});
+test("winner queue reuses serialized optimistic assignments, waits for server, and sends only local winner intents",async()=>{
+ const h=harness(4),m=minigameFixture(h);let release,inFlight=0,maxFlight=0;
+ h.setGameRPC(async p=>{
+  inFlight++;maxFlight=Math.max(maxFlight,inFlight);if(!release)await new Promise(resolve=>{release=resolve;});
+  const g=h.rows.special.game_state,w=g.minigame.distributions.u0;
+  if(p.p_action==="assign")w.drinks[p.p_target]=(w.drinks[p.p_target]??0)+1;
+  g.revision++;inFlight--;return {data:"special-1",error:null};
+ });
+ await openGame(h,{phase:"minigame_distribution",actor:"u3",minigame:m,drinks:{u2:2}});
+ h.doc.querySelectorAll(".trottl-special-target")[0].click();await flush();h.doc.querySelectorAll(".trottl-special-target")[0].click();await flush();
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"2 / 2");
+ assert.ok(h.doc.querySelector("#trottl-special-four-confirm").classList.contains("is-incomplete"));
+ release();await flush();assert.equal(maxFlight,1);assert.deepEqual(h.rows.special.game_state.minigame.distributions.u1.drinks,{});
+ assert.equal(h.rows.special.game_state.minigame.distributions.u0.drinks.u0,2);
+ assert.equal(h.doc.querySelector("#trottl-special-four-confirm").classList.contains("is-incomplete"),false);
+});
+test("SQL structure: result ranking is numeric, direction-aware, tied, deterministic and separate from settlement",()=>{
+ assert.match(minigameSQL,/rank\(\) over\(order by case when p_direction='higher_is_better'/);
+ assert.match(minigameSQL,/v_best<>v_worst and raw_value=v_best/);assert.match(minigameSQL,/v_best<>v_worst and raw_value=v_worst/);
+ assert.match(minigameSQL,/'draw',v_best=v_worst/);assert.match(minigameSQL,/jsonb_typeof\(r->'raw_value'\) is distinct from 'number'/);
+ const rank=minigameSQL.slice(minigameSQL.indexOf("create function public.special_minigame_rank"),minigameSQL.indexOf("create function public.special_minigame_aggregate"));
+ assert.doesNotMatch(rank,/lives|drinks|trottl/);
+});
+test("SQL structure: parallel winner writers serialize, mutate auth.uid allocation only, freeze confirms, and gate aggregate ACK",()=>{
+ assert.match(minigameSQL,/pg_advisory_xact_lock\(337734/);assert.match(minigameSQL,/for update/);
+ assert.match(minigameSQL,/w:=m->'distributions'->v_user::text/);assert.match(minigameSQL,/v_used>=2/);assert.match(minigameSQL,/v_used<>2/);
+ assert.match(minigameSQL,/w is null or \(w->>'confirmed'\)::boolean or \(w->>'cancelled'\)::boolean/);
+ assert.match(minigameSQL,/where not \(w.value->>'confirmed'\)::boolean and not \(w.value->>'cancelled'\)::boolean/);
+ assert.match(minigameSQL,/'phase','drink_ack','acks','\{\}'::jsonb/);
+});
+test("SQL structure: private registry/start/finalize are inaccessible to app roles; productive Roll 4 and Phase 1 delegate unchanged",()=>{
+ assert.match(minigameSQL,/special_minigame_pick_slot[\s\S]*floor\(random\(\)\*10\)/);
+ assert.match(minigameSQL,/revoke all on function public.special_minigame_pick_slot/);
+ const grants=minigameSQL.match(/grant execute[\s\S]*?;/g).join("\n");assert.doesNotMatch(grants,/begin_locked|finalize_locked|rank|pick_slot/);
+ assert.match(minigameSQL,/return public.act_trottl_special_phase_one\(p_session_id,p_action,p_roll_seq,p_target\)/);
+ assert.match(minigameSQL,/return public.leave_trottl_special_phase_one\(p_session_id\)/);
+ assert.doesNotMatch(minigameSQL,/special_lose_life_locked|special_restore_life_locked|public\.trottl_classic/);
+});
+test("SQL structure: explicit leave cancels unconfirmed winner, retains confirmed history, removes missing targets, and prevents zero-participant hangs",()=>{
+ assert.match(minigameSQL,/jsonb_array_length\(v_members\)<2/);assert.match(minigameSQL,/'draw',true,'results','\[\]'::jsonb/);
+ assert.match(minigameSQL,/v_winner is not null and not \(v_winner->>'confirmed'\)::boolean/);
+ assert.match(minigameSQL,/'drinks','\{\}'::jsonb,'cancelled',true/);
+ assert.match(minigameSQL,/case when \(w.value->>'confirmed'\)::boolean then w.value/);
+ assert.match(minigameSQL,/lifecycle_status in \('alive','critical'\)/);
+ assert.match(minigameSQL,/m->'result_seen' \? \(p->>'player_id'\)/);
+});
+test("PostgreSQL fixture includes ranking matrix, section 18, guard checks, ACK gate and unchanged life/Trottl assertion",()=>{
+ const fixture=read("tests/fixtures/trottl-special-minigame-framework.sql");
+ assert.match(fixture,/"values":\[100,100,100,40\]/);assert.match(fixture,/"direction":"lower_is_better"/);
+ assert.match(fixture,/Final section 18 settlement regression/);assert.match(fixture,/Premature ACK/);
+ assert.match(fixture,/Life \/ critical \/ Trottl regression/);assert.match(fixture,/rollback;/);
+});
 const section=name=>phaseSQL.match(new RegExp(`create (?:or replace )?function public\\.${name}\\([\\s\\S]*?end; \\$\\$;`))[0];
 test("SQL structure: life engine decrements centrally, once-only critical, permanent elimination, zero-life Trottl reset",()=>{
  const s=section("special_lose_life_locked");

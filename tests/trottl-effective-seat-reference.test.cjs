@@ -19,7 +19,11 @@ test("complete CSS cascade, including parents and media queries, equals deployme
 });
 
 test("complete UI rendering, inline variables and perspective equal deployment 257 except the frozen background URL", () => {
-  const ui=read("trottl-classic-ui.js").replace(/const GAME_BACKGROUND_ASSET = [^;]+;/,"protected background");
+  const ui=read("trottl-classic-ui.js")
+    // Only the two explicitly requested seven-player lower coordinates differ.
+    .replace("7: { avatarSize: 66, seats: [[50, 87], [26.5, 73], [13, 43], [33, 17], [67, 17], [87, 43], [73.5, 73]] }",
+      "7: { avatarSize: 66, seats: [[50, 87], [27, 74], [13, 43], [33, 17], [67, 17], [87, 43], [73, 74]] }")
+    .replace(/const GAME_BACKGROUND_ASSET = [^;]+;/,"protected background");
   assert.equal(hash(ui),"11decc103c53a4be8a86bddf3e6c05e4b723cdd80669de5a7b51a7ca931dab90",reference);
 });
 

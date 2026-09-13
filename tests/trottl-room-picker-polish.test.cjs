@@ -22,7 +22,7 @@ test("room title keeps its final size, brightness, centering and safe-area posit
 test("room picker removes the graphic footer and places exact small context below the title", () => {
   assert.doesNotMatch(roomMarkup + css, /trottl-classic-room-footer-asset/);
   assert.doesNotMatch(roomMarkup, /text-3er-trottl\.png/);
-  assert.match(roomMarkup, /text-raum-wählen\.png[^>]*>[\s\S]*<p class="trottl-classic-room-context">3ER TROTTL Classic<\/p>[\s\S]*<\/header>[\s\S]*trottl-classic-room-list/);
+  assert.match(roomMarkup, /text-raum-wählen\.png[^>]*>[\s\S]*<p class="trottl-classic-room-context">3er Trottl<br>CLASSIC<\/p>[\s\S]*<\/header>[\s\S]*trottl-classic-room-list/);
   const context = rule(".trottl-classic-room-context");
   assert.match(context, /margin: 12px 0 0/);
   assert.match(context, /font-size: 0\.78rem/);
@@ -33,7 +33,7 @@ test("room picker removes the graphic footer and places exact small context belo
 
 test("room cards move down independently while retaining gap and card geometry", () => {
   const list = rule(".trottl-classic-room-list");
-  assert.match(list, /margin-top: calc\(clamp\(54px, 10dvh, 88px\) \+ 26px\)/);
+  assert.match(list, /margin-top: calc\(clamp\(54px, 10dvh, 88px\) \+ 26px - 0\.936rem\)/);
   assert.match(list, /gap: 24px/);
   assert.match(list, /width: min\(86vw, 360px\)/);
   const card = rule(".trottl-classic-room");
@@ -44,11 +44,11 @@ test("room cards move down independently while retaining gap and card geometry",
     // Static layout budget with generous iPhone top/bottom safe areas.
     const top = Math.max(59 + 26, 46);
     const titleHeight = Math.max(210, Math.min(width * 0.6, 294)) / 3;
-    const contextHeight = 12 + 0.78 * 16 * 1.2;
-    const listMargin = Math.max(54, Math.min(height * 0.1, 88)) + 26;
+    const contextHeight = 12 + 2 * 0.78 * 16 * 1.2;
+    const listMargin = Math.max(54, Math.min(height * 0.1, 88)) + 26 - 0.936 * 16;
     const cardsBottom = top + titleHeight + contextHeight + listMargin + 112 * 2 + 24;
     assert.ok(cardsBottom < height - (34 + 24), `${width}x${height}: cards clear bottom safe area`);
-    assert.equal(Math.round(contextHeight + 26), 53);
+    assert.equal(Math.round(contextHeight + 26 - 0.936 * 16), 53);
   }
 });
 

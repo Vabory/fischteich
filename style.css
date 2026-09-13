@@ -710,9 +710,15 @@ button:focus-visible {
 .trottl-classic-room-list {
   display: grid;
   width: min(86vw, 360px);
-  margin-top: calc(clamp(54px, 10dvh, 88px) + 26px);
+  /* Offset the added subtitle line (0.78rem * 1.2), keeping room 2 fixed. */
+  margin-top: calc(clamp(54px, 10dvh, 88px) + 26px - 0.936rem);
   gap: 24px;
   flex-shrink: 0;
+}
+
+#trottl-classic-room-list > .trottl-classic-room[data-room-slot="1"] {
+  position: relative;
+  top: 12px;
 }
 
 .trottl-classic-room {

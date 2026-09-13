@@ -375,6 +375,7 @@
       actionRequestPending: false,
       fourMutationQueue: [],
       fourMutationInFlight: false,
+      fourIncompleteHintTimer: null,
       fourOptimisticAllocations: null,
       fourOptimisticKey: null,
       reactionCountdownTimer: null,
@@ -1118,7 +1119,7 @@
           && seatIndex !== session.actionActorSeat;
       }
       if (ruleView.phase === "distributing_four") {
-        return ruleView.localSeat === session.actionActorSeat && seatIndex !== session.actionActorSeat;
+        return ruleView.localSeat === session.actionActorSeat;
       }
       return false;
     }
@@ -1454,8 +1455,9 @@
       fourResetButton.hidden = !mayDistribute;
       fourResetButton.disabled = total === 0;
       fourConfirmButton.hidden = !mayDistribute;
-      fourConfirmButton.classList.toggle("is-slot-hidden", mayDistribute && total !== 4);
-      fourConfirmButton.disabled = total !== 4 || mutationsPending || serverTotal !== 4;
+      fourConfirmButton.classList.toggle("is-incomplete", total !== 4 || mutationsPending || serverTotal !== 4);
+      fourConfirmButton.disabled = false;
+      if (!mayDistribute) clearFourIncompleteHint();
       globalConfirmButton.hidden = !localNeedsConfirmation;
       globalConfirmButton.disabled = state.actionRequestPending;
       ruleControls.classList.toggle("has-actions", mayDistribute || localNeedsConfirmation);
@@ -1745,6 +1747,7 @@
     }
 
     function clearFourMutationState() {
+      clearFourIncompleteHint();
       state.fourMutationQueue = [];
       state.fourMutationInFlight = false;
       state.fourOptimisticAllocations = null;
@@ -1833,7 +1836,6 @@
       if (
         phase === "distributing_four"
         && ownSeat === session.actionActorSeat
-        && seatIndex !== ownSeat
         && getAllocationTotal(getRuleView(snapshot).allocations) < 4
       ) return enqueueFourAssignment(snapshot, seatIndex);
       return undefined;
@@ -1879,11 +1881,29 @@
       enqueueFourReset(snapshot);
     }
 
+    function clearFourIncompleteHint() {
+      global.clearTimeout(state.fourIncompleteHintTimer);
+      state.fourIncompleteHintTimer = null;
+      actionProgress.classList.remove("is-incomplete-hint");
+    }
+
+    function showFourIncompleteHint() {
+      clearFourIncompleteHint();
+      actionProgress.classList.add("is-incomplete-hint");
+      state.fourIncompleteHintTimer = global.setTimeout(clearFourIncompleteHint, 400);
+    }
+
     function confirmFourSips() {
       const session = state.snapshot?.session;
       if (!session || service.getEffectiveActionPhase(session) !== "distributing_four") return;
+      if (state.preview || state.actionRequestPending || localPlayerSeat(state.snapshot) !== session.actionActorSeat) return;
+      if (getAllocationTotal(getRuleView(state.snapshot).allocations) < 4) {
+        showFourIncompleteHint();
+        return;
+      }
       if (state.fourMutationInFlight || state.fourMutationQueue.length > 0) return;
       if (service.getFourTotal(session) !== 4) return;
+      clearFourIncompleteHint();
       void executeRuleAction(() => service.confirmFourSips(session.id, session.rollSeq));
     }
 

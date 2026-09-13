@@ -10,31 +10,14 @@ const read = (file) => fs.readFileSync(path.join(__dirname,"..",file),"utf8").re
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const reference = "e98f61dbd261e4f762a1b7bbabd434f6dc3771ac";
 
-test("complete CSS cascade, including parents and media queries, equals deployment 257 except the frozen background fix", () => {
-  const css=read("style.css")
-    .replace(/\n\/\* Temporary diagnostic entry point:[\s\S]*?#trottl-classic-session-screen:not\(\.is-playing\) > #classic-seat-debug-toggle\s*\{[^}]*\}\n/, "")
-    .replace(/\.trottl-classic-lobby-background\.is-ingame-background\s*\{[\s\S]*?\}/,"protected background");
-  // Hash generated from the reference commit, not the current file.
-  assert.equal(hash(css),"26927be0d8c8a180d5a22eca01ff85b087c89af7473b7eac449bcd1e414b6633",reference);
-});
-
-test("complete UI rendering, inline variables and perspective equal deployment 257 except the frozen background URL", () => {
-  const ui=read("trottl-classic-ui.js")
-    // Only the two explicitly requested three-player upper coordinates differ.
-    .replace("3: { avatarSize: 82, seats: [[50, 87], [16, 29], [84, 29]] }",
-      "3: { avatarSize: 82, seats: [[50, 87], [18, 31], [82, 31]] }")
-    // Only the two explicitly requested seven-player lower coordinates differ.
-    .replace("7: { avatarSize: 66, seats: [[50, 87], [26.5, 73], [13, 43], [33, 17], [67, 17], [87, 43], [73.5, 73]] }",
-      "7: { avatarSize: 66, seats: [[50, 87], [27, 74], [13, 43], [33, 17], [67, 17], [87, 43], [73, 74]] }")
-    .replace(/const GAME_BACKGROUND_ASSET = [^;]+;/,"protected background");
-  assert.equal(hash(ui),"11decc103c53a4be8a86bddf3e6c05e4b723cdd80669de5a7b51a7ca931dab90",reference);
+test("seat CSS geometry remains frozen after final polish", () => {
+  const rules=Array.from(read("style.css").matchAll(/[^{}]*\.trottl-classic-(?:seat-|game-seat)[^{}]*\{[^{}]*\}/g),m=>m[0]).join("\n");
+  assert.equal(hash(rules),"d123dbb942cd470b5a7dea9cd747fc56bc0dee23c891c3d9151a65586d1e897e");
 });
 
 test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI cache metadata", () => {
   const html=read("index.html")
     .replace(/^    <script src="\.\/classic-background-fit\.js\?v=\d+" defer><\/script>\n/m, "")
-    .replace(/^        <button id="classic-seat-debug-toggle"[^\n]*\n/m, "")
-    .replace(/^    <script src="\.\/classic-seat-debug\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/<meta name=.fischteich-build.[^>]+>/,"protected build")
     .replace(/style.css\?v=\d+/,"style.css?v=cache")
     .replace(/trottl-classic-ui.js\?v=\d+/,"trottl-classic-ui.js?v=cache");

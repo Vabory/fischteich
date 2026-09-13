@@ -919,6 +919,20 @@ test("service action methods send only intent plus current action identity", asy
   assert.doesNotMatch(serviceSource, /startPersonalReaction/);
 });
 
+test("self allocations and actor ACK survive reconnect without special handling", async () => {
+  const { service, sessionRow, rpcCalls } = createHarness();
+  sessionRow.action_phase = "awaiting_four_acks";
+  sessionRow.action_actor_seat = 0;
+  sessionRow.action_payload = { kind: "four_sips", allocations: { 0: 2, 1: 2 }, acks: [1] };
+  const snapshot = await service.loadSession(SESSION_ID);
+  assert.deepEqual({ ...service.getFourAllocations(snapshot.session) }, { 0: 2, 1: 2 });
+  assert.deepEqual([...service.getAcknowledgedSeats(snapshot.session)], [1]);
+  await service.assignFourSip(SESSION_ID, 7, 0);
+  await service.acknowledgeDrink(SESSION_ID, 7);
+  assert.ok(rpcCalls.some(call => call.name === "assign_trottl_classic_four" && call.parameters.p_target_seat === 0));
+  assert.ok(rpcCalls.some(call => call.name === "ack_trottl_classic_drink"));
+});
+
 test("personal reaction helpers use persisted per-seat deadlines and the synchronized server clock", () => {
   const { service } = createHarness();
   const clientStart = Date.parse("2026-09-06T10:00:00.000Z");
@@ -965,7 +979,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=38[\s\S]*script\.js\?v=87/);
+  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=39[\s\S]*script\.js\?v=87/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*class="trottl-classic-room-context">3ER TROTTL Classic<\/p>/);
@@ -1243,7 +1257,7 @@ test("Klassik UI renders and submits every rule phase through direct table inter
   assert.match(ui, /service\.acknowledgeReactionLoser\(session\.id, session\.rollSeq, session\.reactionId\)/);
   assert.match(ui, /service\.acknowledgeShot\(session\.id, session\.rollSeq\)/);
   assert.match(ui, /new Date\(service\.getCorrectedNow\(\)\)\.toISOString\(\)/);
-  assert.match(ui, /fourConfirmButton\.hidden = !mayDistribute[\s\S]*is-slot-hidden[\s\S]*mutationsPending \|\| serverTotal !== 4/);
+  assert.match(ui, /fourConfirmButton\.hidden = !mayDistribute[\s\S]*is-incomplete[\s\S]*mutationsPending \|\| serverTotal !== 4/);
   assert.match(ui, /renderSession\(deferredIsCurrent \? "live" : "passive"\)/);
   assert.doesNotMatch(ui, /Math\.random/);
 });
@@ -1255,7 +1269,7 @@ test("rule four uses immediate optimistic state with an ordered capped server qu
   assert.match(ui, /function enqueueFourReset\(snapshot\)[\s\S]*fourOptimisticAllocations = \{\}[\s\S]*kind: "reset"/s);
   assert.match(ui, /function confirmFourSips\(\)[\s\S]*fourMutationInFlight \|\| state\.fourMutationQueue\.length > 0[\s\S]*getFourTotal\(session\) !== 4/s);
   assert.match(css, /\.trottl-classic-rule-controls\.has-four-actions\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:/s);
-  assert.match(css, /#trottl-classic-four-confirm\.is-slot-hidden\s*\{[^}]*visibility:\s*hidden/s);
+  assert.match(css, /#trottl-classic-four-confirm\.is-incomplete\s*\{[^}]*box-shadow:\s*none/s);
 });
 
 test("global reaction window stays absolute across hidden tabs and rejects late arrivals", () => {

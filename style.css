@@ -201,26 +201,6 @@ button:focus-visible {
   transform: translateY(-30px);
 }
 
-/* Temporary diagnostic entry point: visibility never depends on debug state. */
-#trottl-classic-session-screen > #classic-seat-debug-toggle {
-  position: fixed;
-  z-index: 10001;
-  top: max(12px, calc(env(safe-area-inset-top) + 8px));
-  right: max(12px, calc(env(safe-area-inset-right) + 8px));
-  min-height: 32px;
-  padding: 5px 7px;
-  border: 1px solid rgb(255 255 255 / 35%);
-  border-radius: 5px;
-  background: rgb(0 0 0 / 45%);
-  color: rgb(255 255 255 / 75%);
-  font: 11px/1.2 monospace;
-  pointer-events: auto;
-}
-
-#trottl-classic-session-screen:not(.is-playing) > #classic-seat-debug-toggle {
-  display: none;
-}
-
 .sidemenu-fish-asset {
   position: absolute;
   z-index: 1;
@@ -2057,11 +2037,6 @@ button:focus-visible {
   color: rgb(225 239 246 / 72%);
 }
 
-.trottl-classic-rule-controls #trottl-classic-four-reset::before {
-  margin-right: 0.35em;
-  content: "↶";
-}
-
 .trottl-classic-rule-controls #trottl-classic-four-confirm {
   border-color: rgb(207 239 250 / 62%);
   background: linear-gradient(180deg, rgb(235 249 255 / 24%), rgb(170 224 243 / 13%));
@@ -2076,15 +2051,31 @@ button:focus-visible {
   content: "✓";
 }
 
-.trottl-classic-rule-controls #trottl-classic-four-confirm.is-slot-hidden {
-  visibility: hidden;
-  pointer-events: none;
+.trottl-classic-rule-controls #trottl-classic-four-confirm.is-incomplete {
+  border-color: rgb(213 234 243 / 22%);
+  background: rgb(255 255 255 / 5%);
+  box-shadow: none;
+  color: rgb(225 239 246 / 72%);
 }
 
-.trottl-classic-rule-controls #trottl-classic-four-confirm:not(:disabled) {
+.trottl-classic-rule-controls #trottl-classic-four-confirm:not(:disabled):not(.is-incomplete) {
   border-color: rgb(116 242 178 / 76%);
   background: linear-gradient(180deg, rgb(35 120 86 / 82%), rgb(11 68 54 / 88%));
   box-shadow: 0 0 18px rgb(66 224 144 / 27%), inset 0 1px rgb(255 255 255 / 10%);
+}
+
+.trottl-classic-rule-controls #trottl-classic-four-confirm.is-incomplete::before {
+  color: inherit;
+}
+
+.trottl-classic-action-progress.is-incomplete-hint {
+  border-color: #ff7878;
+  color: #ff9999;
+  box-shadow: 0 0 14px rgb(255 92 92 / 35%);
+}
+
+.trottl-classic-action-progress.is-incomplete-hint strong {
+  color: #ff9999;
 }
 
 .trottl-classic-rule-controls .trottl-classic-global-confirm {
@@ -2100,7 +2091,7 @@ button:focus-visible {
   letter-spacing: 0.105em;
 }
 
-.trottl-classic-rule-controls #trottl-classic-four-confirm.is-ready-impact {
+.trottl-classic-rule-controls #trottl-classic-four-confirm.is-ready-impact:not(.is-incomplete) {
   animation: trottl-classic-four-button-ready 210ms ease-out;
 }
 

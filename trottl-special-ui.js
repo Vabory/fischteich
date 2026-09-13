@@ -32,6 +32,9 @@
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } } });
     const roulette = global.TrottlSpecialRoulette?.create({ root: game, service,
       onAction: (action, value) => void rouletteAction(action, value), onResolve: () => void gameAction("resolve") });
+    const numberHunt = global.TrottlSpecialNumberHunt?.create({ root: game, service,
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
+      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fortschritt wird erneut gespeichert."; void refresh(); } });
     // Results and transitions come exclusively from the Special intent RPC.
     dieButton.disabled = true;
     dieButton.setAttribute("aria-label", "Special-Würfel werfen");
@@ -193,7 +196,7 @@
       if (!resultPanel.hidden) {
         const m = g.minigame;
         resultPanel.querySelector("h2").textContent = m.title ?? m.minigame_type;
-        resultPanel.querySelector("p").textContent = m.draw ? g.phase === "panic_results" ? "Unentschieden – kein Lebenverlust" : "Unentschieden – keine Schlücke" : showingResults ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
+        resultPanel.querySelector("p").textContent = m.all_tied ? "Alle gleich – alle Gewinner · je 2 Schlücke verteilen" : m.draw ? g.phase === "panic_results" ? "Unentschieden – kein Lebenverlust" : "Unentschieden – keine Schlücke" : showingResults ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
         resultPanel.querySelector("ol").replaceChildren(...(m.results ?? []).map(row => {
           const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
           const item = node("li", row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : "");
@@ -220,6 +223,9 @@
         if (resolved.hasAvatar) { avatar.src = resolved.src; avatar.alt = resolved.alt; avatar.draggable = false; avatar.decoding = "async"; }
         else avatar.setAttribute("aria-hidden", "true");
         wrap.append(avatar); seat.append(wrap, node("strong", "trottl-classic-seat-name", player.displayName));
+        if (g.phase === "minigame_active" && g.minigame?.minigame_type === "special_minigame_01" && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
+          wrap.classList.add(g.minigame.runs?.[player.userId]?.completed ? "trottl-special-minigame-done" : "trottl-special-minigame-waiting");
+        }
         const hearts = node("span", "trottl-special-hearts");
         hearts.setAttribute("aria-label", `${player.lives} von 3 Leben`);
         for (let i = 0; i < 3; i++) {
@@ -303,6 +309,7 @@
       }
       panic?.update(snapshot);
       roulette?.update(snapshot, state.gameBusy);
+      numberHunt?.update(snapshot);
     }
     function distributionCount() {
       const distribution = state.snapshot ? service.getGameDistribution(state.snapshot.session.gameState, state.snapshot.identity.userId) : null;
@@ -430,6 +437,7 @@
     async function stopConnection() {
       panic?.suspend();
       roulette?.suspend();
+      numberHunt?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearInterval(state.timer); state.timer = null;
       global.clearTimeout(state.retryTimer); state.retryTimer = null;

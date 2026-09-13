@@ -12,7 +12,7 @@ const flush = async () => { for (let i=0; i<8; i++) await new Promise(resolve =>
 
 function harness(count=3) {
   const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[];
-  let userId = "u0", gameRPC = null, rouletteRPC = null;
+  let userId = "u0", gameRPC = null, rouletteRPC = null, numberHuntRPC = null, serverTime = null;
   const players = Array.from({length:count}, (_,seat_index) => ({ session_id:"special-1",user_id:`u${seat_index}`,
     seat_index,display_name_snapshot:`Spieler ${seat_index}`,avatar_id:"turbo-lachs",is_ready:true,lives:3,lifecycle_status:"alive",critical_used:false,joined_at:"2026-09-13",last_seen_at:"2026-09-13" }));
   const rows = { special: { id:"special-1",mode:"special",room_slot:1,status:"lobby",host_user_id:"u0",player_count:count,
@@ -22,6 +22,8 @@ function harness(count=3) {
       calls.push({name,p}); const mode=name.includes("special")?"special":"classic", row=rows[mode];
       if (name==="act_trottl_special_game" && gameRPC) return gameRPC(p);
       if (name==="act_trottl_special_roulette" && rouletteRPC) return rouletteRPC(p);
+      if (name==="tap_trottl_special_number_hunt" && numberHuntRPC) return numberHuntRPC(p);
+      if (name==="get_trottl_special_server_time" && serverTime!==null) return {data:new Date(serverTime).toISOString(),error:null};
       const role=players.some(x=>x.user_id===userId)?"player":spectators.some(x=>x.user_id===userId)?"spectator":"none";
       if(name==="get_trottl_special_membership")return {data:[{membership_role:role,spectator_count:spectators.length}],error:null};
       if(name==="get_trottl_special_memberships")return {data:role==="none"?[]:[{session_id:rows.special.id,membership_role:role,room_slot:1}],error:null};
@@ -61,10 +63,10 @@ function harness(count=3) {
   const context=vm.createContext({window:win,document:doc,console,supabaseClient:client,
     getLocalIdentity:()=>({displayName:"Spieler 0",deviceId:"device"}),initializeAppAuth:async()=>{},
     syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0"}})});
-  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-roulette.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
+  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-roulette.js","trottl-special-minigames.js","trottl-special-number-hunt.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
-  return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},service:win.trottlSpecialService};
+  return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},setNumberHuntRPC:fn=>{numberHuntRPC=fn;},setServerTime:t=>{serverTime=t;},service:win.trottlSpecialService};
 }
 
 test("Classic and Special room one summaries are independent in both lobby and playing combinations",async()=>{
@@ -82,6 +84,40 @@ function rouletteFixture(overrides={}) {
  return {round_id:"r1",chosen_color:"RED",result_color:"RED",reward:null,target:null,reward_done:false,
   available:{attack:true,heal:false,transfer:false},shots:{},shot_acks:{},end_offset:-3522,...overrides};
 }
+function numberHuntFixture() {
+ const start=Date.now()-1000;
+ return {minigame_id:"hunt-1",minigame_type:"special_minigame_01",title:"Zahlenjagd",title_started_at:new Date(start-5000).toISOString(),
+  title_ends_at:new Date(start-3000).toISOString(),start_at:new Date(start).toISOString(),participants:[{player_id:"u0"},{player_id:"u1"},{player_id:"u2"}],
+  runs:{u0:{board:[9,8,7,6,5,4,3,2,1],progress:0,completed:false},u1:{board:[1,3,2,4,6,5,7,9,8],progress:9,completed:true,elapsed_ms:999},u2:{board:[1,2,3,4,5,6,7,8,9],progress:0,completed:false}}};
+}
+test("number hunt adds only avatar glows and leaves exact table/seat/background geometry untouched",async()=>{
+ const h=harness(8);h.setServerTime(Date.now());await openGame(h,{});
+ const geometry=()=>h.doc.querySelector("#trottl-special-seat-layer").children.map(x=>[x.style["--seat-left"],x.style["--seat-top"]]);const before=geometry();
+ h.rows.special.game_state={...h.rows.special.game_state,phase:"minigame_active",minigame:numberHuntFixture(),revision:2};await h.ui.refresh();await flush();
+ assert.deepEqual(geometry(),before);assert.equal(h.doc.querySelectorAll(".trottl-special-minigame-done").length,1);assert.equal(h.doc.querySelectorAll(".trottl-special-minigame-waiting").length,2);
+ assert.equal(h.doc.querySelector(".trottl-special-minigame-shell").hidden,false);assert.equal(h.doc.querySelector(".trottl-special-number-hunt-board").children.length,9);
+});
+test("number hunt host view follows current host and spectators have no writable controls",async()=>{
+ const h=harness();h.setUser("watch");h.spectators.push({user_id:"watch",session_id:"special-1"});h.setServerTime(Date.now());
+ await openGame(h,{phase:"minigame_active",minigame:numberHuntFixture()});
+ const board=()=>h.doc.querySelector(".trottl-special-number-hunt-board").children;
+ assert.deepEqual(board().map(x=>x.textContent),["9","8","7","6","5","4","3","2","1"]);assert.ok(board().every(x=>x.disabled));
+ h.rows.special.host_user_id="u1";h.rows.special.game_state={...h.rows.special.game_state,revision:2};await h.ui.refresh();await flush();
+ assert.deepEqual(board().map(x=>x.textContent),["1","3","2","4","6","5","7","9","8"]);
+ assert.match(h.doc.querySelector(".trottl-special-minigame-copy").textContent,/Host fertig/);
+ assert.equal(h.calls.filter(x=>x.name==="tap_trottl_special_number_hunt").length,0);
+});
+test("number hunt service sends own round, ordered number and only final frozen measurement",async()=>{
+ const h=harness();await h.service.tapNumberHunt("special-1","hunt-1",9,1234);
+ assert.deepEqual({...h.calls.find(x=>x.name==="tap_trottl_special_number_hunt").p},{p_session_id:"special-1",p_round_id:"hunt-1",p_number:9,p_elapsed_ms:1234});
+});
+test("full minigame tie presents all-winner result and retains each winner's two-drink dock",async()=>{
+ const h=harness();const m=minigameFixture(h);m.all_tied=true;m.draw=false;m.winners=["u0","u1","u2"];
+ m.results=m.results.map(r=>({...r,rank:1,is_winner:true,is_loser:false}));m.automatic_drinks={};m.distributions={u0:{drinks:{},confirmed:false},u1:{drinks:{},confirmed:false},u2:{drinks:{},confirmed:false}};
+ await openGame(h,{phase:"minigame_results",minigame:m});assert.match(h.doc.querySelector(".trottl-special-minigame-results").querySelector("p").textContent,/Alle gleich – alle Gewinner/);
+ h.rows.special.game_state={...h.rows.special.game_state,phase:"minigame_distribution",revision:2};await h.ui.refresh();await flush();
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"0 / 2");
+});
 test("roulette actor color selection sends only server intent and preserves all seat geometry",async()=>{
  const h=harness(7);await openGame(h,{});
  const geometry=()=>h.doc.querySelector("#trottl-special-seat-layer").children.map(x=>[x.style["--seat-left"],x.style["--seat-top"]]);

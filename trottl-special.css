@@ -158,3 +158,17 @@
 .trottl-special-roulette-rewards button:disabled, .trottl-special-roulette button.is-dimmed { opacity: .48; }
 .trottl-special-roulette button.is-selected { opacity: 1; border-color: white; box-shadow: 0 0 12px rgb(255 255 255 / 75%); }
 .trottl-special-roulette-selected-target { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 6px; background: #197045; border-radius: 8px; font-size: 10px; color: white; pointer-events: none; }
+/* Reusable minigame overlay; never changes table, dice or dock dimensions. */
+.trottl-special-minigame-shell { position: absolute; z-index: 11; top: calc(env(safe-area-inset-top, 0px) + 135px); bottom: calc(env(safe-area-inset-bottom, 0px) + 105px); left: 20px; right: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px; min-width: 0; overflow: auto; border: 1px solid rgb(255 255 255 / 25%); border-radius: 20px; background: rgb(10 21 31 / 94%); box-shadow: 0 8px 30px rgb(0 0 0 / 40%); }
+.trottl-special-minigame-shell[hidden], .trottl-special-minigame-shell [hidden] { display: none; }
+.trottl-special-minigame-shell.is-waiting { bottom: auto; background: rgb(10 21 31 / 85%); }
+.trottl-special-minigame-title { color: white; text-align: center; font-size: clamp(24px, 7vw, 36px); margin: 0; }
+.trottl-special-minigame-countdown { color: white; font-size: 30px; min-height: 36px; text-shadow: 0 0 16px rgb(255 255 255 / 40%); }
+.trottl-special-minigame-copy, .trottl-special-number-hunt-progress { margin: 0; color: white; font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.trottl-special-minigame-content { width: min(100%, 276px); }
+.trottl-special-number-hunt-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.trottl-special-number-hunt-board button { width: 100%; min-width: 44px; min-height: 48px; height: clamp(48px, 16vw, 72px); padding: 0; font-size: 26px; color: white; border: 1px solid rgb(255 255 255 / 35%); border-radius: 14px; background: linear-gradient(150deg, #294954, #172630); touch-action: manipulation; }
+.trottl-special-number-hunt-board button.is-done { opacity: .28; background: #197045; }
+.trottl-special-minigame-done { box-shadow: 0 0 18px 4px rgb(48 215 125 / 90%); }
+.trottl-special-minigame-waiting { box-shadow: 0 0 18px 4px rgb(255 255 255 / 75%); }
+@media (prefers-reduced-motion: reduce) { .trottl-special-minigame-title { transition: none; } }

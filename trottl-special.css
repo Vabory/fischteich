@@ -80,3 +80,31 @@
   line-height: 1.2;
   pointer-events: none;
 }
+
+#trottl-special-session-screen .trottl-special-hearts {
+  position: absolute;
+  top: calc(100% + 5px + 0.75rem + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  pointer-events: none;
+}
+#trottl-special-session-screen .trottl-special-heart { width: 11px; height: 11px; color: #080a10; filter: drop-shadow(0 0 1px #bec8d0); }
+#trottl-special-session-screen .trottl-special-heart svg { display: block; width: 100%; height: 100%; }
+#trottl-special-session-screen .trottl-special-heart.is-live { color: #ef4b65; }
+#trottl-special-session-screen .trottl-classic-seat-self-marker { top: calc(100% + 5px + 0.75rem + 19px); }
+#trottl-special-session-screen [data-lifecycle="critical"] .trottl-special-heart { animation: trottl-special-critical 1.4s ease-in-out infinite; }
+#trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-classic-game-avatar,
+#trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-classic-seat-name,
+#trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-special-hearts { opacity: 0.42; }
+#trottl-special-session-screen .trottl-special-skull { position: absolute; inset: 22%; color: rgb(237 245 255 / 65%); pointer-events: none; }
+#trottl-special-session-screen .trottl-special-skull svg { width: 100%; height: 100%; }
+#trottl-special-session-screen .trottl-special-target { position: absolute; inset: -5px; z-index: 6; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgb(163 225 255 / 65%); background: transparent; }
+#trottl-special-session-screen .trottl-special-peak { animation: trottl-special-point-peak 600ms ease-out; }
+@keyframes trottl-special-critical { 0%, 100% { rotate: -5deg; } 50% { rotate: 5deg; } }
+@keyframes trottl-special-point-peak { 50% { box-shadow: 0 0 16px #d9a6ff; } }
+@media (prefers-reduced-motion: reduce) {
+  #trottl-special-session-screen .trottl-special-heart,
+  #trottl-special-session-screen .trottl-special-peak { animation: none; }
+}

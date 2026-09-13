@@ -41,7 +41,14 @@
     if (s.error) throw s.error;
     if (p.error) throw p.error;
     if (!s.data) throw new Error("TROTTL_SPECIAL_SESSION_NOT_FOUND");
-    const players = (p.data ?? []).filter(row => (row.lifecycle_status ?? "alive") === "alive").map(presentation.normalizePlayer);
+    const players = (p.data ?? []).filter(row => row.lifecycle_status !== "left").map(row => {
+      const base = presentation.normalizePlayer(row);
+      if (!base) return null;
+      const lifecycle = row.lifecycle_status ?? "alive", lives = Number(row.lives ?? 3);
+      if (!["alive","critical","eliminated"].includes(lifecycle) || !Number.isInteger(lives) || lives < 0 || lives > 3) return null;
+      if ((lifecycle === "alive" && lives === 0) || (lifecycle !== "alive" && lives !== 0) || (lifecycle === "critical" && row.critical_used !== true)) return null;
+      return Object.freeze({ ...base, lifecycle, lives, criticalUsed: row.critical_used === true });
+    });
     if (players.some(player => !player)) throw new Error("Invalid Special players response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
       membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount });
@@ -93,6 +100,10 @@
   global.trottlSpecialService = Object.freeze({
     mode: MODE, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, tables,
     ensureIdentity, normalizeSession, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    actGame: async (id, action, rollSeq, target = null) => {
+      await rpc("act_trottl_special_game", { p_session_id: id, p_action: action, p_roll_seq: rollSeq, p_target: target });
+      return loadSession(id);
+    },
     joinSpectator: async (id, roomSlot) => loadSession(await rpc("join_trottl_special_spectator", { p_session_id: id, p_room_slot: roomSlot })),
     leaveSpectator: id => rpc("leave_trottl_special_spectator", { p_session_id: id }),
     heartbeatSpectator: id => rpc("heartbeat_trottl_special_spectator", { p_session_id: id }),

@@ -13,12 +13,13 @@
     const stage = q("table-stage"), layer = q("seat-layer"), background = q("session-background");
     const mount = q("dice-mount"), start = q("start");
     const state = { snapshot: null, rooms: [], busy: false, generation: 0, refreshPromise: null,
-      refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null, spectatorRoom: null };
+      refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null, spectatorRoom: null,
+      queue: [], processing: false, gameBusy: false, deadlineTimer: null, hintTimer: null, animatedKey: null };
     const dice = global.FischteichDice.mount({ mountPoint: mount, status: q("dice-status"), rollOnClick: false });
     const dieButton = mount.querySelector(".fischteich-die");
-    // Foundation only: no local dice roll and no Classic gameplay RPC wired here.
+    // Results and transitions come exclusively from the Special intent RPC.
     dieButton.disabled = true;
-    dieButton.setAttribute("aria-label", "Special-Würfel – Regeln folgen im nächsten Schritt");
+    dieButton.setAttribute("aria-label", "Special-Würfel werfen");
     dice.setResultInstant(1);
     view.bindBackgroundFit(session, background, mount, stage);
 
@@ -148,15 +149,26 @@
     function renderGame() {
       const snapshot = state.snapshot, preset = view.getTableSeatPreset(snapshot.players.length);
       const spectator = snapshot.membershipRole === "spectator";
+      const g = snapshot.session.gameState, local = snapshot.players.find(p => p.userId === snapshot.identity.userId);
+      const playable = !spectator && local && local.lifecycle !== "eliminated";
+      const actor = playable && g.actor === snapshot.identity.userId;
+      const distributing = actor && g.phase === "distribution";
+      const choosing = actor && g.phase === "choose_trottl";
       stage.dataset.playerCount = String(snapshot.players.length);
       stage.style.setProperty("--seat-avatar-target", `${preset.avatarSize}px`);
-      q("event-player").textContent = ""; q("event-copy").textContent = "SPIEL LÄUFT";
+      q("event-player").textContent = snapshot.players.find(p => p.userId === g.actor)?.displayName ?? "";
+      const messages = { awaiting_roll: "IST AM ZUG", rescue_roll: "MUSS EINE 6 WÜRFELN", rolling: g.rescue ? "LETZTE CHANCE!" : "WÜRFELT …",
+        distribution: `${g.total} ${g.total === 1 ? "Schluck" : "Schlücke"} verteilen`, choose_trottl: "3ER TROTTL WÄHLEN",
+        drink_ack: "SCHLÜCKE BESTÄTIGEN", trottl_peak: "3/3 – EIN LEBEN VERLIEREN", placeholder: "Special-Regel folgt", awaiting_players: "KEIN SPIELBERECHTIGTER SPIELER" };
+      q("event-copy").textContent = messages[g.phase] ?? "SPIEL LÄUFT";
       q("event-roll").hidden = true; q("event-action").hidden = true; q("event-meta").hidden = true;
+      if (g.phase === "rescue_roll") { q("event-action").hidden = false; q("event-action").textContent = "Letzte Chance!"; }
       const perspectiveUserId = spectator ? snapshot.session.hostUserId : snapshot.identity.userId;
       layer.replaceChildren(...(snapshot.players.length ? service.getRelativeSeats(snapshot.players, perspectiveUserId) : []).map(({ player, relativeIndex }) => {
-        const self = !spectator && player.userId === snapshot.identity.userId;
-        const card = view.createPlayerCardPresentation({ isSelf: self, isActive: player.seatIndex === snapshot.session.currentTurnSeat });
+        const self = !spectator && player.userId === snapshot.identity.userId && player.lifecycle !== "eliminated";
+        const card = view.createPlayerCardPresentation({ isSelf: !spectator && player.userId === snapshot.identity.userId, isActive: player.seatIndex === snapshot.session.currentTurnSeat });
         const seat = node("article", card.classes.join(" "));
+        seat.dataset.lifecycle = player.lifecycle;
         seat.dataset.globalSeat = String(player.seatIndex); seat.dataset.relativeSeat = String(relativeIndex);
         const position = preset.seats[relativeIndex];
         seat.style.setProperty("--seat-left", `${position.x}%`); seat.style.setProperty("--seat-top", `${position.y}%`);
@@ -166,13 +178,118 @@
         if (resolved.hasAvatar) { avatar.src = resolved.src; avatar.alt = resolved.alt; avatar.draggable = false; avatar.decoding = "async"; }
         else avatar.setAttribute("aria-hidden", "true");
         wrap.append(avatar); seat.append(wrap, node("strong", "trottl-classic-seat-name", player.displayName));
+        const hearts = node("span", "trottl-special-hearts");
+        hearts.setAttribute("aria-label", `${player.lives} von 3 Leben`);
+        for (let i = 0; i < 3; i++) {
+          const heart = node("span", `trottl-special-heart${i < player.lives ? " is-live" : ""}`);
+          heart.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21 3 12C-4 4 7-2 12 5 17-2 28 4 21 12Z"/></svg>';
+          hearts.append(heart);
+        }
+        seat.append(hearts);
+        if (player.lifecycle === "eliminated") {
+          const skull = node("span", "trottl-special-skull");
+          skull.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2C2 2 1 15 6 17v5h12v-5C23 15 22 2 12 2Z"/><circle cx="8" cy="11" r="2" fill="#121820"/><circle cx="16" cy="11" r="2" fill="#121820"/><path d="m12 14-2 3h4Z" fill="#121820"/></svg>';
+          wrap.append(skull);
+        }
+        if (g.trottl === player.userId) {
+          const badge = node("span", `trottl-classic-trottl-badge${g.phase === "trottl_peak" ? " trottl-special-peak" : ""}`, `3ER ${g.points}/3`);
+          wrap.append(badge);
+        }
+        const amount = Number(g.drinks?.[player.userId] ?? 0);
+        if (amount > 0) seat.append(node("span", "trottl-classic-seat-status-overlay", `${amount} ${amount === 1 ? "Schluck" : "Schlücke"}${g.acks?.[player.userId] ? " ✓" : ""}`));
+        if ((distributing && player.lifecycle !== "eliminated") || (choosing && player.lifecycle === "alive" && player.lives > 0 && !self)) {
+          const target = button("trottl-special-target", "", () => {
+            if (distributing) enqueueGame("assign", player.userId);
+            else void gameAction("choose", player.userId);
+          }, state.gameBusy);
+          target.setAttribute("aria-label", `${player.displayName}: ${distributing ? "Schluck zuweisen" : "Trottl wählen"}`);
+          seat.append(target);
+        }
         if (self) seat.append(node("small", "trottl-classic-seat-self-marker", "DU"));
         seat.setAttribute("aria-label", `${player.displayName}${self ? ", du" : ""}`);
         return seat;
       }));
-      // Same three-column dock markup and CSS, dormant until Special rules are defined.
       q("rule-controls").classList.remove("has-actions", "has-four-actions", "has-confirm-action");
-      q("rule-controls").hidden = spectator;
+      q("rule-controls").hidden = !playable;
+      const progress = q("action-progress"), reset = q("four-reset"), confirm = q("four-confirm"), ack = q("global-confirm");
+      progress.hidden = reset.hidden = confirm.hidden = !distributing;
+      ack.hidden = !(playable && g.phase === "drink_ack" && Number(g.drinks?.[local.userId]) > 0 && !g.acks?.[local.userId]);
+      const received = Number(g.drinks?.[local?.userId] ?? 0);
+      ack.textContent = `${received} ${received === 1 ? "SCHLUCK" : "SCHLÜCKE"} BESTÄTIGEN`;
+      ack.disabled = state.gameBusy;
+      if (!ack.hidden) q("rule-controls").classList.add("has-confirm-action");
+      if (distributing) {
+        q("rule-controls").classList.add("has-four-actions");
+        const count = distributionCount();
+        q("action-progress-value").textContent = `${count} / ${g.total}`;
+        progress.querySelector("span").textContent = g.total === 1 ? "Schluck verteilt" : "Schlücke verteilt";
+        confirm.classList.toggle("is-incomplete", count !== g.total || state.queue.length > 0 || state.processing);
+        confirm.classList.toggle("is-ready-impact", count === g.total && state.queue.length === 0 && !state.processing);
+        confirm.disabled = state.gameBusy; reset.disabled = state.gameBusy || count === 0;
+      }
+      dieButton.disabled = !actor || !["awaiting_roll", "rescue_roll"].includes(g.phase) || state.gameBusy;
+      if (g.last_roll) {
+        const key = `${snapshot.session.id}:${g.last_roll_seq}`;
+        if (state.animatedKey !== key) {
+          state.animatedKey = key;
+          if (g.phase === "rolling" && Date.now() - Date.parse(g.roll_started_at) < 2600 && dice.rollTo) void dice.rollTo(g.last_roll);
+          else dice.setResultInstant(g.last_roll);
+        }
+      }
+      global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
+      if (["rolling", "trottl_peak", "placeholder"].includes(g.phase)) {
+        const generation = state.generation;
+        state.deadlineTimer = global.setTimeout(() => { if (generation === state.generation && !session.hidden) void gameAction("resolve"); }, Math.max(40, Date.parse(g.deadline) - Date.now() + 30));
+      }
+    }
+    function distributionCount() {
+      let count = Object.values(state.snapshot?.session.gameState.drinks ?? {}).reduce((sum, n) => sum + Number(n), 0);
+      for (const action of state.queue) count = action.action === "reset" ? 0 : count + 1;
+      return count;
+    }
+    async function gameAction(action, target = null) {
+      if (!state.snapshot || (action !== "resolve" && state.gameBusy)) return;
+      const snapshot = state.snapshot, generation = state.generation;
+      if (action !== "resolve" && (snapshot.membershipRole !== "player" || !snapshot.players.some(p => p.userId === snapshot.identity.userId && ["alive", "critical"].includes(p.lifecycle)))) return;
+      if (action !== "resolve") state.gameBusy = true;
+      renderSession();
+      try {
+        const next = await service.actGame(snapshot.session.id, action, Number(snapshot.session.gameState.roll_seq ?? 0), target);
+        if (generation === state.generation) acceptSnapshot(next);
+      } catch (error) {
+        if (generation === state.generation) q("game-feedback").textContent = "Aktion nicht übernommen. Spielstand wird aktualisiert.";
+        void refresh();
+      } finally { if (generation === state.generation) { state.gameBusy = false; renderSession(); } }
+    }
+    function enqueueGame(action, target = null) {
+      const g = state.snapshot?.session.gameState;
+      if (!g || g.phase !== "distribution" || g.actor !== state.snapshot.identity.userId || state.gameBusy) return;
+      if (action === "assign" && distributionCount() >= g.total) return;
+      state.queue.push({ action, target }); renderSession(); void drainGameQueue();
+    }
+    function acceptSnapshot(next) {
+      const old = state.snapshot;
+      if (old?.session.id === next.session.id && Number(old.session.gameState.revision ?? 0) > Number(next.session.gameState.revision ?? 0)) return;
+      state.snapshot = next;
+    }
+    async function drainGameQueue() {
+      if (state.processing) return;
+      const generation = state.generation, id = state.snapshot.session.id, seq = state.snapshot.session.gameState.roll_seq;
+      state.processing = true;
+      try {
+        while (state.queue.length && generation === state.generation) {
+          const item = state.queue[0];
+          const next = await service.actGame(id, item.action, seq, item.target);
+          if (generation !== state.generation) return;
+          state.queue.shift(); acceptSnapshot(next);
+          if (next.session.gameState.phase !== "distribution") state.queue.length = 0;
+          renderSession();
+        }
+      } catch (error) {
+        if (generation === state.generation) {
+          state.queue.length = 0; q("game-feedback").textContent = "Verteilung zurückgesetzt. Serverstand wird geladen."; void refresh();
+        }
+      } finally { if (generation === state.generation) { state.processing = false; renderSession(); } }
     }
     function renderSession() {
       if (!state.snapshot) return;
@@ -236,6 +353,7 @@
       renderAvatar(); openModal("avatar");
     }
     async function stopConnection() {
+      global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearInterval(state.timer); state.timer = null;
       global.clearTimeout(state.retryTimer); state.retryTimer = null;
       const unsubscribe = state.unsubscribe; state.unsubscribe = null;
@@ -259,6 +377,7 @@
     async function openSnapshot(snapshot) {
       if (snapshot.membershipRole === "none" || snapshot.session.status === "finished") { await openRooms(); return; }
       ++state.generation; await stopConnection(); state.snapshot = snapshot;
+      state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       try { global.localStorage.setItem("fischteich:trottl-special-session", snapshot.session.id); } catch {}
       rememberMode("special"); showScreen(session); renderSession(); connect();
       doc.querySelector("#close-trottl-special-session").focus();
@@ -267,6 +386,7 @@
     async function openRooms() {
       if (state.busy) return;
       ++state.generation; await stopConnection(); closeModal(); state.snapshot = null;
+      state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       rememberMode("special"); showScreen(rooms); q("room-feedback").textContent = "Räume werden geladen …";
       connect(); void refresh(); doc.querySelector("#close-trottl-special-rooms").focus();
     }
@@ -304,7 +424,7 @@
             if (loaded.session.status === "finished" || loaded.membershipRole === "none") {
               await openRooms(); return;
             }
-            state.snapshot = loaded; feedback.textContent = ""; renderSession();
+            if (!state.processing) { acceptSnapshot(loaded); feedback.textContent = ""; renderSession(); }
           }
         } catch (error) {
           if (generation !== state.generation) return;
@@ -347,6 +467,19 @@
         startModal.querySelector(".guest-fish-error").textContent = ""; openModal("start");
       }
     });
+    dieButton.addEventListener("click", () => void gameAction("roll"));
+    q("four-reset").addEventListener("click", () => enqueueGame("reset"));
+    q("four-confirm").addEventListener("click", () => {
+      const g = state.snapshot?.session.gameState;
+      if (!g || g.phase !== "distribution") return;
+      const serverCount = Object.values(g.drinks ?? {}).reduce((sum, n) => sum + Number(n), 0);
+      if (serverCount !== g.total || state.processing || state.queue.length) {
+        q("action-progress").classList.add("is-incomplete-hint");
+        global.clearTimeout(state.hintTimer);
+        state.hintTimer = global.setTimeout(() => q("action-progress").classList.remove("is-incomplete-hint"), 400);
+      } else void gameAction("confirm");
+    });
+    q("global-confirm").addEventListener("click", () => void gameAction("ack"));
     cancelStart.addEventListener("click", closeModal);
     cancelSpectator.addEventListener("click", closeModal);
     confirmSpectator.addEventListener("click", async () => {

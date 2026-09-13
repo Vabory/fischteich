@@ -12,14 +12,15 @@ const flush = async () => { for (let i=0; i<8; i++) await new Promise(resolve =>
 
 function harness(count=3) {
   const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[];
-  let userId = "u0";
+  let userId = "u0", gameRPC = null;
   const players = Array.from({length:count}, (_,seat_index) => ({ session_id:"special-1",user_id:`u${seat_index}`,
-    seat_index,display_name_snapshot:`Spieler ${seat_index}`,avatar_id:"turbo-lachs",is_ready:true,joined_at:"2026-09-13",last_seen_at:"2026-09-13" }));
+    seat_index,display_name_snapshot:`Spieler ${seat_index}`,avatar_id:"turbo-lachs",is_ready:true,lives:3,lifecycle_status:"alive",critical_used:false,joined_at:"2026-09-13",last_seen_at:"2026-09-13" }));
   const rows = { special: { id:"special-1",mode:"special",room_slot:1,status:"lobby",host_user_id:"u0",player_count:count,
     current_turn_seat:null,started_at:null,game_state:{} }, classic: { id:"classic-1",mode:"classic",room_slot:1,status:"lobby",host_user_id:"u0",player_count:5 } };
   const client = {
     async rpc(name,p={}) {
       calls.push({name,p}); const mode=name.includes("special")?"special":"classic", row=rows[mode];
+      if (name==="act_trottl_special_game" && gameRPC) return gameRPC(p);
       const role=players.some(x=>x.user_id===userId)?"player":spectators.some(x=>x.user_id===userId)?"spectator":"none";
       if(name==="get_trottl_special_membership")return {data:[{membership_role:role,spectator_count:spectators.length}],error:null};
       if(name==="get_trottl_special_memberships")return {data:role==="none"?[]:[{session_id:rows.special.id,membership_role:role,room_slot:1}],error:null};
@@ -62,7 +63,7 @@ function harness(count=3) {
   for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
-  return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},service:win.trottlSpecialService};
+  return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},service:win.trottlSpecialService};
 }
 
 test("Classic and Special room one summaries are independent in both lobby and playing combinations",async()=>{
@@ -74,6 +75,126 @@ test("Classic and Special room one summaries are independent in both lobby and p
     assert.equal(a[0].status,classic);assert.equal(b[0].status,special);
     assert.equal(a[0].playerCount,5);assert.equal(b[0].playerCount,3);
   }
+});
+
+async function openGame(h, g) {
+  h.rows.special.status="playing"; h.rows.special.current_turn_seat=0;
+  h.rows.special.game_state={phase:"awaiting_roll",actor:"u0",actor_seat:0,roll_seq:4,revision:1,trottl:null,points:0,...g};
+  await h.ui.openRooms(); await flush(); h.doc.querySelector("#trottl-special-room-list").children[0].click(); await flush();
+}
+for (const lives of [0,1,2,3]) test(`Special renders three stable SVG hearts with ${lives} red hearts`,async()=>{
+  const h=harness(); Object.assign(h.players[1],{lives,lifecycle_status:lives===0?"critical":"alive",critical_used:lives===0});
+  await openGame(h,{});
+  const seat=h.doc.querySelector("#trottl-special-seat-layer").children[1];
+  assert.equal(seat.querySelector(".trottl-special-hearts").children.length,3);
+  assert.equal(seat.querySelectorAll(".is-live").length,lives);
+  assert.equal(seat.querySelectorAll("svg").length,3);
+});
+test("eliminated local member retains its exact seat, skull, hearts, but no DU or roll action",async()=>{
+  const h=harness(7);Object.assign(h.players[0],{lives:0,lifecycle_status:"eliminated",critical_used:true});
+  await openGame(h,{actor:"u1"});
+  const seats=h.doc.querySelector("#trottl-special-seat-layer").children;
+  assert.equal(seats.length,7); assert.equal(seats[0].dataset.lifecycle,"eliminated");
+  assert.ok(seats[0].querySelector(".trottl-special-skull"));
+  assert.equal(seats[0].querySelector(".trottl-classic-seat-self-marker"),null);
+  assert.equal(h.doc.querySelector(".fischteich-die").disabled,true);
+  assert.equal(h.doc.querySelector("#trottl-special-rule-controls").hidden,true);
+});
+test("hearts precede DU; critical rescue status uses existing statusbox",async()=>{
+  const h=harness();Object.assign(h.players[0],{lives:0,lifecycle_status:"critical",critical_used:true});
+  await openGame(h,{phase:"rescue_roll"});
+  const seat=h.doc.querySelector("#trottl-special-seat-layer").children[0];
+  assert.ok(seat.children.indexOf(seat.querySelector(".trottl-special-hearts"))<seat.children.indexOf(seat.querySelector(".trottl-classic-seat-self-marker")));
+  assert.equal(h.doc.querySelector("#trottl-special-event-copy").textContent,"MUSS EINE 6 WÜRFELN");
+  assert.equal(h.doc.querySelector("#trottl-special-event-action").textContent,"Letzte Chance!");
+});
+test("Trottl targets exclude critical/dead/self while drink targets include self and critical",async()=>{
+  const h=harness(4);Object.assign(h.players[1],{lives:0,lifecycle_status:"critical",critical_used:true});
+  Object.assign(h.players[2],{lives:0,lifecycle_status:"eliminated",critical_used:true});
+  await openGame(h,{phase:"choose_trottl"});
+  assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,1);
+  h.rows.special.game_state={...h.rows.special.game_state,phase:"distribution",total:2,drinks:{},revision:2};await h.ui.refresh();await flush();
+  assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,3);
+});
+test("early confirm flashes counter without sending any confirm intent",async()=>{
+  const h=harness();await openGame(h,{phase:"distribution",total:2,drinks:{}});
+  h.doc.querySelector("#trottl-special-four-confirm").click();await flush();
+  assert.ok(h.doc.querySelector("#trottl-special-action-progress").classList.contains("is-incomplete-hint"));
+  assert.equal(h.calls.filter(x=>x.name==="act_trottl_special_game").length,0);
+});
+test("optimistic queue serializes repeated self assignments; confirm waits for server and empty queue; reset clears distribution",async()=>{
+  const h=harness();let release;let inFlight=0,maxFlight=0;
+  h.setGameRPC(async p=>{
+    inFlight++;maxFlight=Math.max(maxFlight,inFlight);
+    if (!release && p.p_action==="assign") await new Promise(resolve=>{release=resolve;});
+    const g=h.rows.special.game_state;
+    if(p.p_action==="assign")g.drinks[p.p_target]=(g.drinks[p.p_target]??0)+1;
+    if(p.p_action==="reset")g.drinks={};
+    if(p.p_action==="confirm")g.phase="drink_ack";
+    g.revision++;inFlight--;return {data:"special-1",error:null};
+  });
+  await openGame(h,{phase:"distribution",total:2,drinks:{},acks:{}});
+  h.doc.querySelectorAll(".trottl-special-target")[0].click();await flush();
+  h.doc.querySelectorAll(".trottl-special-target")[0].click();await flush();
+  assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"2 / 2");
+  assert.ok(h.doc.querySelector("#trottl-special-four-confirm").classList.contains("is-incomplete"));
+  release();await flush();assert.equal(maxFlight,1);
+  assert.equal(h.rows.special.game_state.drinks.u0,2);
+  assert.equal(h.doc.querySelector("#trottl-special-four-confirm").classList.contains("is-incomplete"),false);
+  h.doc.querySelector("#trottl-special-four-reset").click();await flush();
+  assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"0 / 2");
+});
+for(const lifecycle of ["alive","critical","eliminated"]) test(`ACK visibility after life-state ${lifecycle} is based on server snapshot`,async()=>{
+ const h=harness();Object.assign(h.players[0],{lives:lifecycle==="alive"?1:0,lifecycle_status:lifecycle,critical_used:lifecycle!=="alive"});
+ await openGame(h,{phase:"drink_ack",actor:"u1",drinks:lifecycle==="eliminated"?{}:{u0:1},acks:{}});
+ assert.equal(h.doc.querySelector("#trottl-special-global-confirm").hidden,lifecycle==="eliminated");
+});
+test("reconnect renders server distribution, ACK and Trottl points without local authority",async()=>{
+ const h=harness();await openGame(h,{phase:"distribution",total:2,drinks:{u1:1},trottl:"u1",points:2});
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"1 / 2");
+ assert.equal(h.doc.querySelector(".trottl-classic-trottl-badge").textContent,"3ER 2/3");
+});
+const phaseSQL=read("supabase/migrations/20260913030000_add_trottl_special_phase_one.sql");
+const section=name=>phaseSQL.match(new RegExp(`create (?:or replace )?function public\\.${name}\\([\\s\\S]*?end; \\$\\$;`))[0];
+test("SQL structure: life engine decrements centrally, once-only critical, permanent elimination, zero-life Trottl reset",()=>{
+ const s=section("special_lose_life_locked");
+ assert.match(s,/lifecycle_status<>'alive' or v_player.lives<1/);
+ assert.match(s,/lives>1 then 'alive' when v_player.critical_used then 'eliminated' else 'critical'/);
+ assert.match(s,/lives=lives-1/);assert.match(s,/critical_used=critical_used or v_status='critical'/);
+ assert.match(s,/v_player.lives=1[\s\S]*'trottl',null,'points',0/);
+});
+test("SQL structure: rescue branches before ordinary rules, restores exactly one, failed rescue advances without events",()=>{
+ const s=section("act_trottl_special_game");
+ assert.match(s,/if coalesce\(\(g->>'rescue'\)::boolean,false\)[\s\S]*v_result=6[\s\S]*special_restore_life_locked[\s\S]*'phase','awaiting_roll'/);
+ assert.match(s,/lifecycle_status='eliminated'[\s\S]*special_advance_locked[\s\S]*return p_session_id;[\s\S]*elsif v_result in \(1,2\)/);
+ assert.match(section("special_restore_life_locked"),/set lives=1,lifecycle_status='alive'[\s\S]*lifecycle_status='critical' and lives=0 and critical_used/);
+});
+test("SQL structure: third-point A/B retain ACK, C waives ACK after central engine; peak visible before resolution",()=>{
+ const s=section("act_trottl_special_game");
+ const peak=s.slice(s.indexOf("if g->>'phase'='trottl_peak'"),s.indexOf("v_result:=(g->>'result')"));
+ assert.match(peak,/v_status:=public.special_lose_life_locked/);
+ assert.match(peak,/'points',0,'phase','drink_ack'/);
+ assert.match(peak,/if v_status='eliminated' then[\s\S]*'drinks','\{\}'::jsonb[\s\S]*special_advance_locked[\s\S]*return/);
+ assert.match(s,/integer=2 then 'trottl_peak'/);assert.match(s,/600 milliseconds/);
+});
+test("SQL structure: critical drink targets valid, Trottl targets alive only, transfer retains points",()=>{
+ const s=section("act_trottl_special_game");
+ assert.match(s,/v_used>=v_total[\s\S]*lifecycle_status in \('alive','critical'\)/);
+ const choose=s.slice(s.indexOf("elsif p_action='choose'"),s.indexOf("elsif p_action='ack'"));
+ assert.match(choose,/p_target=v_user/);assert.match(choose,/lifecycle_status='alive' and lives>0/);
+ assert.doesNotMatch(choose,/'points'/);
+ assert.match(section("special_validate_game_state"),/lifecycle_status='alive' and p.lives>0/);
+ assert.match(phaseSQL,/deferrable initially deferred/);
+});
+test("SQL structure: guarded authoritative randomness, atomic locks, sparse turn order, no Classic writes or finale",()=>{
+ assert.match(phaseSQL,/pg_advisory_xact_lock\(337734/);assert.match(phaseSQL,/for update/);
+ assert.match(phaseSQL,/p_roll_seq is distinct from v_seq/);assert.match(phaseSQL,/v_actor is distinct from v_user/);
+ assert.match(phaseSQL,/floor\(random\(\)\*6\)/);
+ assert.match(section("special_advance_locked"),/lifecycle_status in \('alive','critical'\)[\s\S]*seat_index>p_after/);
+ assert.doesNotMatch(phaseSQL,/(?:update|alter table|create or replace function) public\.trottl_classic/);
+ assert.match(phaseSQL,/revoke all on function public\.special_advance_locked/);
+ assert.match(phaseSQL,/grant execute on function public\.act_trottl_special_game/);
+ assert.doesNotMatch(phaseSQL,/winner|confetti|roulette/);
 });
 test("Realtime events use disjoint tables and mode/session channels",()=>{
   const h=harness();let a=0,b=0;
@@ -325,5 +446,5 @@ test("Classic code and stylesheet stay byte-identical to the finished current ma
     "classic-background-fit.js":"99c7395479f98673ab6a17299d6b54c8237038252569a23149ea19cce47b44b3"};
   for(const [f,hash]of Object.entries(hashes))assert.equal(crypto.createHash("sha256").update(read(f)).digest("hex"),hash,f);
   const css=read("trottl-special.css");
-  for(const selector of css.matchAll(/([^{}]+)\{/g))assert.ok(selector[1].includes("special")||selector[1].includes("@media"),selector[1]);
+  for(const selector of css.matchAll(/([^{}]+)\{/g))assert.ok(selector[1].includes("special")||selector[1].includes("@media")||/^\s*\d+%(?:,\s*\d+%)*\s*$/.test(selector[1]),selector[1]);
 });

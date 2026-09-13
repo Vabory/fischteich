@@ -46,23 +46,47 @@ begin
  begin execute p_sql;exception when others then if position(p_error in sqlerrm)=0 then raise; end if;return;end;
  raise exception 'Expected %: %',p_error,p_sql;
 end; $$;
+create function pg_temp.hunt_tap(p_id uuid,p_round uuid,p_number integer,p_elapsed bigint default null) returns uuid language plpgsql as $$
+declare v_input uuid:=gen_random_uuid();v_seq bigint;
+begin
+ select coalesce((game_state->'minigame'->'runs'->auth.uid()::text->>'input_seq')::bigint,0) into v_seq from public.trottl_special_sessions where id=p_id;
+ perform public.tap_trottl_special_number_hunt(p_id,p_round,p_number,p_elapsed,v_input,v_seq);
+ perform public.tap_trottl_special_number_hunt(p_id,p_round,p_number,p_elapsed,v_input,v_seq); -- Exact input retry is idempotent.
+ return p_id;
+end; $$;
+do $$ declare f jsonb;v_id uuid;r uuid;u uuid;before_run jsonb;g jsonb;start_value jsonb;
+begin
+ f:=pg_temp.hunt_prepare();v_id:=(f->>'id')::uuid;r:=(f->>'round')::uuid;u:=(f->'ids'->>0)::uuid;
+ update public.trottl_special_sessions set game_state=jsonb_set(game_state,'{minigame,start_at}',to_jsonb(clock_timestamp()-interval '10 seconds')) where id=v_id;
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ for n in 1..3 loop perform pg_temp.hunt_tap(v_id,r,n);end loop;
+ select game_state into g from public.trottl_special_sessions where id=v_id;
+ before_run:=g->'minigame'->'runs'->u::text;start_value:=g->'minigame'->'start_at';
+ perform pg_temp.hunt_tap(v_id,r,7);
+ select game_state into g from public.trottl_special_sessions where id=v_id;
+ if g->'minigame'->'runs'->u::text->>'progress'<>'0'
+  or g->'minigame'->'runs'->u::text->'board'<>before_run->'board'
+  or g->'minigame'->'start_at'<>start_value
+  or g->'minigame'->>'minigame_id'<>r::text then raise exception 'Reset changed board, clock or round'; end if;
+ perform pg_temp.hunt_tap(v_id,r,1);
+ if (select game_state->'minigame'->'runs'->u::text->>'progress' from public.trottl_special_sessions where id=v_id)<>'1' then raise exception 'Reset must restart at one'; end if;
+end; $$;
 do $$ declare f jsonb;v_id uuid;r uuid;ids uuid[];g jsonb;score bigint;all_tied boolean;seq bigint;
 begin
  foreach all_tied in array array[false,true] loop
   f:=pg_temp.hunt_prepare();v_id:=(f->>'id')::uuid;r:=(f->>'round')::uuid;seq:=(f->>'seq')::bigint;
   select array_agg(value::uuid order by ordinality) into ids from jsonb_array_elements_text(f->'ids') with ordinality;
-  perform pg_temp.hunt_error(format('select public.tap_trottl_special_number_hunt(%L,%L,1)',v_id,r),'SPECIAL_NUMBER_HUNT_NOT_STARTED');
-  perform pg_temp.hunt_error(format('select public.tap_trottl_special_number_hunt(%L,%L,1)',v_id,gen_random_uuid()),'SPECIAL_INVALID_NUMBER_HUNT_TAP');
+  perform pg_temp.hunt_error(format('select pg_temp.hunt_tap(%L,%L,1)',v_id,r),'SPECIAL_NUMBER_HUNT_NOT_STARTED');
+  perform pg_temp.hunt_error(format('select pg_temp.hunt_tap(%L,%L,1)',v_id,gen_random_uuid()),'SPECIAL_INVALID_NUMBER_HUNT_TAP');
   update public.trottl_special_sessions set game_state=jsonb_set(game_state,'{minigame,start_at}',to_jsonb(clock_timestamp()-interval '10 seconds')) where id=v_id;
   for i in 1..4 loop
    perform set_config('request.jwt.claim.sub',ids[i]::text,true);
-   perform public.tap_trottl_special_number_hunt(v_id,r,9,1000); -- Wrong order ignored.
+   perform pg_temp.hunt_tap(v_id,r,9,1000); -- Wrong order resets to zero without moving numbers.
    if (select game_state->'minigame'->'runs'->ids[i]::text->>'progress' from public.trottl_special_sessions where id=v_id)<>'0' then raise exception 'Wrong tap advanced'; end if;
-   for n in 1..8 loop perform public.tap_trottl_special_number_hunt(v_id,r,n);end loop;
-   perform public.tap_trottl_special_number_hunt(v_id,r,8); -- Retry idempotent.
-   perform pg_temp.hunt_error(format('select public.tap_trottl_special_number_hunt(%L,%L,9,-1)',v_id,r),'SPECIAL_INVALID_NUMBER_HUNT_TIME');
+   for n in 1..8 loop perform pg_temp.hunt_tap(v_id,r,n);end loop;
+   perform pg_temp.hunt_error(format('select pg_temp.hunt_tap(%L,%L,9,-1)',v_id,r),'SPECIAL_INVALID_NUMBER_HUNT_TIME');
    score:=case when all_tied then 1234 else 1000*i end;
-   perform public.tap_trottl_special_number_hunt(v_id,r,9,score);perform public.tap_trottl_special_number_hunt(v_id,r,9,score);
+   perform pg_temp.hunt_tap(v_id,r,9,score);
    select game_state into g from public.trottl_special_sessions where id=v_id;
    if i<4 and g->>'phase'<>'minigame_active' then raise exception 'Result before all finished'; end if;
   end loop;
@@ -92,8 +116,8 @@ begin
  select array_agg(value::uuid order by ordinality) into ids from jsonb_array_elements_text(f->'ids') with ordinality;
  update public.trottl_special_sessions set game_state=jsonb_set(game_state,'{minigame,start_at}',to_jsonb(clock_timestamp()-interval '10 seconds')) where id=v_id;
  for i in 1..3 loop
-  perform set_config('request.jwt.claim.sub',ids[i]::text,true);for n in 1..8 loop perform public.tap_trottl_special_number_hunt(v_id,r,n);end loop;
-  perform public.tap_trottl_special_number_hunt(v_id,r,9,1000*i);
+  perform set_config('request.jwt.claim.sub',ids[i]::text,true);for n in 1..8 loop perform pg_temp.hunt_tap(v_id,r,n);end loop;
+  perform pg_temp.hunt_tap(v_id,r,9,1000*i);
  end loop;
  perform set_config('request.jwt.claim.sub',ids[4]::text,true);perform public.leave_trottl_special_session(v_id);
  select game_state into g from public.trottl_special_sessions where id=v_id;
@@ -107,13 +131,13 @@ begin
  select array_agg(value::uuid order by ordinality) into ids from jsonb_array_elements_text(f->'ids') with ordinality;
  update public.trottl_special_sessions set game_state=jsonb_set(game_state,'{minigame,start_at}',to_jsonb(clock_timestamp()-interval '10 seconds')) where id=v_id;
  update public.trottl_special_players set lives=0,critical_used=true,lifecycle_status='critical' where session_id=v_id and user_id=ids[3];
- perform set_config('request.jwt.claim.sub',ids[3]::text,true);perform public.tap_trottl_special_number_hunt(v_id,r,1);
+ perform set_config('request.jwt.claim.sub',ids[3]::text,true);perform pg_temp.hunt_tap(v_id,r,1);
  if (select game_state->'minigame'->'runs'->ids[3]::text->>'progress' from public.trottl_special_sessions where id=v_id)<>'1' then raise exception 'Critical participant rejected'; end if;
  update public.trottl_special_players set lives=0,critical_used=true,lifecycle_status='eliminated' where session_id=v_id and user_id=ids[4];
  perform set_config('request.jwt.claim.sub',ids[4]::text,true);
- perform pg_temp.hunt_error(format('select public.tap_trottl_special_number_hunt(%L,%L,1)',v_id,r),'SPECIAL_INVALID_NUMBER_HUNT_TAP');
+ perform pg_temp.hunt_error(format('select pg_temp.hunt_tap(%L,%L,1)',v_id,r),'SPECIAL_INVALID_NUMBER_HUNT_TAP');
  delete from public.trottl_special_players where session_id=v_id and user_id=ids[4];insert into public.trottl_special_spectators(session_id,user_id) values(v_id,ids[4]);
- perform pg_temp.hunt_error(format('select public.tap_trottl_special_number_hunt(%L,%L,1)',v_id,r),'SPECIAL_INVALID_NUMBER_HUNT_TAP');
+ perform pg_temp.hunt_error(format('select pg_temp.hunt_tap(%L,%L,1)',v_id,r),'SPECIAL_INVALID_NUMBER_HUNT_TAP');
 end; $$;
 rollback to savepoint hunt_leave;
 set constraints all immediate;

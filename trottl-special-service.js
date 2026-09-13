@@ -131,8 +131,8 @@
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
       return loadSession(id);
     },
-    tapNumberHunt: async (id, roundId, number, elapsed = null) => {
-      await rpc("tap_trottl_special_number_hunt", { p_session_id: id, p_round_id: roundId, p_number: number, p_elapsed_ms: elapsed });
+    tapNumberHunt: async (id, roundId, number, elapsed = null, inputId = null, inputSeq = null) => {
+      await rpc("tap_trottl_special_number_hunt", { p_session_id: id, p_round_id: roundId, p_number: number, p_elapsed_ms: elapsed, p_input_id: inputId, p_input_seq: inputSeq });
       return loadSession(id);
     },
     submitPanic: async (id, roundId, count) => { await rpc("submit_trottl_special_panic", { p_session_id: id, p_round_id: roundId, p_tap_count: count }); return loadSession(id); },

@@ -94,7 +94,11 @@
 #trottl-special-session-screen .trottl-special-heart svg { display: block; width: 100%; height: 100%; }
 #trottl-special-session-screen .trottl-special-heart.is-live { color: #ef4b65; }
 #trottl-special-session-screen .trottl-classic-seat-self-marker { top: calc(100% + 5px + 0.75rem + 19px); }
-#trottl-special-session-screen [data-lifecycle="critical"] .trottl-special-heart { animation: trottl-special-critical 1.4s ease-in-out infinite; }
+#trottl-special-session-screen [data-lifecycle="critical"] .trottl-special-heart { animation: trottl-special-critical .55s ease-in-out infinite; filter: drop-shadow(0 0 1px #b82c43); }
+#trottl-special-session-screen [data-lifecycle="critical"] .trottl-special-heart:nth-child(2) { animation-delay: -.12s; }
+#trottl-special-session-screen [data-lifecycle="critical"] .trottl-special-heart:nth-child(3) { animation-delay: -.24s; }
+#trottl-special-session-screen .trottl-special-critical-badge { position: absolute; z-index: 5; top: -18px; left: 50%; transform: translateX(-50%); width: max-content; padding: 3px 6px; border: 1px solid #a92c43; border-radius: 999px; background: linear-gradient(180deg, #260e19, #09090d); box-shadow: 0 0 9px rgb(163 30 53 / 55%); color: #fff; font-size: .48rem; font-weight: 950; white-space: nowrap; pointer-events: none; }
+#trottl-special-session-screen .trottl-special-minigame-drinks { opacity: 1; color: #f4fcff; border-color: rgb(190 235 255 / 80%); background: rgb(5 12 23 / 96%); box-shadow: 0 0 10px rgb(135 216 255 / 60%); text-shadow: 0 0 8px rgb(200 239 255 / 32%); }
 #trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-classic-game-avatar,
 #trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-classic-seat-name,
 #trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-special-hearts { opacity: 0.42; }
@@ -102,7 +106,7 @@
 #trottl-special-session-screen .trottl-special-skull svg { width: 100%; height: 100%; }
 #trottl-special-session-screen .trottl-special-target { position: absolute; inset: -5px; z-index: 6; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgb(163 225 255 / 65%); background: transparent; }
 #trottl-special-session-screen .trottl-special-peak { animation: trottl-special-point-peak 600ms ease-out; }
-@keyframes trottl-special-critical { 0%, 100% { rotate: -5deg; } 50% { rotate: 5deg; } }
+@keyframes trottl-special-critical { 0%, 100% { transform: translateX(-2px) rotate(-12deg); } 50% { transform: translateX(2px) rotate(12deg); } }
 @keyframes trottl-special-point-peak { 50% { box-shadow: 0 0 16px #d9a6ff; } }
 
 #trottl-special-session-screen .trottl-special-minigame-results {
@@ -124,6 +128,15 @@
 #trottl-special-session-screen .trottl-special-minigame-results strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #trottl-special-session-screen .trottl-special-minigame-results .is-winner { color: #91efbd; }
 #trottl-special-session-screen .trottl-special-minigame-results .is-loser { color: #ff9aad; }
+#trottl-special-session-screen .trottl-special-result-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; min-width: 0; }
+#trottl-special-session-screen .trottl-special-result-identity strong { min-width: 0; max-width: 100%; }
+#trottl-special-session-screen .trottl-special-result-life-loss { color: #ff708b; font-size: .7rem; white-space: nowrap; }
+#trottl-special-session-screen .trottl-special-result-value { text-align: right; white-space: nowrap; }
+#trottl-special-session-screen .trottl-special-minigame-results.is-panic-result { display: flex; flex-direction: column; gap: 12px; bottom: auto; max-height: calc(100% - max(10px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)) - 145px); overflow: hidden; background: rgb(8 19 34 / 92%); }
+#trottl-special-session-screen .trottl-special-minigame-results.is-panic-result h2 { margin: 0; line-height: 1.3; }
+#trottl-special-session-screen .trottl-special-minigame-results.is-panic-result ol { min-height: 0; overflow-y: auto; margin: 0; flex: 0 1 auto; }
+#trottl-special-session-screen .trottl-special-panic-result-confirm { flex: 0 0 auto; width: 100%; min-height: 44px; padding: 10px; margin-top: auto; border: 1px solid rgb(116 242 178 / 76%); border-radius: 12px; background: linear-gradient(180deg, rgb(35 120 86 / 82%), rgb(11 68 54 / 88%)); color: #f4fcff; font-size: .72rem; font-weight: 900; }
+#trottl-special-session-screen .trottl-special-panic-result-confirm[hidden] { display: none; }
 #trottl-special-session-screen .trottl-special-minigame-result-toggle { position: absolute; z-index: 13; top: calc(max(10px, env(safe-area-inset-top)) + 82px); right: max(16px, env(safe-area-inset-right)); min-width: 44px; min-height: 32px; padding: 5px 10px; border: 1px solid rgb(185 223 245 / 35%); border-radius: 999px; background: rgb(8 19 34 / 85%); color: #f0f8ff; font-size: 0.7rem; }
 #trottl-special-session-screen .trottl-special-panic-area { position: absolute; z-index: 8; inset: calc(max(10px, env(safe-area-inset-top)) + 160px) 12px calc(max(12px, env(safe-area-inset-bottom)) + 105px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; color: #fff; text-shadow: 0 3px 12px #000; user-select: none; -webkit-user-select: none; }
 #trottl-special-session-screen .trottl-special-panic-area.is-tapping { pointer-events: auto; touch-action: none; }
@@ -169,6 +182,8 @@
 .trottl-special-number-hunt-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
 .trottl-special-number-hunt-board button { width: 100%; min-width: 44px; min-height: 48px; height: clamp(48px, 16vw, 72px); padding: 0; font-size: 26px; color: white; border: 1px solid rgb(255 255 255 / 35%); border-radius: 14px; background: linear-gradient(150deg, #294954, #172630); touch-action: manipulation; }
 .trottl-special-number-hunt-board button.is-done { opacity: .28; background: #197045; }
+.trottl-special-number-hunt-board.is-error-flash { animation: trottl-special-number-hunt-error 320ms ease-out; border-radius: 14px; }
+@keyframes trottl-special-number-hunt-error { 0%, 55% { outline: 2px solid #d12b45; box-shadow: 0 0 18px 5px rgb(196 26 52 / 75%); } 100% { outline: 2px solid transparent; box-shadow: 0 0 0 transparent; } }
 .trottl-special-minigame-done { box-shadow: 0 0 18px 4px rgb(48 215 125 / 90%); }
 .trottl-special-minigame-waiting { box-shadow: 0 0 18px 4px rgb(255 255 255 / 75%); }
 @media (prefers-reduced-motion: reduce) { .trottl-special-minigame-title { transition: none; } }

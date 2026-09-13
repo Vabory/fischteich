@@ -14,13 +14,16 @@
     const mount = q("dice-mount"), start = q("start");
     const state = { snapshot: null, rooms: [], busy: false, generation: 0, refreshPromise: null,
       refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null, spectatorRoom: null,
-      queue: [], processing: false, gameBusy: false, deadlineTimer: null, hintTimer: null, animatedKey: null, resultRound: null, resultOpen: false };
+      queue: [], processing: false, gameBusy: false, resolveFlight: null, resolveNotBefore: 0, deadlineTimer: null, hintTimer: null, animatedKey: null, resultRound: null, resultOpen: false };
     const dice = global.FischteichDice.mount({ mountPoint: mount, status: q("dice-status"), rollOnClick: false });
     const dieButton = mount.querySelector(".fischteich-die");
     const resultPanel = doc.createElement("section");
     resultPanel.className = "trottl-special-minigame-results"; resultPanel.hidden = true;
     resultPanel.setAttribute("aria-label", "Minigame-Ergebnis");
     resultPanel.innerHTML = '<h2>Minigame</h2><p></p><ol></ol>';
+    const panicConfirm = doc.createElement("button"); panicConfirm.type = "button";
+    panicConfirm.className = "trottl-special-panic-result-confirm"; panicConfirm.textContent = "✓ ERGEBNIS BESTÄTIGEN"; panicConfirm.hidden = true;
+    panicConfirm.addEventListener("click", () => void gameAction("results_ack")); resultPanel.append(panicConfirm);
     game.append(resultPanel);
     const resultToggle = doc.createElement("button");
     resultToggle.type = "button"; resultToggle.className = "trottl-special-minigame-result-toggle"; resultToggle.hidden = true;
@@ -31,7 +34,7 @@
       onResolve: () => gameAction("resolve"),
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } } });
     const roulette = global.TrottlSpecialRoulette?.create({ root: game, service,
-      onAction: (action, value) => void rouletteAction(action, value), onResolve: () => void gameAction("resolve") });
+      onAction: (action, value) => void rouletteAction(action, value), onResolve: () => gameAction("resolve") });
     const numberHunt = global.TrottlSpecialNumberHunt?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fortschritt wird erneut gespeichert."; void refresh(); } });
@@ -178,12 +181,14 @@
       const rewardTarget = rewardDock && ["attack", "transfer"].includes(r.reward);
       stage.dataset.playerCount = String(snapshot.players.length);
       stage.style.setProperty("--seat-avatar-target", `${preset.avatarSize}px`);
-      q("event-player").textContent = snapshot.players.find(p => p.userId === g.actor)?.displayName ?? "";
+      const ownWinner = playable && g.phase === "minigame_distribution" && g.minigame?.winners?.includes(local.userId) && distribution;
+      q("event-player").textContent = g.phase === "panic_results" || (g.phase === "minigame_distribution" && !ownWinner) ? ""
+        : snapshot.players.find(p => p.userId === (ownWinner ? local.userId : g.actor))?.displayName ?? "";
       const messages = { awaiting_roll: "IST AM ZUG", rescue_roll: "MUSS EINE 6 WÜRFELN", rolling: g.rescue ? "LETZTE CHANCE!" : "WÜRFELT …",
         distribution: `${g.total} ${g.total === 1 ? "Schluck" : "Schlücke"} verteilen`, choose_trottl: "3ER TROTTL WÄHLEN",
         drink_ack: "SCHLÜCKE BESTÄTIGEN", trottl_peak: "3/3 – EIN LEBEN VERLIEREN", placeholder: "Special-Regel folgt", awaiting_players: "KEIN SPIELBERECHTIGTER SPIELER",
         minigame_active: "MINIGAME LÄUFT", minigame_results: g.minigame?.draw ? "Unentschieden" : "MINIGAME-ERGEBNIS",
-        minigame_distribution: "GEWINNER VERTEILEN SCHLÜCKE", panic_active: "PANIK!", panic_results: g.minigame?.draw ? "PANIK – Unentschieden" : "PANIK – ERGEBNIS" };
+        minigame_distribution: "GEWINNER VERTEILEN SCHLÜCKE", panic_active: "PANIK!", panic_results: "PANIK – ERGEBNIS" };
       q("event-copy").textContent = g.phase?.startsWith("roulette_") ? g.phase === "roulette_choose_color" ? "RISIKO-ROULETTE – FARBE WÄHLEN" : g.phase === "roulette_spinning" ? "RISIKO-ROULETTE DREHT …" : "ROULETTE – REWARD / SHOTS" : messages[g.phase] ?? "SPIEL LÄUFT";
       q("event-roll").hidden = true; q("event-action").hidden = true; q("event-meta").hidden = true;
       if (g.phase === "rescue_roll") { q("event-action").hidden = false; q("event-action").textContent = "Letzte Chance!"; }
@@ -192,15 +197,20 @@
       resultToggle.textContent = state.resultOpen ? "Schließen" : "Ergebnis";
       resultToggle.setAttribute("aria-expanded", String(state.resultOpen));
       const showingResults = ["minigame_results", "panic_results"].includes(g.phase);
+      const isPanicResult = g.phase === "panic_results";
+      resultPanel.classList.toggle("is-panic-result", isPanicResult); panicConfirm.hidden = true;
       resultPanel.hidden = !(showingResults || (!resultToggle.hidden && state.resultOpen));
       if (!resultPanel.hidden) {
         const m = g.minigame;
-        resultPanel.querySelector("h2").textContent = m.title ?? m.minigame_type;
-        resultPanel.querySelector("p").textContent = m.all_tied ? "Alle gleich – alle Gewinner · je 2 Schlücke verteilen" : m.draw ? g.phase === "panic_results" ? "Unentschieden – kein Lebenverlust" : "Unentschieden – keine Schlücke" : showingResults ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
+        resultPanel.querySelector("h2").textContent = isPanicResult ? "Ergebnisse von Panik Event" : m.title ?? m.minigame_type;
+        resultPanel.querySelector("p").textContent = isPanicResult ? "" : m.all_tied ? "Alle gleich – alle Gewinner · je 2 Schlücke verteilen" : m.draw ? "Unentschieden – keine Schlücke" : showingResults ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
+        resultPanel.querySelector("p").hidden = isPanicResult;
         resultPanel.querySelector("ol").replaceChildren(...(m.results ?? []).map(row => {
           const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
           const item = node("li", row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : "");
-          item.append(node("span", "", String(row.rank)), node("strong", "", name), node("span", "", `${row.display_value}${row.life_loss === 1 ? " · −1 Leben" : ""}`));
+          const identity = node("span", "trottl-special-result-identity"); identity.append(node("strong", "", name));
+          if (row.life_loss === 1) identity.append(node("small", "trottl-special-result-life-loss", "−1 Leben"));
+          item.append(node("span", "", String(row.rank)), identity, node("span", "trottl-special-result-value", row.display_value));
           item.setAttribute("aria-label", `${row.rank}. ${name}: ${row.display_value}${row.is_winner ? ", Gewinner" : row.is_loser ? ", Verlierer" : ""}`);
           return item;
         }));
@@ -239,12 +249,13 @@
           skull.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2C2 2 1 15 6 17v5h12v-5C23 15 22 2 12 2Z"/><circle cx="8" cy="11" r="2" fill="#121820"/><circle cx="16" cy="11" r="2" fill="#121820"/><path d="m12 14-2 3h4Z" fill="#121820"/></svg>';
           wrap.append(skull);
         }
+        if (player.lifecycle === "critical") wrap.append(node("span", "trottl-special-critical-badge", "LETZTE CHANCE!"));
         if (g.trottl === player.userId) {
           const badge = node("span", `trottl-classic-trottl-badge${g.phase === "trottl_peak" ? " trottl-special-peak" : ""}`, `3ER ${g.points}/3`);
           wrap.append(badge);
         }
         const amount = Number(g.drinks?.[player.userId] ?? 0);
-        if (amount > 0) seat.append(node("span", "trottl-classic-seat-status-overlay", `${amount} ${amount === 1 ? "Schluck" : "Schlücke"}${g.acks?.[player.userId] ? " ✓" : ""}`));
+        if (amount > 0) seat.append(node("span", `trottl-classic-seat-status-overlay${g.minigame ? " trottl-special-minigame-drinks" : ""}`, `${amount} ${amount === 1 ? "Schluck" : "Schlücke"}${g.acks?.[player.userId] ? " ✓" : ""}`));
         if (rouletteActive && r.shots?.[player.userId]) seat.append(node("span", "trottl-classic-seat-status-overlay", `1 Shot${r.shot_acks?.[player.userId] ? " ✓" : ""}`));
         if (rouletteActive && r.target === player.userId) seat.append(node("span", "trottl-special-roulette-selected-target", "Ziel ✓"));
         if ((distributing && player.lifecycle !== "eliminated") || ((choosing || rewardTarget) && player.lifecycle === "alive" && player.lives > 0 && !self)) {
@@ -265,13 +276,16 @@
       const progress = q("action-progress"), reset = q("four-reset"), confirm = q("four-confirm"), ack = q("global-confirm");
       progress.hidden = reset.hidden = confirm.hidden = !distributing;
       const resultAck = playable && showingResults && g.minigame.participants.some(p => p.player_id === local.userId) && !g.minigame.result_seen?.[local.userId];
+      panicConfirm.hidden = !(isPanicResult && resultAck); panicConfirm.disabled = state.gameBusy;
       ack.hidden = !(resultAck || (playable && g.phase === "drink_ack" && Number(g.drinks?.[local.userId]) > 0 && !g.acks?.[local.userId]));
       const received = Number(g.drinks?.[local?.userId] ?? 0);
       ack.textContent = resultAck ? "ERGEBNIS BESTÄTIGEN" : `${received} ${received === 1 ? "SCHLUCK" : "SCHLÜCKE"} BESTÄTIGEN`;
       ack.disabled = state.gameBusy;
+      if (isPanicResult) ack.hidden = true;
       if (!ack.hidden) q("rule-controls").classList.add("has-confirm-action");
       if (distributing) {
         q("rule-controls").classList.add("has-four-actions");
+        if (g.phase === "minigame_distribution") q("rule-controls").classList.add("has-actions");
         const count = distributionCount();
         q("action-progress-value").textContent = `${count} / ${distribution.total}`;
         progress.querySelector("span").textContent = distribution.total === 1 ? "Schluck verteilt" : "Schlücke verteilt";
@@ -303,9 +317,13 @@
         }
       }
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
-      if (["rolling", "trottl_peak", "placeholder"].includes(g.phase)) {
+      if (["rolling", "trottl_peak", "placeholder"].includes(g.phase) && !state.resolveFlight) {
         const generation = state.generation;
-        state.deadlineTimer = global.setTimeout(() => { if (generation === state.generation && !session.hidden) void gameAction("resolve"); }, Math.max(40, Date.parse(g.deadline) - Date.now() + 30));
+        const id = snapshot.session.id, seq = g.roll_seq, phase = g.phase;
+        state.deadlineTimer = global.setTimeout(() => {
+          const current = state.snapshot;
+          if (generation === state.generation && !session.hidden && current?.session.id === id && current.session.gameState.roll_seq === seq && current.session.gameState.phase === phase) void gameAction("resolve");
+        }, Math.max(40, state.resolveNotBefore - Date.now(), Date.parse(g.deadline) - (service.serverNow() ?? Date.now()) + 30));
       }
       panic?.update(snapshot);
       roulette?.update(snapshot, state.gameBusy);
@@ -331,16 +349,31 @@
     async function gameAction(action, target = null) {
       if (!state.snapshot || (action !== "resolve" && state.gameBusy)) return;
       const snapshot = state.snapshot, generation = state.generation;
+      const automatic = action === "resolve";
+      if (automatic && (state.resolveFlight || Date.now() < state.resolveNotBefore || !["rolling", "trottl_peak", "placeholder", "panic_active", "roulette_spinning"].includes(snapshot.session.gameState.phase))) return;
       if (action !== "resolve" && (snapshot.membershipRole !== "player" || !snapshot.players.some(p => p.userId === snapshot.identity.userId && ["alive", "critical"].includes(p.lifecycle)))) return;
-      if (action !== "resolve") state.gameBusy = true;
-      renderSession();
+      const flight = {}; if (automatic) { state.resolveFlight = flight; global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null; }
+      else { state.gameBusy = true; renderSession(); }
       try {
         const next = await service.actGame(snapshot.session.id, action, Number(snapshot.session.gameState.roll_seq ?? 0), target);
-        if (generation === state.generation) acceptSnapshot(next);
+        if (generation === state.generation) { acceptSnapshot(next); q("game-feedback").textContent = ""; }
       } catch (error) {
-        if (generation === state.generation) q("game-feedback").textContent = "Aktion nicht übernommen. Spielstand wird aktualisiert.";
-        void refresh();
-      } finally { if (generation === state.generation) { state.gameBusy = false; renderSession(); } }
+        if (generation === state.generation) {
+          await refresh();
+          const current = state.snapshot;
+          const advanced = current?.session.id === snapshot.session.id && (current.session.gameState.roll_seq !== snapshot.session.gameState.roll_seq || current.session.gameState.phase !== snapshot.session.gameState.phase);
+          const g = current?.session.gameState, uid = snapshot.identity.userId;
+          const applied = current?.session.id === snapshot.session.id && ((automatic && advanced)
+            || (action === "results_ack" && g.minigame?.result_seen?.[uid] === true)
+            || (action === "ack" && g.acks?.[uid] === true)
+            || (action === "confirm" && g.minigame?.distributions?.[uid]?.confirmed === true));
+          // A concurrent device already resolved the captured turn: reconcile, not a failed user action.
+          q("game-feedback").textContent = applied ? "" : "Aktion nicht übernommen. Spielstand wird aktualisiert.";
+        }
+      } finally {
+        if (state.resolveFlight === flight) state.resolveFlight = null;
+        if (generation === state.generation) { if (automatic) state.resolveNotBefore = Date.now() + 500; else state.gameBusy = false; renderSession(); }
+      }
     }
     function enqueueGame(action, target = null) {
       const g = state.snapshot?.session.gameState;
@@ -462,6 +495,7 @@
     async function openSnapshot(snapshot) {
       if (snapshot.membershipRole === "none" || snapshot.session.status === "finished") { await openRooms(); return; }
       ++state.generation; await stopConnection(); state.snapshot = snapshot;
+      state.resolveFlight = null; state.resolveNotBefore = 0; q("game-feedback").textContent = "";
       state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       try { global.localStorage.setItem("fischteich:trottl-special-session", snapshot.session.id); } catch {}
       rememberMode("special"); showScreen(session); renderSession(); connect();
@@ -471,6 +505,7 @@
     async function openRooms() {
       if (state.busy) return;
       ++state.generation; await stopConnection(); closeModal(); state.snapshot = null;
+      state.resolveFlight = null; state.resolveNotBefore = 0;
       state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       rememberMode("special"); showScreen(rooms); q("room-feedback").textContent = "Räume werden geladen …";
       connect(); void refresh(); doc.querySelector("#close-trottl-special-rooms").focus();

@@ -136,3 +136,25 @@
   #trottl-special-session-screen .trottl-special-heart,
   #trottl-special-session-screen .trottl-special-peak { animation: none; }
 }
+/* Own horizontal Fisch Roulette-style presentation. Overlay, never a seat-layout child. */
+.trottl-special-roulette { position: absolute; z-index: 10; top: calc(env(safe-area-inset-top, 0px) + 145px); left: 12px; right: 12px; pointer-events: none; min-width: 0; }
+.trottl-special-roulette[hidden], .trottl-special-roulette [hidden] { display: none; }
+.trottl-special-roulette.has-reward-selection .trottl-special-roulette-window { display: none; }
+.trottl-special-roulette-window { position: relative; height: 124px; overflow: hidden; border-block: 1px solid rgb(255 255 255 / 22%); background: rgb(0 0 0 / 24%); box-shadow: inset 0 0 36px rgb(0 0 0 / 48%); }
+.trottl-special-roulette-window::before, .trottl-special-roulette-window::after { position: absolute; z-index: 2; top: 0; bottom: 0; width: 18%; content: ""; pointer-events: none; }
+.trottl-special-roulette-window::before { left: 0; background: linear-gradient(90deg, #080b18, transparent); }
+.trottl-special-roulette-window::after { right: 0; background: linear-gradient(-90deg, #080b18, transparent); }
+.trottl-special-roulette-marker { position: absolute; z-index: 4; top: 0; bottom: 0; left: 50%; width: 4px; background: white; box-shadow: 0 0 15px white; transform: translateX(-50%); }
+.trottl-special-roulette-marker::before { position: absolute; top: 0; left: 50%; border-top: 14px solid white; border-right: 9px solid transparent; border-left: 9px solid transparent; content: ""; transform: translateX(-50%); }
+.trottl-special-roulette-strip { position: absolute; top: 18px; left: 50%; display: flex; gap: 3px; will-change: transform; }
+.trottl-special-roulette-tile { flex: 0 0 78px; height: 88px; display: grid; place-items: center; border-radius: 12px; color: white; font-size: 11px; font-weight: 800; box-shadow: inset 0 0 15px rgb(255 255 255 / 12%); }
+.trottl-special-roulette-tile[data-color="RED"], .trottl-special-roulette-colors button[data-value="RED"] { background: #a42530; }
+.trottl-special-roulette-tile[data-color="BLACK"], .trottl-special-roulette-colors button[data-value="BLACK"] { background: #171c27; }
+.trottl-special-roulette-tile[data-color="GREEN"], .trottl-special-roulette-colors button[data-value="GREEN"] { background: #197045; }
+.trottl-special-roulette p { margin: 6px 0; text-align: center; color: white; font-weight: 800; text-shadow: 0 2px 5px black; }
+.trottl-special-roulette-colors, .trottl-special-roulette-rewards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.trottl-special-roulette button { pointer-events: auto; width: 100%; min-width: 0; min-height: 44px; padding: 6px; font-size: 11px; color: white; background: rgb(20 32 44 / 94%); border: 1px solid rgb(255 255 255 / 35%); border-radius: 12px; overflow-wrap: anywhere; }
+.trottl-special-roulette button:disabled { cursor: default; }
+.trottl-special-roulette-rewards button:disabled, .trottl-special-roulette button.is-dimmed { opacity: .48; }
+.trottl-special-roulette button.is-selected { opacity: 1; border-color: white; box-shadow: 0 0 12px rgb(255 255 255 / 75%); }
+.trottl-special-roulette-selected-target { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 6px; background: #197045; border-radius: 8px; font-size: 10px; color: white; pointer-events: none; }

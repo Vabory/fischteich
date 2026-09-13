@@ -30,6 +30,8 @@
     const panic = global.TrottlSpecialPanic?.create({ root: session, service,
       onResolve: () => gameAction("resolve"),
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } } });
+    const roulette = global.TrottlSpecialRoulette?.create({ root: game, service,
+      onAction: (action, value) => void rouletteAction(action, value), onResolve: () => void gameAction("resolve") });
     // Results and transitions come exclusively from the Special intent RPC.
     dieButton.disabled = true;
     dieButton.setAttribute("aria-label", "Special-Würfel werfen");
@@ -168,6 +170,9 @@
       const distribution = playable ? service.getGameDistribution(g, snapshot.identity.userId) : null;
       const distributing = Boolean(distribution);
       const choosing = actor && g.phase === "choose_trottl";
+      const r = g.roulette, rouletteActive = g.phase === "roulette_settlement";
+      const rewardDock = actor && rouletteActive && r?.reward && !r.reward_done;
+      const rewardTarget = rewardDock && ["attack", "transfer"].includes(r.reward);
       stage.dataset.playerCount = String(snapshot.players.length);
       stage.style.setProperty("--seat-avatar-target", `${preset.avatarSize}px`);
       q("event-player").textContent = snapshot.players.find(p => p.userId === g.actor)?.displayName ?? "";
@@ -176,7 +181,7 @@
         drink_ack: "SCHLÜCKE BESTÄTIGEN", trottl_peak: "3/3 – EIN LEBEN VERLIEREN", placeholder: "Special-Regel folgt", awaiting_players: "KEIN SPIELBERECHTIGTER SPIELER",
         minigame_active: "MINIGAME LÄUFT", minigame_results: g.minigame?.draw ? "Unentschieden" : "MINIGAME-ERGEBNIS",
         minigame_distribution: "GEWINNER VERTEILEN SCHLÜCKE", panic_active: "PANIK!", panic_results: g.minigame?.draw ? "PANIK – Unentschieden" : "PANIK – ERGEBNIS" };
-      q("event-copy").textContent = messages[g.phase] ?? "SPIEL LÄUFT";
+      q("event-copy").textContent = g.phase?.startsWith("roulette_") ? g.phase === "roulette_choose_color" ? "RISIKO-ROULETTE – FARBE WÄHLEN" : g.phase === "roulette_spinning" ? "RISIKO-ROULETTE DREHT …" : "ROULETTE – REWARD / SHOTS" : messages[g.phase] ?? "SPIEL LÄUFT";
       q("event-roll").hidden = true; q("event-action").hidden = true; q("event-meta").hidden = true;
       if (g.phase === "rescue_roll") { q("event-action").hidden = false; q("event-action").textContent = "Letzte Chance!"; }
       if (state.resultRound !== g.minigame?.minigame_id) { state.resultRound = g.minigame?.minigame_id ?? null; state.resultOpen = false; }
@@ -234,12 +239,15 @@
         }
         const amount = Number(g.drinks?.[player.userId] ?? 0);
         if (amount > 0) seat.append(node("span", "trottl-classic-seat-status-overlay", `${amount} ${amount === 1 ? "Schluck" : "Schlücke"}${g.acks?.[player.userId] ? " ✓" : ""}`));
-        if ((distributing && player.lifecycle !== "eliminated") || (choosing && player.lifecycle === "alive" && player.lives > 0 && !self)) {
+        if (rouletteActive && r.shots?.[player.userId]) seat.append(node("span", "trottl-classic-seat-status-overlay", `1 Shot${r.shot_acks?.[player.userId] ? " ✓" : ""}`));
+        if (rouletteActive && r.target === player.userId) seat.append(node("span", "trottl-special-roulette-selected-target", "Ziel ✓"));
+        if ((distributing && player.lifecycle !== "eliminated") || ((choosing || rewardTarget) && player.lifecycle === "alive" && player.lives > 0 && !self)) {
           const target = button("trottl-special-target", "", () => {
             if (distributing) enqueueGame("assign", player.userId);
+            else if (rewardTarget) void rouletteAction("target", null, player.userId);
             else void gameAction("choose", player.userId);
           }, state.gameBusy);
-          target.setAttribute("aria-label", `${player.displayName}: ${distributing ? "Schluck zuweisen" : "Trottl wählen"}`);
+          target.setAttribute("aria-label", `${player.displayName}: ${distributing ? "Schluck zuweisen" : rewardTarget ? "Reward-Ziel wählen" : "Trottl wählen"}`);
           seat.append(target);
         }
         if (self) seat.append(node("small", "trottl-classic-seat-self-marker", "DU"));
@@ -265,6 +273,20 @@
         confirm.classList.toggle("is-ready-impact", count === distribution.total && state.queue.length === 0 && !state.processing);
         confirm.disabled = state.gameBusy; reset.disabled = state.gameBusy || count === 0;
       }
+      if (rouletteActive) {
+        const shotAck = playable && r.shots?.[local?.userId] && !r.shot_acks?.[local?.userId];
+        ack.hidden = !shotAck; ack.textContent = "1 SHOT BESTÄTIGEN";
+        if (shotAck) q("rule-controls").classList.add("has-confirm-action");
+        if (rewardDock) {
+          q("rule-controls").classList.add("has-four-actions");
+          progress.hidden = reset.hidden = confirm.hidden = false;
+          const complete = r.reward === "heal" || Boolean(r.target);
+          q("action-progress-value").textContent = r.reward === "heal" ? "+1 Leben" : `${complete ? 1 : 0} / 1`;
+          progress.querySelector("span").textContent = r.reward === "heal" ? "Wiederherstellen" : "Spieler gewählt";
+          confirm.classList.toggle("is-incomplete", !complete); confirm.classList.toggle("is-ready-impact", complete);
+          confirm.disabled = reset.disabled = state.gameBusy;
+        }
+      }
       dieButton.disabled = !actor || !["awaiting_roll", "rescue_roll"].includes(g.phase) || state.gameBusy;
       if (g.last_roll) {
         const key = `${snapshot.session.id}:${g.last_roll_seq}`;
@@ -280,12 +302,24 @@
         state.deadlineTimer = global.setTimeout(() => { if (generation === state.generation && !session.hidden) void gameAction("resolve"); }, Math.max(40, Date.parse(g.deadline) - Date.now() + 30));
       }
       panic?.update(snapshot);
+      roulette?.update(snapshot, state.gameBusy);
     }
     function distributionCount() {
       const distribution = state.snapshot ? service.getGameDistribution(state.snapshot.session.gameState, state.snapshot.identity.userId) : null;
       let count = Object.values(distribution?.drinks ?? {}).reduce((sum, n) => sum + Number(n), 0);
       for (const action of state.queue) count = action.action === "reset" ? 0 : count + 1;
       return count;
+    }
+    async function rouletteAction(action, value = null, target = null) {
+      const snapshot = state.snapshot, generation = state.generation;
+      if (!snapshot || state.gameBusy || !snapshot.session.gameState.phase?.startsWith("roulette_") || snapshot.membershipRole !== "player") return;
+      state.gameBusy = true; renderSession();
+      try {
+        const next = await service.actRoulette(snapshot.session.id, snapshot.session.gameState.roulette.round_id, action, value, target);
+        if (generation === state.generation) acceptSnapshot(next);
+      } catch (error) {
+        if (generation === state.generation) { q("game-feedback").textContent = "Aktion nicht übernommen. Serverstand wird geladen."; void refresh(); }
+      } finally { if (generation === state.generation) { state.gameBusy = false; renderSession(); } }
     }
     async function gameAction(action, target = null) {
       if (!state.snapshot || (action !== "resolve" && state.gameBusy)) return;
@@ -395,6 +429,7 @@
     }
     async function stopConnection() {
       panic?.suspend();
+      roulette?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearInterval(state.timer); state.timer = null;
       global.clearTimeout(state.retryTimer); state.retryTimer = null;
@@ -510,9 +545,17 @@
       }
     });
     dieButton.addEventListener("click", () => void gameAction("roll"));
-    q("four-reset").addEventListener("click", () => enqueueGame("reset"));
+    q("four-reset").addEventListener("click", () => state.snapshot?.session.gameState.phase === "roulette_settlement" ? void rouletteAction("undo") : enqueueGame("reset"));
     q("four-confirm").addEventListener("click", () => {
       const g = state.snapshot?.session.gameState;
+      if (g?.phase === "roulette_settlement") {
+        if (g.roulette.reward === "heal" || g.roulette.target) void rouletteAction("confirm");
+        else {
+          q("action-progress").classList.add("is-incomplete-hint"); global.clearTimeout(state.hintTimer);
+          state.hintTimer = global.setTimeout(() => q("action-progress").classList.remove("is-incomplete-hint"), 400);
+        }
+        return;
+      }
       const distribution = g ? service.getGameDistribution(g, state.snapshot.identity.userId) : null;
       if (!distribution) return;
       const serverCount = Object.values(distribution.drinks).reduce((sum, n) => sum + Number(n), 0);
@@ -522,7 +565,7 @@
         state.hintTimer = global.setTimeout(() => q("action-progress").classList.remove("is-incomplete-hint"), 400);
       } else void gameAction("confirm");
     });
-    q("global-confirm").addEventListener("click", () => void gameAction(["minigame_results", "panic_results"].includes(state.snapshot?.session.gameState.phase) ? "results_ack" : "ack"));
+    q("global-confirm").addEventListener("click", () => state.snapshot?.session.gameState.phase === "roulette_settlement" ? void rouletteAction("shot_ack") : void gameAction(["minigame_results", "panic_results"].includes(state.snapshot?.session.gameState.phase) ? "results_ack" : "ack"));
     cancelStart.addEventListener("click", closeModal);
     cancelSpectator.addEventListener("click", closeModal);
     confirmSpectator.addEventListener("click", async () => {

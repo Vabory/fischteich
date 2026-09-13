@@ -127,6 +127,10 @@
   global.trottlSpecialService = Object.freeze({
     mode: MODE, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, tables,
     ensureIdentity, normalizeSession, getGameDistribution, serverNow, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    actRoulette: async (id, roundId, action, value = null, target = null) => {
+      await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
+      return loadSession(id);
+    },
     submitPanic: async (id, roundId, count) => { await rpc("submit_trottl_special_panic", { p_session_id: id, p_round_id: roundId, p_tap_count: count }); return loadSession(id); },
     actGame: async (id, action, rollSeq, target = null) => {
       await rpc("act_trottl_special_game", { p_session_id: id, p_action: action, p_roll_seq: rollSeq, p_target: target });

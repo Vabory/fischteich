@@ -12,7 +12,7 @@ const flush = async () => { for (let i=0; i<8; i++) await new Promise(resolve =>
 
 function harness(count=3) {
   const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[];
-  let userId = "u0", gameRPC = null;
+  let userId = "u0", gameRPC = null, rouletteRPC = null;
   const players = Array.from({length:count}, (_,seat_index) => ({ session_id:"special-1",user_id:`u${seat_index}`,
     seat_index,display_name_snapshot:`Spieler ${seat_index}`,avatar_id:"turbo-lachs",is_ready:true,lives:3,lifecycle_status:"alive",critical_used:false,joined_at:"2026-09-13",last_seen_at:"2026-09-13" }));
   const rows = { special: { id:"special-1",mode:"special",room_slot:1,status:"lobby",host_user_id:"u0",player_count:count,
@@ -21,6 +21,7 @@ function harness(count=3) {
     async rpc(name,p={}) {
       calls.push({name,p}); const mode=name.includes("special")?"special":"classic", row=rows[mode];
       if (name==="act_trottl_special_game" && gameRPC) return gameRPC(p);
+      if (name==="act_trottl_special_roulette" && rouletteRPC) return rouletteRPC(p);
       const role=players.some(x=>x.user_id===userId)?"player":spectators.some(x=>x.user_id===userId)?"spectator":"none";
       if(name==="get_trottl_special_membership")return {data:[{membership_role:role,spectator_count:spectators.length}],error:null};
       if(name==="get_trottl_special_memberships")return {data:role==="none"?[]:[{session_id:rows.special.id,membership_role:role,room_slot:1}],error:null};
@@ -60,10 +61,10 @@ function harness(count=3) {
   const context=vm.createContext({window:win,document:doc,console,supabaseClient:client,
     getLocalIdentity:()=>({displayName:"Spieler 0",deviceId:"device"}),initializeAppAuth:async()=>{},
     syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0"}})});
-  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
+  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-roulette.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
-  return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},service:win.trottlSpecialService};
+  return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},service:win.trottlSpecialService};
 }
 
 test("Classic and Special room one summaries are independent in both lobby and playing combinations",async()=>{
@@ -75,6 +76,82 @@ test("Classic and Special room one summaries are independent in both lobby and p
     assert.equal(a[0].status,classic);assert.equal(b[0].status,special);
     assert.equal(a[0].playerCount,5);assert.equal(b[0].playerCount,3);
   }
+});
+
+function rouletteFixture(overrides={}) {
+ return {round_id:"r1",chosen_color:"RED",result_color:"RED",reward:null,target:null,reward_done:false,
+  available:{attack:true,heal:false,transfer:false},shots:{},shot_acks:{},end_offset:-3522,...overrides};
+}
+test("roulette actor color selection sends only server intent and preserves all seat geometry",async()=>{
+ const h=harness(7);await openGame(h,{});
+ const geometry=()=>h.doc.querySelector("#trottl-special-seat-layer").children.map(x=>[x.style["--seat-left"],x.style["--seat-top"]]);
+ const before=geometry(),bg=h.doc.querySelector("#trottl-special-session-background").src;
+ h.rows.special.game_state={...h.rows.special.game_state,phase:"roulette_choose_color",roulette:rouletteFixture({chosen_color:null,result_color:null}),revision:2};await h.ui.refresh();await flush();
+ assert.deepEqual(geometry(),before);assert.equal(h.doc.querySelector("#trottl-special-session-background").src,bg);
+ const b=h.doc.querySelector(".trottl-special-roulette-colors").children;assert.equal(b.length,3);assert.ok(b.every(x=>!x.disabled));
+ b[0].click();await flush();const call=h.calls.find(x=>x.name==="act_trottl_special_roulette");
+ assert.deepEqual({...call.p},{p_session_id:"special-1",p_round_id:"r1",p_action:"color",p_value:"RED",p_target:null});
+ assert.equal(h.doc.querySelector(".fischteich-die").disabled,true);
+});
+for(const who of ["other","spectator","eliminated"])test(`roulette selection and reward are readonly for ${who}`,async()=>{
+ const h=harness();if(who==="other")h.setUser("u1");
+ if(who==="spectator"){h.setUser("watch");h.spectators.push({user_id:"watch",session_id:"special-1"});}
+ if(who==="eliminated")Object.assign(h.players[0],{lives:0,lifecycle_status:"eliminated",critical_used:true});
+ await openGame(h,{phase:"roulette_choose_color",roulette:rouletteFixture({chosen_color:null,result_color:null})});
+ assert.ok(h.doc.querySelector(".trottl-special-roulette-colors").children.every(b=>b.disabled));
+ h.rows.special.game_state={...h.rows.special.game_state,phase:"roulette_settlement",roulette:rouletteFixture(),revision:2};await h.ui.refresh();await flush();
+ assert.equal(h.doc.querySelector(".trottl-special-roulette-rewards").children.length,3);
+ assert.ok(h.doc.querySelector(".trottl-special-roulette-rewards").children.every(b=>b.disabled));
+ assert.equal(h.doc.querySelector("#trottl-special-rule-controls").querySelectorAll(".trottl-special-target").length,0);
+});
+test("roulette reward cards remain visible, disabled availability and selected color follow server snapshot",async()=>{
+ const h=harness();await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture()});
+ const cards=h.doc.querySelector(".trottl-special-roulette-rewards").children;
+ assert.deepEqual(cards.map(b=>b.disabled),[false,true,true]);cards[0].click();await flush();
+ assert.equal(h.calls.find(x=>x.name==="act_trottl_special_roulette").p.p_action,"reward");
+ const colors=h.doc.querySelector(".trottl-special-roulette-colors").children;
+ assert.ok(colors[0].classList.contains("is-selected"));assert.ok(colors[1].classList.contains("is-dimmed"));
+});
+test("roulette target dock excludes self/critical/dead, early confirm flashes, and target click never confirms",async()=>{
+ const h=harness(4);Object.assign(h.players[1],{lives:0,lifecycle_status:"critical",critical_used:true});
+ Object.assign(h.players[2],{lives:0,lifecycle_status:"eliminated",critical_used:true});
+ await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({reward:"attack"})});
+ assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,1);
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"0 / 1");
+ h.doc.querySelector("#trottl-special-four-confirm").click();await flush();
+ assert.ok(h.doc.querySelector("#trottl-special-action-progress").classList.contains("is-incomplete-hint"));
+ assert.equal(h.calls.filter(x=>x.name==="act_trottl_special_roulette").length,0);
+ h.doc.querySelector(".trottl-special-target").click();await flush();
+ const call=h.calls.find(x=>x.name==="act_trottl_special_roulette");assert.equal(call.p.p_action,"target");assert.equal(call.p.p_target,"u3");
+ assert.ok(h.players.every(p=>p.lives===(p.user_id==="u1"||p.user_id==="u2"?0:3)));
+});
+for(const reward of ["attack","transfer","heal"])test(`roulette restores pending ${reward}, confirm and undo use own event RPC`,async()=>{
+ const h=harness();await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({reward,target:reward==="heal"?null:"u1"})});
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,reward==="heal"?"+1 Leben":"1 / 1");
+ h.doc.querySelector("#trottl-special-four-confirm").click();await flush();
+ h.doc.querySelector("#trottl-special-four-reset").click();await flush();
+ assert.deepEqual(h.calls.filter(x=>x.name==="act_trottl_special_roulette").map(x=>x.p.p_action),["confirm","undo"]);
+ assert.equal(h.calls.filter(x=>x.name==="act_trottl_special_game").length,0);
+});
+for(const life of ["alive","critical","eliminated"])test(`green shot ACK is own-only and lifecycle-gated: ${life}`,async()=>{
+ const h=harness();h.setUser("u1");if(life!=="alive")Object.assign(h.players[1],{lifecycle_status:life,lives:0,critical_used:true});
+ await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({chosen_color:"GREEN",result_color:"GREEN",shots:{u1:1,u2:1}})});
+ const ack=h.doc.querySelector("#trottl-special-global-confirm");assert.equal(ack.hidden,life==="eliminated");
+ assert.equal(h.doc.querySelectorAll(".trottl-classic-seat-status-overlay").length,2);
+ if(life!=="eliminated"){ack.click();await flush();assert.equal(h.calls.find(x=>x.name==="act_trottl_special_roulette").p.p_action,"shot_ack");}
+});
+test("confirmed roulette reward leaves other players' outstanding shots available on reconnect",async()=>{
+ const h=harness();h.setUser("u1");await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({chosen_color:"GREEN",result_color:"GREEN",reward:"heal",reward_done:true,shots:{u1:1,u2:1},shot_acks:{u2:true}})});
+ assert.equal(h.doc.querySelector("#trottl-special-global-confirm").hidden,false);
+ assert.equal(h.doc.querySelector("#trottl-special-four-confirm").hidden,true);
+ assert.ok(h.doc.querySelector(".trottl-special-roulette-rewards").children.every(b=>b.disabled));
+});
+test("roulette overlay disappears outside Special game without moving its parent",async()=>{
+ const h=harness();await openGame(h,{phase:"roulette_choose_color",roulette:rouletteFixture({chosen_color:null})});
+ assert.equal(h.doc.querySelector(".trottl-special-roulette").hidden,false);
+ h.rows.special.game_state={...h.rows.special.game_state,phase:"awaiting_roll",revision:2};await h.ui.refresh();await flush();
+ assert.equal(h.doc.querySelector(".trottl-special-roulette").hidden,true);
+ assert.equal(h.doc.querySelector(".trottl-special-roulette").parentNode.id,"trottl-special-game-view");
 });
 
 async function openGame(h, g) {

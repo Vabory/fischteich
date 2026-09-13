@@ -13,7 +13,7 @@
     const stage = q("table-stage"), layer = q("seat-layer"), background = q("session-background");
     const mount = q("dice-mount"), start = q("start");
     const state = { snapshot: null, rooms: [], busy: false, generation: 0, refreshPromise: null,
-      refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null };
+      refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null, spectatorRoom: null };
     const dice = global.FischteichDice.mount({ mountPoint: mount, status: q("dice-status"), rollOnClick: false });
     const dieButton = mount.querySelector(".fischteich-die");
     // Foundation only: no local dice roll and no Classic gameplay RPC wired here.
@@ -32,7 +32,19 @@
     startModal.innerHTML = '<div class="modal-card"><h2 id="trottl-special-start-modal-title">Spiel starten?</h2><p id="trottl-special-start-modal-copy">Sobald das Spiel gestartet wurde, können keine weiteren Spieler mehr beitreten.</p><p class="guest-fish-error" aria-live="polite"></p><div class="modal-actions"><button type="button" class="secondary-button">Abbrechen</button><button type="button" class="primary-button trottl-special-start-confirm">Spiel starten</button></div></div>';
     doc.body.append(startModal);
     const [cancelStart, confirmStart] = startModal.querySelectorAll("button");
-    const modals = { start: startModal, avatar: q("avatar-modal"), kick: q("kick-modal"), leave: q("leave-modal") };
+    const spectatorModal = doc.createElement("div");
+    spectatorModal.id = "trottl-special-spectator-modal";
+    spectatorModal.className = "modal-backdrop"; spectatorModal.hidden = true;
+    spectatorModal.setAttribute("role", "dialog"); spectatorModal.setAttribute("aria-modal", "true");
+    spectatorModal.setAttribute("aria-labelledby", "trottl-special-spectator-title");
+    spectatorModal.innerHTML = '<div class="modal-card"><h2 id="trottl-special-spectator-title">Als Zuschauer beitreten?</h2><p>Das Spiel läuft bereits.</p><p class="guest-fish-error" aria-live="polite"></p><div class="modal-actions"><button type="button" class="secondary-button">Abbrechen</button><button type="button" class="primary-button trottl-special-start-confirm">Zuschauen</button></div></div>';
+    doc.body.append(spectatorModal);
+    const [cancelSpectator, confirmSpectator] = spectatorModal.querySelectorAll("button");
+    const eyeCounter = doc.createElement("div");
+    eyeCounter.id = "trottl-special-spectator-count"; eyeCounter.hidden = true;
+    eyeCounter.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><span>0</span>';
+    session.append(eyeCounter);
+    const modals = { start: startModal, spectate: spectatorModal, avatar: q("avatar-modal"), kick: q("kick-modal"), leave: q("leave-modal") };
     let returnFocus = null;
     function closeModal() {
       if (state.busy) return;
@@ -71,7 +83,7 @@
     function renderRooms() {
       roomList.replaceChildren(...state.rooms.map(room => {
         const item = button("trottl-classic-room", "", () => void joinRoom(room.roomSlot),
-          !room.isMember && (room.status === "playing" || room.playerCount >= service.maxPlayers));
+          !room.isMember && room.status !== "playing" && room.playerCount >= service.maxPlayers);
         item.dataset.roomSlot = String(room.roomSlot);
         const status = room.isMember ? room.status === "playing" ? "Wieder beitreten" : "Weiter"
           : room.status === "playing" ? "Spiel läuft" : room.status === "lobby" ? "Lobby" : "Frei";
@@ -135,12 +147,14 @@
     }
     function renderGame() {
       const snapshot = state.snapshot, preset = view.getTableSeatPreset(snapshot.players.length);
+      const spectator = snapshot.membershipRole === "spectator";
       stage.dataset.playerCount = String(snapshot.players.length);
       stage.style.setProperty("--seat-avatar-target", `${preset.avatarSize}px`);
       q("event-player").textContent = ""; q("event-copy").textContent = "SPIEL LÄUFT";
       q("event-roll").hidden = true; q("event-action").hidden = true; q("event-meta").hidden = true;
-      layer.replaceChildren(...service.getRelativeSeats(snapshot.players, snapshot.identity.userId).map(({ player, relativeIndex }) => {
-        const self = player.userId === snapshot.identity.userId;
+      const perspectiveUserId = spectator ? snapshot.session.hostUserId : snapshot.identity.userId;
+      layer.replaceChildren(...(snapshot.players.length ? service.getRelativeSeats(snapshot.players, perspectiveUserId) : []).map(({ player, relativeIndex }) => {
+        const self = !spectator && player.userId === snapshot.identity.userId;
         const card = view.createPlayerCardPresentation({ isSelf: self, isActive: player.seatIndex === snapshot.session.currentTurnSeat });
         const seat = node("article", card.classes.join(" "));
         seat.dataset.globalSeat = String(player.seatIndex); seat.dataset.relativeSeat = String(relativeIndex);
@@ -158,10 +172,14 @@
       }));
       // Same three-column dock markup and CSS, dormant until Special rules are defined.
       q("rule-controls").classList.remove("has-actions", "has-four-actions", "has-confirm-action");
+      q("rule-controls").hidden = spectator;
     }
     function renderSession() {
       if (!state.snapshot) return;
       const playing = state.snapshot.session.status === "playing";
+      eyeCounter.hidden = !playing;
+      eyeCounter.querySelector("span").textContent = String(state.snapshot.spectatorCount);
+      eyeCounter.setAttribute("aria-label", `${state.snapshot.spectatorCount} Zuschauer`);
       background.src = playing ? view.gameBackgroundAsset : view.lobbyBackgroundAsset;
       background.classList.toggle("is-ingame-background", playing); session.classList.toggle("is-playing", playing);
       q("session-header").hidden = playing; lobby.hidden = playing; game.hidden = !playing;
@@ -171,7 +189,7 @@
       } else renderLobby();
     }
     async function mutate(action) {
-      if (state.busy || !state.snapshot) return false;
+      if (state.busy || !state.snapshot || state.snapshot.membershipRole !== "player") return false;
       const generation = state.generation, sessionId = state.snapshot.session.id;
       state.busy = true; feedback.textContent = ""; renderSession();
       for (const modal of Object.values(modals)) for (const item of modal.querySelectorAll("button")) item.disabled = true;
@@ -239,7 +257,9 @@
       state.timer = global.setInterval(() => void refresh(), 20_000);
     }
     async function openSnapshot(snapshot) {
+      if (snapshot.membershipRole === "none" || snapshot.session.status === "finished") { await openRooms(); return; }
       ++state.generation; await stopConnection(); state.snapshot = snapshot;
+      try { global.localStorage.setItem("fischteich:trottl-special-session", snapshot.session.id); } catch {}
       rememberMode("special"); showScreen(session); renderSession(); connect();
       doc.querySelector("#close-trottl-special-session").focus();
       if (snapshot.session.status === "lobby" && snapshot.players.some(p => p.userId === snapshot.identity.userId && p.avatarId === null)) openAvatar();
@@ -252,8 +272,13 @@
     }
     async function joinRoom(slot) {
       if (state.busy) return;
+      const room = state.rooms.find(room => room.roomSlot === slot);
+      if (room?.status === "playing" && !room.isMember) {
+        state.spectatorRoom = room; spectatorModal.querySelector(".guest-fish-error").textContent = "";
+        openModal("spectate"); return;
+      }
       state.busy = true; renderRooms();
-      try { await openSnapshot(await service.joinRoom(slot)); }
+      try { await openSnapshot(await (room?.isMember ? service.loadSession(room.sessionId) : service.joinRoom(slot))); }
       catch (error) { q("room-feedback").textContent = errorText(error); }
       finally {
         state.busy = false; renderRooms(); renderSession();
@@ -271,18 +296,19 @@
             if (generation !== state.generation) return;
             state.rooms = summaries; q("room-feedback").textContent = ""; renderRooms();
           } else if (snapshot) {
-            await service.heartbeat(snapshot.session.id);
-            if (snapshot.session.status === "lobby") await service.cleanupLobby(snapshot.session.id);
+            if (snapshot.membershipRole === "spectator") await service.heartbeatSpectator(snapshot.session.id);
+            else await service.heartbeat(snapshot.session.id);
+            if (snapshot.membershipRole === "player" && snapshot.session.status === "lobby") await service.cleanupLobby(snapshot.session.id);
             const loaded = await service.loadSession(snapshot.session.id);
             if (generation !== state.generation) return;
-            if (loaded.session.status === "finished" || !loaded.players.some(p => p.userId === loaded.identity.userId)) {
+            if (loaded.session.status === "finished" || loaded.membershipRole === "none") {
               await openRooms(); return;
             }
             state.snapshot = loaded; feedback.textContent = ""; renderSession();
           }
         } catch (error) {
           if (generation !== state.generation) return;
-          if (String(error?.message).includes("NOT_MEMBER") || String(error?.message).includes("SESSION_NOT_FOUND")) {
+          if (String(error?.message).includes("NOT_MEMBER") || String(error?.message).includes("NOT_SPECTATOR") || String(error?.message).includes("NOT_PLAYING") || String(error?.message).includes("SESSION_NOT_FOUND")) {
             await openRooms(); return;
           }
           const target = rooms.hidden ? feedback : q("room-feedback");
@@ -296,13 +322,21 @@
     }
     async function leave() {
       if (!state.snapshot || state.busy) return;
+      if (state.snapshot.membershipRole === "spectator") {
+        state.busy = true;
+        try { await service.leaveSpectator(state.snapshot.session.id); state.busy = false; await openRooms(); }
+        catch (error) { feedback.textContent = errorText(error); }
+        finally { state.busy = false; }
+        return;
+      }
       if (await mutate(async () => { await service.leaveSession(state.snapshot.session.id); return state.snapshot; })) await openRooms();
     }
     function goBack() {
       if (state.busy) return;
       if (state.modal) { closeModal(); return; }
       if (!session.hidden) {
-        if (state.snapshot?.session.status === "playing") openModal("leave");
+        if (state.snapshot?.membershipRole === "spectator") void leave();
+        else if (state.snapshot?.session.status === "playing") openModal("leave");
         else void leave();
       } else {
         ++state.generation; void stopConnection(); closeModal(); showTrottlMenu({ focusSelector: "#open-trottl-deluxe" });
@@ -314,6 +348,17 @@
       }
     });
     cancelStart.addEventListener("click", closeModal);
+    cancelSpectator.addEventListener("click", closeModal);
+    confirmSpectator.addEventListener("click", async () => {
+      if (state.busy || state.modal !== "spectate" || !state.spectatorRoom) return;
+      state.busy = true; confirmSpectator.disabled = true;
+      try {
+        const room = state.spectatorRoom;
+        const snapshot = await service.joinSpectator(room.sessionId, room.roomSlot);
+        state.busy = false; closeModal(); await openSnapshot(snapshot);
+      } catch (error) { spectatorModal.querySelector(".guest-fish-error").textContent = errorText(error); }
+      finally { state.busy = false; confirmSpectator.disabled = false; }
+    });
     confirmStart.addEventListener("click", () => {
       if (state.modal === "start" && state.snapshot) void mutate(() => service.startSession(state.snapshot.session.id));
     });
@@ -350,7 +395,12 @@
       isRoomScreenActive: () => !rooms.hidden, isSessionScreenActive: () => !session.hidden,
       restoreMembership: async () => {
         if (preferredMode() !== "special") return false;
-        try { const snapshot = await service.restoreMembership(); if (snapshot) { await openSnapshot(snapshot); return true; } }
+        try {
+          let preferredSessionId = null;
+          try { preferredSessionId = global.localStorage.getItem("fischteich:trottl-special-session"); } catch {}
+          const snapshot = await service.restoreMembership(preferredSessionId);
+          if (snapshot) { await openSnapshot(snapshot); return true; }
+        }
         catch (error) { console.warn("Special-Reconnect konnte nicht geladen werden.", error); }
         return false;
       } });

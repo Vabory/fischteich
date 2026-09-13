@@ -11,7 +11,8 @@ const sql = read("supabase/migrations/20260913010000_add_trottl_special_foundati
 const flush = async () => { for (let i=0; i<8; i++) await new Promise(resolve => setImmediate(resolve)); };
 
 function harness(count=3) {
-  const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map();
+  const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[];
+  let userId = "u0";
   const players = Array.from({length:count}, (_,seat_index) => ({ session_id:"special-1",user_id:`u${seat_index}`,
     seat_index,display_name_snapshot:`Spieler ${seat_index}`,avatar_id:"turbo-lachs",is_ready:true,joined_at:"2026-09-13",last_seen_at:"2026-09-13" }));
   const rows = { special: { id:"special-1",mode:"special",room_slot:1,status:"lobby",host_user_id:"u0",player_count:count,
@@ -19,6 +20,16 @@ function harness(count=3) {
   const client = {
     async rpc(name,p={}) {
       calls.push({name,p}); const mode=name.includes("special")?"special":"classic", row=rows[mode];
+      const role=players.some(x=>x.user_id===userId)?"player":spectators.some(x=>x.user_id===userId)?"spectator":"none";
+      if(name==="get_trottl_special_membership")return {data:[{membership_role:role,spectator_count:spectators.length}],error:null};
+      if(name==="get_trottl_special_memberships")return {data:role==="none"?[]:[{session_id:rows.special.id,membership_role:role,room_slot:1}],error:null};
+      if(name==="join_trottl_special_spectator") {
+        if(role==="player")return {error:new Error("TROTTL_SPECIAL_ALREADY_PLAYER")};
+        if(row.status!=="playing")return {error:new Error("TROTTL_SPECIAL_NOT_PLAYING")};
+        if(role!=="spectator")spectators.push({session_id:row.id,user_id:userId});
+        return {data:row.id,error:null};
+      }
+      if(name==="leave_trottl_special_spectator") {const index=spectators.findIndex(x=>x.user_id===userId);if(index>=0)spectators.splice(index,1);return {data:true,error:null};}
       if (name.startsWith("get_trottl_") && name.endsWith("_rooms")) return {data:[{room_slot:1,session_id:row.id,session_status:row.status,player_count:row.player_count,is_member:row.is_member!==false}],error:null};
       if (name==="start_trottl_special_session") {
         if (row.host_user_id!=="u0" || row.status!=="lobby" || players.length<3 || players.some(x=>!x.is_ready)) return {error:new Error("TROTTL_SPECIAL_PLAYERS_NOT_READY")};
@@ -47,11 +58,11 @@ function harness(count=3) {
     setInterval(){return 1;},clearInterval(){},setTimeout(){return 1;},clearTimeout(){}};
   const context=vm.createContext({window:win,document:doc,console,supabaseClient:client,
     getLocalIdentity:()=>({displayName:"Spieler 0",deviceId:"device"}),initializeAppAuth:async()=>{},
-    syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:"u0"},currentProfile:{displayName:"Spieler 0"}})});
+    syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0"}})});
   for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
-  return {doc,win,ui,calls,channels,rows,players,store,service:win.trottlSpecialService};
+  return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},service:win.trottlSpecialService};
 }
 
 test("Classic and Special room one summaries are independent in both lobby and playing combinations",async()=>{
@@ -121,14 +132,144 @@ test("lobby changes during popup are checked on final server call, not assumed f
   h.doc.querySelector("#trottl-special-start-modal").querySelectorAll("button")[1].click();await flush();
   assert.equal(h.rows.special.status,"lobby");assert.equal(h.doc.querySelector("#trottl-special-start-modal").hidden,false);
 });
-test("running Special room blocks newcomers in UI without hiding reconnect",async()=>{
+test("running Special room offers spectators while keeping player reconnect",async()=>{
   const h=harness();h.rows.special.status="playing";h.rows.special.current_turn_seat=0;
   await h.ui.openRooms();await flush();assert.equal(h.doc.querySelector("#trottl-special-room-list").children[0].disabled,false);
   assert.match(h.doc.querySelector("#trottl-special-room-list").children[0].textContent,/Wieder beitreten/);
   h.rows.special.is_member=false;await h.ui.refresh();await flush();
-  assert.equal(h.doc.querySelector("#trottl-special-room-list").children[0].disabled,true);
+  assert.equal(h.doc.querySelector("#trottl-special-room-list").children[0].disabled,false);
   assert.match(h.doc.querySelector("#trottl-special-room-list").children[0].textContent,/Spiel läuft/);
-  assert.match(read("trottl-special-ui.js"),/!room\.isMember && \(room\.status === "playing"/);
+  assert.match(read("trottl-special-ui.js"),/room\?\.status === "playing" && !room\.isMember/);
+});
+
+const spectatorSql = read("supabase/migrations/20260913020000_add_trottl_special_spectators.sql");
+async function spectatorHarness(count=3) {
+  const h=harness(count);h.setUser("viewer");h.rows.special.status="playing";h.rows.special.current_turn_seat=0;h.rows.special.is_member=false;
+  await h.ui.openRooms();await flush();return h;
+}
+async function watch(h) {
+  h.doc.querySelector("#trottl-special-room-list").children[0].click();
+  h.doc.querySelector("#trottl-special-spectator-modal").querySelectorAll("button")[1].click();await flush();
+}
+
+test("spectator room tap opens modal; cancel does not execute any join",async()=>{
+  const h=await spectatorHarness();h.doc.querySelector("#trottl-special-room-list").children[0].click();
+  const modal=h.doc.querySelector("#trottl-special-spectator-modal");assert.equal(modal.hidden,false);
+  assert.match(modal.textContent,/Als Zuschauer beitreten/);
+  modal.querySelectorAll("button")[0].click();assert.equal(modal.hidden,true);
+  assert.ok(!h.calls.some(x=>x.name==="join_trottl_special_room"||x.name==="join_trottl_special_spectator"));
+});
+test("watch creates spectator membership, not seat or DU; host is bottom; count is an overlay",async()=>{
+  const h=await spectatorHarness();await watch(h);
+  assert.equal(h.spectators.length,1);assert.equal(h.players.length,3);
+  assert.equal(h.doc.querySelector("#trottl-special-game-view").hidden,false);
+  const seats=h.doc.querySelector("#trottl-special-seat-layer").children;
+  assert.equal(seats.length,3);assert.equal(seats[0].dataset.globalSeat,"0");assert.equal(seats[0].style["--seat-top"],"87%");
+  assert.ok(seats.every(x=>!x.classList.contains("trottl-classic-player--self")));
+  assert.equal(h.doc.querySelector("#trottl-special-seat-layer").querySelectorAll(".trottl-classic-seat-self-marker").length,0);
+  assert.equal(h.doc.querySelector("#trottl-special-rule-controls").hidden,true);
+  assert.equal(h.doc.querySelector("#trottl-special-spectator-count").querySelector("span").textContent,"1");
+  assert.ok(!h.calls.some(x=>x.name==="join_trottl_special_room"));
+});
+test("eight players plus five spectators do not alter active-player count or preset",async()=>{
+  const h=await spectatorHarness(8);for(let i=0;i<4;i++)h.spectators.push({session_id:"special-1",user_id:`v${i}`});
+  await watch(h);assert.equal(h.spectators.length,5);assert.equal(h.players.length,8);
+  assert.equal(h.doc.querySelector("#trottl-special-seat-layer").children.length,8);
+  assert.equal(h.doc.querySelector("#trottl-special-spectator-count").querySelector("span").textContent,"5");
+  assert.equal((await h.service.loadRooms())[0].playerCount,8);
+});
+test("spectator back leaves immediately without player leave RPC or confirm popup",async()=>{
+  const h=await spectatorHarness();await watch(h);h.ui.goBack();await flush();
+  assert.equal(h.spectators.length,0);assert.equal(h.players.length,3);
+  assert.equal(h.doc.querySelector("#trottl-special-rooms-screen").hidden,false);
+  assert.equal(h.doc.querySelector("#trottl-special-leave-modal").hidden,true);
+  assert.ok(h.calls.some(x=>x.name==="leave_trottl_special_spectator"));
+  assert.ok(!h.calls.some(x=>x.name==="leave_trottl_special_session"));
+});
+test("spectator reconnect restores role and host perspective without duplication",async()=>{
+  const h=await spectatorHarness();await watch(h);await h.ui.openRooms();await flush();
+  assert.equal(await h.ui.restoreMembership(),true);await flush();
+  assert.equal(h.spectators.length,1);assert.equal(h.doc.querySelector("#trottl-special-rule-controls").hidden,true);
+  assert.equal(h.doc.querySelector("#trottl-special-seat-layer").querySelectorAll(".trottl-classic-seat-self-marker").length,0);
+});
+test("current server host is derived afresh after host change",async()=>{
+  const h=await spectatorHarness(4);await watch(h);h.rows.special.host_user_id="u2";await h.ui.refresh();await flush();
+  const seats=h.doc.querySelector("#trottl-special-seat-layer").children;
+  assert.deepEqual(seats.map(x=>x.dataset.globalSeat),["2","3","0","1"]);
+  assert.equal(seats[0].style["--seat-top"],"87%");
+  assert.equal(h.doc.querySelector("#trottl-special-seat-layer").querySelectorAll(".trottl-classic-seat-self-marker").length,0);
+});
+test("spectator cannot invoke client player mutations and uses spectator heartbeat",async()=>{
+  const h=await spectatorHarness();await watch(h);
+  await h.ui.refresh();await flush();
+  for(const fn of [()=>h.service.setReady("special-1",true),()=>h.service.setAvatar("special-1","turbo-lachs"),
+    ()=>h.service.startSession("special-1"),()=>h.service.kickPlayer("special-1","u1")])await assert.rejects(fn,/PLAYER_REQUIRED/);
+  assert.ok(!h.calls.some(x=>/^set_trottl_special_|^start_trottl_special_|^kick_trottl_special_/.test(x.name??"")));
+  assert.ok(h.calls.some(x=>x.name==="heartbeat_trottl_special_spectator"));
+});
+test("active player cannot also become spectator; former player can watch without becoming active again",async()=>{
+  const h=harness();h.rows.special.status="playing";
+  await assert.rejects(()=>h.service.joinSpectator("special-1",1),/ALREADY_PLAYER/);assert.equal(h.spectators.length,0);
+  await h.service.leaveSession("special-1");const snapshot=await h.service.joinSpectator("special-1",1);
+  assert.equal(snapshot.membershipRole,"spectator");assert.equal(h.players.length,2);
+  assert.ok(!snapshot.players.some(x=>x.userId==="u0"));
+});
+test("spectator join and leave events subscribe by session; heartbeat-only updates do not recurse",()=>{
+  const h=harness();let calls=0;h.service.subscribeSession("special-1",()=>calls++);
+  const ch=h.channels[0],spectator=ch.handlers.find(x=>x.options.table==="trottl_special_spectators");
+  assert.equal(spectator.options.filter,"session_id=eq.special-1");
+  spectator.fn({table:"trottl_special_spectators",eventType:"INSERT",new:{user_id:"viewer"}});
+  spectator.fn({table:"trottl_special_spectators",eventType:"DELETE",old:{user_id:"viewer"}});
+  spectator.fn({table:"trottl_special_spectators",eventType:"UPDATE",old:{user_id:"viewer",last_seen_at:"old"},new:{user_id:"viewer",last_seen_at:"new"}});
+  assert.equal(calls,2);
+});
+test("player eye counter sees live authoritative spectator count and zero is retained",async()=>{
+  const h=harness();h.rows.special.status="playing";h.rows.special.current_turn_seat=0;
+  h.store.set("fischteich:trottl-active-mode","special");await h.ui.restoreMembership();await flush();
+  h.spectators.push({session_id:"special-1",user_id:"viewer"});await h.ui.refresh();await flush();
+  const count=h.doc.querySelector("#trottl-special-spectator-count");assert.equal(count.querySelector("span").textContent,"1");
+  h.spectators.splice(0,1);await h.ui.refresh();await flush();assert.equal(count.hidden,false);assert.equal(count.querySelector("span").textContent,"0");
+});
+test("spectator migration adds RLS and durable role uniqueness, TTL count, lifecycle vocabulary only",()=>{
+  assert.match(spectatorSql,/primary key\(session_id,user_id\)/);
+  assert.match(spectatorSql,/lifecycle_status in \('alive','eliminated','left'\)/);
+  assert.match(spectatorSql,/create trigger trottl_special_spectator_role_guard/);
+  assert.match(spectatorSql,/create trigger trottl_special_player_role_guard/);
+  assert.match(spectatorSql,/pg_advisory_xact_lock\(337734/);
+  assert.match(spectatorSql,/where s.id=new.session_id for update/);
+  assert.match(spectatorSql,/TROTTL_SPECIAL_ALREADY_PLAYER/);assert.match(spectatorSql,/TROTTL_SPECIAL_ALREADY_SPECTATOR/);
+  assert.match(spectatorSql,/v_session.room_slot<>p_room_slot or v_session.status<>'playing'/);
+  assert.match(spectatorSql,/on conflict\(session_id,user_id\) do update set last_seen_at/);
+  assert.match(spectatorSql,/last_seen_at>pg_catalog.clock_timestamp\(\)-interval '120 seconds'/);
+  assert.match(spectatorSql,/using\(public.is_trottl_special_viewer\(session_id\)\)/);
+  assert.doesNotMatch(spectatorSql,/grant (insert|update|delete)/i);
+  assert.doesNotMatch(spectatorSql.replace(/--[^\n]*/g,""),/trottl_classic|winner|finale|set lifecycle_status/);
+});
+test("all existing Special player mutations remain behind the new alive-player guard",()=>{
+  const foundation=read("supabase/migrations/20260913010000_add_trottl_special_foundation.sql");
+  for(const name of ["heartbeat_trottl_special_session","cleanup_trottl_special_lobby","set_trottl_special_ready",
+    "set_trottl_special_avatar","start_trottl_special_session","leave_trottl_special_session","kick_trottl_special_player"]){
+    const body=foundation.slice(foundation.indexOf(`create function public.${name}`)).split("end; $$;")[0];
+    assert.match(body,/lock_trottl_special_session\(p_session_id\)/);
+  }
+  const guard=spectatorSql.match(/create or replace function public\.lock_trottl_special_session[\s\S]*?end; \$\$;/)[0];
+  assert.match(guard,/p.user_id=auth.uid\(\) and p.lifecycle_status='alive'/);
+  assert.doesNotMatch(guard,/trottl_special_spectators/);
+});
+
+for(const status of ["lobby",null])test(`non-running room uses player join, not spectator modal: ${status}`,async()=>{
+  const h=harness();h.rows.special.status=status;h.rows.special.is_member=false;
+  await h.ui.openRooms();await flush();h.doc.querySelector("#trottl-special-room-list").children[0].click();await flush();
+  assert.ok(h.calls.some(x=>x.name==="join_trottl_special_room"));
+  assert.ok(!h.calls.some(x=>x.name==="join_trottl_special_spectator"));
+  assert.equal(h.doc.querySelector("#trottl-special-spectator-modal").hidden,true);
+});
+
+test("spectator reads identical public game state and subscribes to session updates",async()=>{
+  const h=await spectatorHarness();await watch(h);h.rows.special.game_state={public_event:"foundation-only"};
+  const snapshot=await h.service.loadSession("special-1");assert.equal(snapshot.gameState,undefined);
+  assert.equal(snapshot.session.gameState.public_event,"foundation-only");
+  assert.ok(h.channels.some(ch=>ch.handlers.some(handler=>handler.options.table==="trottl_special_sessions"&&handler.options.filter==="id=eq.special-1")));
 });
 
 for (const change of ["host", "count", "started"]) test(`final start is refused after popup lobby change: ${change}`,async()=>{

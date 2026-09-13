@@ -65,3 +65,18 @@
 @media (prefers-reduced-motion: reduce) {
   #trottl-special-four-confirm.is-ready-impact { animation: none; }
 }
+
+#trottl-special-spectator-count {
+  position: fixed;
+  z-index: 5;
+  top: calc(max(10px, env(safe-area-inset-top)) + 42px);
+  left: max(10px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgb(222 241 255 / 78%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  pointer-events: none;
+}

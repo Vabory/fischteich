@@ -4,7 +4,7 @@
   const MODE = "special", MIN_PLAYERS = 3, MAX_PLAYERS = 8;
   let channelSequence = 0;
   const presentation = global.trottlClassicService;
-  const tables = Object.freeze({ sessions: "trottl_special_sessions", players: "trottl_special_players" });
+  const tables = Object.freeze({ sessions: "trottl_special_sessions", players: "trottl_special_players", spectators: "trottl_special_spectators" });
 
   async function ensureIdentity() {
     // Shared app authentication only; no Classic membership or gameplay RPC.
@@ -33,25 +33,32 @@
   }
   async function loadSession(sessionId) {
     const identity = await ensureIdentity();
-    const [s, p] = await Promise.all([
+    const [s, p, membership] = await Promise.all([
       supabaseClient.from(tables.sessions).select("*").eq("id", sessionId).maybeSingle(),
       supabaseClient.from(tables.players).select("*").eq("session_id", sessionId).order("seat_index", { ascending: true }),
+      loadMembership(sessionId),
     ]);
     if (s.error) throw s.error;
     if (p.error) throw p.error;
     if (!s.data) throw new Error("TROTTL_SPECIAL_SESSION_NOT_FOUND");
-    const players = (p.data ?? []).map(presentation.normalizePlayer);
+    const players = (p.data ?? []).filter(row => (row.lifecycle_status ?? "alive") === "alive").map(presentation.normalizePlayer);
     if (players.some(player => !player)) throw new Error("Invalid Special players response");
-    return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity });
+    return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
+      membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount });
   }
-  async function restoreMembership() {
-    const identity = await ensureIdentity();
-    const response = await supabaseClient.from(tables.players).select("session_id").eq("user_id", identity.userId);
-    if (response.error) throw response.error;
-    for (const row of response.data ?? []) {
+  async function loadMembership(sessionId) {
+    const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
+    const row = rows?.[0];
+    if (!row || !["player","spectator","none"].includes(row.membership_role)
+      || !Number.isSafeInteger(Number(row.spectator_count)) || Number(row.spectator_count) < 0) throw new Error("Invalid Special membership response");
+    return Object.freeze({ membershipRole: row.membership_role, spectatorCount: Number(row.spectator_count) });
+  }
+  async function restoreMembership(preferredSessionId = null) {
+    const rows = await rpc("get_trottl_special_memberships");
+    for (const row of [...(rows ?? [])].sort((a,b) => Number(b.session_id === preferredSessionId) - Number(a.session_id === preferredSessionId))) {
       const snapshot = await loadSession(row.session_id);
       if (["lobby","playing"].includes(snapshot.session.status)
-        && snapshot.players.some(player => player.userId === identity.userId)) return snapshot;
+        && snapshot.membershipRole !== "none") return snapshot;
     }
     return null;
   }
@@ -60,22 +67,35 @@
     return loadSession(await rpc("join_trottl_special_room", { p_room_slot: roomSlot }));
   }
   async function mutate(name, sessionId, parameters = {}) {
+    if ((await loadMembership(sessionId)).membershipRole !== "player") throw new Error("TROTTL_SPECIAL_PLAYER_REQUIRED");
     await rpc(name, { p_session_id: sessionId, ...parameters });
     return loadSession(sessionId);
   }
   function subscribe(kind, sessionId, onChange, onStatus) {
+    const change = payload => {
+      if (payload?.eventType === "UPDATE" && [tables.players,tables.spectators].includes(payload.table)) {
+        const publicFields = row => Object.fromEntries(Object.entries(row ?? {}).filter(([key]) => key !== "last_seen_at"));
+        if (JSON.stringify(publicFields(payload.old)) === JSON.stringify(publicFields(payload.new))) return;
+      }
+      onChange(payload);
+    };
     const channel = supabaseClient.channel(`trottl-special-${kind}-${sessionId ?? "all"}-${++channelSequence}`)
       .on("postgres_changes", { event: "*", schema: "public", table: tables.sessions,
-        ...(sessionId ? { filter: `id=eq.${sessionId}` } : {}) }, onChange);
+        ...(sessionId ? { filter: `id=eq.${sessionId}` } : {}) }, change);
     if (sessionId) channel.on("postgres_changes", { event: "*", schema: "public", table: tables.players,
-      filter: `session_id=eq.${sessionId}` }, onChange);
+      filter: `session_id=eq.${sessionId}` }, change);
+    if (sessionId) channel.on("postgres_changes", { event: "*", schema: "public", table: tables.spectators,
+      filter: `session_id=eq.${sessionId}` }, change);
     channel.subscribe((status, error) => onStatus?.(status, error ?? null));
     let active = true;
     return async () => { if (active) { active = false; await supabaseClient.removeChannel(channel); } };
   }
   global.trottlSpecialService = Object.freeze({
     mode: MODE, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, tables,
-    ensureIdentity, normalizeSession, loadRooms, loadSession, restoreMembership, joinRoom,
+    ensureIdentity, normalizeSession, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    joinSpectator: async (id, roomSlot) => loadSession(await rpc("join_trottl_special_spectator", { p_session_id: id, p_room_slot: roomSlot })),
+    leaveSpectator: id => rpc("leave_trottl_special_spectator", { p_session_id: id }),
+    heartbeatSpectator: id => rpc("heartbeat_trottl_special_spectator", { p_session_id: id }),
     getRelativeSeats: presentation.getRelativeSeats,
     startSession: id => mutate("start_trottl_special_session", id),
     setReady: (id, ready) => mutate("set_trottl_special_ready", id, { p_ready: ready }),

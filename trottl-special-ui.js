@@ -38,6 +38,11 @@
     const numberHunt = global.TrottlSpecialNumberHunt?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fortschritt wird erneut gespeichert."; void refresh(); } });
+    const fishCatch = global.TrottlSpecialFishCatch?.create({ root: game, service,
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
+      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fänge werden erneut gespeichert."; void refresh(); } });
+    const debug = global.TrottlSpecialDebug?.create({ root: game, service,
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id) { acceptSnapshot(next); renderSession(); } } });
     // Results and transitions come exclusively from the Special intent RPC.
     dieButton.disabled = true;
     dieButton.setAttribute("aria-label", "Special-Würfel werfen");
@@ -233,7 +238,7 @@
         if (resolved.hasAvatar) { avatar.src = resolved.src; avatar.alt = resolved.alt; avatar.draggable = false; avatar.decoding = "async"; }
         else avatar.setAttribute("aria-hidden", "true");
         wrap.append(avatar); seat.append(wrap, node("strong", "trottl-classic-seat-name", player.displayName));
-        if (g.phase === "minigame_active" && g.minigame?.minigame_type === "special_minigame_01" && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
+        if (g.phase === "minigame_active" && ["special_minigame_01", "special_minigame_02"].includes(g.minigame?.minigame_type) && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
           wrap.classList.add(g.minigame.runs?.[player.userId]?.completed ? "trottl-special-minigame-done" : "trottl-special-minigame-waiting");
         }
         const hearts = node("span", "trottl-special-hearts");
@@ -328,6 +333,8 @@
       panic?.update(snapshot);
       roulette?.update(snapshot, state.gameBusy);
       numberHunt?.update(snapshot);
+      fishCatch?.update(snapshot);
+      debug?.update(snapshot);
     }
     function distributionCount() {
       const distribution = state.snapshot ? service.getGameDistribution(state.snapshot.session.gameState, state.snapshot.identity.userId) : null;
@@ -471,6 +478,8 @@
       panic?.suspend();
       roulette?.suspend();
       numberHunt?.suspend();
+      fishCatch?.suspend();
+      debug?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearInterval(state.timer); state.timer = null;
       global.clearTimeout(state.retryTimer); state.retryTimer = null;

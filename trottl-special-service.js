@@ -34,7 +34,7 @@
     return Object.freeze({ id: row.id, mode: MODE, roomSlot: Number(row.room_slot), status: row.status,
       hostUserId: row.host_user_id, playerCount: Number(row.player_count), startedAt: row.started_at,
       currentTurnSeat: row.current_turn_seat === null ? null : Number(row.current_turn_seat),
-      gameState: Object.freeze({ ...row.game_state }) });
+      gameState: Object.freeze({ ...row.game_state, debug_test: row.debug_test ?? {} }) });
   }
   async function loadRooms() {
     // Pure room-summary normalizer, shared visual data shape, isolated RPC.
@@ -127,6 +127,8 @@
   global.trottlSpecialService = Object.freeze({
     mode: MODE, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, tables,
     ensureIdentity, normalizeSession, getGameDistribution, serverNow, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    setDebugNext: async (id, roll, minigame) => { await rpc("set_trottl_special_debug_next", { p_session_id: id, p_roll: roll, p_minigame: minigame }); return loadSession(id); },
+    saveFishCatch: async (id, roundId, score, hits, final) => { await rpc("save_trottl_special_fish_catch", { p_session_id: id, p_round_id: roundId, p_score: score, p_hits: hits, p_final: final }); return loadSession(id); },
     actRoulette: async (id, roundId, action, value = null, target = null) => {
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
       return loadSession(id);

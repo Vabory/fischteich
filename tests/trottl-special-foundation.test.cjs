@@ -63,7 +63,7 @@ function harness(count=3) {
   const context=vm.createContext({window:win,document:doc,console,supabaseClient:client,
     getLocalIdentity:()=>({displayName:"Spieler 0",deviceId:"device"}),initializeAppAuth:async()=>{},
     syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0"}})});
-  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-roulette.js","trottl-special-minigames.js","trottl-special-number-hunt.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
+  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-roulette.js","trottl-special-minigames.js","trottl-special-number-hunt.js","trottl-special-fish-catch.js","trottl-special-debug.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
   return {doc,win,ui,calls,channels,rows,players,spectators,store,timeouts,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},setNumberHuntRPC:fn=>{numberHuntRPC=fn;},setServerTime:t=>{serverTime=t;},service:win.trottlSpecialService};
@@ -243,6 +243,30 @@ async function openGame(h, g) {
   h.rows.special.game_state={phase:"awaiting_roll",actor:"u0",actor_seat:0,roll_seq:4,revision:1,trottl:null,points:0,...g};
   await h.ui.openRooms(); await flush(); h.doc.querySelector("#trottl-special-room-list").children[0].click(); await flush();
 }
+test("temporary TEST is mounted only in Special game view, survives host swap, disappears for spectators",async()=>{
+ const h=harness();await openGame(h,{});const b=h.doc.querySelector(".trottl-special-test-button");
+ assert.equal(b.parentNode.id,"trottl-special-game-view");assert.equal(b.hidden,false);
+ assert.equal(h.doc.querySelector("#trottl-classic-session-screen").querySelector(".trottl-special-test-button"),null);
+ h.rows.special.host_user_id="u1";await h.ui.refresh();assert.equal(b.hidden,true);
+ h.rows.special.host_user_id="u0";await h.ui.refresh();assert.equal(b.hidden,false);
+ h.setUser("watcher");h.spectators.push({session_id:"special-1",user_id:"watcher"});await h.ui.refresh();assert.equal(b.hidden,true);
+});
+test("fish controller mounts shared shell; completed green/unfinished white seats derive from authoritative fish runs",async()=>{
+ const h=harness(),now=Date.now();h.setServerTime(now);
+ await openGame(h,{phase:"minigame_active",minigame:{minigame_id:"f1",minigame_type:"special_minigame_02",title:"Fischfang",title_started_at:new Date(now-7000).toISOString(),title_ends_at:new Date(now-5000).toISOString(),start_at:new Date(now-2000).toISOString(),end_at:new Date(now+8000).toISOString(),participants:[{player_id:"u0"},{player_id:"u1"},{player_id:"u2"}],runs:{u0:{seed:123,score:0,hits:[],completed:false},u1:{seed:42,score:5,hits:[],completed:true},u2:{seed:99,score:0,hits:[],completed:false}}}});
+ const seats=h.doc.querySelector("#trottl-special-seat-layer").children;
+ assert.ok(seats[1].querySelector(".trottl-special-minigame-done"));assert.ok(seats[0].querySelector(".trottl-special-minigame-waiting"));
+ assert.equal(h.doc.querySelector(".trottl-special-fish-field").parentNode.parentNode.hidden,false);
+ assert.equal(h.doc.querySelector(".trottl-special-number-hunt-board").parentNode.parentNode.hidden,true);
+});
+test("debug pending state comes from server row and fish/debug RPC payloads stay Special-only",async()=>{
+ const h=harness();h.rows.special.debug_test={next_roll:4,next_minigame:"special_minigame_02"};await openGame(h,{});
+ h.doc.querySelector(".trottl-special-test-button").click();assert.match(h.doc.querySelector(".trottl-special-test-panel").querySelector("p").textContent,/Nächster Würfel: 4.*Fischfang/);
+ await h.service.setDebugNext("special-1",6,"special_minigame_01");await h.service.saveFishCatch("special-1","f1",1,[{index:0,at:10}],true);
+ assert.deepEqual(JSON.parse(JSON.stringify(h.calls.find(c=>c.name==="set_trottl_special_debug_next").p)),{p_session_id:"special-1",p_roll:6,p_minigame:"special_minigame_01"});
+ assert.deepEqual(JSON.parse(JSON.stringify(h.calls.find(c=>c.name==="save_trottl_special_fish_catch").p)),{p_session_id:"special-1",p_round_id:"f1",p_score:1,p_hits:[{index:0,at:10}],p_final:true});
+ assert.ok(h.calls.every(c=>!c.name?.startsWith("act_trottl_classic")));
+});
 for (const lives of [0,1,2,3]) test(`Special renders three stable SVG hearts with ${lives} red hearts`,async()=>{
   const h=harness(); Object.assign(h.players[1],{lives,lifecycle_status:lives===0?"critical":"alive",critical_used:lives===0});
   await openGame(h,{});

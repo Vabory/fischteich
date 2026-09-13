@@ -3,6 +3,15 @@
 (function installTrottlSpecialService(global) {
   const MODE = "special", MIN_PLAYERS = 3, MAX_PLAYERS = 8;
   let channelSequence = 0;
+  let clockAnchor = null, clockLocal = 0, clockSampleStarted = -Infinity;
+  const monotonicNow = () => global.performance?.now?.() ?? Date.now();
+  function serverNow() { return clockAnchor === null ? null : clockAnchor + monotonicNow() - clockLocal; }
+  async function sampleServerClock(sessionId) {
+    const started = monotonicNow();
+    const time = await rpc("get_trottl_special_server_time", { p_session_id: sessionId });
+    const received = monotonicNow(), value = Date.parse(time);
+    if (Number.isFinite(value) && started >= clockSampleStarted) { clockAnchor = value + (received-started)/2; clockLocal = received; clockSampleStarted = started; }
+  }
   const presentation = global.trottlClassicService;
   const tables = Object.freeze({ sessions: "trottl_special_sessions", players: "trottl_special_players", spectators: "trottl_special_spectators" });
 
@@ -44,6 +53,7 @@
       supabaseClient.from(tables.sessions).select("*").eq("id", sessionId).maybeSingle(),
       supabaseClient.from(tables.players).select("*").eq("session_id", sessionId).order("seat_index", { ascending: true }),
       loadMembership(sessionId),
+      sampleServerClock(sessionId),
     ]);
     if (s.error) throw s.error;
     if (p.error) throw p.error;
@@ -57,8 +67,18 @@
       return Object.freeze({ ...base, lifecycle, lives, criticalUsed: row.critical_used === true });
     });
     if (players.some(player => !player)) throw new Error("Invalid Special players response");
+    let panicSubmittedCount = null;
+    if (s.data.game_state?.phase === "panic_active" && membership.membershipRole === "player") {
+      const receipt = await supabaseClient.from("trottl_special_panic_submissions").select("tap_count").eq("session_id",sessionId)
+        .eq("round_id",s.data.game_state.minigame.minigame_id).eq("user_id",identity.userId).maybeSingle();
+      if (receipt.error) throw receipt.error;
+      if (receipt.data) {
+        panicSubmittedCount = Number(receipt.data.tap_count);
+        if (!Number.isInteger(panicSubmittedCount) || panicSubmittedCount < 0 || panicSubmittedCount > 400) throw new Error("Invalid panic receipt");
+      }
+    }
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
-      membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount });
+      membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount });
   }
   async function loadMembership(sessionId) {
     const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
@@ -106,7 +126,8 @@
   }
   global.trottlSpecialService = Object.freeze({
     mode: MODE, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, tables,
-    ensureIdentity, normalizeSession, getGameDistribution, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    ensureIdentity, normalizeSession, getGameDistribution, serverNow, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    submitPanic: async (id, roundId, count) => { await rpc("submit_trottl_special_panic", { p_session_id: id, p_round_id: roundId, p_tap_count: count }); return loadSession(id); },
     actGame: async (id, action, rollSeq, target = null) => {
       await rpc("act_trottl_special_game", { p_session_id: id, p_action: action, p_roll_seq: rollSeq, p_target: target });
       return loadSession(id);

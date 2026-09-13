@@ -60,7 +60,7 @@ function harness(count=3) {
   const context=vm.createContext({window:win,document:doc,console,supabaseClient:client,
     getLocalIdentity:()=>({displayName:"Spieler 0",deviceId:"device"}),initializeAppAuth:async()=>{},
     syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0"}})});
-  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
+  for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
   return {doc,win,ui,calls,channels,rows,players,spectators,store,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},service:win.trottlSpecialService};
@@ -220,6 +220,14 @@ test("late spectator can inspect stored ranking during distribution without any 
  assert.equal(panel.hidden,true);assert.equal(toggle.hidden,false);toggle.click();assert.equal(panel.hidden,false);
  assert.equal(panel.querySelector("ol").children.length,4);toggle.click();assert.equal(panel.hidden,true);
  assert.equal(h.calls.filter(x=>x.name==="act_trottl_special_game").length,0);
+});
+for(const lifecycle of ["alive","critical","eliminated"])test(`panic result screen reuses ranking/hearts and requires ACK only for active ${lifecycle}`,async()=>{
+ const h=harness(4);Object.assign(h.players[0],{lives:lifecycle==="alive"?2:0,lifecycle_status:lifecycle,critical_used:lifecycle!=="alive"});
+ const m=minigameFixture(h,{minigame_type:"panic",title:"PANIK"});m.results[0].life_loss=1;
+ await openGame(h,{phase:"panic_results",minigame:m,actor:lifecycle==="eliminated"?null:"u0"});
+ const panel=h.doc.querySelector(".trottl-special-minigame-results");assert.equal(panel.hidden,false);assert.equal(panel.querySelector("h2").textContent,"PANIK");
+ assert.ok(panel.textContent.includes("−1 Leben"));assert.equal(h.doc.querySelector("#trottl-special-global-confirm").hidden,lifecycle==="eliminated");
+ assert.equal(h.doc.querySelector("#trottl-special-seat-layer").children.length,4);
 });
 for(const step of ["results","partial","confirmed","ack"]) test(`reconnect restores minigame ${step} from server snapshot`,async()=>{
  const h=harness(4),m=minigameFixture(h);let phase="minigame_distribution";

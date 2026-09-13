@@ -27,6 +27,9 @@
     resultToggle.textContent = "Ergebnis";
     resultToggle.addEventListener("click", () => { state.resultOpen = !state.resultOpen; renderSession(); });
     game.append(resultToggle);
+    const panic = global.TrottlSpecialPanic?.create({ root: session, service,
+      onResolve: () => gameAction("resolve"),
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } } });
     // Results and transitions come exclusively from the Special intent RPC.
     dieButton.disabled = true;
     dieButton.setAttribute("aria-label", "Special-Würfel werfen");
@@ -172,7 +175,7 @@
         distribution: `${g.total} ${g.total === 1 ? "Schluck" : "Schlücke"} verteilen`, choose_trottl: "3ER TROTTL WÄHLEN",
         drink_ack: "SCHLÜCKE BESTÄTIGEN", trottl_peak: "3/3 – EIN LEBEN VERLIEREN", placeholder: "Special-Regel folgt", awaiting_players: "KEIN SPIELBERECHTIGTER SPIELER",
         minigame_active: "MINIGAME LÄUFT", minigame_results: g.minigame?.draw ? "Unentschieden" : "MINIGAME-ERGEBNIS",
-        minigame_distribution: "GEWINNER VERTEILEN SCHLÜCKE" };
+        minigame_distribution: "GEWINNER VERTEILEN SCHLÜCKE", panic_active: "PANIK!", panic_results: g.minigame?.draw ? "PANIK – Unentschieden" : "PANIK – ERGEBNIS" };
       q("event-copy").textContent = messages[g.phase] ?? "SPIEL LÄUFT";
       q("event-roll").hidden = true; q("event-action").hidden = true; q("event-meta").hidden = true;
       if (g.phase === "rescue_roll") { q("event-action").hidden = false; q("event-action").textContent = "Letzte Chance!"; }
@@ -180,15 +183,16 @@
       resultToggle.hidden = !g.minigame || !["minigame_distribution", "drink_ack"].includes(g.phase);
       resultToggle.textContent = state.resultOpen ? "Schließen" : "Ergebnis";
       resultToggle.setAttribute("aria-expanded", String(state.resultOpen));
-      resultPanel.hidden = !(g.phase === "minigame_results" || (!resultToggle.hidden && state.resultOpen));
+      const showingResults = ["minigame_results", "panic_results"].includes(g.phase);
+      resultPanel.hidden = !(showingResults || (!resultToggle.hidden && state.resultOpen));
       if (!resultPanel.hidden) {
         const m = g.minigame;
         resultPanel.querySelector("h2").textContent = m.title ?? m.minigame_type;
-        resultPanel.querySelector("p").textContent = m.draw ? "Unentschieden – keine Schlücke" : g.phase === "minigame_results" ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
+        resultPanel.querySelector("p").textContent = m.draw ? g.phase === "panic_results" ? "Unentschieden – kein Lebenverlust" : "Unentschieden – keine Schlücke" : showingResults ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
         resultPanel.querySelector("ol").replaceChildren(...(m.results ?? []).map(row => {
           const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
           const item = node("li", row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : "");
-          item.append(node("span", "", String(row.rank)), node("strong", "", name), node("span", "", row.display_value));
+          item.append(node("span", "", String(row.rank)), node("strong", "", name), node("span", "", `${row.display_value}${row.life_loss === 1 ? " · −1 Leben" : ""}`));
           item.setAttribute("aria-label", `${row.rank}. ${name}: ${row.display_value}${row.is_winner ? ", Gewinner" : row.is_loser ? ", Verlierer" : ""}`);
           return item;
         }));
@@ -243,10 +247,10 @@
         return seat;
       }));
       q("rule-controls").classList.remove("has-actions", "has-four-actions", "has-confirm-action");
-      q("rule-controls").hidden = !playable;
+      q("rule-controls").hidden = !playable || g.phase === "panic_active";
       const progress = q("action-progress"), reset = q("four-reset"), confirm = q("four-confirm"), ack = q("global-confirm");
       progress.hidden = reset.hidden = confirm.hidden = !distributing;
-      const resultAck = playable && g.phase === "minigame_results" && g.minigame.participants.some(p => p.player_id === local.userId) && !g.minigame.result_seen?.[local.userId];
+      const resultAck = playable && showingResults && g.minigame.participants.some(p => p.player_id === local.userId) && !g.minigame.result_seen?.[local.userId];
       ack.hidden = !(resultAck || (playable && g.phase === "drink_ack" && Number(g.drinks?.[local.userId]) > 0 && !g.acks?.[local.userId]));
       const received = Number(g.drinks?.[local?.userId] ?? 0);
       ack.textContent = resultAck ? "ERGEBNIS BESTÄTIGEN" : `${received} ${received === 1 ? "SCHLUCK" : "SCHLÜCKE"} BESTÄTIGEN`;
@@ -275,6 +279,7 @@
         const generation = state.generation;
         state.deadlineTimer = global.setTimeout(() => { if (generation === state.generation && !session.hidden) void gameAction("resolve"); }, Math.max(40, Date.parse(g.deadline) - Date.now() + 30));
       }
+      panic?.update(snapshot);
     }
     function distributionCount() {
       const distribution = state.snapshot ? service.getGameDistribution(state.snapshot.session.gameState, state.snapshot.identity.userId) : null;
@@ -389,6 +394,7 @@
       renderAvatar(); openModal("avatar");
     }
     async function stopConnection() {
+      panic?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearInterval(state.timer); state.timer = null;
       global.clearTimeout(state.retryTimer); state.retryTimer = null;
@@ -516,7 +522,7 @@
         state.hintTimer = global.setTimeout(() => q("action-progress").classList.remove("is-incomplete-hint"), 400);
       } else void gameAction("confirm");
     });
-    q("global-confirm").addEventListener("click", () => void gameAction(state.snapshot?.session.gameState.phase === "minigame_results" ? "results_ack" : "ack"));
+    q("global-confirm").addEventListener("click", () => void gameAction(["minigame_results", "panic_results"].includes(state.snapshot?.session.gameState.phase) ? "results_ack" : "ack"));
     cancelStart.addEventListener("click", closeModal);
     cancelSpectator.addEventListener("click", closeModal);
     confirmSpectator.addEventListener("click", async () => {

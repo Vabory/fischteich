@@ -10,7 +10,7 @@
   // Screen coordinates in clockwise order, starting with the local bottom seat.
   const TABLE_SEAT_PRESETS = Object.freeze(Object.fromEntries(Object.entries({
     2: { avatarSize: 84, seats: [[50, 87], [50, 13]] },
-    3: { avatarSize: 82, seats: [[50, 87], [18, 31], [82, 31]] },
+    3: { avatarSize: 82, seats: [[50, 87], [16, 29], [84, 29]] },
     4: { avatarSize: 80, seats: [[50, 87], [13, 50], [50, 13], [87, 50]] },
     5: { avatarSize: 76, seats: [[50, 87], [15, 62], [28, 21], [72, 21], [85, 62]] },
     6: { avatarSize: 72, seats: [[50, 87], [18, 69], [18, 31], [50, 13], [82, 31], [82, 69]] },

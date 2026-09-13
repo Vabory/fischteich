@@ -20,6 +20,9 @@ test("complete CSS cascade, including parents and media queries, equals deployme
 
 test("complete UI rendering, inline variables and perspective equal deployment 257 except the frozen background URL", () => {
   const ui=read("trottl-classic-ui.js")
+    // Only the two explicitly requested three-player upper coordinates differ.
+    .replace("3: { avatarSize: 82, seats: [[50, 87], [16, 29], [84, 29]] }",
+      "3: { avatarSize: 82, seats: [[50, 87], [18, 31], [82, 31]] }")
     // Only the two explicitly requested seven-player lower coordinates differ.
     .replace("7: { avatarSize: 66, seats: [[50, 87], [26.5, 73], [13, 43], [33, 17], [67, 17], [87, 43], [73.5, 73]] }",
       "7: { avatarSize: 66, seats: [[50, 87], [27, 74], [13, 43], [33, 17], [67, 17], [87, 43], [73, 74]] }")

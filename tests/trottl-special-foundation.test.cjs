@@ -134,6 +134,59 @@ test("admin service addresses Special only and rejects invalid slots before RPC"
  assert.equal(h.calls[0].name,"admin_reset_trottl_special_room");await assert.rejects(h.service.adminResetRoom(3));assert.equal(h.calls.length,1);
 });
 
+function drinkSeat(h, id) { return h.doc.querySelector("#trottl-special-seat-layer").children.find(s=>s.dataset.globalSeat===id.slice(1)); }
+test("view-only drink projection replaces own pending picks while retaining automatic and other-winner baseline",()=>{
+ const h=harness(),project=h.win.TrottlSpecialPresentation.createDrinkDistributionPresentation;
+ const game={drinks:{u2:4}},distribution={total:2,drinks:{u2:1}};
+ const a=project({game,distribution,queue:[{action:"assign",target:"u2"}]});assert.equal(a.totals.u2,5);assert.equal(a.own.u2,2);
+ const b=project({game,distribution,queue:[{action:"reset"}]});assert.equal(b.totals.u2,3);assert.equal(b.own.u2,undefined);
+ assert.equal(b.format(1),"1 Schluck");assert.equal(b.format(4),"4 Schlücke");assert.deepEqual(game,{drinks:{u2:4}});assert.deepEqual(distribution,{total:2,drinks:{u2:1}});
+});
+for(const total of [1,2])test(`Roll ${total}: blue valid targets, yellow own picks, exact badge/count and shared dock`,async()=>{
+ const h=harness(4);Object.assign(h.players[3],{lives:0,lifecycle_status:"eliminated",critical_used:true});
+ let release;h.setGameRPC(()=>new Promise(r=>{release=r;}));await openGame(h,{phase:"distribution",total,drinks:{}});
+ const seat=()=>drinkSeat(h,"u2");assert.ok(seat().classList.contains("trottl-classic-player--selectable"));
+ assert.ok(!drinkSeat(h,"u3").classList.contains("trottl-classic-player--selectable"));
+ const dock=h.doc.querySelector("#trottl-special-rule-controls");assert.ok(dock.classList.contains("has-four-actions"));assert.ok(dock.classList.contains("has-actions"));
+ const confirm=h.doc.querySelector("#trottl-special-four-confirm"),undo=h.doc.querySelector("#trottl-special-four-reset");assert.equal(undo.textContent,"Rückgängig");assert.equal(undo.disabled,true);assert.equal(confirm.getAttribute("aria-disabled"),"true");
+ seat().querySelector(".trottl-special-target").click();await flush();
+ assert.ok(seat().classList.contains("trottl-classic-player--selected"));assert.ok(seat().classList.contains("trottl-classic-player--allocation-impact"));
+ assert.equal(seat().querySelector(".trottl-classic-seat-status-overlay").textContent,"1 Schluck");assert.equal(undo.disabled,false);
+ if(total===2){seat().querySelector(".trottl-special-target").click();await flush();assert.equal(seat().querySelector(".trottl-classic-seat-status-overlay").textContent,"2 Schlücke");assert.ok(seat().classList.contains("trottl-classic-player--allocation-impact"));}
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,`${total} / ${total}`);assert.ok(confirm.classList.contains("is-incomplete"));assert.equal(typeof release,"function");
+ await h.ui.suspend();
+});
+test("winner loser baseline stays bright/blue, own assignment turns yellow and Undo restores baseline",async()=>{
+ const h=harness(4),m=minigameFixture(h);let releases=[];
+ h.setGameRPC(async p=>{await new Promise(r=>releases.push(r));const g=h.rows.special.game_state,w=g.minigame.distributions.u0;
+  if(p.p_action==="assign") {w.drinks[p.p_target]=(w.drinks[p.p_target]??0)+1;g.drinks[p.p_target]=(g.drinks[p.p_target]??0)+1;}
+  if(p.p_action==="reset") {for(const [id,n]of Object.entries(w.drinks))g.drinks[id]-=n;w.drinks={};}
+  g.revision++;return {data:"special-1",error:null};
+ });
+ await openGame(h,{phase:"minigame_distribution",minigame:m,drinks:{u2:2}});const seat=()=>drinkSeat(h,"u2"),badge=()=>seat().querySelector(".trottl-classic-seat-status-overlay");
+ assert.equal(badge().textContent,"2 Schlücke");assert.ok(seat().classList.contains("trottl-classic-player--selectable"));assert.ok(!seat().classList.contains("trottl-classic-player--selected"));
+ seat().querySelector(".trottl-special-target").click();await flush();assert.equal(badge().textContent,"3 Schlücke");releases.shift()();await flush();
+ seat().querySelector(".trottl-special-target").click();await flush();assert.equal(badge().textContent,"4 Schlücke");releases.shift()();await flush();
+ const confirm=h.doc.querySelector("#trottl-special-four-confirm");assert.equal(confirm.classList.contains("is-incomplete"),false);assert.equal(confirm.getAttribute("aria-disabled"),"false");
+ h.doc.querySelector("#trottl-special-four-reset").click();await flush();assert.equal(badge().textContent,"2 Schlücke");assert.ok(!seat().classList.contains("trottl-classic-player--selected"));assert.ok(seat().classList.contains("trottl-classic-player--selectable"));releases.shift()();await flush();
+ assert.equal(h.rows.special.game_state.drinks.u2,2);assert.equal(badge().textContent,"2 Schlücke");
+});
+for(const uid of ["u0","u1","u2","viewer"])test(`local distributor perspective is isolated from other winner and observer: ${uid}`,async()=>{
+ const h=harness(4),m=minigameFixture(h);h.setUser(uid);if(uid==="viewer")h.spectators.push({session_id:"special-1",user_id:uid});m.distributions.u0.drinks={u2:1};
+ await openGame(h,{phase:"minigame_distribution",minigame:m,drinks:{u2:3}});
+ const s=drinkSeat(h,"u2");assert.equal(s.querySelector(".trottl-classic-seat-status-overlay").textContent,"3 Schlücke");
+ assert.equal(s.classList.contains("trottl-classic-player--selectable"),["u0","u1"].includes(uid));assert.equal(s.classList.contains("trottl-classic-player--selected"),uid==="u0");
+ if(["u2","viewer"].includes(uid))assert.equal(s.querySelector(".trottl-special-target"),null);
+});
+test("Classic distribution master style/animation values are reused and geometry/game controllers remain protected",()=>{
+ const ui=read("trottl-special-ui.js"),css=read("style.css"),special=read("trottl-special.css");
+ assert.match(ui,/has-four-actions", "has-actions"/);assert.match(css,/allocation-impact 160ms ease-out/);assert.match(css,/count-impact 160ms ease-out/);
+ assert.match(css,/grid-template-columns: minmax\(82px, 0.9fr\) minmax\(96px, 1fr\) minmax\(104px, 1.08fr\)/);
+ assert.match(css,/border: 1px solid rgb\(184 220 237 \/ 18%\)/);assert.match(css,/border-radius: 16px/);
+ assert.match(css,/@media \(prefers-reduced-motion: reduce\)[\s\S]*trottl-classic-player--allocation-impact/);
+ assert.match(special,/trottl-special-drink-target \{ border-color: transparent; \}/);
+});
+
 test("Classic and Special room one summaries are independent in both lobby and playing combinations",async()=>{
   const h=harness();
   for(const [classic,special] of [["lobby","lobby"],["playing","lobby"],["lobby","playing"]]){

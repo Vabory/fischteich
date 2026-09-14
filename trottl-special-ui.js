@@ -15,7 +15,8 @@
     const state = { snapshot: null, rooms: [], busy: false, generation: 0, refreshPromise: null,
       refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null, spectatorRoom: null,
       queue: [], processing: false, gameBusy: false, resolveFlight: null, resolveNotBefore: 0, deadlineTimer: null, hintTimer: null, animatedKey: null, resultRound: null, resultOpen: false,
-      heartbeatTimer: null, cleanupTimer: null, heartbeatFlight: null, cleanupFlight: null };
+      heartbeatTimer: null, cleanupTimer: null, heartbeatFlight: null, cleanupFlight: null,
+      drinkVisualKey: null, drinkVisualOwn: {}, drinkImpacts: new Map() };
     const dice = global.FischteichDice.mount({ mountPoint: mount, status: q("dice-status"), rollOnClick: false });
     const dieButton = mount.querySelector(".fischteich-die");
     const resultPanel = doc.createElement("section");
@@ -181,6 +182,14 @@
       const actor = playable && g.actor === snapshot.identity.userId;
       const distribution = playable ? service.getGameDistribution(g, snapshot.identity.userId) : null;
       const distributing = Boolean(distribution);
+      const drinksView = view.createDrinkDistributionPresentation({ game: g, distribution, queue: distributing ? state.queue : [] });
+      const drinkVisualKey = distributing ? `${snapshot.session.id}:${g.roll_seq}:${g.minigame?.round_id ?? ""}:${snapshot.identity.userId}` : null;
+      const now = Date.now();
+      if (state.drinkVisualKey !== drinkVisualKey) { state.drinkImpacts.clear(); state.drinkVisualOwn = { ...drinksView.own }; }
+      else if (distributing) for (const [id, amount] of Object.entries(drinksView.own)) {
+        if (amount > Number(state.drinkVisualOwn[id] ?? 0)) state.drinkImpacts.set(id, now);
+      }
+      state.drinkVisualKey = drinkVisualKey; state.drinkVisualOwn = { ...drinksView.own };
       const choosing = actor && g.phase === "choose_trottl";
       const r = g.roulette, rouletteActive = g.phase === "roulette_settlement";
       const rewardDock = actor && rouletteActive && r?.reward && !r.reward_done;
@@ -227,8 +236,15 @@
       const perspectiveUserId = spectator ? snapshot.session.hostUserId : snapshot.identity.userId;
       layer.replaceChildren(...(snapshot.players.length ? service.getRelativeSeats(snapshot.players, perspectiveUserId) : []).map(({ player, relativeIndex }) => {
         const self = !spectator && player.userId === snapshot.identity.userId && player.lifecycle !== "eliminated";
-        const card = view.createPlayerCardPresentation({ isSelf: !spectator && player.userId === snapshot.identity.userId, isActive: player.seatIndex === snapshot.session.currentTurnSeat });
+        const selectableDrink = distributing && player.lifecycle !== "eliminated";
+        const impactAt = state.drinkImpacts.get(player.userId);
+        const pickImpact = selectableDrink && impactAt !== undefined && now - impactAt < 160;
+        const card = view.createPlayerCardPresentation({ isSelf: !spectator && player.userId === snapshot.identity.userId, isActive: player.seatIndex === snapshot.session.currentTurnSeat,
+          isSelectable: selectableDrink, allocation: selectableDrink ? Number(drinksView.own[player.userId] ?? 0) : 0,
+          isAllocationImpact: pickImpact });
         const seat = node("article", card.classes.join(" "));
+        if (["distribution", "minigame_distribution"].includes(g.phase)) seat.classList.add("trottl-special-distribution-seat");
+        if (pickImpact) seat.style.animationDelay = `-${now - impactAt}ms`;
         seat.dataset.lifecycle = player.lifecycle;
         seat.dataset.globalSeat = String(player.seatIndex); seat.dataset.relativeSeat = String(relativeIndex);
         const position = preset.seats[relativeIndex];
@@ -260,12 +276,12 @@
           const badge = node("span", `trottl-classic-trottl-badge${g.phase === "trottl_peak" ? " trottl-special-peak" : ""}`, `3ER ${g.points}/3`);
           wrap.append(badge);
         }
-        const amount = Number(g.drinks?.[player.userId] ?? 0);
-        if (amount > 0) seat.append(node("span", `trottl-classic-seat-status-overlay${g.minigame ? " trottl-special-minigame-drinks" : ""}`, `${amount} ${amount === 1 ? "Schluck" : "Schlücke"}${g.acks?.[player.userId] ? " ✓" : ""}`));
+        const amount = Number(drinksView.totals[player.userId] ?? 0);
+        if (amount > 0) seat.append(node("span", `trottl-classic-seat-status-overlay${g.minigame ? " trottl-special-minigame-drinks" : ""}`, `${drinksView.format(amount)}${g.acks?.[player.userId] ? " ✓" : ""}`));
         if (rouletteActive && r.shots?.[player.userId]) seat.append(node("span", "trottl-classic-seat-status-overlay", `1 Shot${r.shot_acks?.[player.userId] ? " ✓" : ""}`));
         if (rouletteActive && r.target === player.userId) seat.append(node("span", "trottl-special-roulette-selected-target", "Ziel ✓"));
         if ((distributing && player.lifecycle !== "eliminated") || ((choosing || rewardTarget) && player.lifecycle === "alive" && player.lives > 0 && !self)) {
-          const target = button("trottl-special-target", "", () => {
+          const target = button(`trottl-special-target${distributing ? " trottl-special-drink-target" : ""}`, "", () => {
             if (distributing) enqueueGame("assign", player.userId);
             else if (rewardTarget) void rouletteAction("target", null, player.userId);
             else void gameAction("choose", player.userId);
@@ -290,16 +306,17 @@
       if (isPanicResult) ack.hidden = true;
       if (!ack.hidden) q("rule-controls").classList.add("has-confirm-action");
       if (distributing) {
-        q("rule-controls").classList.add("has-four-actions");
-        if (g.phase === "minigame_distribution") q("rule-controls").classList.add("has-actions");
+        q("rule-controls").classList.add("has-four-actions", "has-actions");
         const count = distributionCount();
         q("action-progress-value").textContent = `${count} / ${distribution.total}`;
         progress.querySelector("span").textContent = distribution.total === 1 ? "Schluck verteilt" : "Schlücke verteilt";
         confirm.classList.toggle("is-incomplete", count !== distribution.total || state.queue.length > 0 || state.processing);
         confirm.classList.toggle("is-ready-impact", count === distribution.total && state.queue.length === 0 && !state.processing);
         confirm.disabled = state.gameBusy; reset.disabled = state.gameBusy || count === 0;
+        confirm.setAttribute("aria-disabled", String(state.gameBusy || count !== distribution.total || state.queue.length > 0 || state.processing));
       }
       if (rouletteActive) {
+        confirm.removeAttribute?.("aria-disabled");
         const shotAck = playable && r.shots?.[local?.userId] && !r.shot_acks?.[local?.userId];
         ack.hidden = !shotAck; ack.textContent = "1 SHOT BESTÄTIGEN";
         if (shotAck) q("rule-controls").classList.add("has-confirm-action");

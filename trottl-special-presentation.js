@@ -57,7 +57,22 @@
     doc.addEventListener("visibilitychange", schedule);
     schedule();
   }
+  // View-only projection: public totals remain server-owned; pending local picks
+  // replace only the local distributor's contribution for immediate feedback.
+  function createDrinkDistributionPresentation({ game, distribution, queue = [] }) {
+    const own = { ...distribution?.drinks };
+    for (const item of queue) {
+      if (item.action === "reset") { for (const key of Object.keys(own)) delete own[key]; }
+      else if (item.action === "assign") own[item.target] = Number(own[item.target] ?? 0) + 1;
+    }
+    const totals = { ...game.drinks };
+    if (distribution) for (const id of new Set([...Object.keys(distribution.drinks ?? {}), ...Object.keys(own)])) {
+      totals[id] = Math.max(0, Number(totals[id] ?? 0) - Number(distribution.drinks?.[id] ?? 0) + Number(own[id] ?? 0));
+    }
+    return { own, totals, format: amount => `${amount} ${amount === 1 ? "Schluck" : "Schlücke"}` };
+  }
   global.TrottlSpecialPresentation = Object.freeze({
+    createDrinkDistributionPresentation,
     getTableSeatPreset: master.getTableSeatPreset,
     getLobbyHeaderAsset: master.getLobbyHeaderAsset,
     createLobbyPresentation: context => master.createLobbyPresentation({ ...context, minPlayers: 3 }),

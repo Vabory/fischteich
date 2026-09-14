@@ -105,6 +105,15 @@
 #trottl-special-session-screen .trottl-special-skull { position: absolute; inset: 22%; color: rgb(237 245 255 / 65%); pointer-events: none; }
 #trottl-special-session-screen .trottl-special-skull svg { width: 100%; height: 100%; }
 #trottl-special-session-screen .trottl-special-target { position: absolute; inset: -5px; z-index: 6; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgb(163 225 255 / 65%); background: transparent; }
+/* Drink picks use the master's seat/atlas glow, not a second hitbox ring. */
+#trottl-special-session-screen .trottl-special-drink-target { border-color: transparent; }
+#trottl-special-session-screen .trottl-classic-player--allocation-impact .trottl-classic-seat-status-overlay { animation-delay: inherit; }
+#trottl-special-session-screen .trottl-special-distribution-seat .trottl-special-minigame-drinks {
+  border-color: color-mix(in srgb, var(--player-accent) 72%, transparent);
+  box-shadow: 0 0 10px var(--player-glow);
+  color: var(--player-accent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--player-accent) 32%, transparent);
+}
 #trottl-special-session-screen .trottl-special-peak { animation: trottl-special-point-peak 600ms ease-out; }
 @keyframes trottl-special-critical { 0%, 100% { transform: translateX(-2px) rotate(-12deg); } 50% { transform: translateX(2px) rotate(12deg); } }
 @keyframes trottl-special-point-peak { 50% { box-shadow: 0 0 16px #d9a6ff; } }

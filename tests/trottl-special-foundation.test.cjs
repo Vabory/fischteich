@@ -284,6 +284,28 @@ test("full minigame tie presents all-winner result and retains each winner's two
  h.rows.special.game_state={...h.rows.special.game_state,phase:"minigame_distribution",revision:2};await h.ui.refresh();await flush();
  assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"0 / 2");
 });
+for(const [phase,r,text] of [
+ ["roulette_choose_color",{chosen_color:null,result_color:null},"ROULETTE"],
+ ["roulette_spinning",{},"ROULETTE"],
+ ["roulette_settlement",{result_color:"BLACK"},"HAT VERLOREN! – SHOT"],
+ ["roulette_settlement",{},"HAT GEWONNEN!"],
+ ["roulette_settlement",{chosen_color:"GREEN",result_color:"GREEN"},"HAT GEWONNEN!"],
+ ["roulette_settlement",{reward:"attack"},"SPIELER ANGREIFEN"],
+ ["roulette_settlement",{reward:"heal"},"LEBEN WIEDERHERSTELLEN"],
+ ["roulette_settlement",{reward:"transfer"},"3ER TROTTL WEITERGEBEN"]
+])test(`roulette reconstructs header ${text}`,async()=>{
+ const h=harness();await openGame(h,{phase,roulette:rouletteFixture(r)});assert.equal(h.doc.querySelector("#trottl-special-event-copy").textContent,text);
+ if(r.reward)assert.equal(h.doc.querySelector("#trottl-special-event-player").textContent,"");else assert.equal(h.doc.querySelector("#trottl-special-event-player").textContent,"Spieler 0");
+});
+for(const kind of ["gain","loss"])test(`roulette ${kind} heart animation appears only after confirmed intent; base geometry stays unchanged`,async()=>{
+ const h=harness();const uid=kind==="gain"?"u0":"u1";h.players[Number(uid.slice(1))].lives=kind==="gain"?2:3;
+ await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({reward:kind==="gain"?"heal":"attack",target:kind==="gain"?null:uid})});
+ const before=drinkSeat(h,uid);const geometry=[before.style["--seat-left"],before.style["--seat-top"]];assert.equal(h.doc.querySelector(`.trottl-special-heart--${kind}`),null);
+ h.setRouletteRPC(p=>{assert.equal(p.p_action,"confirm");h.players[Number(uid.slice(1))].lives+=kind==="gain"?1:-1;h.rows.special.game_state.roulette.reward_done=true;h.rows.special.game_state.revision++;return {data:"special-1",error:null};});
+ h.doc.querySelector("#trottl-special-four-confirm").click();await flush();assert.ok(h.doc.querySelector(`.trottl-special-heart--${kind}`));
+ const after=drinkSeat(h,uid);assert.deepEqual([after.style["--seat-left"],after.style["--seat-top"]],geometry);
+});
+
 test("roulette actor color selection sends only server intent and preserves all seat geometry",async()=>{
  const h=harness(7);await openGame(h,{});
  const geometry=()=>h.doc.querySelector("#trottl-special-seat-layer").children.map(x=>[x.style["--seat-left"],x.style["--seat-top"]]);
@@ -339,7 +361,7 @@ for(const life of ["alive","critical","eliminated"])test(`green shot ACK is own-
  const h=harness();h.setUser("u1");if(life!=="alive")Object.assign(h.players[1],{lifecycle_status:life,lives:0,critical_used:true});
  await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({chosen_color:"GREEN",result_color:"GREEN",shots:{u1:1,u2:1}})});
  const ack=h.doc.querySelector("#trottl-special-global-confirm");assert.equal(ack.hidden,life==="eliminated");
- assert.equal(h.doc.querySelectorAll(".trottl-classic-seat-status-overlay").length,2);
+ assert.equal(h.doc.querySelectorAll(".trottl-classic-seat-status-overlay").length,0); // Green shots stage after reward selection; existing ACK stays available.
  if(life!=="eliminated"){ack.click();await flush();assert.equal(h.calls.find(x=>x.name==="act_trottl_special_roulette").p.p_action,"shot_ack");}
 });
 test("confirmed roulette reward leaves other players' outstanding shots available on reconnect",async()=>{

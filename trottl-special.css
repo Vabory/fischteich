@@ -159,9 +159,8 @@
   #trottl-special-session-screen .trottl-special-peak { animation: none; }
 }
 /* Own horizontal Fisch Roulette-style presentation. Overlay, never a seat-layout child. */
-.trottl-special-roulette { position: absolute; z-index: 10; top: calc(env(safe-area-inset-top, 0px) + 145px); left: 12px; right: 12px; pointer-events: none; min-width: 0; }
+.trottl-special-roulette { position: absolute; z-index: 10; top: calc(env(safe-area-inset-top, 0px) + 145px); left: 12px; right: 12px; pointer-events: none; min-width: 0; padding: 12px; border: 1px solid rgb(184 220 237 / 35%); border-radius: 18px; background: linear-gradient(160deg, #193444, #102837); box-shadow: 0 12px 32px rgb(0 0 0 / 36%), inset 0 1px rgb(255 255 255 / 8%); max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 210px); overflow: auto; }
 .trottl-special-roulette[hidden], .trottl-special-roulette [hidden] { display: none; }
-.trottl-special-roulette.has-reward-selection .trottl-special-roulette-window { display: none; }
 .trottl-special-roulette-window { position: relative; height: 124px; overflow: hidden; border-block: 1px solid rgb(255 255 255 / 22%); background: rgb(0 0 0 / 24%); box-shadow: inset 0 0 36px rgb(0 0 0 / 48%); }
 .trottl-special-roulette-window::before, .trottl-special-roulette-window::after { position: absolute; z-index: 2; top: 0; bottom: 0; width: 18%; content: ""; pointer-events: none; }
 .trottl-special-roulette-window::before { left: 0; background: linear-gradient(90deg, #080b18, transparent); }
@@ -175,6 +174,29 @@
 .trottl-special-roulette-tile[data-color="GREEN"], .trottl-special-roulette-colors button[data-value="GREEN"] { background: #197045; }
 .trottl-special-roulette p { margin: 6px 0; text-align: center; color: white; font-weight: 800; text-shadow: 0 2px 5px black; }
 .trottl-special-roulette-colors, .trottl-special-roulette-rewards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.trottl-special-roulette-rewards { grid-template-columns: minmax(0, 1fr); gap: 10px; animation: trottl-special-roulette-enter 240ms ease-out; }
+.trottl-special-roulette-rewards button { min-height: 50px; font-size: .78rem; font-weight: 800; }
+.trottl-special-roulette-group.is-fading, .trottl-special-roulette-rewards.is-fading { animation: trottl-special-roulette-exit 320ms ease-in forwards; pointer-events: none; }
+.trottl-special-roulette .is-hit { animation: trottl-special-roulette-hit 400ms ease-out; outline: 1px solid #fff; }
+.trottl-special-roulette .is-jackpot { animation: trottl-special-roulette-jackpot 800ms ease-out; }
+.trottl-special-roulette-confetti { position: absolute; z-index: 5; left: 50%; top: 62px; pointer-events: none; }
+.trottl-special-roulette-confetti i { position: absolute; width: 5px; height: 8px; background: #8cf8b5; animation: trottl-special-roulette-confetti 800ms ease-out forwards; }
+.trottl-special-roulette-confetti i:nth-child(2n) { background: #ffdd79; }
+.trottl-special-heart--loss { animation: trottl-special-life-loss 700ms ease-out; }
+.trottl-special-heart--gain { animation: trottl-special-life-gain 800ms ease-out; }
+@keyframes trottl-special-roulette-enter { 0% { opacity: 0; transform: translateY(3px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes trottl-special-roulette-exit { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes trottl-special-roulette-hit { 40% { filter: brightness(1.8); box-shadow: 0 0 20px #fff; } }
+@keyframes trottl-special-roulette-jackpot { 25%, 65% { filter: brightness(2); scale: 1.045; box-shadow: 0 0 28px #8cffb5; } }
+@keyframes trottl-special-roulette-confetti { 0% { opacity: 1; transform: translate(0, 0) rotate(0deg); } 100% { opacity: 0; transform: translate(var(--particle-x), var(--particle-y)) rotate(160deg); } }
+@keyframes trottl-special-life-loss { 0%, 30% { color: #ff536e; filter: drop-shadow(0 0 6px #ff536e); } 15%, 45% { transform: rotate(-14deg); } 30%, 60% { transform: rotate(14deg); } }
+@keyframes trottl-special-life-gain { 0% { color: #38404a; } 20%, 60% { transform: rotate(-12deg) scale(1.18); color: #ff536e; filter: drop-shadow(0 0 7px #ff8598); } 40% { transform: rotate(12deg) scale(1.1); } }
+@media (prefers-reduced-motion: reduce) {
+  .trottl-special-roulette-group.is-fading, .trottl-special-roulette-rewards.is-fading { animation-duration: 80ms; }
+  .trottl-special-roulette-rewards { animation: none; }
+  .trottl-special-roulette .is-hit, .trottl-special-roulette .is-jackpot, .trottl-special-heart--loss, .trottl-special-heart--gain { animation: none; }
+  .trottl-special-roulette-confetti { display: none; }
+}
 .trottl-special-roulette button { pointer-events: auto; width: 100%; min-width: 0; min-height: 44px; padding: 6px; font-size: 11px; color: white; background: rgb(20 32 44 / 94%); border: 1px solid rgb(255 255 255 / 35%); border-radius: 12px; overflow-wrap: anywhere; }
 .trottl-special-roulette button:disabled { cursor: default; }
 .trottl-special-roulette-rewards button:disabled, .trottl-special-roulette button.is-dimmed { opacity: .48; }

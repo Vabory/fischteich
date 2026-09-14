@@ -306,6 +306,47 @@ for(const kind of ["gain","loss"])test(`roulette ${kind} heart animation appears
  const after=drinkSeat(h,uid);assert.deepEqual([after.style["--seat-left"],after.style["--seat-top"]],geometry);
 });
 
+for(const total of [1,2])test(`Roll ${total} recipient stays yellow after distributor Confirm, until successful own ACK`,async()=>{
+ const h=harness();await openGame(h,{phase:"distribution",total,drinks:{u2:total}});
+ assert.ok(drinkSeat(h,"u2").classList.contains("trottl-classic-player--selected"));
+ h.setGameRPC(p=>{const g=h.rows.special.game_state;if(p.p_action==="confirm")g.phase="drink_ack";else if(p.p_action==="ack")g.acks={u2:true};g.revision++;return {data:"special-1",error:null};});
+ h.doc.querySelector("#trottl-special-four-confirm").click();await flush();assert.ok(drinkSeat(h,"u2").classList.contains("trottl-classic-player--drink-target"));
+ h.setUser("u2");await h.ui.refresh();await flush();assert.ok(drinkSeat(h,"u2").classList.contains("trottl-classic-player--drink-target"));
+ h.doc.querySelector("#trottl-special-global-confirm").click();await flush();assert.ok(!drinkSeat(h,"u2").classList.contains("trottl-classic-player--drink-target"));
+});
+for(const uid of ["u0","u1","u2","viewer"])test(`pending aggregate drink is public yellow and only recipient has ACK: ${uid}`,async()=>{
+ const h=harness();h.setUser(uid);if(uid==="viewer")h.spectators.push({session_id:"special-1",user_id:uid});await openGame(h,{phase:"drink_ack",minigame:minigameFixture(h),drinks:{u2:4},acks:{}});
+ const seat=drinkSeat(h,"u2");assert.ok(seat.classList.contains("trottl-classic-player--drink-target"));assert.ok(seat.classList.contains("trottl-special-pending-drink"));
+ assert.equal(seat.querySelector(".trottl-classic-seat-status-overlay").textContent,"4 Schlücke");assert.equal(seat.querySelector(".trottl-special-target"),null);
+ assert.equal(h.doc.querySelector("#trottl-special-global-confirm").hidden,uid!=="u2");assert.equal(await h.ui.restoreMembership(),true);await flush();assert.ok(drinkSeat(h,"u2").classList.contains("trottl-classic-player--drink-target"));
+});
+test("Trottl drink remains yellow after rejected ACK; only confirmed server ACK removes yellow",async()=>{
+ const h=harness();h.setUser("u2");await openGame(h,{phase:"drink_ack",trottl:"u2",points:1,drinks:{u2:1},acks:{}});
+ h.setGameRPC(()=>({error:Error("rejected")}));h.doc.querySelector("#trottl-special-global-confirm").click();await flush();assert.ok(drinkSeat(h,"u2").classList.contains("trottl-classic-player--drink-target"));
+ assert.equal(drinkSeat(h,"u2").querySelector(".trottl-classic-seat-status-overlay").textContent,"1 Schluck");assert.ok(drinkSeat(h,"u2").querySelector(".trottl-classic-trottl-badge"));
+ h.setGameRPC(()=>{h.rows.special.game_state.acks={u2:true};h.rows.special.game_state.revision++;return {data:"special-1",error:null};});h.doc.querySelector("#trottl-special-global-confirm").click();await flush();assert.ok(!drinkSeat(h,"u2").classList.contains("trottl-classic-player--drink-target"));
+});
+test("automatic minigame loser penalty stays public yellow while other winners settle",async()=>{
+ const h=harness();h.setUser("u2");await openGame(h,{phase:"minigame_distribution",minigame:minigameFixture(h),drinks:{u2:2}});
+ assert.ok(drinkSeat(h,"u2").classList.contains("trottl-classic-player--drink-target"));assert.equal(drinkSeat(h,"u2").querySelector(".trottl-classic-seat-status-overlay").textContent,"2 Schlücke");
+});
+for(const uid of ["u0","u1","u2","viewer"])test(`attack selection is public red/crosshair, actor-only controls: ${uid}`,async()=>{
+ const h=harness();h.setUser(uid);if(uid==="viewer")h.spectators.push({session_id:"special-1",user_id:uid});await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({reward:"attack",target:"u2"})});
+ const seat=drinkSeat(h,"u2");assert.ok(seat.classList.contains("trottl-special-attack-selected"));assert.ok(seat.querySelector(".trottl-special-attack-crosshair"));assert.ok(!seat.classList.contains("trottl-classic-player--selected"));assert.ok(!seat.classList.contains("trottl-classic-player--drink-target"));
+ assert.ok(!seat.textContent.includes("Ziel ✓"));assert.equal(Boolean(seat.querySelector(".trottl-special-target")),uid==="u0");
+ assert.equal(seat.classList.contains("trottl-special-attack-selectable"),uid==="u0");
+});
+test("Attack Undo removes public crosshair without life mutation; self and Critical remain invalid",async()=>{
+ const h=harness();Object.assign(h.players[1],{lives:0,lifecycle_status:"critical",critical_used:true});await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({reward:"attack",target:"u2"})});
+ assert.ok(!drinkSeat(h,"u0").classList.contains("trottl-special-attack-selectable"));assert.ok(!drinkSeat(h,"u1").classList.contains("trottl-special-attack-selectable"));
+ const lives=h.players.map(p=>p.lives);h.setRouletteRPC(p=>{assert.equal(p.p_action,"undo");h.rows.special.game_state.roulette.target=null;h.rows.special.game_state.revision++;return {data:"special-1",error:null};});
+ h.doc.querySelector("#trottl-special-four-reset").click();await flush();assert.equal(h.doc.querySelector(".trottl-special-attack-crosshair"),null);assert.ok(drinkSeat(h,"u2").classList.contains("trottl-special-attack-selectable"));assert.deepEqual(h.players.map(p=>p.lives),lives);
+});
+for(const reward of ["heal","transfer"])test(`${reward} never has attack danger/crosshair`,async()=>{
+ const h=harness();await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({reward,target:reward==="transfer"?"u2":null})});assert.equal(h.doc.querySelector(".trottl-special-attack-crosshair"),null);assert.equal(h.doc.querySelector(".trottl-special-attack-selected"),null);
+ if(reward==="transfer")assert.ok(drinkSeat(h,"u2").classList.contains("trottl-classic-player--selected"));
+});
+
 test("roulette actor color selection sends only server intent and preserves all seat geometry",async()=>{
  const h=harness(7);await openGame(h,{});
  const geometry=()=>h.doc.querySelector("#trottl-special-seat-layer").children.map(x=>[x.style["--seat-left"],x.style["--seat-top"]]);

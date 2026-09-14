@@ -248,10 +248,19 @@
         const pickImpact = selectableDrink && impactAt !== undefined && now - impactAt < 160;
         const rouletteSelectable = rewardTarget && player.lifecycle === "alive" && player.lives > 0 && !self;
         const rouletteShot = rouletteActive && rouletteView.actionVisible && player.lifecycle !== "eliminated" && Boolean(r.shots?.[player.userId]);
+        const pendingDrink = ["drink_ack", "minigame_results", "minigame_distribution"].includes(g.phase)
+          && Number(g.drinks?.[player.userId] ?? 0) > 0 && !g.acks?.[player.userId] && player.lifecycle !== "eliminated";
+        const attackSelectable = rouletteSelectable && r.reward === "attack";
+        const attackMark = roulette?.attackTarget();
+        const attackSelected = attackMark?.id === player.userId;
         const card = view.createPlayerCardPresentation({ isSelf: !spectator && player.userId === snapshot.identity.userId, isActive: player.seatIndex === snapshot.session.currentTurnSeat,
-          isSelectable: selectableDrink || rouletteSelectable, allocation: selectableDrink ? Number(drinksView.own[player.userId] ?? 0) : rouletteSelectable && r.target === player.userId ? 1 : 0,
+          isSelectable: selectableDrink || rouletteSelectable, allocation: selectableDrink ? Number(drinksView.own[player.userId] ?? 0) : rouletteSelectable && r.reward !== "attack" && r.target === player.userId ? 1 : 0,
+          isDrinkTarget: pendingDrink && !selectableDrink,
           isAllocationImpact: pickImpact || (rouletteSelectable && roulette.pickImpact(player.userId)), isShotTarget: rouletteShot, isActionImpact: rouletteShot && roulette.shotImpact(player.userId) });
         const seat = node("article", card.classes.join(" "));
+        if (pendingDrink && !selectableDrink) seat.classList.add("trottl-special-pending-drink");
+        if (attackSelectable) seat.classList.add("trottl-special-attack-selectable");
+        if (attackSelected) seat.classList.add("trottl-special-attack-selected");
         if (["distribution", "minigame_distribution"].includes(g.phase)) seat.classList.add("trottl-special-distribution-seat");
         if (pickImpact) seat.style.animationDelay = `-${now - impactAt}ms`;
         seat.dataset.lifecycle = player.lifecycle;
@@ -264,6 +273,13 @@
         if (resolved.hasAvatar) { avatar.src = resolved.src; avatar.alt = resolved.alt; avatar.draggable = false; avatar.decoding = "async"; }
         else avatar.setAttribute("aria-hidden", "true");
         wrap.append(avatar); seat.append(wrap, node("strong", "trottl-classic-seat-name", player.displayName));
+        if (attackSelected) {
+          const crosshair = node("span", `trottl-special-attack-crosshair${attackMark.fading ? " is-fading" : ""}`);
+          crosshair.setAttribute("aria-hidden", "true");
+          crosshair.innerHTML = '<svg viewBox="0 0 100 100" fill="none" aria-hidden="true"><circle cx="50" cy="50" r="29"/><path d="M50 10v23m0 34v23M10 50h23m34 0h23"/></svg>';
+          if (attackMark.fading) crosshair.style.animationDelay = `-${attackMark.elapsed}ms`;
+          wrap.append(crosshair);
+        }
         if (g.phase === "minigame_active" && ["special_minigame_01", "special_minigame_02"].includes(g.minigame?.minigame_type) && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
           wrap.classList.add(g.minigame.runs?.[player.userId]?.completed ? "trottl-special-minigame-done" : "trottl-special-minigame-waiting");
         }
@@ -290,9 +306,9 @@
         const amount = Number(drinksView.totals[player.userId] ?? 0);
         if (amount > 0) seat.append(node("span", `trottl-classic-seat-status-overlay${g.minigame ? " trottl-special-minigame-drinks" : ""}`, `${drinksView.format(amount)}${g.acks?.[player.userId] ? " ✓" : ""}`));
         if (rouletteShot) seat.append(node("span", "trottl-classic-seat-status-overlay", `1 Shot${r.shot_acks?.[player.userId] ? " ✓" : ""}`));
-        if (rouletteActive && rouletteView.actionVisible && r.target === player.userId) seat.append(node("span", "trottl-classic-seat-status-overlay", "Ziel ✓"));
+        if (rouletteActive && rouletteView.actionVisible && r.reward !== "attack" && r.target === player.userId) seat.append(node("span", "trottl-classic-seat-status-overlay", "Ziel ✓"));
         if ((distributing && player.lifecycle !== "eliminated") || ((choosing || rewardTarget) && player.lifecycle === "alive" && player.lives > 0 && !self)) {
-          const target = button(`trottl-special-target${distributing ? " trottl-special-drink-target" : ""}`, "", () => {
+          const target = button(`trottl-special-target${distributing ? " trottl-special-drink-target" : ""}${attackSelectable ? " trottl-special-attack-target" : ""}`, "", () => {
             if (distributing) enqueueGame("assign", player.userId);
             else if (rewardTarget) void rouletteAction("target", null, player.userId);
             else void gameAction("choose", player.userId);

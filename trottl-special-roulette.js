@@ -18,7 +18,7 @@
     let snapshot = null, key = null, animation = null, timer = null, lastResolve = 0;
     const group = panel.querySelector(".trottl-special-roulette-group"), particles = panel.querySelector(".trottl-special-roulette-confetti");
     let round = null, stage = null, transition = null, previousPhase = null, lastBusy = false;
-    const lifeEffects = new Map(), shotEffects = new Map();let targetImpact = null;
+    const lifeEffects = new Map(), shotEffects = new Map();let targetImpact = null, confirmedAttack = null, effectTimer = null;
     const clock = () => global.performance?.now?.() ?? Date.now();
     const reducedMotion = () => global.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     function after(ms, fn) { global.clearTimeout(transition);transition = global.setTimeout(() => { transition = null;fn();if(snapshot)update(snapshot,lastBusy);onPresentationChange(); }, reducedMotion() ? 80 : ms); }
@@ -27,7 +27,14 @@
       const old=snapshot, g=next.session.gameState, r=g.roulette, active=next.session.status==="playing" && g.phase?.startsWith("roulette_");
       if(old?.session.id===next.session.id && (old.session.gameState.phase?.startsWith("roulette_") || active)) for(const p of next.players) {
         const before=old.players.find(x=>x.userId===p.userId);
-        if(before && before.lives!==p.lives) lifeEffects.set(p.userId,{kind:p.lives>before.lives?"gain":"loss",index:Math.min(before.lives,p.lives),start:null});
+        if(before && before.lives!==p.lives) {
+          lifeEffects.set(p.userId,{kind:p.lives>before.lives?"gain":"loss",index:Math.min(before.lives,p.lives),start:null});
+          const oldR=old.session.gameState.roulette;
+          if(before.lifecycle==="alive" && p.lives<before.lives && oldR?.reward==="attack" && oldR.target===p.userId && !oldR.reward_done) {
+            confirmedAttack={id:p.userId,sessionId:next.session.id,start:clock()};
+            global.clearTimeout(effectTimer);effectTimer=global.setTimeout(()=>{effectTimer=null;confirmedAttack=null;onPresentationChange();},350);
+          }
+        }
       }
       snapshot=next;
       if (old?.session.id===next.session.id && r?.target && old.session.gameState.roulette?.round_id===r.round_id && old.session.gameState.roulette.target!==r.target) targetImpact={id:r.target,start:clock()};
@@ -48,6 +55,12 @@
     function lifeEffect(id) { const e=lifeEffects.get(id);if(!e)return null;if(stage && stage!=="action_visible")return null;e.start??=clock();return clock()-e.start<(e.kind==="gain"?800:700)?{...e,elapsed:clock()-e.start}:null; }
     function shotImpact(id) { return clock()-(shotEffects.get(id)??-Infinity)<260; }
     function pickImpact(id) { return targetImpact?.id===id && clock()-targetImpact.start<160; }
+    function attackTarget() {
+      const g=snapshot?.session.gameState,r=g?.roulette,p=snapshot?.players.find(x=>x.userId===r?.target);
+      if(stage==="action_visible" && g.phase==="roulette_settlement" && r?.reward==="attack" && !r.reward_done && p?.lifecycle==="alive" && p.lives>0 && p.userId!==g.actor) return {id:p.userId,fading:false};
+      if(confirmedAttack?.sessionId===snapshot?.session.id && clock()-confirmedAttack.start<350) return {id:confirmedAttack.id,fading:true,elapsed:clock()-confirmedAttack.start};
+      return null;
+    }
     const colorButtons = {}, rewardButtons = {};
     function add(parent, map, values, action) {
       for (const [value, label] of Object.entries(values)) {
@@ -123,8 +136,8 @@
       if (timer === null) timer = global.setInterval(tick, 100);
       tick();
     }
-    function suspend() { global.clearInterval(timer); timer = null;cancelAnimation();global.clearTimeout(transition);transition=null;round=null;stage=null;previousPhase=null;snapshot=null;lifeEffects.clear();shotEffects.clear();targetImpact=null; }
-    return Object.freeze({ update, suspend, prepare, lifeEffect, shotImpact, pickImpact });
+    function suspend() { global.clearInterval(timer); timer = null;cancelAnimation();global.clearTimeout(transition);global.clearTimeout(effectTimer);effectTimer=null;confirmedAttack=null;transition=null;round=null;stage=null;previousPhase=null;snapshot=null;lifeEffects.clear();shotEffects.clear();targetImpact=null; }
+    return Object.freeze({ update, suspend, prepare, lifeEffect, shotImpact, pickImpact, attackTarget });
   }
   global.TrottlSpecialRoulette = Object.freeze({ create, timing, DURATION, EASING });
 })(window);

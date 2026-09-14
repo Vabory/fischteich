@@ -53,6 +53,17 @@ for(const kind of ["gain","loss"])test(`life ${kind} effects require confirmed s
  assert.equal(h.c.lifeEffect("u0").kind,kind);assert.equal(h.c.lifeEffect("u0").index,2);assert.equal(s.players[0].lives,kind==="gain"?2:3);
 });
 
+test("confirmed Attack fades crosshair for 350ms during real life loss; reconnect never replays it",()=>{
+ const h=harness();const s=settlement(h,{result_color:"RED",reward:"attack",target:"u1"});s.players.push({userId:"u1",lifecycle:"alive",lives:1});h.c.update(s);assert.equal(h.c.attackTarget().id,"u1");
+ const confirmed=JSON.parse(JSON.stringify(s));confirmed.players[1].lives=0;confirmed.players[1].lifecycle="critical";confirmed.session.gameState.roulette.reward_done=true;h.c.update(confirmed);
+ assert.equal(h.c.attackTarget().fading,true);assert.equal(h.c.lifeEffect("u1").kind,"loss");h.advance();assert.equal(h.c.attackTarget(),null);
+ h.c.suspend();h.c.update(confirmed);assert.equal(h.c.attackTarget(),null);assert.equal(h.c.lifeEffect("u1"),null);
+});
+test("unconfirmed Attack cannot target already Critical or self and produces no life effects",()=>{
+ const h=harness();const s=settlement(h,{result_color:"RED",reward:"attack",target:"u0"});s.players[0].lives=3;h.c.update(s);assert.equal(h.c.attackTarget(),null);
+ s.players.push({userId:"u1",lifecycle:"critical",lives:0});s.session.gameState.roulette.target="u1";h.c.update(s);assert.equal(h.c.attackTarget(),null);assert.equal(h.c.lifeEffect("u1"),null);
+});
+
 test("Special exactly references Fisch Roulette 1x duration/easing, width/pitch and target range",()=>{
  const fish=read("script.js");assert.match(fish,/ROULETTE_BASE_DURATION = 4700/);assert.match(fish,/cubic-bezier\(0.12, 0.7, 0.08, 1\)/);
  const h=harness();h.c.update(h.snapshot);assert.equal(h.animations[0].options.duration,4700);assert.equal(h.animations[0].options.easing,h.api.EASING);
@@ -120,7 +131,7 @@ test("leave preserves committed spin and confirmed reward, forfeits unconfirmed 
 test("Special isolated visual code never references Fish stats, speed state, client randomness or local persistence",()=>{
  for(const source of [sql,read("trottl-special-roulette.js")])assert.doesNotMatch(source,/roulette_stats|total_spins|goldfish|leaderboard|rouletteSpeed|localStorage|Math.random|secureRandomInt|trottl_classic/);
  const css=read("trottl-special.css");assert.match(css,/\.trottl-special-roulette \{ position: absolute/);assert.match(css,/pointer-events: none/);assert.match(css,/overflow: hidden/);
- assert.match(read("index.html"),/trottl-special-roulette.js\?v=2/);
+ assert.match(read("index.html"),/trottl-special-roulette.js\?v=3/);
 });
 test("SQL structure: migration transaction, dollar bodies, private helper revokes and fixture rollback are complete",()=>{
  assert.ok(sql.startsWith("begin;"));assert.ok(sql.trim().endsWith("commit;"));

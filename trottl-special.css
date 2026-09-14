@@ -114,6 +114,25 @@
   color: var(--player-accent);
   text-shadow: 0 0 8px color-mix(in srgb, var(--player-accent) 32%, transparent);
 }
+/* Pending drinks are public settlement state, using Classic's yellow drink palette. */
+#trottl-special-session-screen .trottl-special-pending-drink .trottl-special-minigame-drinks {
+  color: var(--player-accent);
+  border-color: color-mix(in srgb, var(--player-accent) 72%, transparent);
+  box-shadow: 0 0 10px var(--player-glow);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--player-accent) 32%, transparent);
+}
+#trottl-special-session-screen .trottl-special-attack-selectable { --player-border: rgb(223 89 107 / 65%); --player-glow: rgb(199 39 69 / 22%); --player-accent: #ff9dad; }
+#trottl-special-session-screen .trottl-special-attack-selected { --player-border: rgb(255 83 110 / 92%); --player-glow: rgb(255 45 83 / 48%); --player-accent: #ff7b96; --player-highlight: rgb(255 65 100 / 10%); }
+#trottl-special-session-screen .trottl-special-attack-selected .trottl-classic-avatar-wrap { animation: none; }
+#trottl-special-session-screen .trottl-special-attack-target { border-color: transparent; }
+#trottl-special-session-screen .trottl-special-attack-crosshair { position: absolute; inset: 2%; z-index: 7; pointer-events: none; color: #ff536e; filter: drop-shadow(0 0 4px rgb(255 45 83 / 65%)); }
+#trottl-special-session-screen .trottl-special-attack-crosshair svg { display: block; width: 100%; height: 100%; stroke: currentColor; stroke-width: 1.7; }
+#trottl-special-session-screen .trottl-special-attack-crosshair.is-fading { animation: trottl-special-attack-exit 350ms ease-out forwards; }
+@keyframes trottl-special-attack-exit { 0% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  #trottl-special-session-screen .trottl-special-heart--loss { animation: trottl-special-life-loss-reduced 700ms ease-out; }
+}
+@keyframes trottl-special-life-loss-reduced { 0%, 50% { filter: drop-shadow(0 0 3px #ff536e); } 100% { filter: none; } }
 #trottl-special-session-screen .trottl-special-peak { animation: trottl-special-point-peak 600ms ease-out; }
 @keyframes trottl-special-critical { 0%, 100% { transform: translateX(-2px) rotate(-12deg); } 50% { transform: translateX(2px) rotate(12deg); } }
 @keyframes trottl-special-point-peak { 50% { box-shadow: 0 0 16px #d9a6ff; } }
@@ -189,7 +208,7 @@
 @keyframes trottl-special-roulette-hit { 40% { filter: brightness(1.8); box-shadow: 0 0 20px #fff; } }
 @keyframes trottl-special-roulette-jackpot { 25%, 65% { filter: brightness(2); scale: 1.045; box-shadow: 0 0 28px #8cffb5; } }
 @keyframes trottl-special-roulette-confetti { 0% { opacity: 1; transform: translate(0, 0) rotate(0deg); } 100% { opacity: 0; transform: translate(var(--particle-x), var(--particle-y)) rotate(160deg); } }
-@keyframes trottl-special-life-loss { 0%, 30% { color: #ff536e; filter: drop-shadow(0 0 6px #ff536e); } 15%, 45% { transform: rotate(-14deg); } 30%, 60% { transform: rotate(14deg); } }
+@keyframes trottl-special-life-loss { 0%, 30% { color: #ff536e; filter: drop-shadow(0 0 6px #ff536e); } 15%, 45% { transform: rotate(-14deg) scale(1.1); } 30%, 60% { transform: rotate(14deg) scale(1.05); } }
 @keyframes trottl-special-life-gain { 0% { color: #38404a; } 20%, 60% { transform: rotate(-12deg) scale(1.18); color: #ff536e; filter: drop-shadow(0 0 7px #ff8598); } 40% { transform: rotate(12deg) scale(1.1); } }
 @media (prefers-reduced-motion: reduce) {
   .trottl-special-roulette-group.is-fading, .trottl-special-roulette-rewards.is-fading { animation-duration: 80ms; }

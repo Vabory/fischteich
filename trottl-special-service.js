@@ -90,7 +90,7 @@
   async function restoreMembership(preferredSessionId = null) {
     const rows = await rpc("get_trottl_special_memberships");
     for (const row of [...(rows ?? [])].sort((a,b) => Number(b.session_id === preferredSessionId) - Number(a.session_id === preferredSessionId))) {
-      const snapshot = await loadSession(row.session_id);
+      const snapshot = await recoverSession(row.session_id);
       if (["lobby","playing"].includes(snapshot.session.status)
         && snapshot.membershipRole !== "none") return snapshot;
     }
@@ -99,6 +99,14 @@
   async function joinRoom(roomSlot) {
     if (![1,2].includes(roomSlot)) throw new RangeError("Invalid Special room");
     return loadSession(await rpc("join_trottl_special_room", { p_room_slot: roomSlot }));
+  }
+  async function recoverSession(sessionId) {
+    let snapshot = await loadSession(sessionId);
+    if (snapshot.session.status === "lobby" && snapshot.membershipRole === "player") {
+      await rpc("recover_trottl_special_lobby", { p_session_id: sessionId });
+      snapshot = await loadSession(sessionId);
+    }
+    return snapshot;
   }
   async function mutate(name, sessionId, parameters = {}) {
     if ((await loadMembership(sessionId)).membershipRole !== "player") throw new Error("TROTTL_SPECIAL_PLAYER_REQUIRED");
@@ -126,7 +134,12 @@
   }
   global.trottlSpecialService = Object.freeze({
     mode: MODE, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, tables,
-    ensureIdentity, normalizeSession, getGameDistribution, serverNow, loadRooms, loadSession, loadMembership, restoreMembership, joinRoom,
+    ensureIdentity, normalizeSession, getGameDistribution, serverNow, loadRooms, loadSession, recoverSession, loadMembership, restoreMembership, joinRoom,
+    adminResetRoom: async slot => {
+      if (![1,2].includes(Number(slot))) throw new RangeError("Invalid Special room");
+      const result = await rpc("admin_reset_trottl_special_room", { p_room_slot: Number(slot) });
+      if (typeof result !== "boolean") throw new Error("Invalid Special reset response");return result;
+    },
     setDebugNext: async (id, roll, minigame) => { await rpc("set_trottl_special_debug_next", { p_session_id: id, p_roll: roll, p_minigame: minigame }); return loadSession(id); },
     saveFishCatch: async (id, roundId, score, hits, final) => { await rpc("save_trottl_special_fish_catch", { p_session_id: id, p_round_id: roundId, p_score: score, p_hits: hits, p_final: final }); return loadSession(id); },
     actRoulette: async (id, roundId, action, value = null, target = null) => {

@@ -264,6 +264,7 @@ const adminTrottlResetTitle = document.querySelector("#admin-trottl-reset-title"
 const adminTrottlResetFeedback = document.querySelector("#admin-trottl-reset-feedback");
 const cancelAdminTrottlResetButton = document.querySelector("#cancel-admin-trottl-reset");
 const confirmAdminTrottlResetButton = document.querySelector("#confirm-admin-trottl-reset");
+const specialRoomAdmin = window.TrottlSpecialAdmin?.create({ getAuthState: () => getAppAuthState() });
 const openDisplayNameRenameButton = document.querySelector("#open-display-name-rename");
 const displayNameRenameModal = document.querySelector("#display-name-rename-modal");
 const displayNameRenameForm = document.querySelector("#display-name-rename-form");
@@ -1682,6 +1683,7 @@ async function copyShortcutValue(input) {
 }
 
 function renderSettingsAdmin(auth = getAppAuthState()) {
+  specialRoomAdmin?.render(auth);
   const isAdmin = auth.isAdmin === true;
   settingsAdminStatus.textContent = isAdmin ? "Admin angemeldet" : "";
   settingsAdminStatus.hidden = !isAdmin;

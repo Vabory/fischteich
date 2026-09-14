@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260914.1">
+    <meta name="fischteich-build" content="20260914.2">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
@@ -35,7 +35,7 @@
     <script src="./trottl-classic-preview.js?v=3" defer></script>
     <script src="./trottl-classic-ui.js?v=39" defer></script>
     <script src="./classic-background-fit.js?v=1" defer></script>
-    <script src="./trottl-special-service.js?v=9" defer></script>
+    <script src="./trottl-special-service.js?v=10" defer></script>
     <script src="./trottl-special-presentation.js?v=1" defer></script>
     <script src="./trottl-special-panic.js?v=1" defer></script>
     <script src="./trottl-special-roulette.js?v=1" defer></script>
@@ -43,9 +43,10 @@
     <script src="./trottl-special-number-hunt.js?v=2" defer></script>
     <script src="./trottl-special-fish-catch.js?v=1" defer></script>
     <script src="./trottl-special-debug.js?v=1" defer></script>
-    <script src="./trottl-special-ui.js?v=9" defer></script>
+    <script src="./trottl-special-ui.js?v=10" defer></script>
+    <script src="./trottl-special-admin.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=88" defer></script>
+    <script src="./script.js?v=89" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -776,6 +777,12 @@
               <p class="settings-trottl-admin-feedback" id="settings-trottl-admin-feedback" aria-live="polite"></p>
             </section>
             <button class="settings-admin-logout-button" id="admin-logout" type="button">Admin abmelden</button>
+            <section class="settings-trottl-admin-reset" aria-labelledby="settings-special-reset-title">
+              <strong id="settings-special-reset-title">3er Trottl Special</strong>
+              <div class="settings-trottl-admin-room"><span>Raum 1</span><button class="settings-trottl-admin-reset-button settings-special-reset-button" data-special-room="1" type="button">Raum zurücksetzen</button></div>
+              <div class="settings-trottl-admin-room"><span>Raum 2</span><button class="settings-trottl-admin-reset-button settings-special-reset-button" data-special-room="2" type="button">Raum zurücksetzen</button></div>
+              <p class="settings-trottl-admin-feedback" id="settings-special-admin-feedback" aria-live="polite"></p>
+            </section>
           </div>
         </div>
         <p class="settings-app-version" id="settings-app-version">

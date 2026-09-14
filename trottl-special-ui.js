@@ -14,7 +14,8 @@
     const mount = q("dice-mount"), start = q("start");
     const state = { snapshot: null, rooms: [], busy: false, generation: 0, refreshPromise: null,
       refreshAgain: false, unsubscribe: null, timer: null, retryTimer: null, modal: null, pendingAvatar: null, kickTarget: null, spectatorRoom: null,
-      queue: [], processing: false, gameBusy: false, resolveFlight: null, resolveNotBefore: 0, deadlineTimer: null, hintTimer: null, animatedKey: null, resultRound: null, resultOpen: false };
+      queue: [], processing: false, gameBusy: false, resolveFlight: null, resolveNotBefore: 0, deadlineTimer: null, hintTimer: null, animatedKey: null, resultRound: null, resultOpen: false,
+      heartbeatTimer: null, cleanupTimer: null, heartbeatFlight: null, cleanupFlight: null };
     const dice = global.FischteichDice.mount({ mountPoint: mount, status: q("dice-status"), rollOnClick: false });
     const dieButton = mount.querySelector(".fischteich-die");
     const resultPanel = doc.createElement("section");
@@ -426,6 +427,7 @@
         if (["start", "avatar", "kick"].includes(state.modal) && !state.busy) closeModal();
         renderGame();
       } else renderLobby();
+      startPresence();
     }
     async function mutate(action) {
       if (state.busy || !state.snapshot || state.snapshot.membershipRole !== "player") return false;
@@ -435,18 +437,22 @@
       let success = false;
       try {
         const snapshot = await action();
-        if (generation === state.generation && state.snapshot?.session.id === sessionId) state.snapshot = snapshot;
+        if (generation !== state.generation || state.snapshot?.session.id !== sessionId) return false;
+        state.snapshot = snapshot;
         success = true;
       } catch (error) {
+        if (generation !== state.generation) return false;
         const copy = errorText(error); feedback.textContent = copy;
         const hint = state.modal === "start" ? startModal.querySelector(".guest-fish-error") : q(`${state.modal}-modal-feedback`);
         if (hint) hint.textContent = copy;
       } finally {
-        state.busy = false;
-        for (const modal of Object.values(modals)) for (const item of modal.querySelectorAll("button")) item.disabled = false;
-        if (success) closeModal();
-        renderSession();
-        if (state.modal === "avatar") renderAvatar();
+        if (generation === state.generation) {
+          state.busy = false;
+          for (const modal of Object.values(modals)) for (const item of modal.querySelectorAll("button")) item.disabled = false;
+          if (success) closeModal();
+          renderSession();
+          if (state.modal === "avatar") renderAvatar();
+        }
       }
       return success;
     }
@@ -474,13 +480,64 @@
       state.pendingAvatar = self.avatarId; q("avatar-modal-feedback").textContent = "";
       renderAvatar(); openModal("avatar");
     }
+    function stopPresence() {
+      global.clearInterval(state.heartbeatTimer); state.heartbeatTimer = null;
+      global.clearInterval(state.cleanupTimer); state.cleanupTimer = null;
+      state.heartbeatFlight = null; state.cleanupFlight = null;
+    }
+    async function presence(kind) {
+      const s = state.snapshot, generation = state.generation, field = kind === "heartbeat" ? "heartbeatFlight" : "cleanupFlight";
+      if (!s || session.hidden || doc.visibilityState === "hidden" || state[field]) return;
+      if (kind === "cleanup" && (s.membershipRole !== "player" || s.session.status !== "lobby")) return;
+      const token = {}; state[field] = token;
+      try {
+        if (kind === "cleanup") await service.cleanupLobby(s.session.id);
+        else if (s.membershipRole === "spectator") await service.heartbeatSpectator(s.session.id);
+        else await service.heartbeat(s.session.id);
+      } catch (error) {
+        if (generation === state.generation && /NOT_MEMBER|NOT_SPECTATOR|NOT_PLAYING|SESSION_NOT_FOUND/.test(String(error?.message))) await forceExit(s.session.id);
+      } finally { if (state[field] === token) state[field] = null; }
+    }
+    function startPresence() {
+      if (!state.snapshot || session.hidden || doc.visibilityState === "hidden") return;
+      if (state.heartbeatTimer === null) state.heartbeatTimer = global.setInterval(() => void presence("heartbeat"), 30_000);
+      if (state.snapshot.membershipRole === "player" && state.snapshot.session.status === "lobby") {
+        if (state.cleanupTimer === null) state.cleanupTimer = global.setInterval(() => void presence("cleanup"), 20_000);
+      } else { global.clearInterval(state.cleanupTimer); state.cleanupTimer = null; }
+    }
+    function lifecycleEvent(payload) {
+      const s = state.snapshot; if (!s) return;
+      const ownTable = s.membershipRole === "spectator" ? service.tables.spectators : service.tables.players;
+      if ((payload?.eventType === "DELETE" && payload.table === ownTable && payload.old?.session_id === s.session.id && payload.old?.user_id === s.identity.userId)
+        || (payload?.eventType === "DELETE" && payload.table === service.tables.sessions && payload.old?.id === s.session.id)
+        || (payload?.eventType === "UPDATE" && payload.table === service.tables.sessions && payload.new?.id === s.session.id && payload.new.status === "finished")
+        || (payload?.eventType === "UPDATE" && payload.table === service.tables.players && payload.new?.session_id === s.session.id && payload.new?.user_id === s.identity.userId && payload.new.lifecycle_status === "left")) {
+        void forceExit(s.session.id); return;
+      }
+      void refresh();
+    }
+    async function forceExit(id) {
+      if (state.snapshot?.session.id !== id) return;
+      state.busy = false; const generation = ++state.generation;
+      state.snapshot = null; state.refreshPromise = null; state.refreshAgain = false;
+      state.pendingAvatar = null; state.kickTarget = null; state.spectatorRoom = null; state.resultRound = null; state.resultOpen = false;
+      state.queue = []; state.processing = false; state.gameBusy = false; state.resolveFlight = null;
+      dieButton.disabled = true; start.disabled = true;
+      for (const modal of Object.values(modals)) { modal.hidden = true; for (const b of modal.querySelectorAll("button")) b.disabled = false; }
+      state.modal = null; returnFocus = null; feedback.textContent = ""; q("game-feedback").textContent = "";
+      try { global.localStorage.removeItem("fischteich:trottl-special-session"); } catch {}
+      showScreen(rooms);
+      await stopConnection(); if (generation === state.generation) await openRooms();
+    }
     async function stopConnection() {
+      stopPresence();
       panic?.suspend();
       roulette?.suspend();
       numberHunt?.suspend();
       fishCatch?.suspend();
       debug?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
+      global.clearTimeout(state.hintTimer); state.hintTimer = null;
       global.clearInterval(state.timer); state.timer = null;
       global.clearTimeout(state.retryTimer); state.retryTimer = null;
       const unsubscribe = state.unsubscribe; state.unsubscribe = null;
@@ -498,22 +555,29 @@
         }
       };
       state.unsubscribe = !rooms.hidden ? service.subscribeRooms(() => void refresh(), onStatus)
-        : service.subscribeSession(state.snapshot.session.id, () => void refresh(), onStatus);
+        : service.subscribeSession(state.snapshot.session.id, lifecycleEvent, onStatus);
       state.timer = global.setInterval(() => void refresh(), 20_000);
+      startPresence();
     }
     async function openSnapshot(snapshot) {
       if (snapshot.membershipRole === "none" || snapshot.session.status === "finished") { await openRooms(); return; }
-      ++state.generation; await stopConnection(); state.snapshot = snapshot;
+      const generation = ++state.generation; await stopConnection();
+      if (generation !== state.generation) return;
+      state.snapshot = snapshot;
       state.resolveFlight = null; state.resolveNotBefore = 0; q("game-feedback").textContent = "";
       state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       try { global.localStorage.setItem("fischteich:trottl-special-session", snapshot.session.id); } catch {}
       rememberMode("special"); showScreen(session); renderSession(); connect();
+      await presence("heartbeat");
+      if (state.snapshot?.session.id !== snapshot.session.id) return;
       doc.querySelector("#close-trottl-special-session").focus();
       if (snapshot.session.status === "lobby" && snapshot.players.some(p => p.userId === snapshot.identity.userId && p.avatarId === null)) openAvatar();
     }
     async function openRooms() {
       if (state.busy) return;
-      ++state.generation; await stopConnection(); closeModal(); state.snapshot = null;
+      const generation = ++state.generation; await stopConnection();
+      if (generation !== state.generation) return;
+      closeModal(); state.snapshot = null;
       state.resolveFlight = null; state.resolveNotBefore = 0;
       state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       rememberMode("special"); showScreen(rooms); q("room-feedback").textContent = "Räume werden geladen …";
@@ -527,7 +591,7 @@
         openModal("spectate"); return;
       }
       state.busy = true; renderRooms();
-      try { await openSnapshot(await (room?.isMember ? service.loadSession(room.sessionId) : service.joinRoom(slot))); }
+      try { await openSnapshot(await (room?.isMember ? service.recoverSession(room.sessionId) : service.joinRoom(slot))); }
       catch (error) { q("room-feedback").textContent = errorText(error); }
       finally {
         state.busy = false; renderRooms(); renderSession();
@@ -538,44 +602,45 @@
       if ((rooms.hidden && session.hidden) || doc.visibilityState === "hidden") return;
       if (state.refreshPromise) { state.refreshAgain = true; return state.refreshPromise; }
       const generation = state.generation, snapshot = state.snapshot;
-      state.refreshPromise = (async () => {
+      let request;
+      request = (async () => {
         try {
           if (!rooms.hidden) {
             const summaries = await service.loadRooms();
             if (generation !== state.generation) return;
             state.rooms = summaries; q("room-feedback").textContent = ""; renderRooms();
           } else if (snapshot) {
-            if (snapshot.membershipRole === "spectator") await service.heartbeatSpectator(snapshot.session.id);
-            else await service.heartbeat(snapshot.session.id);
-            if (snapshot.membershipRole === "player" && snapshot.session.status === "lobby") await service.cleanupLobby(snapshot.session.id);
             const loaded = await service.loadSession(snapshot.session.id);
             if (generation !== state.generation) return;
             if (loaded.session.status === "finished" || loaded.membershipRole === "none") {
-              await openRooms(); return;
+              await forceExit(snapshot.session.id); return;
             }
-            if (!state.processing) { acceptSnapshot(loaded); feedback.textContent = ""; renderSession(); }
+            if (!state.processing) { acceptSnapshot(loaded); feedback.textContent = ""; renderSession(); startPresence(); }
           }
         } catch (error) {
           if (generation !== state.generation) return;
           if (String(error?.message).includes("NOT_MEMBER") || String(error?.message).includes("NOT_SPECTATOR") || String(error?.message).includes("NOT_PLAYING") || String(error?.message).includes("SESSION_NOT_FOUND")) {
-            await openRooms(); return;
+            if (snapshot) await forceExit(snapshot.session.id); return;
           }
           const target = rooms.hidden ? feedback : q("room-feedback");
           target.textContent = "Verbindung wird geprüft. Bitte erneut versuchen.";
         }
       })().finally(() => {
+        if (state.refreshPromise !== request) return;
         state.refreshPromise = null;
         if (state.refreshAgain) { state.refreshAgain = false; void refresh(); }
       });
+      state.refreshPromise = request;
       return state.refreshPromise;
     }
     async function leave() {
       if (!state.snapshot || state.busy) return;
       if (state.snapshot.membershipRole === "spectator") {
+        const generation = state.generation, id = state.snapshot.session.id;
         state.busy = true;
-        try { await service.leaveSpectator(state.snapshot.session.id); state.busy = false; await openRooms(); }
-        catch (error) { feedback.textContent = errorText(error); }
-        finally { state.busy = false; }
+        try { await service.leaveSpectator(id); if (generation !== state.generation) return;state.busy = false; await openRooms(); }
+        catch (error) { if (generation === state.generation) feedback.textContent = errorText(error); }
+        finally { if (generation === state.generation) state.busy = false; }
         return;
       }
       if (await mutate(async () => { await service.leaveSession(state.snapshot.session.id); return state.snapshot; })) await openRooms();
@@ -656,7 +721,7 @@
     });
     async function resume() {
       if (rooms.hidden && session.hidden) return;
-      await stopConnection(); connect(); await refresh();
+      await stopConnection(); connect(); await presence("heartbeat"); await refresh();
     }
     doc.addEventListener("visibilitychange", () => { if (doc.visibilityState === "hidden") void stopConnection(); else void resume(); });
     global.addEventListener("pagehide", () => void stopConnection());

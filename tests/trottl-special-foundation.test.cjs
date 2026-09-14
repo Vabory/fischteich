@@ -11,8 +11,8 @@ const sql = read("supabase/migrations/20260913010000_add_trottl_special_foundati
 const flush = async () => { for (let i=0; i<8; i++) await new Promise(resolve => setImmediate(resolve)); };
 
 function harness(count=3) {
-  const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[], timeouts=new Map(); let timeoutId=0, inputId=0;
-  let userId = "u0", gameRPC = null, rouletteRPC = null, numberHuntRPC = null, serverTime = null;
+  const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[], timeouts=new Map(), intervals=new Map(), events={}; let timeoutId=0, inputId=0, intervalId=0;
+  let userId = "u0", gameRPC = null, rouletteRPC = null, numberHuntRPC = null, lobbyRPC = null, serverTime = null;
   const players = Array.from({length:count}, (_,seat_index) => ({ session_id:"special-1",user_id:`u${seat_index}`,
     seat_index,display_name_snapshot:`Spieler ${seat_index}`,avatar_id:"turbo-lachs",is_ready:true,lives:3,lifecycle_status:"alive",critical_used:false,joined_at:"2026-09-13",last_seen_at:"2026-09-13" }));
   const rows = { special: { id:"special-1",mode:"special",room_slot:1,status:"lobby",host_user_id:"u0",player_count:count,
@@ -23,6 +23,7 @@ function harness(count=3) {
       if (name==="act_trottl_special_game" && gameRPC) return gameRPC(p);
       if (name==="act_trottl_special_roulette" && rouletteRPC) return rouletteRPC(p);
       if (name==="tap_trottl_special_number_hunt" && numberHuntRPC) return numberHuntRPC(p);
+      if (["set_trottl_special_ready","set_trottl_special_avatar","start_trottl_special_session"].includes(name) && lobbyRPC) return lobbyRPC(p);
       if (name==="get_trottl_special_server_time" && serverTime!==null) return {data:new Date(serverTime).toISOString(),error:null};
       const role=players.some(x=>x.user_id===userId)?"player":spectators.some(x=>x.user_id===userId)?"spectator":"none";
       if(name==="get_trottl_special_membership")return {data:[{membership_role:role,spectator_count:spectators.length}],error:null};
@@ -57,17 +58,81 @@ function harness(count=3) {
     channel(name){const ch={name,handlers:[],on(type,options,fn){this.handlers.push({type,options,fn});return this;},subscribe(){return this;}};channels.push(ch);return ch;},
     async removeChannel(ch){channels.splice(channels.indexOf(ch),1);}
   };
-  const win={document:doc,crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++inputId).padStart(12,"0")}`},localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)},
-    addEventListener(){},requestAnimationFrame(){return 1;},MutationObserver:class{observe(){}},
-    setInterval(){return 1;},clearInterval(){},setTimeout(fn,ms){const id=++timeoutId;timeouts.set(id,{fn,ms});return id;},clearTimeout(id){timeouts.delete(id);}};
+  const win={document:doc,crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++inputId).padStart(12,"0")}`},localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
+    addEventListener(type,fn){(events[type]??=[]).push(fn);},requestAnimationFrame(){return 1;},MutationObserver:class{observe(){}},
+    setInterval(fn,ms){const id=++intervalId;intervals.set(id,{fn,ms});return id;},clearInterval(id){intervals.delete(id);},setTimeout(fn,ms){const id=++timeoutId;timeouts.set(id,{fn,ms});return id;},clearTimeout(id){timeouts.delete(id);}};
   const context=vm.createContext({window:win,document:doc,console,supabaseClient:client,
     getLocalIdentity:()=>({displayName:"Spieler 0",deviceId:"device"}),initializeAppAuth:async()=>{},
     syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0"}})});
   for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-roulette.js","trottl-special-minigames.js","trottl-special-number-hunt.js","trottl-special-fish-catch.js","trottl-special-debug.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
-  return {doc,win,ui,calls,channels,rows,players,spectators,store,timeouts,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},setNumberHuntRPC:fn=>{numberHuntRPC=fn;},setServerTime:t=>{serverTime=t;},service:win.trottlSpecialService};
+  return {doc,win,ui,calls,channels,rows,players,spectators,store,timeouts,intervals,events,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setLobbyRPC:fn=>{lobbyRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},setNumberHuntRPC:fn=>{numberHuntRPC=fn;},setServerTime:t=>{serverTime=t;},service:win.trottlSpecialService};
 }
+
+async function openLobby(h) {
+ await h.ui.openRooms();await flush();h.doc.querySelector("#trottl-special-room-list").children[0].click();await flush();
+}
+function lifecycle(h, payload) {
+ const channel=h.channels.find(c=>c.name.includes("-session-"));
+ assert.ok(channel);channel.handlers.find(x=>x.options.table===payload.table).fn(payload);
+}
+test("lobby opening recovers once and pings immediately; snapshot/realtime refresh stays read-only",async()=>{
+ const h=harness();await openLobby(h);
+ assert.equal(h.calls.filter(c=>c.name==="recover_trottl_special_lobby").length,1);
+ assert.equal(h.calls.filter(c=>c.name==="heartbeat_trottl_special_session").length,1);
+ h.calls.length=0;
+ lifecycle(h,{table:"trottl_special_sessions",eventType:"UPDATE",old:{...h.rows.special},new:{...h.rows.special}});await flush();
+ assert.ok(h.calls.some(c=>c.table==="trottl_special_sessions"));
+ assert.ok(!h.calls.some(c=>/heartbeat|cleanup|recover|reconcile/.test(c.name??"")));
+});
+test("30s heartbeat and 20s lobby cleanup use independent RPC-only timers, including non-host",async()=>{
+ const h=harness();h.setUser("u1");await openLobby(h);
+ const timers=[...h.intervals.values()];assert.equal(timers.filter(t=>t.ms===30000).length,1);assert.equal(timers.filter(t=>t.ms===20000).length,2);
+ h.calls.length=0;timers.find(t=>t.ms===30000).fn();await flush();
+ assert.deepEqual(h.calls.map(c=>c.name),["heartbeat_trottl_special_session"]);
+ h.calls.length=0;for(const t of timers.filter(t=>t.ms===20000)){t.fn();await flush();}
+ assert.equal(h.calls.filter(c=>c.name==="cleanup_trottl_special_lobby").length,1);
+ assert.ok(h.calls.some(c=>c.table==="trottl_special_sessions"));assert.ok(!h.calls.some(c=>/heartbeat|recover/.test(c.name??"")));
+});
+test("hidden pauses all presence timers; resume/online heartbeat immediately; ingame never gets lobby cleanup",async()=>{
+ const h=harness();await openLobby(h);h.doc.visibilityState="hidden";
+ for(const fn of h.doc.listeners.visibilitychange)fn();await flush();assert.equal(h.intervals.size,0);
+ h.calls.length=0;h.doc.visibilityState="visible";for(const fn of h.doc.listeners.visibilitychange)fn();await flush();
+ assert.equal(h.calls.filter(c=>c.name==="heartbeat_trottl_special_session").length,1);
+ h.calls.length=0;for(const fn of h.events.online)fn();await flush();assert.equal(h.calls.filter(c=>c.name==="heartbeat_trottl_special_session").length,1);
+ h.rows.special.status="playing";h.rows.special.current_turn_seat=0;await h.ui.refresh();await flush();
+ assert.equal([...h.intervals.values()].filter(t=>t.ms===20000).length,1);
+ h.calls.length=0;for(const t of h.intervals.values()){t.fn();await flush();}assert.ok(!h.calls.some(c=>c.name==="cleanup_trottl_special_lobby"));
+});
+test("own DELETE forces exit during pending Ready and neutralizes late mutation response",async()=>{
+ const h=harness();await openLobby(h);let release;h.setLobbyRPC(()=>new Promise(r=>{release=r;}));
+ h.doc.querySelector(".trottl-classic-ready-button").click();await flush();assert.equal(typeof release,"function");
+ const own=h.players.shift();lifecycle(h,{table:"trottl_special_players",eventType:"DELETE",old:own});await flush();
+ assert.equal(h.ui.isRoomScreenActive(),true);assert.equal(h.ui.isSessionScreenActive(),false);
+ assert.equal(h.store.has("fischteich:trottl-special-session"),false);assert.ok(h.channels.every(c=>c.name.includes("-rooms-")));
+ assert.equal([...h.intervals.values()].filter(t=>t.ms===30000).length,0);
+ release({data:true,error:null});await flush();assert.equal(h.ui.isRoomScreenActive(),true);
+});
+for(const kind of ["delete","finished","left"])test(`definitive ${kind} lifecycle exits without a snapshot wait`,async()=>{
+ const h=harness();await openLobby(h);
+ lifecycle(h,kind==="left"?{table:"trottl_special_players",eventType:"UPDATE",new:{...h.players[0],lifecycle_status:"left"}}:
+ {table:"trottl_special_sessions",eventType:kind==="delete"?"DELETE":"UPDATE",old:{...h.rows.special},new:{...h.rows.special,status:"finished"}});
+ await flush();assert.equal(h.ui.isRoomScreenActive(),true);
+});
+test("foreign player deletion refreshes rather than forcing own exit",async()=>{
+ const h=harness();await openLobby(h);const other=h.players.pop();h.rows.special.player_count=2;
+ lifecycle(h,{table:"trottl_special_players",eventType:"DELETE",old:other});await flush();assert.equal(h.ui.isSessionScreenActive(),true);
+});
+test("spectator own deletion forces exit and stops spectator heartbeat",async()=>{
+ const h=harness();h.setUser("viewer");h.spectators.push({user_id:"viewer",session_id:"special-1"});await openGame(h,{});
+ lifecycle(h,{table:"trottl_special_spectators",eventType:"DELETE",old:h.spectators.shift()});await flush();assert.equal(h.ui.isRoomScreenActive(),true);
+ assert.equal([...h.intervals.values()].filter(t=>t.ms===30000).length,0);
+});
+test("admin service addresses Special only and rejects invalid slots before RPC",async()=>{
+ const h=harness();assert.equal(await h.service.adminResetRoom(2),true);assert.deepEqual({...h.calls[0].p},{p_room_slot:2});
+ assert.equal(h.calls[0].name,"admin_reset_trottl_special_room");await assert.rejects(h.service.adminResetRoom(3));assert.equal(h.calls.length,1);
+});
 
 test("Classic and Special room one summaries are independent in both lobby and playing combinations",async()=>{
   const h=harness();

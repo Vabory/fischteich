@@ -12,7 +12,7 @@ const css = read("style.css");
 const script = read("script.js");
 
 assert.match(html, /style\.css\?v=188/);
-assert.match(html, /script\.js\?v=88/);
+assert.match(html, /script\.js\?v=89/);
 assert.equal((html.match(/rage-cage-cup--extra/g) ?? []).length, 6);
 assert.equal((html.match(/rage-cage-cup--upper/g) ?? []).length, 3);
 assert.equal((html.match(/rage-cage-cup--lower/g) ?? []).length, 3);

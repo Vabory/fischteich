@@ -1247,7 +1247,7 @@
         const trottlBadge = document.createElement("span");
         trottlBadge.className = "trottl-classic-trottl-badge";
         trottlBadge.setAttribute("aria-hidden", "true");
-        trottlBadge.textContent = "3ER";
+        trottlBadge.textContent = "TROTTL";
         avatarWrap.append(trottlBadge);
       }
       if (cardPresentation.status) {

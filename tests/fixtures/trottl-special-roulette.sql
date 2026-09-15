@@ -156,20 +156,41 @@ begin
  perform pg_temp.roulette_expect_error(format('select public.act_trottl_special_roulette(%L,%L,''confirm'')',v_id,r),'SPECIAL_INVALID_REWARD_ACTOR');
  for i in 3..4 loop perform set_config('request.jwt.claim.sub',ids[i]::text,true);perform public.act_trottl_special_roulette(v_id,r,'shot_ack');end loop;
 end; $$;
--- Productive six enters roulette; rescue six restores EXACTLY one and keeps same actor/extra roll.
-do $$ declare f jsonb;v_id uuid;ids uuid[];g jsonb;is_rescue boolean;n integer;
+-- Productive six enters roulette; rescue 1..5 eliminates, while rescue six restores
+-- exactly one life and advances past eliminated/left seats without an extra roll.
+do $$ declare f jsonb;v_id uuid;ids uuid[];g jsonb;is_rescue boolean;n integer;rescue_result integer;
 begin
+ for rescue_result in 1..5 loop
+  f:=pg_temp.roulette_prepare(null);v_id:=(f->>'id')::uuid;
+  select array_agg(value::uuid order by ordinality) into ids from jsonb_array_elements_text(f->'ids') with ordinality;
+  update public.trottl_special_players set lives=0,lifecycle_status='critical',critical_used=true where session_id=v_id and user_id=ids[1];
+  update public.trottl_special_players set lives=0,lifecycle_status='eliminated' where session_id=v_id and user_id=ids[2];
+  update public.trottl_special_players set lifecycle_status='left' where session_id=v_id and user_id=ids[3];
+  update public.trottl_special_sessions set game_state=(game_state-'roulette')||jsonb_build_object('phase','rolling','result',rescue_result,'rescue',true,
+   'deadline',clock_timestamp()-interval '1 second') where id=v_id;
+  perform public.act_trottl_special_game(v_id,'resolve',(f->>'seq')::bigint);
+  select game_state into g from public.trottl_special_sessions where id=v_id;
+  select lives into n from public.trottl_special_players where session_id=v_id and user_id=ids[1];
+  if n<>0 or (select lifecycle_status from public.trottl_special_players where session_id=v_id and user_id=ids[1])<>'eliminated'
+    or g->>'actor'<>ids[4]::text or g ? 'roulette' then raise exception 'Failed rescue 1-5 regression: %',rescue_result; end if;
+ end loop;
  foreach is_rescue in array array[false,true] loop
   f:=pg_temp.roulette_prepare(null);v_id:=(f->>'id')::uuid;
   select array_agg(value::uuid order by ordinality) into ids from jsonb_array_elements_text(f->'ids') with ordinality;
-  if is_rescue then update public.trottl_special_players set lives=0,lifecycle_status='critical',critical_used=true where session_id=v_id and user_id=ids[1]; end if;
+  if is_rescue then
+   update public.trottl_special_players set lives=0,lifecycle_status='critical',critical_used=true where session_id=v_id and user_id=ids[1];
+   update public.trottl_special_players set lives=0,lifecycle_status='eliminated' where session_id=v_id and user_id=ids[2];
+   update public.trottl_special_players set lifecycle_status='left' where session_id=v_id and user_id=ids[3];
+  end if;
   update public.trottl_special_sessions set game_state=(game_state-'roulette')||jsonb_build_object('phase','rolling','result',6,'rescue',is_rescue,
    'deadline',clock_timestamp()-interval '1 second') where id=v_id;
   perform public.act_trottl_special_game(v_id,'resolve',(f->>'seq')::bigint);
   select game_state into g from public.trottl_special_sessions where id=v_id;
   if is_rescue then
    select lives into n from public.trottl_special_players where session_id=v_id and user_id=ids[1];
-   if n<>1 or g->>'phase'<>'awaiting_roll' or g->>'actor'<>ids[1]::text or g ? 'roulette' then raise exception 'Rescue-six regression'; end if;
+   if n<>1 or g->>'phase'<>'awaiting_roll' or g->>'actor'<>ids[4]::text or g ? 'roulette'
+     or (select not critical_used from public.trottl_special_players where session_id=v_id and user_id=ids[1])
+     then raise exception 'Rescue-six next-turn/reconnect regression'; end if;
   elsif g->>'phase'<>'roulette_choose_color' then raise exception 'Normal six not activated'; end if;
  end loop;
 end; $$;

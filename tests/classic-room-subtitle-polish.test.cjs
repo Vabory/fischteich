@@ -45,5 +45,5 @@ test("entire CSS is unchanged apart from the two deliberate room positioning adj
 });
 
 test("Classic rendering, click handlers, seats and gameplay remain byte-identical", () => {
-  assert.equal(hash(read("trottl-classic-ui.js")), "cb1b68f158ed59b0f9eeee212d27e8ea010b1b36aa348d9e13d2cdcff1650650");
+  assert.equal(hash(read("trottl-classic-ui.js")), "c8df38d9ba3f4698b861ac0014b7a9fb2a342b7fd401e5ed6e1f0898bc905400");
 });

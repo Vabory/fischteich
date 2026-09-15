@@ -120,6 +120,6 @@ test("native disposable PostgreSQL fixture covers pool boundaries, force 1..6, r
  assert.match(fixture,/rollback;\n$/);
 });
 test("versioned fish/debug load after shell before Special UI; unchanged Zahl/PANIK/Roulette assets retain cache",()=>{
- const html=read("index.html");for(const [file,v]of [["trottl-special-service.js",10],["trottl-special-ui.js",13],["trottl-special.css",12],["trottl-special-presentation.js",2],["trottl-special-minigames.js",2],["trottl-special-fish-catch.js",1],["trottl-special-debug.js",1],["trottl-special-number-hunt.js",2],["trottl-special-panic.js",1],["trottl-special-roulette.js",3]])assert.ok(html.includes(`${file}?v=${v}`));
+ const html=read("index.html");for(const [file,v]of [["trottl-special-service.js",10],["trottl-special-ui.js",14],["trottl-special.css",13],["trottl-special-presentation.js",2],["trottl-special-minigames.js",2],["trottl-special-fish-catch.js",1],["trottl-special-debug.js",1],["trottl-special-number-hunt.js",2],["trottl-special-panic.js",1],["trottl-special-roulette.js",3]])assert.ok(html.includes(`${file}?v=${v}`));
  assert.ok(html.indexOf("trottl-special-minigames.js")<html.indexOf("trottl-special-fish-catch.js"));assert.ok(html.indexOf("trottl-special-debug.js")<html.indexOf("trottl-special-ui.js"));
 });

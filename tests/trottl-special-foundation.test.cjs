@@ -392,11 +392,22 @@ test("roulette target dock excludes self/critical/dead, early confirm flashes, a
 });
 for(const reward of ["attack","transfer","heal"])test(`roulette restores pending ${reward}, confirm and undo use own event RPC`,async()=>{
  const h=harness();await openGame(h,{phase:"roulette_settlement",roulette:rouletteFixture({reward,target:reward==="heal"?null:"u1"})});
- assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,reward==="heal"?"+1 Leben":"1 / 1");
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,reward==="heal"?"+1 Leben":reward==="transfer"?"3er Trottl":"1 / 1");
  h.doc.querySelector("#trottl-special-four-confirm").click();await flush();
  h.doc.querySelector("#trottl-special-four-reset").click();await flush();
  assert.deepEqual(h.calls.filter(x=>x.name==="act_trottl_special_roulette").map(x=>x.p.p_action),["confirm","undo"]);
  assert.equal(h.calls.filter(x=>x.name==="act_trottl_special_game").length,0);
+});
+test("transfer Undo clears the target first, then returns to reward choices without changing Trottl points",async()=>{
+ const h=harness();h.setRouletteRPC(p=>{const r={...h.rows.special.game_state.roulette};if(p.p_action==="undo"){if(r.target)r.target=null;else r.reward=null;}h.rows.special.game_state={...h.rows.special.game_state,roulette:r,revision:h.rows.special.game_state.revision+1};return {data:"special-1",error:null};});
+ await openGame(h,{phase:"roulette_settlement",trottl:"u0",points:2,roulette:rouletteFixture({reward:"transfer",target:"u1"})});
+ h.doc.querySelector("#trottl-special-four-reset").click();await flush();
+ assert.equal(h.rows.special.game_state.roulette.reward,"transfer");assert.equal(h.rows.special.game_state.roulette.target,null);
+ assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"3er Trottl");
+ h.doc.querySelector("#trottl-special-four-reset").click();await flush();
+ assert.equal(h.rows.special.game_state.roulette.reward,null);assert.equal(h.rows.special.game_state.points,2);
+ assert.equal(h.doc.querySelector(".trottl-special-roulette-rewards").hidden,false);
+ assert.deepEqual(h.calls.filter(x=>x.name==="act_trottl_special_roulette").map(x=>x.p.p_action),["undo","undo"]);
 });
 for(const life of ["alive","critical","eliminated"])test(`green shot ACK is own-only and lifecycle-gated: ${life}`,async()=>{
  const h=harness();h.setUser("u1");if(life!=="alive")Object.assign(h.players[1],{lifecycle_status:life,lives:0,critical_used:true});
@@ -518,12 +529,12 @@ for(const lifecycle of ["alive","critical","eliminated"]) test(`ACK visibility a
 test("reconnect renders server distribution, ACK and Trottl points without local authority",async()=>{
  const h=harness();await openGame(h,{phase:"distribution",total:2,drinks:{u1:1},trottl:"u1",points:2});
  assert.equal(h.doc.querySelector("#trottl-special-action-progress-value").textContent,"1 / 2");
- assert.equal(h.doc.querySelector(".trottl-classic-trottl-badge").textContent,"3ER 2/3");
+ assert.equal(h.doc.querySelector(".trottl-classic-trottl-badge").textContent,"TROTTL 2/3");
 });
 const phaseSQL=read("supabase/migrations/20260913030000_add_trottl_special_phase_one.sql");
 const minigameSQL=read("supabase/migrations/20260913040000_add_trottl_special_minigame_framework.sql");
 function minigameFixture(h, overrides={}) {
- return {minigame_id:"round-1",minigame_type:"special_minigame_01",ranking_direction:"higher_is_better",status:"distribution",draw:false,
+ return {minigame_id:"round-1",minigame_type:"special_minigame_01",title:"Zahlenjagd",ranking_direction:"higher_is_better",status:"distribution",draw:false,
   participants:h.players.map(p=>({player_id:p.user_id,display_name:p.display_name_snapshot})),
   results:[{player_id:"u0",raw_value:100,display_value:"100 Punkte",rank:1,is_winner:true,is_loser:false},
    {player_id:"u1",raw_value:100,display_value:"100 Punkte",rank:1,is_winner:true,is_loser:false},
@@ -536,17 +547,51 @@ test("minigame result panel presents server ranking, ties and winner/loser flags
  const h=harness(4),m=minigameFixture(h);await openGame(h,{phase:"minigame_results",minigame:m});
  const panel=h.doc.querySelector(".trottl-special-minigame-results");
  assert.equal(panel.hidden,false);assert.equal(panel.querySelector("ol").children.length,4);
+ assert.equal(panel.querySelector("h2").textContent,"Ergebnisse von „Zahlenjagd“ Game");
+ assert.equal(panel.querySelector("p").hidden,true);
  assert.equal(panel.querySelectorAll(".is-winner").length,2);assert.equal(panel.querySelectorAll(".is-loser").length,1);
- assert.equal(h.doc.querySelector("#trottl-special-global-confirm").textContent,"ERGEBNIS BESTÄTIGEN");
+ assert.equal(panel.querySelector(".trottl-special-panic-result-confirm").textContent,"✓ ERGEBNIS BESTÄTIGEN");
+ assert.equal(h.doc.querySelector("#trottl-special-global-confirm").hidden,true);
  const seats=h.doc.querySelector("#trottl-special-seat-layer").children;
  assert.equal(seats[0].style["--seat-top"],"87%");
 });
+test("eight-player minigame ranking uses the same bounded panel with its confirm inside",async()=>{
+ const h=harness(8),m=minigameFixture(h);m.results=h.players.map((p,index)=>({player_id:p.user_id,raw_value:80-index,display_value:`${80-index} Punkte`,rank:index+1,is_winner:index===0,is_loser:index===7}));
+ await openGame(h,{phase:"minigame_results",minigame:m});const panel=h.doc.querySelector(".trottl-special-minigame-results");
+ assert.equal(panel.querySelector("ol").children.length,8);
+ assert.equal(panel.querySelector(".trottl-special-panic-result-confirm").parentNode,panel);
+ assert.match(read("trottl-special.css"),/trottl-special-minigame-results \{[^}]*max-height:[^}]*100dvh[^}]*overflow: hidden/s);
+ assert.match(read("trottl-special.css"),/trottl-special-minigame-results ol \{[^}]*overflow-y: auto/s);
+});
+test("result ACK hides the own panel and exposes the public green ready seat",async()=>{
+ const h=harness(4),m=minigameFixture(h,{result_seen:{u0:true}});await openGame(h,{phase:"minigame_results",minigame:m});
+ const seats=[...h.doc.querySelector("#trottl-special-seat-layer").children];
+ assert.equal(h.doc.querySelector(".trottl-special-minigame-results").hidden,true);
+ assert.ok(seats.find(seat=>seat.dataset.globalSeat==="0").classList.contains("trottl-special-result-ready"));
+ assert.ok(!seats.find(seat=>seat.dataset.globalSeat==="1").classList.contains("trottl-special-result-ready"));
+});
+test("spectator sees readonly results and authoritative ready seats",async()=>{
+ const h=harness(4),m=minigameFixture(h,{result_seen:{u0:true}});h.spectators.push({session_id:"special-1",user_id:"watcher"});h.setUser("watcher");
+ await openGame(h,{phase:"minigame_results",minigame:m});
+ assert.equal(h.doc.querySelector(".trottl-special-minigame-results").hidden,false);
+ assert.equal(h.doc.querySelector(".trottl-special-panic-result-confirm").hidden,true);
+ assert.equal(h.doc.querySelectorAll(".trottl-special-result-ready").length,1);
+});
+for(const phase of ["minigame_results","panic_results"])test(`${phase} keeps every acknowledged seat green for the shared ready delay, then clears it`,async()=>{
+ const h=harness(4),m=minigameFixture(h,{minigame_type:phase.startsWith("panic")?"panic":"special_minigame_01",result_seen:{u0:true,u1:true,u2:true,u3:true}});
+ h.setGameRPC(p=>{assert.equal(p.p_action,"resolve");h.rows.special.game_state={...h.rows.special.game_state,phase:phase.startsWith("panic")?"awaiting_roll":"minigame_distribution",revision:2};return {data:"special-1",error:null};});
+ await openGame(h,{phase,minigame:m,all_results_ready:true,deadline:new Date(Date.now()-1).toISOString()});
+ assert.equal(h.doc.querySelectorAll(".trottl-special-result-ready").length,4);
+ const readyTimer=[...h.timeouts.values()].find(timer=>timer.ms===40);assert.ok(readyTimer);readyTimer.fn();await flush();
+ assert.equal(h.calls.filter(c=>c.name==="act_trottl_special_game"&&c.p.p_action==="resolve").length,1);
+ assert.equal(h.doc.querySelectorAll(".trottl-special-result-ready").length,0);
+});
 test("draw results use explicit outcome and never expose winner distribution or premature drink ACK",async()=>{
  const h=harness(4);await openGame(h,{phase:"minigame_results",minigame:minigameFixture(h,{draw:true,winners:[],losers:[],distributions:{},automatic_drinks:{}}),drinks:{}});
- assert.equal(h.doc.querySelector("#trottl-special-event-copy").textContent,"Unentschieden");
+ assert.equal(h.doc.querySelector("#trottl-special-event-copy").textContent,"MINIGAME – ERGEBNIS");
  assert.equal(h.doc.querySelectorAll(".trottl-special-target").length,0);
  assert.equal(h.doc.querySelector("#trottl-special-four-confirm").hidden,true);
- assert.equal(h.doc.querySelector("#trottl-special-global-confirm").textContent,"ERGEBNIS BESTÄTIGEN");
+ assert.equal(h.doc.querySelector(".trottl-special-panic-result-confirm").hidden,false);
 });
 test("local winner dock tracks own allocation rather than aggregate or actor; other winner stays independently usable",async()=>{
  const h=harness(4);const m=minigameFixture(h);
@@ -947,7 +992,7 @@ test("server migration has independent keys, locked join/start validation and no
 });
 test("Classic code and stylesheet stay byte-identical to the finished current master",()=>{
   const hashes={"style.css":"025089862c99b9e0d231f2af94a8de2412e5e32d904c7d6f25bee9230bf15130",
-    "trottl-classic-ui.js":"cb1b68f158ed59b0f9eeee212d27e8ea010b1b36aa348d9e13d2cdcff1650650",
+    "trottl-classic-ui.js":"c8df38d9ba3f4698b861ac0014b7a9fb2a342b7fd401e5ed6e1f0898bc905400",
     "trottl-classic-service.js":"cfb53ae6de0d9133275849a7d5a11551ff6962e63de61e77c05aebb4a45f14c0",
     "classic-background-fit.js":"99c7395479f98673ab6a17299d6b54c8237038252569a23149ea19cce47b44b3"};
   for(const [f,hash]of Object.entries(hashes))assert.equal(crypto.createHash("sha256").update(read(f)).digest("hex"),hash,f);

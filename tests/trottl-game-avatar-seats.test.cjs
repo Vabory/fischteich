@@ -50,7 +50,7 @@ test("null and invalid game avatars produce a neutral non-image fallback", () =>
 test("round seats render one avatar, one-line name, self marker and detached status elements", () => {
   assert.match(uiSource, /avatarWrap\.prepend\(avatar\)[\s\S]*seat\.append\(avatarWrap, name\)/);
   assert.match(uiSource, /selfMarker\.textContent = "DU"/);
-  assert.match(uiSource, /trottlBadge\.textContent = "3ER"/);
+  assert.match(uiSource, /trottlBadge\.textContent = "TROTTL"/);
   assert.match(uiSource, /statusLabel\.className = "trottl-classic-seat-status-overlay"/);
   assert.match(css, /\.trottl-classic-game-avatar\s*\{[^}]*border-radius:\s*50%[^}]*object-fit:\s*contain/s);
   assert.match(css, /\.trottl-classic-seat-name\s*\{[^}]*max-width:\s*12ch[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s);

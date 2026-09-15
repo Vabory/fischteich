@@ -23,9 +23,9 @@
     resultPanel.className = "trottl-special-minigame-results"; resultPanel.hidden = true;
     resultPanel.setAttribute("aria-label", "Minigame-Ergebnis");
     resultPanel.innerHTML = '<h2>Minigame</h2><p></p><ol></ol>';
-    const panicConfirm = doc.createElement("button"); panicConfirm.type = "button";
-    panicConfirm.className = "trottl-special-panic-result-confirm"; panicConfirm.textContent = "✓ ERGEBNIS BESTÄTIGEN"; panicConfirm.hidden = true;
-    panicConfirm.addEventListener("click", () => void gameAction("results_ack")); resultPanel.append(panicConfirm);
+    const resultConfirm = doc.createElement("button"); resultConfirm.type = "button";
+    resultConfirm.className = "trottl-special-panic-result-confirm"; resultConfirm.textContent = "✓ ERGEBNIS BESTÄTIGEN"; resultConfirm.hidden = true;
+    resultConfirm.addEventListener("click", () => void gameAction("results_ack")); resultPanel.append(resultConfirm);
     game.append(resultPanel);
     const resultToggle = doc.createElement("button");
     resultToggle.type = "button"; resultToggle.className = "trottl-special-minigame-result-toggle"; resultToggle.hidden = true;
@@ -198,12 +198,12 @@
       stage.dataset.playerCount = String(snapshot.players.length);
       stage.style.setProperty("--seat-avatar-target", `${preset.avatarSize}px`);
       const ownWinner = playable && g.phase === "minigame_distribution" && g.minigame?.winners?.includes(local.userId) && distribution;
-      q("event-player").textContent = g.phase === "panic_results" || (g.phase === "minigame_distribution" && !ownWinner) ? ""
+      q("event-player").textContent = ["panic_results", "minigame_results"].includes(g.phase) || (g.phase === "minigame_distribution" && !ownWinner) ? ""
         : snapshot.players.find(p => p.userId === (ownWinner ? local.userId : g.actor))?.displayName ?? "";
       const messages = { awaiting_roll: "IST AM ZUG", rescue_roll: "MUSS EINE 6 WÜRFELN", rolling: g.rescue ? "LETZTE CHANCE!" : "WÜRFELT …",
         distribution: `${g.total} ${g.total === 1 ? "Schluck" : "Schlücke"} verteilen`, choose_trottl: "3ER TROTTL WÄHLEN",
         drink_ack: "SCHLÜCKE BESTÄTIGEN", trottl_peak: "3/3 – EIN LEBEN VERLIEREN", placeholder: "Special-Regel folgt", awaiting_players: "KEIN SPIELBERECHTIGTER SPIELER",
-        minigame_active: "MINIGAME LÄUFT", minigame_results: g.minigame?.draw ? "Unentschieden" : "MINIGAME-ERGEBNIS",
+        minigame_active: "MINIGAME LÄUFT", minigame_results: "MINIGAME – ERGEBNIS",
         minigame_distribution: "GEWINNER VERTEILEN SCHLÜCKE", panic_active: "PANIK!", panic_results: "PANIK – ERGEBNIS" };
       q("event-copy").textContent = g.phase?.startsWith("roulette_") ? g.phase === "roulette_choose_color" ? "RISIKO-ROULETTE – FARBE WÄHLEN" : g.phase === "roulette_spinning" ? "RISIKO-ROULETTE DREHT …" : "ROULETTE – REWARD / SHOTS" : messages[g.phase] ?? "SPIEL LÄUFT";
       q("event-roll").hidden = true; q("event-action").hidden = true; q("event-meta").hidden = true;
@@ -220,13 +220,15 @@
       resultToggle.setAttribute("aria-expanded", String(state.resultOpen));
       const showingResults = ["minigame_results", "panic_results"].includes(g.phase);
       const isPanicResult = g.phase === "panic_results";
-      resultPanel.classList.toggle("is-panic-result", isPanicResult); panicConfirm.hidden = true;
-      resultPanel.hidden = !(showingResults || (!resultToggle.hidden && state.resultOpen));
+      const localResultSeen = Boolean(g.minigame?.result_seen?.[local?.userId]);
+      const showResultPanel = showingResults && (spectator || !localResultSeen);
+      resultPanel.classList.toggle("is-panic-result", isPanicResult); resultConfirm.hidden = true;
+      resultPanel.hidden = !(showResultPanel || (!resultToggle.hidden && state.resultOpen));
       if (!resultPanel.hidden) {
         const m = g.minigame;
-        resultPanel.querySelector("h2").textContent = isPanicResult ? "Ergebnisse von Panik Event" : m.title ?? m.minigame_type;
-        resultPanel.querySelector("p").textContent = isPanicResult ? "" : m.all_tied ? "Alle gleich – alle Gewinner · je 2 Schlücke verteilen" : m.draw ? "Unentschieden – keine Schlücke" : showingResults ? "Ergebnis bestätigen, um fortzufahren" : "Gewinner grün · Verlierer rot";
-        resultPanel.querySelector("p").hidden = isPanicResult;
+        resultPanel.querySelector("h2").textContent = isPanicResult ? "Ergebnisse von Panik Event" : `Ergebnisse von „${m.title ?? m.minigame_type}“ Game`;
+        resultPanel.querySelector("p").textContent = m.all_tied ? "Alle gleich – alle Gewinner · je 2 Schlücke verteilen" : m.draw ? "Unentschieden – keine Schlücke" : "Gewinner grün · Verlierer rot";
+        resultPanel.querySelector("p").hidden = showingResults;
         resultPanel.querySelector("ol").replaceChildren(...(m.results ?? []).map(row => {
           const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
           const item = node("li", row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : "");
@@ -258,6 +260,7 @@
           isDrinkTarget: pendingDrink && !selectableDrink,
           isAllocationImpact: pickImpact || (rouletteSelectable && roulette.pickImpact(player.userId)), isShotTarget: rouletteShot, isActionImpact: rouletteShot && roulette.shotImpact(player.userId) });
         const seat = node("article", card.classes.join(" "));
+        if (showingResults && player.lifecycle !== "eliminated" && g.minigame?.result_seen?.[player.userId]) seat.classList.add("trottl-special-result-ready");
         if (pendingDrink && !selectableDrink) seat.classList.add("trottl-special-pending-drink");
         if (attackSelectable) seat.classList.add("trottl-special-attack-selectable");
         if (attackSelected) seat.classList.add("trottl-special-attack-selected");
@@ -300,7 +303,7 @@
         }
         if (player.lifecycle === "critical") wrap.append(node("span", "trottl-special-critical-badge", "LETZTE CHANCE!"));
         if (g.trottl === player.userId) {
-          const badge = node("span", `trottl-classic-trottl-badge${g.phase === "trottl_peak" ? " trottl-special-peak" : ""}`, `3ER ${g.points}/3`);
+          const badge = node("span", `trottl-classic-trottl-badge${g.phase === "trottl_peak" ? " trottl-special-peak" : ""}`, `TROTTL ${g.points}/3`);
           wrap.append(badge);
         }
         const amount = Number(drinksView.totals[player.userId] ?? 0);
@@ -325,10 +328,10 @@
       const progress = q("action-progress"), reset = q("four-reset"), confirm = q("four-confirm"), ack = q("global-confirm");
       progress.hidden = reset.hidden = confirm.hidden = !distributing;
       const resultAck = playable && showingResults && g.minigame.participants.some(p => p.player_id === local.userId) && !g.minigame.result_seen?.[local.userId];
-      panicConfirm.hidden = !(isPanicResult && resultAck); panicConfirm.disabled = state.gameBusy;
-      ack.hidden = !(resultAck || (playable && g.phase === "drink_ack" && Number(g.drinks?.[local.userId]) > 0 && !g.acks?.[local.userId]));
+      resultConfirm.hidden = !resultAck; resultConfirm.disabled = state.gameBusy;
+      ack.hidden = !(playable && g.phase === "drink_ack" && Number(g.drinks?.[local.userId]) > 0 && !g.acks?.[local.userId]);
       const received = Number(g.drinks?.[local?.userId] ?? 0);
-      ack.textContent = resultAck ? "ERGEBNIS BESTÄTIGEN" : `${received} ${received === 1 ? "SCHLUCK" : "SCHLÜCKE"} BESTÄTIGEN`;
+      ack.textContent = `${received} ${received === 1 ? "SCHLUCK" : "SCHLÜCKE"} BESTÄTIGEN`;
       ack.disabled = state.gameBusy;
       if (isPanicResult) ack.hidden = true;
       if (!ack.hidden) q("rule-controls").classList.add("has-confirm-action");
@@ -351,8 +354,8 @@
           q("rule-controls").classList.add("has-four-actions", "has-actions");
           progress.hidden = reset.hidden = confirm.hidden = false;
           const complete = r.reward === "heal" || Boolean(r.target);
-          q("action-progress-value").textContent = r.reward === "heal" ? "+1 Leben" : `${complete ? 1 : 0} / 1`;
-          progress.querySelector("span").textContent = r.reward === "heal" ? "Wiederherstellen" : "Spieler gewählt";
+          q("action-progress-value").textContent = r.reward === "heal" ? "+1 Leben" : r.reward === "transfer" ? "3er Trottl" : `${complete ? 1 : 0} / 1`;
+          progress.querySelector("span").textContent = r.reward === "heal" ? "Wiederherstellen" : r.reward === "transfer" ? "weitergeben" : "Spieler gewählt";
           confirm.classList.toggle("is-incomplete", !complete); confirm.classList.toggle("is-ready-impact", complete);
           confirm.disabled = reset.disabled = state.gameBusy;
         }
@@ -367,7 +370,7 @@
         }
       }
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
-      if (["rolling", "trottl_peak", "placeholder"].includes(g.phase) && !state.resolveFlight) {
+      if (!state.resolveFlight && (["rolling", "trottl_peak", "placeholder"].includes(g.phase) || (["minigame_results", "panic_results"].includes(g.phase) && g.all_results_ready))) {
         const generation = state.generation;
         const id = snapshot.session.id, seq = g.roll_seq, phase = g.phase;
         state.deadlineTimer = global.setTimeout(() => {
@@ -402,7 +405,7 @@
       if (!state.snapshot || (action !== "resolve" && state.gameBusy)) return;
       const snapshot = state.snapshot, generation = state.generation;
       const automatic = action === "resolve";
-      if (automatic && (state.resolveFlight || Date.now() < state.resolveNotBefore || !["rolling", "trottl_peak", "placeholder", "panic_active", "roulette_spinning"].includes(snapshot.session.gameState.phase))) return;
+      if (automatic && (state.resolveFlight || Date.now() < state.resolveNotBefore || !["rolling", "trottl_peak", "placeholder", "panic_active", "roulette_spinning", "minigame_results", "panic_results"].includes(snapshot.session.gameState.phase))) return;
       if (action !== "resolve" && (snapshot.membershipRole !== "player" || !snapshot.players.some(p => p.userId === snapshot.identity.userId && ["alive", "critical"].includes(p.lifecycle)))) return;
       const flight = {}; if (automatic) { state.resolveFlight = flight; global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null; }
       else { state.gameBusy = true; renderSession(); }

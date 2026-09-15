@@ -140,5 +140,5 @@ test("SQL structure: migration transaction, dollar bodies, private helper revoke
   assert.ok(sql.slice(sql.lastIndexOf("revoke all on function")).includes(`public.${name}(`));
  }
  const fixture=read("tests/fixtures/trottl-special-roulette.sql");assert.ok(fixture.trim().endsWith("rollback;"));
- for(const phrase of ["Boundary mapping","Attack matrix","Heal +1","Transfer points lost","Parallel green stalled","Rescue-six regression","Binding green spin lost","No available reward deadlock","Expected %"])assert.ok(fixture.includes(phrase));
+ for(const phrase of ["Boundary mapping","Attack matrix","Heal +1","Transfer points lost","Parallel green stalled","Failed rescue 1-5 regression","Rescue-six next-turn/reconnect regression","Binding green spin lost","No available reward deadlock","Expected %"])assert.ok(fixture.includes(phrase));
 });

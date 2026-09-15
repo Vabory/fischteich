@@ -1,9 +1,11 @@
 "use strict";
 (function installFishCatch(global) {
   const CONFIG = Object.freeze({
-    roundDurationMs: 10000, slotCount: 10, spawnCountMin: 26, spawnCountMax: 32,
-    lifetimeMinMs: 520, lifetimeMaxMs: 820, maxSimultaneous: 3,
-    spawnSpacingMinMs: 130, spawnSpacingMaxMs: 330, sameSlotCooldownMs: 180,
+    roundDurationMs: 10000, slotCount: 10, spawnCountMin: 34, spawnCountMax: 42,
+    legacySpawnCountMin: 26, legacySpawnCountMax: 32,
+    lifetimeMinMs: 400, lifetimeMaxMs: 650, maxSimultaneous: 4,
+    spawnSpacingMinMs: 100, spawnSpacingMaxMs: 270, latePhaseStartMs: 8000,
+    lateSpawnCountMin: 6, lateSpawnCountMax: 8, lastSpawnMinMs: 9400, lastSpawnMaxMs: 9600, sameSlotCooldownMs: 180,
     popAnimationMs: 120, fishSizePx: 52, slotSizePx: 46, checkpointMs: 500, retryMs: 750,
   });
   const FISH_CATCH_ASSETS = Object.freeze(Array.from({ length: 8 }, (_, index) => `./assets/mini-games/${index + 1}-fish.png`));
@@ -14,7 +16,10 @@
   }
 
   function validatePattern(pattern) {
-    if (!Array.isArray(pattern) || pattern.length < CONFIG.spawnCountMin || pattern.length > CONFIG.spawnCountMax) return false;
+    if (!Array.isArray(pattern)) return false;
+    const currentCount = pattern.length >= CONFIG.spawnCountMin && pattern.length <= CONFIG.spawnCountMax;
+    const legacyCount = pattern.length >= CONFIG.legacySpawnCountMin && pattern.length <= CONFIG.legacySpawnCountMax;
+    if (!currentCount && !legacyCount) return false;
     const ids = new Set();
     return pattern.every((spawn) => {
       const valid = Number.isInteger(spawn?.i) && spawn.i >= 0 && spawn.i < pattern.length && !ids.has(spawn.i)

@@ -18,14 +18,16 @@ end; $$;
 do $$ declare p jsonb:=public.special_fish_catch_pattern(123456);q jsonb:=public.special_fish_catch_pattern(654321);entry jsonb;
 begin
  if p is distinct from public.special_fish_catch_pattern(123456) or p=q then raise exception 'Seeded pattern determinism'; end if;
- if jsonb_array_length(p) not between 26 and 32 then raise exception 'Pattern count'; end if;
+ if jsonb_array_length(p) not between 34 and 42 then raise exception 'Pattern count'; end if;
  for entry in select value from jsonb_array_elements(p) loop
   if (entry->>'s')::integer not between 0 and 9 or (entry->>'a')::integer not between 1 and 8
-   or (entry->>'t')::integer<0 or (entry->>'d')::integer not between 520 and 820
+   or (entry->>'t')::integer<0 or (entry->>'d')::integer not between 400 and 650
    or (entry->>'t')::integer+(entry->>'d')::integer>10000 then raise exception 'Pattern bounds'; end if;
  end loop;
- if exists(select 1 from jsonb_array_elements(p) a where 3<(select count(*) from jsonb_array_elements(p) b
+ if exists(select 1 from jsonb_array_elements(p) a where 4<(select count(*) from jsonb_array_elements(p) b
    where (b->>'t')::integer<=(a->>'t')::integer and (b->>'t')::integer+(b->>'d')::integer>(a->>'t')::integer)) then raise exception 'Pattern concurrency'; end if;
+ if (select count(*) from jsonb_array_elements(p) entry where (entry->>'t')::integer>=8000) not between 6 and 8
+  or (p -> -1 ->> 't')::integer not between 9400 and 9600 or (p -> -1 ->> 'd')::integer<400 then raise exception 'Late phase'; end if;
 end; $$;
 create function pg_temp.fish_error(q text,expected text) returns void language plpgsql as $$
 begin

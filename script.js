@@ -183,7 +183,7 @@ const manualTeamParticipantList = {
   toggle: manualTeamParticipantToggle,
   panel: manualTeamParticipantPanel,
   locationLabel: "Fische im Teich",
-  participantNames: [],
+  participantItems: [],
 };
 const rageCageParticipantList = {
   screen: rageCageScreen,
@@ -192,7 +192,7 @@ const rageCageParticipantList = {
   toggle: rageCageParticipantToggle,
   panel: rageCageParticipantPanel,
   locationLabel: "Fische im Cage",
-  participantNames: [],
+  participantItems: [],
 };
 const participantListControls = [manualTeamParticipantList, rageCageParticipantList];
 const PARTICIPANT_LIST_SEPARATOR = " · ";
@@ -2746,7 +2746,7 @@ async function animateManualTeamReshuffle() {
   divideManualTeamsButton.disabled = true;
 
   try {
-    await animateReshuffle(manualTeamGrid, divideRemainingManualParticipants);
+    await animateReshuffle(manualTeamGrid, reshuffleAutomaticParticipants);
   } finally {
     state.manualTeamsReshuffling = false;
     divideManualTeamsButton.disabled = false;
@@ -2809,17 +2809,27 @@ function getAssignedParticipantIds() {
   return new Set(getAssignmentEntries().map(({ participantId }) => participantId));
 }
 
+function hasAutoSplitContext() {
+  return state.lastAutoSplitParticipantIds.size > 0 || hasAutomaticAssignments();
+}
+
+function getManualParticipantOverview() {
+  return window.TeamSplitterV2Logic.getParticipantOverview(
+    state.selectedParticipants,
+    getAssignmentEntries(),
+    hasAutoSplitContext(),
+  );
+}
+
 function getAvailableManualParticipants() {
   const assignedIds = getAssignedParticipantIds();
   return state.selectedParticipants.filter((participant) => !assignedIds.has(participant.id));
 }
 
 function getMissingAfterAutoSplit() {
-  if (!state.lastAutoSplitParticipantIds.size) return [];
-  const assignedIds = getAssignedParticipantIds();
-  return state.selectedParticipants.filter((participant) => (
-    !state.lastAutoSplitParticipantIds.has(participant.id) && !assignedIds.has(participant.id)
-  ));
+  return getManualParticipantOverview()
+    .filter(({ isMissing }) => isMissing)
+    .map(({ participant }) => participant);
 }
 
 function hasAutomaticAssignments() {
@@ -2827,11 +2837,10 @@ function hasAutomaticAssignments() {
 }
 
 function getPrimarySplitAction() {
-  const missing = getMissingAfterAutoSplit();
-  if (missing.length) return { kind: "missing", label: missing.length === 1 ? "Fehlenden Spieler zuteilen" : "Fehlende Spieler aufteilen", participants: missing };
-  const allAssigned = state.selectedParticipants.length > 0 && getAvailableManualParticipants().length === 0;
-  if (allAssigned && hasAutomaticAssignments()) return { kind: "reshuffle", label: "Neu aufteilen", participants: [] };
-  return { kind: "split", label: "Aufteilen", participants: getAvailableManualParticipants() };
+  return window.TeamSplitterV2Logic.getPrimarySplitAction(
+    getManualParticipantOverview(),
+    hasAutomaticAssignments(),
+  );
 }
 
 function reconcileManualTeamAssignments() {
@@ -2858,15 +2867,27 @@ function getManualTeamMembers(teamIndex) {
 
 function distributeAutomatically(participants) {
   ensureManualAssignmentTeams();
-  state.automaticAssignments ??= Array.from({ length: state.manualTeamCount }, () => []);
-  const teamSizes = Array.from({ length: state.manualTeamCount }, (_, index) => getManualTeamMemberCount(index));
-  for (const participant of shuffle(participants)) {
-    const smallest = Math.min(...teamSizes);
-    const choices = teamSizes.flatMap((size, index) => size === smallest ? [index] : []);
-    const teamIndex = choices[secureRandomInt(choices.length)];
-    state.automaticAssignments[teamIndex].push(participant);
-    teamSizes[teamIndex] += 1;
-  }
+  state.automaticAssignments = window.TeamSplitterV2Logic.createFairAutomaticAssignments({
+    participants,
+    manualAssignments: state.manualAssignments,
+    initialAutomaticAssignments: state.automaticAssignments ?? [],
+    teamCount: state.manualTeamCount,
+    randomInt: secureRandomInt,
+  });
+}
+
+function reshuffleAutomaticParticipants() {
+  const manualIds = getManuallyAssignedParticipantIds();
+  const participants = state.selectedParticipants.filter(({ id }) => !manualIds.has(id));
+  state.automaticAssignments = window.TeamSplitterV2Logic.createReshuffledAutomaticAssignments({
+    participants,
+    manualAssignments: state.manualAssignments,
+    previousAssignments: state.automaticAssignments ?? [],
+    teamCount: state.manualTeamCount,
+    randomInt: secureRandomInt,
+  });
+  state.lastAutoSplitParticipantIds = new Set(state.selectedParticipants.map(({ id }) => id));
+  renderManualTeamScreen();
 }
 
 function divideRemainingManualParticipants() {
@@ -2915,18 +2936,24 @@ function addManualTeam() {
 function createManualTeamCard(teamIndex) {
   const card = document.createElement("article");
   const teamName = getManualTeamName(teamIndex);
+  const header = document.createElement("header");
+  const controls = document.createElement("div");
   card.className = "manual-team-card";
+  header.className = "manual-team-card-header";
+  controls.className = "manual-team-card-controls";
   card.style.setProperty("--team-color", getTeamColor(teamIndex));
   if (getCurrentTeamCount() === MIN_MANUAL_TEAM_COUNT) card.classList.add(teamIndex === 0 ? "is-turbolachs" : "is-nitroforelle");
-  const heading = document.createElement("h3"); heading.textContent = teamName; card.append(heading);
+  const heading = document.createElement("h3"); heading.textContent = teamName;
   if (getCurrentTeamCount() > MIN_MANUAL_TEAM_COUNT) {
-    const edit = document.createElement("button"); edit.type = "button"; edit.className = "manual-team-edit-button"; edit.textContent = "✎"; edit.dataset.manualTeamEditIndex = teamIndex; edit.setAttribute("aria-label", `${teamName} umbenennen`); edit.addEventListener("click", () => openManualTeamRename(teamIndex)); card.append(edit);
+    const edit = document.createElement("button"); edit.type = "button"; edit.className = "manual-team-edit-button"; edit.textContent = "✎"; edit.dataset.manualTeamEditIndex = teamIndex; edit.setAttribute("aria-label", `${teamName} umbenennen`); edit.addEventListener("click", () => openManualTeamRename(teamIndex)); controls.append(edit);
   }
-  if (teamIndex >= MIN_MANUAL_TEAM_COUNT) { const remove = document.createElement("button"); remove.type = "button"; remove.className = "manual-remove-team-button"; remove.textContent = "×"; remove.setAttribute("aria-label", `${teamName} entfernen`); remove.addEventListener("click", removeManualTeam); card.append(remove); }
+  if (teamIndex >= MIN_MANUAL_TEAM_COUNT) { const remove = document.createElement("button"); remove.type = "button"; remove.className = "manual-remove-team-button"; remove.textContent = "×"; remove.setAttribute("aria-label", `${teamName} entfernen`); remove.addEventListener("click", removeManualTeam); controls.append(remove); }
+  if (controls.children.length) header.append(controls);
+  header.append(heading);card.append(header);
   const list = document.createElement("ul"); list.className = "manual-team-member-list";
   for (const { participant, source } of getManualTeamMembers(teamIndex)) {
     const item = document.createElement("li"); item.className = source === "manual" ? "is-manually-assigned" : "is-automatically-assigned";
-    const remove = document.createElement("button"); remove.type = "button"; remove.className = "manual-fixed-member-button"; remove.textContent = `− ${participant.name}${source === "manual" ? " · MANUELL" : ""}`; remove.setAttribute("aria-label", `${participant.name} aus ${teamName} entfernen`); remove.addEventListener("click", () => removeManualParticipantFromTeam(teamIndex, participant.id)); item.append(remove); list.append(item);
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "manual-fixed-member-button"; remove.textContent = `− ${participant.name}`; remove.setAttribute("aria-label", `${participant.name} aus ${teamName} entfernen`); remove.addEventListener("click", () => removeManualParticipantFromTeam(teamIndex, participant.id)); item.append(remove); list.append(item);
   }
   card.append(list);
   const footer = document.createElement("div"); footer.className = "tournament-builder-card-footer manual-team-card-footer";
@@ -2936,20 +2963,9 @@ function createManualTeamCard(teamIndex) {
 
 function renderManualTeamScreen() {
   reconcileManualTeamAssignments(); ensureManualTeamNames();
-  const missingIds = new Set(getMissingAfterAutoSplit().map(({ id }) => id));
-  const ordered = [...state.selectedParticipants].sort((a, b) => Number(missingIds.has(b.id)) - Number(missingIds.has(a.id)));
+  const participantOverview = getManualParticipantOverview();
   manualTeamTitle.textContent = `${state.selectedParticipants.length} Fische im Teich:`;
-  renderParticipantList(manualTeamParticipantList, ordered.map((participant) => participant.name));
-  if (missingIds.size) {
-    const renderNames = (target) => {
-      target.replaceChildren(...ordered.flatMap((participant, index) => {
-        const name = document.createElement("span"); name.textContent = participant.name; if (missingIds.has(participant.id)) name.className = "is-missing-participant";
-        return index ? [document.createTextNode(PARTICIPANT_LIST_SEPARATOR), name] : [name];
-      }));
-    };
-    renderNames(manualTeamParticipantNames); renderNames(manualTeamParticipantNamesFull);
-    manualTeamParticipantToggle.classList.remove("has-truncated-names"); manualTeamParticipantToggle.disabled = true;
-  }
+  renderParticipantList(manualTeamParticipantList, participantOverview);
   for (const card of manualTeamGrid.querySelectorAll(".manual-team-card")) card.remove();
   manualTeamGrid.prepend(...Array.from({ length: state.manualTeamCount }, (_, index) => createManualTeamCard(index)));
   addManualTeamButton.hidden = state.manualTeamCount >= MAX_MANUAL_TEAM_COUNT;
@@ -2994,17 +3010,27 @@ function renderTeamWheel() {
   const slices = wheel.remaining.map((team, index) => `${team.color} ${index * 100 / count}% ${(index + 1) * 100 / count}%`).join(", ");
   teamWheelDisc.style.background = count ? `conic-gradient(${slices})` : "transparent";
   teamWheelDisc.style.transform = `rotate(${wheel.rotation}deg)`;
-  teamWheelDisc.replaceChildren(...wheel.remaining.map((team, index) => { const label = document.createElement("span"); label.textContent = team.name; label.style.transform = `rotate(${(index + .5) * 360 / count}deg) translateY(-108px) rotate(90deg)`; return label; }));
+  teamWheelDisc.replaceChildren(...wheel.remaining.map((team, index) => {
+    const angle = 360 / count;
+    const layout = window.TeamSplitterV2Logic.getWheelLabelLayout(team.name, angle, count);
+    const label = document.createElement("span");label.className = "team-wheel-label";
+    label.setAttribute("aria-label", team.name);
+    label.style.width = `${layout.width}px`;label.style.marginLeft = `${-layout.width / 2}px`;label.style.fontSize = `${layout.fontSize}px`;
+    label.style.transform = `rotate(${(index + .5) * angle}deg) translateY(-${layout.radialOffset}px) rotate(90deg)`;
+    label.replaceChildren(...layout.lines.map((line) => Object.assign(document.createElement("b"), { textContent: line })));
+    return label;
+  }));
   if (wheel.picks.length === 2) {
     const [a, b] = wheel.picks;
-    teamWheelMatchup.replaceChildren(createTeamWheelMatchupCard(a, "Team A"), Object.assign(document.createElement("strong"), { textContent: "VS" }), createTeamWheelMatchupCard(b, "Team B"));
+    teamWheelMatchup.replaceChildren(createTeamWheelMatchupCard(a), Object.assign(document.createElement("strong"), { textContent: "VS" }), createTeamWheelMatchupCard(b));
     teamWheelSpinButton.hidden = true; teamWheelResetButton.hidden = false;
   } else { teamWheelMatchup.replaceChildren(Object.assign(document.createElement("p"), { textContent: wheel.picks.length ? `${wheel.picks[0].name} wartet auf den Gegner …` : "Noch kein Duell ausgelost." })); teamWheelSpinButton.hidden = false; teamWheelResetButton.hidden = true; }
   teamWheelSpinButton.disabled = wheel.spinning;
 }
 
-function createTeamWheelMatchupCard(team, label) {
-  const card = document.createElement("div"); card.className = "team-wheel-matchup-card"; card.style.setProperty("--team-color", team.color); card.innerHTML = `<small>${label}</small><strong></strong>`; card.querySelector("strong").textContent = team.name; return card;
+function createTeamWheelMatchupCard(team) {
+  const card = document.createElement("div"); card.className = "team-wheel-matchup-card"; card.style.setProperty("--team-color", team.color);
+  card.append(Object.assign(document.createElement("strong"), { textContent: team.name }));return card;
 }
 
 function spinTeamWheel() {
@@ -3317,10 +3343,9 @@ function updateParticipantListTruncation(control) {
     return;
   }
 
-  const { names, participantNames, toggle } = control;
-  const fullText = participantNames.join(PARTICIPANT_LIST_SEPARATOR);
+  const { names, participantItems, toggle } = control;
 
-  names.textContent = fullText;
+  renderParticipantListItems(names, participantItems);
   toggle.classList.remove("has-truncated-names");
   toggle.disabled = true;
   toggle.removeAttribute("aria-label");
@@ -3331,12 +3356,12 @@ function updateParticipantListTruncation(control) {
   }
 
   let low = 1;
-  let high = Math.max(1, participantNames.length - 1);
+  let high = Math.max(1, participantItems.length - 1);
   let bestVisibleCount = 1;
 
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
-    names.textContent = `${participantNames.slice(0, middle).join(PARTICIPANT_LIST_SEPARATOR)}, ...`;
+    renderParticipantListItems(names, participantItems, middle, true);
 
     if (participantListTextOverflows(names)) {
       high = middle - 1;
@@ -3346,21 +3371,31 @@ function updateParticipantListTruncation(control) {
     }
   }
 
-  names.textContent = `${participantNames.slice(0, bestVisibleCount).join(PARTICIPANT_LIST_SEPARATOR)}, ...`;
+  renderParticipantListItems(names, participantItems, bestVisibleCount, true);
   toggle.classList.add("has-truncated-names");
   toggle.disabled = false;
   toggle.setAttribute(
     "aria-label",
-    `Alle ${participantNames.length} ${control.locationLabel} anzeigen`,
+    `Alle ${participantItems.length} ${control.locationLabel} anzeigen`,
   );
 }
 
-function renderParticipantList(control, participantNames) {
-  control.participantNames = participantNames;
-  const fullText = participantNames.join(PARTICIPANT_LIST_SEPARATOR);
+function renderParticipantListItems(target, participantItems, visibleCount = participantItems.length, ellipsis = false) {
+  const visibleItems = participantItems.slice(0, visibleCount);
+  target.replaceChildren(...visibleItems.flatMap((item, index) => {
+    const name = document.createElement("span");name.textContent = item.name;
+    if (item.isMissing) name.className = "is-missing-participant";
+    return index ? [document.createTextNode(PARTICIPANT_LIST_SEPARATOR), name] : [name];
+  }), ...(ellipsis ? [document.createTextNode(", ...")] : []));
+}
 
-  control.names.textContent = fullText;
-  control.fullNames.textContent = fullText;
+function renderParticipantList(control, participants) {
+  const participantItems = participants.map((participant, index) => typeof participant === "string"
+    ? { name: participant, isMissing: false, selectionIndex: index }
+    : participant);
+  control.participantItems = participantItems;
+  renderParticipantListItems(control.names, participantItems);
+  renderParticipantListItems(control.fullNames, participantItems);
   closeParticipantListPanel(control);
   requestAnimationFrame(() => updateParticipantListTruncation(control));
 }

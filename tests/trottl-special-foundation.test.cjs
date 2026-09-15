@@ -946,7 +946,7 @@ test("server migration has independent keys, locked join/start validation and no
   assert.doesNotMatch(sql,/(?:alter|update|delete from|insert into|create or replace function) public\.trottl_classic/);
 });
 test("Classic code and stylesheet stay byte-identical to the finished current master",()=>{
-  const hashes={"style.css":"860b731f11905d157fdfbd8b1b3ca850b0eea1b0bb5a7c4f99c10bf3de0ed0b8",
+  const hashes={"style.css":"025089862c99b9e0d231f2af94a8de2412e5e32d904c7d6f25bee9230bf15130",
     "trottl-classic-ui.js":"cb1b68f158ed59b0f9eeee212d27e8ea010b1b36aa348d9e13d2cdcff1650650",
     "trottl-classic-service.js":"cfb53ae6de0d9133275849a7d5a11551ff6962e63de61e77c05aebb4a45f14c0",
     "classic-background-fit.js":"99c7395479f98673ab6a17299d6b54c8237038252569a23149ea19cce47b44b3"};

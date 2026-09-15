@@ -10,12 +10,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260914.5">
+    <meta name="fischteich-build" content="20260915.1">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <link rel="stylesheet" href="./style.css?v=188">
+    <link rel="stylesheet" href="./style.css?v=189">
     <link rel="stylesheet" href="./trottl-special.css?v=12">
     <!-- Official @supabase/supabase-js v2.112.4 UMD browser build. -->
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
@@ -46,7 +46,7 @@
     <script src="./trottl-special-ui.js?v=13" defer></script>
     <script src="./trottl-special-admin.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
-    <script src="./script.js?v=89" defer></script>
+    <script src="./script.js?v=90" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -397,9 +397,21 @@
           </div>
 
           <div class="manual-team-actions">
+            <button class="manual-team-start-button" id="manual-team-start" type="button" hidden>Wer fängt an?</button>
             <button class="manual-team-reset-button secondary-button" id="reset-manual-teams" type="button" disabled>Reset</button>
             <button class="manual-divide-button" id="divide-manual-teams" type="button">Aufteilen</button>
           </div>
+        </div>
+      </section>
+
+      <section class="screen team-wheel-screen" id="team-wheel-screen" aria-labelledby="team-wheel-title" hidden>
+        <button class="close-button navigation-back-button" id="close-team-wheel" type="button" aria-label="Zurück zur Teamaufteilung">←</button>
+        <div class="team-wheel-shell">
+          <header class="team-wheel-header"><p>Teams stehen fest</p><h2 id="team-wheel-title">Wer spielt als Nächstes?</h2></header>
+          <div class="team-wheel-stage"><div class="team-wheel-pointer" aria-hidden="true"></div><div class="team-wheel-disc" id="team-wheel-disc" aria-label="Team Glücksrad"></div></div>
+          <div class="team-wheel-matchup" id="team-wheel-matchup" aria-live="polite"><p>Noch kein Duell ausgelost.</p></div>
+          <button class="manual-divide-button team-wheel-spin-button" id="spin-team-wheel" type="button">Drehen</button>
+          <button class="secondary-button team-wheel-reset-button" id="reset-team-wheel" type="button" hidden>Reset</button>
         </div>
       </section>
 

@@ -50,6 +50,7 @@ const MIN_TEAM_COUNT = 2;
 const MAX_TEAM_COUNT = 10;
 const MIN_MANUAL_TEAM_COUNT = 2;
 const MAX_MANUAL_TEAM_COUNT = 20;
+const TEAM_SPLIT_COLORS = Object.freeze(["#73ddff", "#ff7db9", "#ef5b5b", "#55c77a", "#f4c95d", "#a986ff", "#f39b4a", "#42c7c9"]);
 const FISCHTEICH_APP_VERSION = "1.0";
 const RAGE_CAGE_MIN_ANIMATION_STEPS = 10;
 const RAGE_CAGE_TARGET_ANIMATION_DURATION = 1800;
@@ -158,6 +159,12 @@ const manualTeamGrid = document.querySelector("#manual-team-grid");
 const addManualTeamButton = document.querySelector("#add-manual-team");
 const resetManualTeamsButton = document.querySelector("#reset-manual-teams");
 const divideManualTeamsButton = document.querySelector("#divide-manual-teams");
+const manualTeamStartButton = document.querySelector("#manual-team-start");
+const teamWheelScreen = document.querySelector("#team-wheel-screen");
+const teamWheelDisc = document.querySelector("#team-wheel-disc");
+const teamWheelMatchup = document.querySelector("#team-wheel-matchup");
+const teamWheelSpinButton = document.querySelector("#spin-team-wheel");
+const teamWheelResetButton = document.querySelector("#reset-team-wheel");
 const rageCageTitle = document.querySelector("#rage-cage-title");
 const rageCageParticipantNames = document.querySelector("#rage-cage-participant-names");
 const rageCageParticipantNamesFull = document.querySelector("#rage-cage-participant-names-full");
@@ -425,10 +432,12 @@ const state = {
   manualTeamRenameIndex: null,
   manualAssignments: Array.from({ length: MIN_MANUAL_TEAM_COUNT }, () => []),
   automaticAssignments: null,
-  manualTeamParticipantSignature: "",
+  lastAutoSplitParticipantIds: new Set(),
   manualPlayerTeamIndex: null,
   manualPlayerSelectionIds: new Set(),
   manualTeamsReshuffling: false,
+  rouletteReturnTarget: "menu",
+  teamWheel: { teams: [], remaining: [], picks: [], spinning: false, rotation: 0 },
   rageCageSeats: [],
   rageCageReshuffling: false,
   rageCageTransitionRun: 0,
@@ -1057,6 +1066,7 @@ function createParticipantButton(participant, isSelected) {
       state.selectedParticipants = state.selectedParticipants.filter(
         (selectedParticipant) => selectedParticipant.id !== participant.id,
       );
+      reconcileManualTeamAssignments();
     } else if (
       !state.selectedParticipants.some(
         (selectedParticipant) => selectedParticipant.id === participant.id,
@@ -1097,6 +1107,7 @@ function renderParticipantSelection() {
 function resetParticipantSelection() {
   state.selectedParticipants = [];
   state.nextGuestId = 1;
+  resetManualTeamWorkflow();
   renderParticipantSelection();
 }
 
@@ -2775,6 +2786,243 @@ async function resetManualTeamAssignments() {
     resetManualTeamsButton.disabled = true;
     resetManualTeamsButton.focus();
   }
+}
+
+// Teams-Aufteilen keeps canonical membership locally.  The DOM is deliberately
+// only a projection of this state, so participants with identical names remain safe.
+function getTeamColor(teamIndex) {
+  return TEAM_SPLIT_COLORS[teamIndex % TEAM_SPLIT_COLORS.length];
+}
+
+function getAssignmentEntries() {
+  const entries = [];
+  for (const source of ["manual", "automatic"]) {
+    const assignments = source === "manual" ? state.manualAssignments : state.automaticAssignments;
+    assignments?.forEach((members, teamIndex) => members.forEach((participant) => {
+      entries.push({ participant, participantId: participant.id, teamIndex, source });
+    }));
+  }
+  return entries;
+}
+
+function getAssignedParticipantIds() {
+  return new Set(getAssignmentEntries().map(({ participantId }) => participantId));
+}
+
+function getAvailableManualParticipants() {
+  const assignedIds = getAssignedParticipantIds();
+  return state.selectedParticipants.filter((participant) => !assignedIds.has(participant.id));
+}
+
+function getMissingAfterAutoSplit() {
+  if (!state.lastAutoSplitParticipantIds.size) return [];
+  const assignedIds = getAssignedParticipantIds();
+  return state.selectedParticipants.filter((participant) => (
+    !state.lastAutoSplitParticipantIds.has(participant.id) && !assignedIds.has(participant.id)
+  ));
+}
+
+function hasAutomaticAssignments() {
+  return Boolean(state.automaticAssignments?.some((members) => members.length));
+}
+
+function getPrimarySplitAction() {
+  const missing = getMissingAfterAutoSplit();
+  if (missing.length) return { kind: "missing", label: missing.length === 1 ? "Fehlenden Spieler zuteilen" : "Fehlende Spieler aufteilen", participants: missing };
+  const allAssigned = state.selectedParticipants.length > 0 && getAvailableManualParticipants().length === 0;
+  if (allAssigned && hasAutomaticAssignments()) return { kind: "reshuffle", label: "Neu aufteilen", participants: [] };
+  return { kind: "split", label: "Aufteilen", participants: getAvailableManualParticipants() };
+}
+
+function reconcileManualTeamAssignments() {
+  const selectedIds = new Set(state.selectedParticipants.map(({ id }) => id));
+  state.manualAssignments = state.manualAssignments.map((members) => members.filter(({ id }) => selectedIds.has(id)));
+  if (state.automaticAssignments) state.automaticAssignments = state.automaticAssignments.map((members) => members.filter(({ id }) => selectedIds.has(id)));
+  for (const id of [...state.lastAutoSplitParticipantIds]) if (!selectedIds.has(id)) state.lastAutoSplitParticipantIds.delete(id);
+}
+
+function resetManualTeamWorkflow() {
+  state.manualTeamCount = MIN_MANUAL_TEAM_COUNT;
+  state.manualTeamNames = [];
+  state.manualAssignments = Array.from({ length: MIN_MANUAL_TEAM_COUNT }, () => []);
+  state.automaticAssignments = null;
+  state.lastAutoSplitParticipantIds.clear();
+}
+
+function getManualTeamMembers(teamIndex) {
+  return [
+    ...(state.manualAssignments[teamIndex] ?? []).map((participant) => ({ participant, source: "manual" })),
+    ...(state.automaticAssignments?.[teamIndex] ?? []).map((participant) => ({ participant, source: "automatic" })),
+  ];
+}
+
+function distributeAutomatically(participants) {
+  ensureManualAssignmentTeams();
+  state.automaticAssignments ??= Array.from({ length: state.manualTeamCount }, () => []);
+  const teamSizes = Array.from({ length: state.manualTeamCount }, (_, index) => getManualTeamMemberCount(index));
+  for (const participant of shuffle(participants)) {
+    const smallest = Math.min(...teamSizes);
+    const choices = teamSizes.flatMap((size, index) => size === smallest ? [index] : []);
+    const teamIndex = choices[secureRandomInt(choices.length)];
+    state.automaticAssignments[teamIndex].push(participant);
+    teamSizes[teamIndex] += 1;
+  }
+}
+
+function divideRemainingManualParticipants() {
+  const participants = getAvailableManualParticipants();
+  if (!participants.length) return;
+  distributeAutomatically(participants);
+  state.lastAutoSplitParticipantIds = new Set(state.selectedParticipants.map(({ id }) => id));
+  renderManualTeamScreen();
+}
+
+function removeManualParticipantFromTeam(teamIndex, participantId) {
+  state.manualAssignments[teamIndex] = (state.manualAssignments[teamIndex] ?? []).filter(({ id }) => id !== participantId);
+  if (state.automaticAssignments) state.automaticAssignments[teamIndex] = state.automaticAssignments[teamIndex].filter(({ id }) => id !== participantId);
+  renderManualTeamScreen();
+}
+
+function confirmManualPlayerSelection() {
+  const teamIndex = state.manualPlayerTeamIndex;
+  const available = new Set(getAvailableManualParticipants().map(({ id }) => id));
+  const participants = state.selectedParticipants.filter(({ id }) => state.manualPlayerSelectionIds.has(id) && available.has(id));
+  if (!Number.isInteger(teamIndex) || !participants.length) return false;
+  state.manualAssignments[teamIndex].push(...participants);
+  closeManualPlayerModal({ restoreFocus: false });
+  renderManualTeamScreen();
+  return true;
+}
+
+function removeManualTeam() {
+  if (state.manualTeamCount <= MIN_MANUAL_TEAM_COUNT) return;
+  state.manualTeamCount -= 1;
+  state.manualAssignments.pop();
+  state.automaticAssignments?.pop();
+  ensureManualTeamNames();
+  renderManualTeamScreen();
+}
+
+function addManualTeam() {
+  if (state.manualTeamCount >= MAX_MANUAL_TEAM_COUNT) return;
+  state.manualTeamCount += 1;
+  state.manualAssignments.push([]);
+  if (state.automaticAssignments) state.automaticAssignments.push([]);
+  ensureManualTeamNames();
+  renderManualTeamScreen();
+}
+
+function createManualTeamCard(teamIndex) {
+  const card = document.createElement("article");
+  const teamName = getManualTeamName(teamIndex);
+  card.className = "manual-team-card";
+  card.style.setProperty("--team-color", getTeamColor(teamIndex));
+  if (getCurrentTeamCount() === MIN_MANUAL_TEAM_COUNT) card.classList.add(teamIndex === 0 ? "is-turbolachs" : "is-nitroforelle");
+  const heading = document.createElement("h3"); heading.textContent = teamName; card.append(heading);
+  if (getCurrentTeamCount() > MIN_MANUAL_TEAM_COUNT) {
+    const edit = document.createElement("button"); edit.type = "button"; edit.className = "manual-team-edit-button"; edit.textContent = "✎"; edit.dataset.manualTeamEditIndex = teamIndex; edit.setAttribute("aria-label", `${teamName} umbenennen`); edit.addEventListener("click", () => openManualTeamRename(teamIndex)); card.append(edit);
+  }
+  if (teamIndex >= MIN_MANUAL_TEAM_COUNT) { const remove = document.createElement("button"); remove.type = "button"; remove.className = "manual-remove-team-button"; remove.textContent = "×"; remove.setAttribute("aria-label", `${teamName} entfernen`); remove.addEventListener("click", removeManualTeam); card.append(remove); }
+  const list = document.createElement("ul"); list.className = "manual-team-member-list";
+  for (const { participant, source } of getManualTeamMembers(teamIndex)) {
+    const item = document.createElement("li"); item.className = source === "manual" ? "is-manually-assigned" : "is-automatically-assigned";
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "manual-fixed-member-button"; remove.textContent = `− ${participant.name}${source === "manual" ? " · MANUELL" : ""}`; remove.setAttribute("aria-label", `${participant.name} aus ${teamName} entfernen`); remove.addEventListener("click", () => removeManualParticipantFromTeam(teamIndex, participant.id)); item.append(remove); list.append(item);
+  }
+  card.append(list);
+  const footer = document.createElement("div"); footer.className = "tournament-builder-card-footer manual-team-card-footer";
+  const add = document.createElement("button"); add.type = "button"; add.className = "manual-team-member-add-button tournament-builder-add-members"; add.textContent = "+"; add.dataset.manualPlayerTeamIndex = teamIndex; add.setAttribute("aria-label", `Spieler zu ${teamName} hinzufügen`); add.addEventListener("click", () => openManualPlayerModal(teamIndex));
+  const count = document.createElement("span"); count.className = "tournament-builder-member-count"; count.textContent = `(${getManualTeamMemberCount(teamIndex)})`; footer.append(add, count); card.append(footer); return card;
+}
+
+function renderManualTeamScreen() {
+  reconcileManualTeamAssignments(); ensureManualTeamNames();
+  const missingIds = new Set(getMissingAfterAutoSplit().map(({ id }) => id));
+  const ordered = [...state.selectedParticipants].sort((a, b) => Number(missingIds.has(b.id)) - Number(missingIds.has(a.id)));
+  manualTeamTitle.textContent = `${state.selectedParticipants.length} Fische im Teich:`;
+  renderParticipantList(manualTeamParticipantList, ordered.map((participant) => participant.name));
+  if (missingIds.size) {
+    const renderNames = (target) => {
+      target.replaceChildren(...ordered.flatMap((participant, index) => {
+        const name = document.createElement("span"); name.textContent = participant.name; if (missingIds.has(participant.id)) name.className = "is-missing-participant";
+        return index ? [document.createTextNode(PARTICIPANT_LIST_SEPARATOR), name] : [name];
+      }));
+    };
+    renderNames(manualTeamParticipantNames); renderNames(manualTeamParticipantNamesFull);
+    manualTeamParticipantToggle.classList.remove("has-truncated-names"); manualTeamParticipantToggle.disabled = true;
+  }
+  for (const card of manualTeamGrid.querySelectorAll(".manual-team-card")) card.remove();
+  manualTeamGrid.prepend(...Array.from({ length: state.manualTeamCount }, (_, index) => createManualTeamCard(index)));
+  addManualTeamButton.hidden = state.manualTeamCount >= MAX_MANUAL_TEAM_COUNT;
+  resetManualTeamsButton.disabled = state.manualTeamsReshuffling || !hasAutomaticAssignments();
+  const action = getPrimarySplitAction(); divideManualTeamsButton.textContent = action.label;
+  const activeTeams = Array.from({ length: state.manualTeamCount }, (_, index) => index).filter((index) => getManualTeamMemberCount(index) > 0);
+  manualTeamStartButton.hidden = !(activeTeams.length >= 2 && state.selectedParticipants.length && !getAvailableManualParticipants().length && !getMissingAfterAutoSplit().length);
+}
+
+function openManualTeamScreen() {
+  if (state.selectedParticipants.length < 2) return;
+  reconcileManualTeamAssignments(); ensureManualAssignmentTeams(); renderManualTeamScreen(); showScreen(manualTeamScreen); document.querySelector("#close-manual-team-screen").focus();
+}
+
+function handleManualTeamDivision() {
+  if (state.manualTeamsReshuffling) return;
+  const action = getPrimarySplitAction();
+  if (action.kind === "reshuffle") { openManualTeamReshuffleConfirmation(); return; }
+  if (action.kind === "missing") { distributeAutomatically(action.participants); state.lastAutoSplitParticipantIds = new Set(state.selectedParticipants.map(({ id }) => id)); renderManualTeamScreen(); return; }
+  divideRemainingManualParticipants();
+}
+
+function clearManualTeamAssignments() {
+  state.automaticAssignments = null; state.lastAutoSplitParticipantIds.clear(); renderManualTeamScreen();
+}
+
+function getActiveTeams() {
+  return Array.from({ length: state.manualTeamCount }, (_, index) => ({ index, name: getManualTeamName(index), color: getTeamColor(index), members: getManualTeamMembers(index) }))
+    .filter((team) => team.members.length);
+}
+
+function openTeamWheel() {
+  const teams = getActiveTeams();
+  if (teams.length < 3) { state.rouletteReturnTarget = "teams"; openRoulette(); return; }
+  state.teamWheel = { teams, remaining: [...teams], picks: [], spinning: false, rotation: 0 };
+  renderTeamWheel(); showScreen(teamWheelScreen); document.querySelector("#close-team-wheel").focus();
+}
+
+function renderTeamWheel() {
+  const wheel = state.teamWheel;
+  const count = wheel.remaining.length;
+  const slices = wheel.remaining.map((team, index) => `${team.color} ${index * 100 / count}% ${(index + 1) * 100 / count}%`).join(", ");
+  teamWheelDisc.style.background = count ? `conic-gradient(${slices})` : "transparent";
+  teamWheelDisc.style.transform = `rotate(${wheel.rotation}deg)`;
+  teamWheelDisc.replaceChildren(...wheel.remaining.map((team, index) => { const label = document.createElement("span"); label.textContent = team.name; label.style.transform = `rotate(${(index + .5) * 360 / count}deg) translateY(-108px) rotate(90deg)`; return label; }));
+  if (wheel.picks.length === 2) {
+    const [a, b] = wheel.picks;
+    teamWheelMatchup.replaceChildren(createTeamWheelMatchupCard(a, "Team A"), Object.assign(document.createElement("strong"), { textContent: "VS" }), createTeamWheelMatchupCard(b, "Team B"));
+    teamWheelSpinButton.hidden = true; teamWheelResetButton.hidden = false;
+  } else { teamWheelMatchup.replaceChildren(Object.assign(document.createElement("p"), { textContent: wheel.picks.length ? `${wheel.picks[0].name} wartet auf den Gegner …` : "Noch kein Duell ausgelost." })); teamWheelSpinButton.hidden = false; teamWheelResetButton.hidden = true; }
+  teamWheelSpinButton.disabled = wheel.spinning;
+}
+
+function createTeamWheelMatchupCard(team, label) {
+  const card = document.createElement("div"); card.className = "team-wheel-matchup-card"; card.style.setProperty("--team-color", team.color); card.innerHTML = `<small>${label}</small><strong></strong>`; card.querySelector("strong").textContent = team.name; return card;
+}
+
+function spinTeamWheel() {
+  const wheel = state.teamWheel;
+  if (wheel.spinning || wheel.remaining.length < 2) return;
+  wheel.spinning = true; const pickIndex = secureRandomInt(wheel.remaining.length); const picked = wheel.remaining[pickIndex];
+  const slice = 360 / wheel.remaining.length; const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; const extra = reduce ? 360 : 1440 + secureRandomInt(720);
+  wheel.rotation += extra - ((pickIndex + .5) * slice + wheel.rotation % 360);
+  teamWheelDisc.style.transition = `transform ${reduce ? 650 : 3200}ms cubic-bezier(.12,.7,.08,1)`;
+  renderTeamWheel();
+  window.setTimeout(() => { wheel.picks.push(picked); wheel.remaining = wheel.remaining.filter((team) => team !== picked); wheel.spinning = false; teamWheelDisc.style.transition = ""; renderTeamWheel(); if (wheel.picks.length === 1) window.setTimeout(spinTeamWheel, reduce ? 250 : 550); }, reduce ? 650 : 3200);
+}
+
+function resetTeamWheel() { state.teamWheel = { teams: getActiveTeams(), remaining: getActiveTeams(), picks: [], spinning: false, rotation: 0 }; renderTeamWheel(); }
+
+function returnFromRoulette() {
+  if (state.rouletteReturnTarget === "teams") { state.rouletteReturnTarget = "menu"; renderManualTeamScreen(); showScreen(manualTeamScreen); return; }
+  showMenu();
 }
 
 function stopRageCageStartAnimation() {
@@ -5184,7 +5432,10 @@ for (const button of document.querySelectorAll("[data-game-team-count]")) {
 }
 
 for (const button of document.querySelectorAll(".screen-back")) {
-  button.addEventListener("click", showMenu);
+  button.addEventListener("click", () => {
+    if (button.closest("#roulette-screen")) returnFromRoulette();
+    else showMenu();
+  });
 }
 
 playZone.addEventListener("pointerdown", handlePlayZonePointerDown, { passive: false });
@@ -5213,6 +5464,10 @@ resetManualTeamsButton.addEventListener("click", () => {
   void resetManualTeamAssignments();
 });
 divideManualTeamsButton.addEventListener("click", handleManualTeamDivision);
+manualTeamStartButton.addEventListener("click", openTeamWheel);
+document.querySelector("#close-team-wheel").addEventListener("click", () => { if (!state.teamWheel.spinning) { renderManualTeamScreen(); showScreen(manualTeamScreen); } });
+teamWheelSpinButton.addEventListener("click", spinTeamWheel);
+teamWheelResetButton.addEventListener("click", resetTeamWheel);
 document.querySelector("#cancel-manual-team-reshuffle").addEventListener(
   "click",
   closeManualTeamReshuffleConfirmation,

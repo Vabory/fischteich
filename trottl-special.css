@@ -101,6 +101,7 @@
 #trottl-special-session-screen .trottl-special-result-ready .trottl-classic-avatar-wrap { border-radius: 50%; box-shadow: 0 0 0 2px #70efaa, 0 0 20px 7px rgb(48 215 125 / 90%); }
 #trottl-special-session-screen .trottl-special-result-ready .trottl-classic-avatar-wrap::after { position: absolute; z-index: 8; right: -3px; bottom: -3px; display: grid; width: 17px; height: 17px; place-items: center; border: 1px solid #b9ffd5; border-radius: 50%; background: #197045; color: #fff; content: "✓"; font-size: 10px; font-weight: 950; }
 #trottl-special-session-screen .trottl-special-minigame-drinks { opacity: 1; color: #f4fcff; border-color: rgb(190 235 255 / 80%); background: rgb(5 12 23 / 96%); box-shadow: 0 0 10px rgb(135 216 255 / 60%); text-shadow: 0 0 8px rgb(200 239 255 / 32%); }
+#trottl-special-session-screen .trottl-classic-seat-status-overlay { bottom: 3px; }
 #trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-classic-game-avatar,
 #trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-classic-seat-name,
 #trottl-special-session-screen [data-lifecycle="eliminated"] .trottl-special-hearts { opacity: 0.42; }

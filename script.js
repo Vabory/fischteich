@@ -3007,12 +3007,13 @@ function openTeamWheel() {
 function renderTeamWheel() {
   const wheel = state.teamWheel;
   const count = wheel.remaining.length;
+  const wheelDiameter = Math.min(document.documentElement.clientWidth * 0.76, 330);
   const slices = wheel.remaining.map((team, index) => `${team.color} ${index * 100 / count}% ${(index + 1) * 100 / count}%`).join(", ");
   teamWheelDisc.style.background = count ? `conic-gradient(${slices})` : "transparent";
   teamWheelDisc.style.transform = `rotate(${wheel.rotation}deg)`;
   teamWheelDisc.replaceChildren(...wheel.remaining.map((team, index) => {
     const angle = 360 / count;
-    const layout = window.TeamSplitterV2Logic.getWheelLabelLayout(team.name, angle, count);
+    const layout = window.TeamSplitterV2Logic.getWheelLabelLayout(team.name, angle, count, wheelDiameter);
     const label = document.createElement("span");label.className = "team-wheel-label";
     label.setAttribute("aria-label", team.name);
     label.style.width = `${layout.width}px`;label.style.marginLeft = `${-layout.width / 2}px`;label.style.fontSize = `${layout.fontSize}px`;

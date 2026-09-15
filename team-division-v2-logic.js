@@ -96,17 +96,23 @@
     return best;
   }
 
-  function getWheelLabelLayout(teamName, segmentAngle, teamCount) {
+  function getWheelLabelLayout(teamName, segmentAngle, teamCount, wheelDiameter = 330) {
     const name = String(teamName ?? "").trim().replace(/\s+/g, " ");
     const angle = Math.max(1, Number(segmentAngle) || (360 / Math.max(1, teamCount)));
-    const chordWidth = 2 * 94 * Math.sin(Math.min(180, angle) * Math.PI / 360);
-    const width = Math.round(Math.max(72, Math.min(150, chordWidth)));
+    const diameter = Math.max(220, Math.min(330, Number(wheelDiameter) || 330));
+    const wheelRadius = diameter / 2 - 5;
+    const safeArea = Math.max(15, Math.min(24, diameter * 0.065));
+    const safeTextRadius = wheelRadius - safeArea;
+    const radialOffset = safeTextRadius * 0.75;
+    const segmentWidth = 2 * radialOffset * Math.sin(Math.min(180, angle) * Math.PI / 360) - 8;
+    const circleWidth = 2 * Math.sqrt(Math.max(0, safeTextRadius ** 2 - (radialOffset + 14) ** 2));
+    const width = Math.round(Math.max(56, Math.min(132, segmentWidth, circleWidth)));
     const maxCharacters = Math.max(8, Math.floor(width / (teamCount >= 6 ? 6.2 : 7)));
     const lines = splitWheelLabel(name, maxCharacters);
     const longestLine = Math.max(1, ...lines.map((line) => line.length));
     const maximumFontSize = teamCount <= 3 ? 13 : teamCount <= 4 ? 12 : 11;
     const fontSize = Math.max(8, Math.min(maximumFontSize, Math.floor(width / (longestLine * 0.62))));
-    return Object.freeze({ lines: Object.freeze(lines), width, fontSize, radialOffset: teamCount >= 6 ? 105 : 108 });
+    return Object.freeze({ lines: Object.freeze(lines), width, fontSize, radialOffset: Math.round(radialOffset), safeArea, wheelRadius });
   }
 
   return Object.freeze({ getParticipantOverview, getPrimarySplitAction, createFairAutomaticAssignments, createReshuffledAutomaticAssignments, getAutomaticAssignmentSignature, ensureDifferentFairAssignment, getWheelLabelLayout });

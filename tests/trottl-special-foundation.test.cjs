@@ -975,7 +975,7 @@ test("Special uses exactly the same frozen seat, avatar and background-fit prese
   assert.match(read("trottl-special-presentation.js"),/FischteichClassicBackgroundFit\.calculateFit/);
   assert.equal(p.gameBackgroundAsset,"./assets/3er-trottl-ingame-background-v2.png?v=2");
   assert.match(read("trottl-special-ui.js"),/rollOnClick: false/);
-  assert.doesNotMatch(read("trottl-special-service.js"),/roll_trottl|assign_trottl|reaction|ack_trottl/);
+  assert.doesNotMatch(read("trottl-special-service.js"),/roll_trottl|assign_trottl|ack_trottl/);
 });
 test("server migration has independent keys, locked join/start validation and no Classic mutations",()=>{
   assert.match(sql,/mode = 'special'/);assert.match(sql,/on public\.trottl_special_sessions\(room_slot\)/);

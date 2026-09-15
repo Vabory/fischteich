@@ -1,7 +1,7 @@
 "use strict";
 (function installSpecialMinigames(global) {
   const registry = Object.freeze(Array.from({ length: 10 }, (_, i) => Object.freeze({
-    id: `special_minigame_${String(i + 1).padStart(2, "0")}`, active: i < 2, implemented: i < 2, title: ["Zahlenjagd", "Fischfang"][i] ?? null,
+    id: `special_minigame_${String(i + 1).padStart(2, "0")}`, active: i < 3, implemented: i < 3, title: ["Zahlenjagd", "Fischfang", "Reaktionstest"][i] ?? null,
   })));
   function sequence(round, now) {
     const intro = Date.parse(round?.title_started_at), countdown = Date.parse(round?.title_ends_at), start = Date.parse(round?.start_at);

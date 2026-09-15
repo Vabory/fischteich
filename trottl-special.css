@@ -252,6 +252,15 @@
 @keyframes trottl-special-fish-pop { 100% { opacity: 1; transform: translate(-50%, -8px) scale(1); } }
 @keyframes trottl-special-fish-hide { 0% { opacity: 1; transform: translate(-50%, -8px) scale(1); } 100% { opacity: 0; transform: translate(-50%, 10px) scale(.84); } }
 @media (prefers-reduced-motion: reduce) { .trottl-special-fish { animation-duration: 1ms; } }
+.trottl-special-reaction-field { display: flex; width: min(100%, 420px); min-height: clamp(190px, 30dvh, 250px); box-sizing: border-box; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; border: 1px solid rgb(105 188 207 / 38%); border-radius: 14px; background: radial-gradient(ellipse at center, #204b62, #0c2332); color: #fff; box-shadow: none; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.trottl-special-reaction-field:disabled { opacity: 1; color: #fff; }
+.trottl-special-reaction-label { min-height: 24px; font-size: clamp(18px, 5vw, 24px); letter-spacing: .08em; }
+.trottl-special-reaction-label.is-signal { color: #9fffc4; text-shadow: 0 0 12px rgb(106 255 167 / 50%); }
+.trottl-special-reaction-stage { display: grid; width: 100%; min-height: clamp(105px, 18dvh, 150px); place-items: center; }
+.trottl-special-reaction-salmon { grid-area: 1 / 1; display: block; width: clamp(150px, 50%, 220px); max-height: 145px; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.trottl-special-reaction-result { grid-area: 1 / 1; color: #fff; font-size: clamp(28px, 9vw, 46px); font-variant-numeric: tabular-nums; text-align: center; }
+.trottl-special-reaction-result.is-penalty, .trottl-special-minigame-results .is-penalty { color: #ff7189; }
+@media (prefers-reduced-motion: reduce) { .trottl-special-reaction-salmon { animation: none; transition: none; } }
 .trottl-special-minigame-title { color: white; text-align: center; font-size: clamp(24px, 7vw, 36px); margin: 0; }
 .trottl-special-minigame-countdown { color: white; font-size: 30px; min-height: 36px; text-shadow: 0 0 16px rgb(255 255 255 / 40%); }
 .trottl-special-minigame-copy, .trottl-special-number-hunt-progress { margin: 0; color: white; font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }

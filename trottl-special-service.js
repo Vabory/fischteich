@@ -58,6 +58,8 @@
     if (s.error) throw s.error;
     if (p.error) throw p.error;
     if (!s.data) throw new Error("TROTTL_SPECIAL_SESSION_NOT_FOUND");
+    const reactionRun = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_03"
+      ? await rpc("get_trottl_special_reaction_view", { p_session_id: sessionId }) : null;
     const players = (p.data ?? []).filter(row => row.lifecycle_status !== "left").map(row => {
       const base = presentation.normalizePlayer(row);
       if (!base) return null;
@@ -77,8 +79,13 @@
         if (!Number.isInteger(panicSubmittedCount) || panicSubmittedCount < 0 || panicSubmittedCount > 400) throw new Error("Invalid panic receipt");
       }
     }
+    if (reactionRun !== null && (typeof reactionRun !== "object" || typeof reactionRun.player_id !== "string" || !["open","completed","false_start","timeout"].includes(reactionRun.status)
+      || !Number.isInteger(Number(reactionRun.delay_ms)) || Number(reactionRun.delay_ms) < 2000 || Number(reactionRun.delay_ms) > 8500
+      || !Number.isFinite(Date.parse(reactionRun.signal_at)) || (reactionRun.reaction_ms !== null && (!Number.isInteger(Number(reactionRun.reaction_ms)) || Number(reactionRun.reaction_ms) < 0))
+      || (reactionRun.status === "completed") !== (reactionRun.reaction_ms !== null))) throw new Error("Invalid reaction run response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
-      membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount });
+      membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount,
+      reactionRun: reactionRun === null ? null : Object.freeze({ ...reactionRun, delay_ms: Number(reactionRun.delay_ms), reaction_ms: reactionRun.reaction_ms === null ? null : Number(reactionRun.reaction_ms) }) });
   }
   async function loadMembership(sessionId) {
     const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
@@ -142,6 +149,8 @@
     },
     setDebugNext: async (id, roll, minigame) => { await rpc("set_trottl_special_debug_next", { p_session_id: id, p_roll: roll, p_minigame: minigame }); return loadSession(id); },
     saveFishCatch: async (id, roundId, score, hits, final) => { await rpc("save_trottl_special_fish_catch", { p_session_id: id, p_round_id: roundId, p_score: score, p_hits: hits, p_final: final }); return loadSession(id); },
+    submitReaction: async (id, roundId, elapsed) => { await rpc("submit_trottl_special_reaction", { p_session_id: id, p_round_id: roundId, p_tap_elapsed_ms: elapsed }); return loadSession(id); },
+    finalizeReaction: async (id, roundId) => { await rpc("finalize_trottl_special_reaction", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     actRoulette: async (id, roundId, action, value = null, target = null) => {
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
       return loadSession(id);

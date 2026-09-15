@@ -43,6 +43,9 @@
     const fishCatch = global.TrottlSpecialFishCatch?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fänge werden erneut gespeichert."; void refresh(); } });
+    const reactionTest = global.TrottlSpecialReactionTest?.create({ root: game, service,
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
+      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Reaktionsergebnis wird erneut geladen."; void refresh(); } });
     const debug = global.TrottlSpecialDebug?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id) { acceptSnapshot(next); renderSession(); } } });
     // Results and transitions come exclusively from the Special intent RPC.
@@ -231,11 +234,11 @@
         resultPanel.querySelector("p").hidden = showingResults;
         resultPanel.querySelector("ol").replaceChildren(...(m.results ?? []).map(row => {
           const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
-          const item = node("li", row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : "");
+          const item = node("li", `${row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : ""}${row.is_penalty ? " is-penalty" : ""}`.trim());
           const identity = node("span", "trottl-special-result-identity"); identity.append(node("strong", "", name));
           if (row.life_loss === 1) identity.append(node("small", "trottl-special-result-life-loss", "−1 Leben"));
-          item.append(node("span", "", String(row.rank)), identity, node("span", "trottl-special-result-value", row.display_value));
-          item.setAttribute("aria-label", `${row.rank}. ${name}: ${row.display_value}${row.is_winner ? ", Gewinner" : row.is_loser ? ", Verlierer" : ""}`);
+          item.append(node("span", "", row.rank == null ? "" : String(row.rank)), identity, node("span", "trottl-special-result-value", row.display_value));
+          item.setAttribute("aria-label", `${row.rank == null ? "" : `${row.rank}. `}${name}: ${row.display_value}${row.is_winner ? ", Gewinner" : row.is_loser ? ", Verlierer" : ""}`);
           return item;
         }));
       }
@@ -283,7 +286,7 @@
           if (attackMark.fading) crosshair.style.animationDelay = `-${attackMark.elapsed}ms`;
           wrap.append(crosshair);
         }
-        if (g.phase === "minigame_active" && ["special_minigame_01", "special_minigame_02"].includes(g.minigame?.minigame_type) && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
+        if (g.phase === "minigame_active" && ["special_minigame_01", "special_minigame_02", "special_minigame_03"].includes(g.minigame?.minigame_type) && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
           wrap.classList.add(g.minigame.runs?.[player.userId]?.completed ? "trottl-special-minigame-done" : "trottl-special-minigame-waiting");
         }
         const hearts = node("span", "trottl-special-hearts");
@@ -382,6 +385,7 @@
       roulette?.update(snapshot, state.gameBusy);
       numberHunt?.update(snapshot);
       fishCatch?.update(snapshot);
+      reactionTest?.update(snapshot);
       debug?.update(snapshot);
     }
     function distributionCount() {

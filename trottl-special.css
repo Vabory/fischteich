@@ -240,11 +240,18 @@
 .trottl-special-test-panel select { display: block; width: 100%; min-height: 40px; margin-top: 4px; background: #182b3a; color: #fff; }
 .trottl-special-test-panel button { min-height: 44px; }
 .trottl-special-test-button[hidden], .trottl-special-test-panel[hidden] { display: none; }
-.trottl-special-fish-field { position: relative; width: min(100%, 420px); height: clamp(120px, 30dvh, 300px); overflow: hidden; border-radius: 14px; background: radial-gradient(ellipse at center, #204b62, #0c2332); touch-action: manipulation; }
-.trottl-special-fish { position: absolute; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.trottl-special-fish-field { display: grid; width: min(100%, 420px); height: clamp(176px, 27dvh, 220px); box-sizing: border-box; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 15px 6px; padding: 20px 6px 10px; overflow: hidden; border-radius: 14px; background: radial-gradient(ellipse at center, #204b62, #0c2332); touch-action: manipulation; }
+.trottl-special-fish-slot { position: relative; display: grid; min-width: 0; place-items: end center; }
+.trottl-special-fish-hole { width: var(--fish-catch-slot-size, 46px); height: var(--fish-catch-slot-size, 46px); box-sizing: border-box; border: 1px solid rgb(76 156 171 / 58%); border-radius: 50%; background: radial-gradient(circle at 50% 62%, #06131b 0 48%, #0b2832 72%, #123d49 100%); box-shadow: inset 0 5px 11px rgb(0 0 0 / 72%), 0 1px 5px rgb(56 155 176 / 20%); pointer-events: none; }
+.trottl-special-fish { position: absolute; z-index: 2; bottom: 12px; left: 50%; width: var(--fish-catch-fish-size, 52px); height: var(--fish-catch-fish-size, 52px); padding: 0; border: 0; background: transparent; box-shadow: none; opacity: 0; transform: translate(-50%, 12px) scale(.82); animation: trottl-special-fish-pop var(--fish-catch-pop-ms, 120ms) ease-out forwards; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.trottl-special-fish.is-leaving { animation: trottl-special-fish-hide var(--fish-catch-pop-ms, 120ms) ease-in forwards; pointer-events: none; }
+.trottl-special-fish.is-hit { filter: brightness(1.2); }
 .trottl-special-fish img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
 .trottl-special-fish-score { margin: 8px 0 0; color: #fff; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
 .trottl-special-fish-score.is-urgent { color: #ffa0a0; }
+@keyframes trottl-special-fish-pop { 100% { opacity: 1; transform: translate(-50%, -8px) scale(1); } }
+@keyframes trottl-special-fish-hide { 0% { opacity: 1; transform: translate(-50%, -8px) scale(1); } 100% { opacity: 0; transform: translate(-50%, 10px) scale(.84); } }
+@media (prefers-reduced-motion: reduce) { .trottl-special-fish { animation-duration: 1ms; } }
 .trottl-special-minigame-title { color: white; text-align: center; font-size: clamp(24px, 7vw, 36px); margin: 0; }
 .trottl-special-minigame-countdown { color: white; font-size: 30px; min-height: 36px; text-shadow: 0 0 16px rgb(255 255 255 / 40%); }
 .trottl-special-minigame-copy, .trottl-special-number-hunt-progress { margin: 0; color: white; font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }

@@ -1,95 +1,147 @@
 "use strict";
 (function installFishCatch(global) {
-  const CONFIG = Object.freeze({ durationMs: 10000, visibleMs: 650, pauseMinMs: 160, pauseMaxMs: 280, fishSize: 72, checkpointMs: 500, retryMs: 750, maxScore: 63 });
-  const ASSET = "./assets/avatars/turbo-lachs.png";
-  // Seed and catch timestamps reconstruct both missed fish and early next spawns.
-  function spawn(seed, hits, elapsed) {
-    let rng = Math.max(1, Number(seed) % 2147483647), at = 0;
-    const random = () => { rng = rng * 48271 % 2147483647; return rng / 2147483647; };
-    for (let index = 0; index <= CONFIG.maxScore && at < CONFIG.durationMs; index++) {
-      const x = random(), y = random(), pause = CONFIG.pauseMinMs + Math.floor(random() * (CONFIG.pauseMaxMs - CONFIG.pauseMinMs + 1));
-      const hit = hits.find(h => h.index === index && h.at >= at && h.at < Math.min(at + CONFIG.visibleMs, CONFIG.durationMs));
-      const until = hit ? hit.at : Math.min(at + CONFIG.visibleMs, CONFIG.durationMs);
-      if (elapsed >= at && elapsed < until) return { index, at, until, x, y };
-      at = until + pause;
-      if (elapsed < at) return null;
-    }
-    return null;
+  const CONFIG = Object.freeze({
+    roundDurationMs: 10000, slotCount: 10, spawnCountMin: 26, spawnCountMax: 32,
+    lifetimeMinMs: 520, lifetimeMaxMs: 820, maxSimultaneous: 3,
+    spawnSpacingMinMs: 130, spawnSpacingMaxMs: 330, sameSlotCooldownMs: 180,
+    popAnimationMs: 120, fishSizePx: 52, slotSizePx: 46, checkpointMs: 500, retryMs: 750,
+  });
+  const FISH_CATCH_ASSETS = Object.freeze(Array.from({ length: 8 }, (_, index) => `./assets/mini-games/${index + 1}-fish.png`));
+
+  function preloadAssets() {
+    if (typeof global.Image !== "function") return;
+    for (const src of FISH_CATCH_ASSETS) { const image = new global.Image(); image.src = src; }
   }
+
+  function validatePattern(pattern) {
+    if (!Array.isArray(pattern) || pattern.length < CONFIG.spawnCountMin || pattern.length > CONFIG.spawnCountMax) return false;
+    const ids = new Set();
+    return pattern.every((spawn) => {
+      const valid = Number.isInteger(spawn?.i) && spawn.i >= 0 && spawn.i < pattern.length && !ids.has(spawn.i)
+        && Number.isInteger(spawn.t) && spawn.t >= 0
+        && Number.isInteger(spawn.d) && spawn.d >= CONFIG.lifetimeMinMs && spawn.d <= CONFIG.lifetimeMaxMs
+        && spawn.t + spawn.d <= CONFIG.roundDurationMs
+        && Number.isInteger(spawn.s) && spawn.s >= 0 && spawn.s < CONFIG.slotCount
+        && Number.isInteger(spawn.a) && spawn.a >= 1 && spawn.a <= FISH_CATCH_ASSETS.length;
+      ids.add(spawn?.i); return valid;
+    });
+  }
+
+  function getVisibleSpawns(pattern, hitSpawnIds, elapsed) {
+    if (!validatePattern(pattern) || !Number.isFinite(elapsed) || elapsed < 0 || elapsed >= CONFIG.roundDurationMs) return [];
+    const hits = hitSpawnIds instanceof Set ? hitSpawnIds : new Set(hitSpawnIds ?? []);
+    return pattern.filter(({ i, t, d }) => !hits.has(i) && elapsed >= t && elapsed < t + d);
+  }
+
   function create({ root, service, onSnapshot, onError }) {
     const doc = global.document, shell = global.TrottlSpecialMinigames.createShell(root);
-    const field = doc.createElement("div"), fish = doc.createElement("button"), img = doc.createElement("img"), score = doc.createElement("p");
-    field.className = "trottl-special-fish-field"; fish.type = "button"; fish.className = "trottl-special-fish"; fish.setAttribute("aria-label", "Fisch fangen");
-    img.src = ASSET; img.alt = ""; img.draggable = false; fish.append(img); field.append(fish); score.className = "trottl-special-fish-score"; shell.content.append(field, score);
-    let snapshot = null, key = null, hits = [], timer = null, suspended = true, sending = false, retryAt = 0, checkpointAt = 0, acknowledged = 0;
+    const field = doc.createElement("div"), score = doc.createElement("p"), slots = [], fishNodes = new Map();
+    field.className = "trottl-special-fish-field";
+    field.style.setProperty("--fish-catch-slot-size", `${CONFIG.slotSizePx}px`);
+    field.style.setProperty("--fish-catch-fish-size", `${CONFIG.fishSizePx}px`);
+    field.style.setProperty("--fish-catch-pop-ms", `${CONFIG.popAnimationMs}ms`);
+    for (let slotIndex = 0; slotIndex < CONFIG.slotCount; slotIndex += 1) {
+      const slot = doc.createElement("div"), hole = doc.createElement("span");
+      slot.className = "trottl-special-fish-slot"; slot.dataset.slot = String(slotIndex);
+      hole.className = "trottl-special-fish-hole"; hole.setAttribute("aria-hidden", "true");
+      slot.append(hole); slots.push(slot); field.append(slot);
+    }
+    score.className = "trottl-special-fish-score"; shell.content.append(field, score); preloadAssets();
+
+    let snapshot = null, key = null, pattern = [], hits = [], hitSpawnIds = new Set(), timer = null;
+    let suspended = true, sending = false, retryAt = 0, checkpointAt = 0, acknowledged = 0;
     const storageKey = () => `fischteich:special-fish:${key}`;
     function persist() { try { global.sessionStorage?.setItem(storageKey(), JSON.stringify(hits)); } catch {} }
-    function eligible() { return snapshot?.membershipRole === "player" && snapshot.players.some(p => p.userId === snapshot.identity.userId && ["alive", "critical"].includes(p.lifecycle)) && snapshot.session.gameState.minigame.participants.some(p => p.player_id === snapshot.identity.userId); }
+    function eligible() { return snapshot?.membershipRole === "player" && snapshot.players.some((player) => player.userId === snapshot.identity.userId && ["alive", "critical"].includes(player.lifecycle)) && snapshot.session.gameState.minigame.participants.some((player) => player.player_id === snapshot.identity.userId); }
     function perspective() { return snapshot.membershipRole === "spectator" ? snapshot.session.hostUserId : snapshot.identity.userId; }
+    function removeFish(spawnId, animate = true) {
+      const fish = fishNodes.get(spawnId); if (!fish) return;
+      fishNodes.delete(spawnId); fish.disabled = true;
+      if (!animate || typeof global.setTimeout !== "function") { fish.remove(); return; }
+      fish.classList.add("is-leaving"); global.setTimeout(() => fish.remove(), CONFIG.popAnimationMs);
+    }
+    function clearFish(animate = false) { for (const spawnId of [...fishNodes.keys()]) removeFish(spawnId, animate); }
+    function elapsedNow() {
+      const now = service.serverNow(), start = Date.parse(snapshot?.session.gameState.minigame?.start_at);
+      return now === null || !Number.isFinite(start) ? null : Math.floor(now - start);
+    }
+    function catchSpawn(spawnId) {
+      if (suspended || !eligible() || root.hidden || doc.visibilityState === "hidden" || hitSpawnIds.has(spawnId)) return false;
+      const m = snapshot.session.gameState.minigame, run = m.runs[perspective()], now = service.serverNow(), elapsed = elapsedNow();
+      if (now === null || elapsed === null || elapsed < 0 || elapsed >= CONFIG.roundDurationMs || run?.completed || global.TrottlSpecialMinigames.sequence(m, now).phase !== "active") return false;
+      if (!getVisibleSpawns(pattern, hitSpawnIds, elapsed).some(({ i }) => i === spawnId)) return false;
+      if (hits.length === acknowledged) checkpointAt = now;
+      hitSpawnIds.add(spawnId); hits.push({ index: spawnId, at: elapsed }); persist();
+      const fish = fishNodes.get(spawnId); if (fish) fish.classList.add("is-hit"); removeFish(spawnId, true); tick(); return true;
+    }
+    function createFish(spawn, interactive) {
+      const fish = doc.createElement("button"), image = doc.createElement("img");
+      fish.type = "button"; fish.className = "trottl-special-fish"; fish.dataset.spawnId = String(spawn.i); fish.dataset.slot = String(spawn.s);
+      fish.setAttribute("aria-label", `Fisch in Position ${spawn.s + 1} fangen`); fish.disabled = !interactive;
+      image.src = FISH_CATCH_ASSETS[spawn.a - 1]; image.alt = ""; image.draggable = false; fish.append(image);
+      fish.addEventListener("pointerdown", (event) => { if (event.isTrusted === false || (event.pointerType === "mouse" && event.button !== 0)) return; event.preventDefault(); catchSpawn(spawn.i); });
+      fish.addEventListener("click", (event) => { if (event.detail === 0) catchSpawn(spawn.i); });
+      slots[spawn.s].append(fish); fishNodes.set(spawn.i, fish);
+    }
+    function renderFish(activeSpawns, interactive) {
+      const activeIds = new Set(activeSpawns.map(({ i }) => i));
+      for (const spawnId of [...fishNodes.keys()]) if (!activeIds.has(spawnId)) removeFish(spawnId, true);
+      for (const spawn of activeSpawns) {
+        if (!fishNodes.has(spawn.i)) createFish(spawn, interactive);
+        else fishNodes.get(spawn.i).disabled = !interactive;
+      }
+    }
     async function save(final) {
       const now = service.serverNow(); if (!eligible() || sending || now === null || now < retryAt) return;
-      const ownKey = key, s = snapshot, sent = hits.map(h => ({ ...h })); sending = true; checkpointAt = now;
+      const ownKey = key, currentSnapshot = snapshot, sent = hits.map((hit) => ({ ...hit })); sending = true; checkpointAt = now;
       try {
-        const next = await service.saveFishCatch(s.session.id, s.session.gameState.minigame.minigame_id, sent.length, sent, final);
+        const next = await service.saveFishCatch(currentSnapshot.session.id, currentSnapshot.session.gameState.minigame.minigame_id, sent.length, sent, final);
         if (key !== ownKey) return; acknowledged = Math.max(acknowledged, sent.length); retryAt = 0;
         if (final) { try { global.sessionStorage?.removeItem(storageKey()); } catch {} }
         onSnapshot(next);
-      } catch (e) { if (key === ownKey) { retryAt = (service.serverNow() ?? 0) + CONFIG.retryMs; onError?.(e); } }
+      } catch (error) { if (key === ownKey) { retryAt = (service.serverNow() ?? 0) + CONFIG.retryMs; onError?.(error); } }
       finally { if (key === ownKey) sending = false; }
     }
     function tick() {
       if (suspended || !snapshot || root.hidden || doc.visibilityState === "hidden") { shell.hide(); return; }
-      const m = snapshot.session.gameState.minigame, now = service.serverNow(), frame = shell.frame(m, now), run = m.runs[perspective()];
-      const elapsed = now === null ? null : Math.max(0, now - Date.parse(m.start_at));
+      const m = snapshot.session.gameState.minigame, now = service.serverNow(), frame = shell.frame(m, now), run = m.runs[perspective()], elapsed = elapsedNow();
       const own = eligible(), spectator = snapshot.membershipRole === "spectator", visibleHits = spectator ? run?.hits ?? [] : hits;
-      const finished = run?.completed || (elapsed !== null && elapsed >= CONFIG.durationMs);
-      const active = frame.phase === "active" && !finished && Boolean(run);
-      const current = active ? spawn(run.seed, visibleHits, elapsed) : null;
-      shell.panel.classList.toggle("is-waiting", Boolean(finished || !run)); field.hidden = !active; fish.hidden = !current;
-      fish.disabled = !own || spectator || !current;
-      if (current) {
-        const bounds = field.getBoundingClientRect(), size = Math.min(CONFIG.fishSize, bounds.width, bounds.height);
-        fish.style.width = `${size}px`; fish.style.height = `${size}px`;
-        fish.style.left = `${current.x * Math.max(0, bounds.width - size)}px`; fish.style.top = `${current.y * Math.max(0, bounds.height - size)}px`;
-        fish.dataset.index = String(current.index);
-      }
-      const n = run?.completed ? Number(run.score) : visibleHits.length;
-      score.textContent = `${n} FISCHE · ${((CONFIG.durationMs - Math.min(CONFIG.durationMs, elapsed ?? 0)) / 1000).toFixed(1)} s`;
-      score.classList.toggle("is-urgent", active && elapsed >= CONFIG.durationMs - 3000);
-      shell.copy.textContent = !run ? "Host nimmt nicht teil – du schaust zu" : finished ? run.completed ? "Fertig – warte auf die anderen Spieler" : "Ergebnis wird gespeichert …" : spectator ? "Host-Sicht · nur zuschauen" : "Tippe direkt auf den Fisch!";
+      const visibleHitIds = new Set(visibleHits.map(({ index }) => index));
+      const finished = run?.completed || (elapsed !== null && elapsed >= CONFIG.roundDurationMs);
+      const boardVisible = ["countdown", "active"].includes(frame.phase) && Boolean(run) && pattern.length > 0 && !finished;
+      const active = frame.phase === "active" && boardVisible;
+      shell.content.hidden = !boardVisible; shell.panel.classList.toggle("is-waiting", Boolean(finished || !run)); field.hidden = !boardVisible;
+      renderFish(active && elapsed !== null ? getVisibleSpawns(pattern, visibleHitIds, elapsed) : [], own && !spectator);
+      if (finished) clearFish(false);
+      const amount = run?.completed ? Number(run.score) : visibleHits.length, noun = amount === 1 ? "FISCH" : "FISCHE";
+      score.textContent = `${amount} ${noun} · ${((CONFIG.roundDurationMs - Math.min(CONFIG.roundDurationMs, Math.max(0, elapsed ?? 0))) / 1000).toFixed(1)} s`;
+      score.classList.toggle("is-urgent", active && elapsed >= CONFIG.roundDurationMs - 3000);
+      shell.copy.textContent = !run ? "Host nimmt nicht teil – du schaust zu" : finished ? run.completed ? "Fertig – warte auf die anderen Spieler" : "Ergebnis wird gespeichert …" : spectator ? "Host-Sicht · nur zuschauen" : "Tippe direkt auf sichtbare Fische!";
       if (own && !run?.completed && elapsed !== null) {
         if (finished) void save(true);
         else if (hits.length > acknowledged && now >= checkpointAt + CONFIG.checkpointMs) void save(false);
       }
     }
-    function tap() {
-      if (suspended || !eligible() || root.hidden || doc.visibilityState === "hidden") return;
-      const m = snapshot.session.gameState.minigame, run = m.runs[perspective()], now = service.serverNow();
-      if (now === null || run?.completed || global.TrottlSpecialMinigames.sequence(m, now).phase !== "active") return;
-      const elapsed = Math.floor(now - Date.parse(m.start_at)); if (elapsed < 0 || elapsed >= CONFIG.durationMs) return;
-      const current = spawn(run.seed, hits, elapsed); if (!current || fish.hidden || fish.dataset.index !== String(current.index)) return;
-      if (hits.length === acknowledged) checkpointAt = now;
-      hits.push({ index: current.index, at: elapsed }); persist(); fish.hidden = true; fish.disabled = true; tick();
-    }
-    fish.addEventListener("pointerdown", e => { if (e.isTrusted === false || (e.pointerType === "mouse" && e.button !== 0)) return; e.preventDefault(); tap(); });
-    fish.addEventListener("click", e => { if (e.detail === 0) tap(); });
     function update(next) {
       snapshot = next;
       if (!next || next.session.status !== "playing" || next.session.gameState.phase !== "minigame_active" || next.session.gameState.minigame?.minigame_type !== "special_minigame_02") { key = null; suspend(); return; }
-      const m = next.session.gameState.minigame, nextKey = `${next.session.id}:${m.minigame_id}:${next.identity.userId}`;
+      const m = next.session.gameState.minigame, nextPattern = m.pattern, nextKey = `${next.session.id}:${m.minigame_id}:${next.identity.userId}`;
+      if (!validatePattern(nextPattern)) { pattern = []; suspended = false; tick(); return; }
+      pattern = nextPattern.map((spawn) => ({ ...spawn }));
       const serverHits = m.runs[next.identity.userId]?.hits ?? [];
       if (nextKey !== key) {
-        key = nextKey; hits = serverHits.map(h => ({ ...h })); acknowledged = hits.length; sending = false; retryAt = 0; checkpointAt = service.serverNow() ?? 0;
+        key = nextKey; hits = serverHits.map((hit) => ({ ...hit })); acknowledged = hits.length; sending = false; retryAt = 0; checkpointAt = service.serverNow() ?? 0;
         try {
-          const cached = JSON.parse(global.sessionStorage?.getItem(storageKey()) ?? "null");
-          if (Array.isArray(cached) && cached.length <= CONFIG.maxScore && cached.every((h,i) => Number.isInteger(h.index) && Number.isInteger(h.at) && h.at >= 0 && h.at < CONFIG.durationMs && (i === 0 || h.index > cached[i-1].index && h.at > cached[i-1].at)) && serverHits.every((h,i) => h.index === cached[i]?.index && h.at === cached[i]?.at)) hits = cached;
+          const cached = JSON.parse(global.sessionStorage?.getItem(storageKey()) ?? "null"), seen = new Set();
+          if (Array.isArray(cached) && cached.length <= pattern.length && cached.every((hit, index) => Number.isInteger(hit.index) && pattern.some(({ i }) => i === hit.index) && !seen.has(hit.index) && seen.add(hit.index) && Number.isInteger(hit.at) && hit.at >= 0 && hit.at < CONFIG.roundDurationMs && (index === 0 || hit.at >= cached[index - 1].at)) && serverHits.every((hit, index) => hit.index === cached[index]?.index && hit.at === cached[index]?.at)) hits = cached;
         } catch {}
       }
-      if (serverHits.length > hits.length) hits = serverHits.map(h => ({ ...h })); acknowledged = Math.max(acknowledged, serverHits.length);
+      if (serverHits.length > hits.length) hits = serverHits.map((hit) => ({ ...hit }));
+      acknowledged = Math.max(acknowledged, serverHits.length); hitSpawnIds = new Set(hits.map(({ index }) => index));
       suspended = false; tick(); if (timer === null) timer = global.setInterval(tick, 50);
     }
-    function suspend() { suspended = true; global.clearInterval(timer); timer = null; shell.hide(); }
+    function suspend() { suspended = true; global.clearInterval(timer); timer = null; clearFish(false); shell.hide(); }
     return Object.freeze({ update, suspend });
   }
-  global.TrottlSpecialFishCatch = Object.freeze({ CONFIG, ASSET, spawn, create });
+  global.TrottlSpecialFishCatch = Object.freeze({ CONFIG, FISH_CATCH_ASSETS, validatePattern, getVisibleSpawns, preloadAssets, create });
 })(window);

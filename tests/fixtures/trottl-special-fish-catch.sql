@@ -15,6 +15,18 @@ begin
  if has_function_privilege('authenticated','public.special_minigame_pick(double precision,text)','EXECUTE')
   or has_function_privilege('authenticated','public.act_trottl_special_before_test_controls(uuid,text,bigint,uuid)','EXECUTE') then raise exception 'Private helper exposed'; end if;
 end; $$;
+do $$ declare p jsonb:=public.special_fish_catch_pattern(123456);q jsonb:=public.special_fish_catch_pattern(654321);entry jsonb;
+begin
+ if p is distinct from public.special_fish_catch_pattern(123456) or p=q then raise exception 'Seeded pattern determinism'; end if;
+ if jsonb_array_length(p) not between 26 and 32 then raise exception 'Pattern count'; end if;
+ for entry in select value from jsonb_array_elements(p) loop
+  if (entry->>'s')::integer not between 0 and 9 or (entry->>'a')::integer not between 1 and 8
+   or (entry->>'t')::integer<0 or (entry->>'d')::integer not between 520 and 820
+   or (entry->>'t')::integer+(entry->>'d')::integer>10000 then raise exception 'Pattern bounds'; end if;
+ end loop;
+ if exists(select 1 from jsonb_array_elements(p) a where 3<(select count(*) from jsonb_array_elements(p) b
+   where (b->>'t')::integer<=(a->>'t')::integer and (b->>'t')::integer+(b->>'d')::integer>(a->>'t')::integer)) then raise exception 'Pattern concurrency'; end if;
+end; $$;
 create function pg_temp.fish_error(q text,expected text) returns void language plpgsql as $$
 begin
  begin execute q;exception when others then if position(expected in sqlerrm)=0 then raise;end if;return;end;
@@ -63,7 +75,7 @@ begin
  perform pg_temp.fish_prepare('special_minigame_01');
  perform pg_temp.fish_prepare('special_minigame_02');
 end; $$;
-do $$ declare s public.trottl_special_sessions;g jsonb;ids uuid[];r uuid;hits jsonb;scores integer[];seq bigint;
+do $$ declare s public.trottl_special_sessions;g jsonb;ids uuid[];r uuid;hits jsonb;scores integer[];seq bigint;max_score integer;
 begin
  select * into s from fish_baseline;
  select array_agg(user_id order by seat_index) into ids from public.trottl_special_players where session_id=s.id;
@@ -73,9 +85,11 @@ begin
   update public.trottl_special_sessions set game_state=jsonb_set(jsonb_set(game_state,'{minigame,start_at}',to_jsonb(clock_timestamp()-interval '11 seconds')),'{minigame,end_at}',to_jsonb(clock_timestamp()-interval '1 second')) where id=s.id;
   for i in 1..4 loop
    perform set_config('request.jwt.claim.sub',ids[i]::text,true);
-   select jsonb_agg(jsonb_build_object('index',n,'at',n*160) order by n) into hits from generate_series(0,scores[i]-1) n;
+   select jsonb_agg(jsonb_build_object('index',(spawn->>'i')::integer,'at',(spawn->>'t')::integer+1) order by ordinality)
+    into hits from jsonb_array_elements(g->'minigame'->'pattern') with ordinality item(spawn,ordinality) where ordinality<=scores[i];
+   max_score:=jsonb_array_length(g->'minigame'->'pattern');
    perform pg_temp.fish_error(format('select public.save_trottl_special_fish_catch(%L,%L,0,%L,true)',s.id,gen_random_uuid(),'[]'),'SPECIAL_INVALID_FISH_CATCH_PARTICIPANT');
-   perform pg_temp.fish_error(format('select public.save_trottl_special_fish_catch(%L,%L,64,%L,true)',s.id,r,'[]'),'SPECIAL_INVALID_FISH_CATCH_SCORE');
+   perform pg_temp.fish_error(format('select public.save_trottl_special_fish_catch(%L,%L,%s,%L,true)',s.id,r,max_score+1,'[]'),'SPECIAL_INVALID_FISH_CATCH_SCORE');
    perform public.save_trottl_special_fish_catch(s.id,r,scores[i],hits,true);
    perform public.save_trottl_special_fish_catch(s.id,r,scores[i],hits,true); -- Lost-response retry is idempotent.
    select game_state into g from public.trottl_special_sessions where id=s.id;

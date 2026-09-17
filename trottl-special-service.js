@@ -62,6 +62,8 @@
       ? await rpc("get_trottl_special_reaction_view", { p_session_id: sessionId }) : null;
     const colorChaosView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_04"
       ? await rpc("get_trottl_special_color_chaos_view", { p_session_id: sessionId }) : null;
+    const fishMemoryView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_05"
+      ? await rpc("get_trottl_special_fish_memory_view", { p_session_id: sessionId }) : null;
     const players = (p.data ?? []).filter(row => row.lifecycle_status !== "left").map(row => {
       const base = presentation.normalizePlayer(row);
       if (!base) return null;
@@ -94,11 +96,24 @@
         || colorChaosView.target_color === colorChaosView.ink_color || !Array.isArray(colorChaosView.fish_order)
         || colorChaosView.fish_order.length !== 4 || new Set(colorChaosView.fish_order).size !== 4
         || colorChaosView.fish_order.some(color => !colorNames.includes(color)))))) throw new Error("Invalid color chaos view response");
+    if (fishMemoryView !== null && (typeof fishMemoryView !== "object" || typeof fishMemoryView.player_id !== "string"
+      || !Array.isArray(fishMemoryView.pattern) || fishMemoryView.pattern.length !== 12 || fishMemoryView.pattern.some((color, index, pattern) => !colorNames.includes(color)
+        || (index >= 2 && color === pattern[index - 1] && color === pattern[index - 2]))
+      || !Number.isInteger(Number(fishMemoryView.memory_round)) || Number(fishMemoryView.memory_round) < 1 || Number(fishMemoryView.memory_round) > 3
+      || !["watch", "input", "finished"].includes(fishMemoryView.phase) || !Number.isFinite(Date.parse(fishMemoryView.phase_started_at))
+      || !Number.isInteger(Number(fishMemoryView.guess_count)) || Number(fishMemoryView.guess_count) < 0 || Number(fishMemoryView.guess_count) > Number(fishMemoryView.memory_round) * 4
+      || typeof fishMemoryView.completed !== "boolean" || (fishMemoryView.phase === "finished") !== fishMemoryView.completed
+      || (fishMemoryView.phase === "watch" && !Number.isFinite(Date.parse(fishMemoryView.phase_ends_at)))
+      || (fishMemoryView.phase === "input" && !Number.isFinite(Date.parse(fishMemoryView.input_deadline)))
+      || (fishMemoryView.errors !== null && (!Number.isInteger(Number(fishMemoryView.errors)) || Number(fishMemoryView.errors) < 0 || Number(fishMemoryView.errors) > 24))
+      || (fishMemoryView.completed && membership.membershipRole === "player" && fishMemoryView.errors === null))) throw new Error("Invalid fish memory view response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
       membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount,
       reactionRun: reactionRun === null ? null : Object.freeze({ ...reactionRun, delay_ms: Number(reactionRun.delay_ms), reaction_ms: reactionRun.reaction_ms === null ? null : Number(reactionRun.reaction_ms) }),
       colorChaosView: colorChaosView === null ? null : Object.freeze({ ...colorChaosView, progress: Number(colorChaosView.progress), challenge_index: Number(colorChaosView.challenge_index),
-        elapsed_ms: colorChaosView.elapsed_ms === null ? null : Number(colorChaosView.elapsed_ms), fish_order: Object.freeze([...(colorChaosView.fish_order ?? [])]) }) });
+        elapsed_ms: colorChaosView.elapsed_ms === null ? null : Number(colorChaosView.elapsed_ms), fish_order: Object.freeze([...(colorChaosView.fish_order ?? [])]) }),
+      fishMemoryView: fishMemoryView === null ? null : Object.freeze({ ...fishMemoryView, memory_round: Number(fishMemoryView.memory_round),
+        guess_count: Number(fishMemoryView.guess_count), errors: fishMemoryView.errors === null ? null : Number(fishMemoryView.errors), pattern: Object.freeze([...fishMemoryView.pattern]) }) });
   }
   async function loadMembership(sessionId) {
     const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
@@ -166,6 +181,15 @@
     finalizeReaction: async (id, roundId) => { await rpc("finalize_trottl_special_reaction", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     answerColorChaos: async (id, roundId, challengeIndex, selectedColor, elapsed) => {
       await rpc("answer_trottl_special_color_chaos", { p_session_id: id, p_round_id: roundId, p_challenge_index: challengeIndex, p_selected_color: selectedColor, p_tap_elapsed_ms: elapsed });
+      return loadSession(id);
+    },
+    guessFishMemory: async (id, roundId, memoryRound, guessIndex, selectedColor, clientTimestamp) => {
+      await rpc("guess_trottl_special_fish_memory", { p_session_id: id, p_round_id: roundId, p_memory_round: memoryRound,
+        p_guess_index: guessIndex, p_selected_color: selectedColor, p_client_timestamp_ms: clientTimestamp === null ? null : Math.round(clientTimestamp) });
+      return loadSession(id);
+    },
+    syncFishMemory: async (id, roundId) => {
+      await rpc("sync_trottl_special_fish_memory", { p_session_id: id, p_round_id: roundId });
       return loadSession(id);
     },
     actRoulette: async (id, roundId, action, value = null, target = null) => {

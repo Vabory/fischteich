@@ -7,14 +7,15 @@ do $$ declare s public.trottl_special_sessions;
 begin
  select * into s from fish_baseline;
  if s.id is null or s.status<>'playing' or (select count(*) from public.trottl_special_players where session_id=s.id)<>4 then raise exception 'Dedicated four-player Special room required'; end if;
- if public.special_minigame_pick(0)<>'special_minigame_01' or public.special_minigame_pick(0.249999)<>'special_minigame_01'
-  or public.special_minigame_pick(0.25)<>'special_minigame_02' or public.special_minigame_pick(0.499999)<>'special_minigame_02'
-  or public.special_minigame_pick(0.5)<>'special_minigame_03' or public.special_minigame_pick(0.749999)<>'special_minigame_03'
-  or public.special_minigame_pick(0.75)<>'special_minigame_04' or public.special_minigame_pick(0.999999)<>'special_minigame_04'
+ if public.special_minigame_pick(0)<>'special_minigame_01' or public.special_minigame_pick(0.199999)<>'special_minigame_01'
+  or public.special_minigame_pick(0.2)<>'special_minigame_02' or public.special_minigame_pick(0.399999)<>'special_minigame_02'
+  or public.special_minigame_pick(0.4)<>'special_minigame_03' or public.special_minigame_pick(0.599999)<>'special_minigame_03'
+  or public.special_minigame_pick(0.6)<>'special_minigame_04' or public.special_minigame_pick(0.799999)<>'special_minigame_04'
+  or public.special_minigame_pick(0.8)<>'special_minigame_05' or public.special_minigame_pick(0.999999)<>'special_minigame_05'
   or public.special_minigame_pick(0,'special_minigame_02')<>'special_minigame_02'
   or public.special_minigame_pick(0.9,'special_minigame_01')<>'special_minigame_01'
   or public.special_minigame_pick(0.1,'special_minigame_03')<>'special_minigame_03' then raise exception 'Uniform implemented pool or override precedence'; end if;
- if exists(select 1 from public.trottl_special_minigame_registry where enabled and id not in ('special_minigame_01','special_minigame_02','special_minigame_03','special_minigame_04')) then raise exception 'Unimplemented pool slot'; end if;
+ if exists(select 1 from public.trottl_special_minigame_registry where enabled and id not in ('special_minigame_01','special_minigame_02','special_minigame_03','special_minigame_04','special_minigame_05')) then raise exception 'Unimplemented pool slot'; end if;
  if has_function_privilege('authenticated','public.special_minigame_pick(double precision,text)','EXECUTE')
   or has_function_privilege('authenticated','public.act_trottl_special_before_test_controls(uuid,text,bigint,uuid)','EXECUTE') then raise exception 'Private helper exposed'; end if;
 end; $$;

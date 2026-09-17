@@ -45,16 +45,22 @@
 
   function create({ root, service, onSnapshot, onError }) {
     const doc = global.document, shell = global.TrottlSpecialMinigames.createShell(root);
-    const challenge = doc.createElement("div"), prompt = doc.createElement("p"), word = doc.createElement("strong");
+    const gameArea = doc.createElement("div"), taskZone = doc.createElement("div"), gridZone = doc.createElement("div");
+    const progressZone = doc.createElement("div"), prompt = doc.createElement("p"), word = doc.createElement("strong");
     const progress = doc.createElement("p"), grid = doc.createElement("div"), result = doc.createElement("strong");
-    challenge.className = "trottl-special-color-chaos-challenge";
+    shell.panel.classList.add("is-color-chaos"); shell.copy.textContent = ""; shell.copy.hidden = true;
+    gameArea.className = "trottl-special-color-chaos-game";
+    taskZone.className = "trottl-special-color-chaos-task-zone";
+    gridZone.className = "trottl-special-color-chaos-grid-zone";
+    progressZone.className = "trottl-special-color-chaos-progress-zone";
     prompt.className = "trottl-special-color-chaos-prompt";
     prompt.append(doc.createTextNode?.("TIPPE ") ?? (() => { const span = doc.createElement("span"); span.textContent = "TIPPE "; return span; })(), word,
       doc.createTextNode?.("!") ?? (() => { const span = doc.createElement("span"); span.textContent = "!"; return span; })());
     progress.className = "trottl-special-color-chaos-progress";
     grid.className = "trottl-special-color-chaos-grid";
     result.className = "trottl-special-color-chaos-result"; result.hidden = true;
-    challenge.append(prompt, grid); shell.content.append(challenge, progress, result); void preloadAssets();
+    taskZone.append(prompt); gridZone.append(grid); progressZone.append(progress);
+    gameArea.append(taskZone, gridZone, progressZone); shell.content.append(gameArea, result); void preloadAssets();
 
     let snapshot = null, key = null, timer = null, suspended = true, submitting = false, renderedChallenge = null;
     const delay = milliseconds => new Promise(resolve => global.setTimeout(resolve, milliseconds));
@@ -98,15 +104,15 @@
       try {
         await delay(correct ? CONFIG.correctDelayMs : CONFIG.wrongDelayMs);
         if (key !== ownKey) return false;
-        challenge.classList.add("is-leaving");
+        gameArea.classList.add("is-transitioning", "is-leaving");
         await delay(CONFIG.fadeOutMs);
         if (key !== ownKey) return false;
         const next = await service.answerColorChaos(snapshot.session.id, m.minigame_id, challengeIndex, selectedColor, elapsed);
         if (key !== ownKey) return false;
         onSnapshot(next);
-        challenge.classList.remove("is-leaving"); challenge.classList.add("is-entering");
+        gameArea.classList.remove("is-leaving"); gameArea.classList.add("is-entering");
         await delay(CONFIG.fadeInMs);
-        challenge.classList.remove("is-entering");
+        gameArea.classList.remove("is-entering", "is-transitioning");
         return true;
       } catch (error) {
         if (key === ownKey) onError?.(error);
@@ -119,16 +125,17 @@
       if (suspended || !snapshot || root.hidden || doc.visibilityState === "hidden") { shell.hide(); return; }
       const m = snapshot.session.gameState.minigame, now = service.serverNow(), frame = shell.frame(m, now), current = view();
       const completed = current?.completed === true;
-      const boardVisible = ["countdown", "active"].includes(frame.phase) && Boolean(current) && !completed;
-      shell.content.hidden = !current; shell.panel.classList.toggle("is-waiting", !current || completed);
-      challenge.hidden = !boardVisible; progress.hidden = !current; result.hidden = !completed;
+      const gameplayVisible = frame.phase === "active" && frame.label === "" && Boolean(current) && !completed;
+      shell.panel.classList.toggle("is-countdown", ["title", "countdown"].includes(frame.phase) || frame.label === "START!");
+      shell.panel.classList.toggle("is-active", gameplayVisible);
+      shell.panel.classList.toggle("is-finished", completed);
+      shell.content.hidden = !gameplayVisible && !completed; shell.panel.classList.toggle("is-waiting", !current || completed);
+      gameArea.hidden = !gameplayVisible; result.hidden = !completed;
       if (current && !completed && renderedChallenge !== current.challenge_index) renderChallenge(current);
       progress.textContent = `Fortschritt: ${Number(current?.progress ?? 0)} / ${CONFIG.requiredCorrect}`;
       result.textContent = completed ? formatElapsed(current.elapsed_ms) : "";
       setChoicesDisabled(submitting || !ownParticipant() || snapshot.membershipRole === "spectator" || frame.phase !== "active");
-      shell.copy.textContent = !current ? "Farbenchaos wird synchronisiert …" : completed
-        ? snapshot.membershipRole === "spectator" ? "Host fertig – wartet auf die anderen Spieler" : "Fertig – warte auf die anderen Spieler"
-        : snapshot.membershipRole === "spectator" ? "Host-Sicht · nur zuschauen" : frame.phase === "active" ? "Tippe den Fisch passend zum geschriebenen Farbwort." : "Mach dich bereit!";
+      shell.copy.textContent = ""; shell.copy.hidden = true;
     }
     function update(next) {
       snapshot = next;
@@ -136,8 +143,12 @@
         key = null; suspend(); return;
       }
       const nextKey = `${next.session.id}:${next.session.gameState.minigame.minigame_id}:${next.identity.userId}:${next.membershipRole}`;
-      if (key !== nextKey) { key = nextKey; renderedChallenge = null; submitting = false; challenge.classList.remove("is-leaving", "is-entering"); }
+      const challengeChanged = key === nextKey && renderedChallenge !== null && next.colorChaosView?.challenge_index !== renderedChallenge;
+      if (key !== nextKey) { key = nextKey; renderedChallenge = null; submitting = false; gameArea.classList.remove("is-leaving", "is-entering", "is-transitioning"); }
       suspended = false; tick(); if (timer === null) timer = global.setInterval(tick, CONFIG.tickMs);
+      if (challengeChanged && next.membershipRole === "spectator") {
+        gameArea.classList.add("is-entering"); global.setTimeout(() => gameArea.classList.remove("is-entering"), CONFIG.fadeInMs);
+      }
     }
     function suspend() { suspended = true; global.clearInterval(timer); timer = null; shell.hide(); }
     return Object.freeze({ update, suspend });

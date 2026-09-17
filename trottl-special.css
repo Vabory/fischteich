@@ -266,7 +266,7 @@
 .trottl-special-minigame-shell.is-color-chaos .trottl-special-minigame-content { display: grid; width: min(100%, 330px); min-height: 0; place-items: center; }
 .trottl-special-color-chaos-game { display: grid; width: 100%; height: clamp(300px, 43dvh, 390px); min-height: 0; grid-template-rows: clamp(44px, 7dvh, 58px) minmax(0, 1fr) clamp(26px, 4dvh, 34px); gap: clamp(8px, 1.5dvh, 12px); opacity: 1; }
 .trottl-special-color-chaos-task-zone { display: grid; min-height: 0; place-items: center; opacity: 1; transition: opacity 150ms ease-out, transform 150ms ease-out; }
-.trottl-special-color-chaos-grid-zone { display: grid; min-height: 0; place-items: center; opacity: 1; transition: opacity 150ms ease-out, transform 150ms ease-out; }
+.trottl-special-color-chaos-grid-zone { position: relative; top: -10px; display: grid; min-height: 0; place-items: center; opacity: 1; transition: opacity 150ms ease-out, transform 150ms ease-out; }
 .trottl-special-color-chaos-game.is-leaving .trottl-special-color-chaos-task-zone,
 .trottl-special-color-chaos-game.is-leaving .trottl-special-color-chaos-grid-zone { opacity: 0; transform: scale(.98); pointer-events: none; }
 .trottl-special-color-chaos-game.is-entering .trottl-special-color-chaos-task-zone,
@@ -274,7 +274,7 @@
 .trottl-special-color-chaos-game.is-transitioning { pointer-events: none; }
 .trottl-special-color-chaos-prompt { min-height: 1.3em; margin: 0; color: #f5fbff; font-size: clamp(24px, 7.5vw, 36px); font-weight: 900; line-height: 1.1; letter-spacing: .035em; text-align: center; }
 .trottl-special-color-chaos-prompt strong { color: inherit; font: inherit; text-shadow: 0 0 12px currentColor; }
-.trottl-special-color-chaos-progress-zone { display: grid; min-height: 0; place-items: center; padding-bottom: 2px; }
+.trottl-special-color-chaos-progress-zone { position: relative; top: -10px; display: grid; min-height: 0; place-items: center; box-sizing: border-box; padding-bottom: 12px; }
 .trottl-special-color-chaos-progress { min-height: 1.3em; margin: 0; color: #f5fbff; font-size: clamp(13px, 3.8vw, 16px); font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; }
 .trottl-special-color-chaos-grid { display: grid; width: min(100%, 330px); height: 100%; min-height: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 2.5vw, 12px); touch-action: manipulation; }
 .trottl-special-color-chaos-choice { display: grid; width: 100%; min-width: 0; min-height: 0; place-items: center; padding: 7px; border: 1px solid rgb(130 196 216 / 34%); border-radius: 14px; background: linear-gradient(150deg, rgb(24 52 65 / 96%), rgb(11 27 38 / 96%)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%); touch-action: manipulation; }

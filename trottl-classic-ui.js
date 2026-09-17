@@ -111,11 +111,12 @@
     submitting = false,
     isReady = false,
   }) {
-    const visibleAvatars = Object.freeze((Array.isArray(avatars) ? avatars : [])
-      .filter(Boolean));
-    const selectedAvatar = visibleAvatars.find((avatar) => avatar.id === pendingAvatarId) ?? null;
+    const visibleAvatars = Object.freeze((Array.isArray(avatars) ? avatars : []).filter(Boolean));
+    const selectableAvatars = Object.freeze(visibleAvatars.filter((avatar) => avatar.selectable !== false));
+    const selectedAvatar = selectableAvatars.find((avatar) => avatar.id === pendingAvatarId) ?? null;
     return Object.freeze({
       visibleAvatars,
+      selectableAvatars,
       selectedAvatarId: selectedAvatar?.id ?? null,
       currentAvatarId,
       canCancel: !required && !submitting,
@@ -465,7 +466,7 @@
         : null;
       const mysticalBobrUnlocked = global.bobrUnlockService
         ?.isMysticalBobrUnlocked(profile) === true;
-      return global.trottlAvatarService.getVisibleTrottlAvatars({ mysticalBobrUnlocked });
+      return global.trottlAvatarService.getTrottlAvatarChoices({ mysticalBobrUnlocked });
     }
 
     function preloadAvailableAvatarChoices() {
@@ -758,14 +759,20 @@
         const button = document.createElement("button");
         const image = document.createElement("img");
         const name = document.createElement("span");
-        const selected = avatar.id === presentation.selectedAvatarId;
+        const selectable = avatar.selectable !== false;
+        const selected = selectable && avatar.id === presentation.selectedAvatarId;
         button.type = "button";
-        button.className = `trottl-avatar-option${selected ? " is-selected" : ""}`;
-        button.dataset.avatarId = avatar.id;
-        button.setAttribute("role", "radio");
-        button.setAttribute("aria-checked", String(selected));
-        button.setAttribute("aria-label", `${avatar.displayName} auswählen`);
-        button.disabled = state.avatarSubmitting || localLobbyPlayer()?.isReady === true;
+        button.className = `trottl-avatar-option${selected ? " is-selected" : ""}${selectable ? "" : " is-locked"}`;
+        if (selectable) {
+          button.dataset.avatarId = avatar.id;
+          button.setAttribute("role", "radio");
+          button.setAttribute("aria-checked", String(selected));
+          button.setAttribute("aria-label", `${avatar.displayName} auswählen`);
+        } else {
+          button.setAttribute("aria-label", avatar.displayName);
+          button.setAttribute("aria-disabled", "true");
+        }
+        button.disabled = !selectable || state.avatarSubmitting || localLobbyPlayer()?.isReady === true;
         image.src = avatar.src;
         image.alt = "";
         image.width = 128;
@@ -773,7 +780,7 @@
         image.draggable = false;
         name.textContent = avatar.displayName;
         button.append(image, name);
-        button.addEventListener("click", () => selectPendingAvatar(avatar.id));
+        if (selectable) button.addEventListener("click", () => selectPendingAvatar(avatar.id));
         return button;
       }));
       if (focusSelected) {
@@ -830,7 +837,7 @@
     function selectPendingAvatar(avatarId) {
       if (!state.avatarModalOpen || state.avatarSubmitting || localLobbyPlayer()?.isReady) return;
       const avatar = getAvailableAvatarChoices()
-        .find((candidate) => candidate.id === avatarId);
+        .find((candidate) => candidate.selectable !== false && candidate.id === avatarId);
       if (!avatar) return;
       state.pendingAvatarId = avatar.id;
       avatarModalFeedback.textContent = "";

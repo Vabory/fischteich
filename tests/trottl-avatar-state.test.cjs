@@ -8,6 +8,7 @@ const test = require("node:test");
 const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const migration = read("supabase/migrations/20260909000000_add_trottl_avatar_ready_state.sql");
+const bobrGuardMigration = read("supabase/migrations/20260917000000_guard_mystical_bobr_avatar.sql");
 const service = read("trottl-classic-service.js");
 const html = read("index.html");
 const expectedIds = [
@@ -47,6 +48,14 @@ test("avatar RPC is self-scoped, lobby-only and atomically persists session and 
   assert.match(migration, /grant execute on function public\.set_trottl_classic_avatar\(uuid, text\) to authenticated/i);
 });
 
+test("Mystical Bobr persistence is guarded by the authoritative profile unlock", () => {
+  assert.match(bobrGuardMigration, /create or replace function public\.set_trottl_classic_avatar/i);
+  assert.match(bobrGuardMigration, /select profile\.bobr_unlocked into v_bobr_unlocked[\s\S]*profile\.user_id = v_user_id[\s\S]*for update/i);
+  assert.match(bobrGuardMigration, /p_avatar_id = 'mystical-bobr' and v_bobr_unlocked is not true[\s\S]*TROTTL_CLASSIC_MYSTICAL_BOBR_LOCKED/i);
+  assert.doesNotMatch(bobrGuardMigration, /locked-avatar/i);
+  assert.match(bobrGuardMigration, /grant execute on function public\.set_trottl_classic_avatar\(uuid, text\) to authenticated/i);
+});
+
 test("ready RPC requires an avatar while unready changes only the ready flag", () => {
   assert.match(migration, /create function public\.set_trottl_classic_ready\([\s\S]*p_ready boolean/i);
   assert.match(migration, /set_trottl_classic_ready[\s\S]*v_session\.status <> 'lobby'[\s\S]*TROTTL_CLASSIC_NOT_IN_LOBBY/i);
@@ -71,6 +80,6 @@ test("existing snapshot and Realtime path expose avatar and ready without new UI
   assert.match(service, /avatarId,[\s\S]*isReady: value\.is_ready === true/);
   assert.match(service, /setAvatar[\s\S]*set_trottl_classic_avatar[\s\S]*setReady[\s\S]*set_trottl_classic_ready/);
   assert.match(service, /table: "trottl_classic_players"/);
-  assert.match(html, /trottl-avatar-service\.js\?v=3[\s\S]*trottl-classic-service\.js\?v=17/);
+  assert.match(html, /trottl-avatar-service\.js\?v=4[\s\S]*trottl-classic-service\.js\?v=17/);
   assert.doesNotMatch(html, /id="[^"]*(?:avatar-select|ready-button)/i);
 });

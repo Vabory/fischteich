@@ -27,6 +27,12 @@
   })));
 
   const AVATARS_BY_ID = new Map(AVATAR_DEFINITIONS.map((avatar) => [avatar.id, avatar]));
+  // Display-only: deliberately has no avatar ID and is never part of the playable registry.
+  const LOCKED_MYSTERY_AVATAR = Object.freeze({
+    displayName: "Mystical ???",
+    src: "./assets/avatars/locked-avatar.png",
+    selectable: false,
+  });
   const PRELOAD_STATUS_BY_SRC = new Map();
   const PRELOAD_PROMISE_BY_SRC = new Map();
 
@@ -54,6 +60,12 @@
     return getVisibleTrottlAvatars();
   }
 
+  function getTrottlAvatarChoices({ mysticalBobrUnlocked = false } = {}) {
+    const visibleAvatars = getVisibleTrottlAvatars({ mysticalBobrUnlocked });
+    if (mysticalBobrUnlocked === true) return visibleAvatars;
+    return Object.freeze([...visibleAvatars, Object.freeze({ ...LOCKED_MYSTERY_AVATAR })]);
+  }
+
   function isValidTrottlAvatarId(id) {
     return typeof id === "string" && AVATARS_BY_ID.has(id);
   }
@@ -63,8 +75,11 @@
     const requests = [];
     for (const avatar of avatars) {
       const registryAvatar = AVATARS_BY_ID.get(avatar?.id);
-      if (!registryAvatar || registryAvatar.src !== avatar.src) continue;
-      const { src } = registryAvatar;
+      const isLockedMystery = avatar?.selectable === false
+        && avatar?.displayName === LOCKED_MYSTERY_AVATAR.displayName
+        && avatar?.src === LOCKED_MYSTERY_AVATAR.src;
+      if (!isLockedMystery && (!registryAvatar || registryAvatar.src !== avatar.src)) continue;
+      const src = isLockedMystery ? LOCKED_MYSTERY_AVATAR.src : registryAvatar.src;
       const existingRequest = PRELOAD_PROMISE_BY_SRC.get(src);
       if (existingRequest) {
         requests.push(existingRequest);
@@ -104,7 +119,7 @@
   }
 
   function preloadVisibleTrottlAvatars(options) {
-    return preloadTrottlAvatars(getVisibleTrottlAvatars(options));
+    return preloadTrottlAvatars(getTrottlAvatarChoices(options));
   }
 
   global.trottlAvatarService = Object.freeze({
@@ -112,6 +127,7 @@
     getAllTrottlAvatars,
     getVisibleTrottlAvatars,
     getDefaultVisibleTrottlAvatars,
+    getTrottlAvatarChoices,
     isValidTrottlAvatarId,
     preloadTrottlAvatars,
     preloadVisibleTrottlAvatars,

@@ -41,10 +41,11 @@ test("preload derives every request from the central avatar registry", async () 
   assert.equal((await pending).every(({ status }) => status === "loaded"), true);
 });
 
-test("locked and unlocked visibility preload fifteen and sixteen avatars respectively", async () => {
+test("locked and unlocked display choices preload the appropriate sixteenth avatar", async () => {
   const locked = createHarness();
   const lockedPending = locked.service.preloadVisibleTrottlAvatars({ mysticalBobrUnlocked: false });
-  assert.equal(locked.images.length, 15);
+  assert.equal(locked.images.length, 16);
+  assert.equal(locked.images.filter((image) => image.src.endsWith("locked-avatar.png")).length, 1);
   assert.equal(locked.images.some((image) => image.src.endsWith("mystical-bobr.png")), false);
   locked.images.forEach((image) => image.load());
   await lockedPending;
@@ -53,6 +54,7 @@ test("locked and unlocked visibility preload fifteen and sixteen avatars respect
   const unlockedPending = unlocked.service.preloadVisibleTrottlAvatars({ mysticalBobrUnlocked: true });
   assert.equal(unlocked.images.length, 16);
   assert.equal(unlocked.images.filter((image) => image.src.endsWith("mystical-bobr.png")).length, 1);
+  assert.equal(unlocked.images.some((image) => image.src.endsWith("locked-avatar.png")), false);
   unlocked.images.forEach((image) => image.load());
   await unlockedPending;
 });

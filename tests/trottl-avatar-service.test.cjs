@@ -75,6 +75,25 @@ test("visible avatar filtering adds an unlocked Mystical Bobr last without reord
   assert.ok(Object.isFrozen(unlocked));
 });
 
+test("display choices reserve the sixteenth slot for a non-persistable locked mystery", () => {
+  const service = loadService();
+  const locked = service.getTrottlAvatarChoices({ mysticalBobrUnlocked: false });
+  const unlocked = service.getTrottlAvatarChoices({ mysticalBobrUnlocked: true });
+  assert.equal(locked.length, 16);
+  assert.deepEqual(Array.from(locked.slice(0, 15), (avatar) => avatar.id), expectedIds.slice(0, 15));
+  assert.deepEqual(JSON.parse(JSON.stringify(locked.at(-1))), {
+    displayName: "Mystical ???",
+    src: "./assets/avatars/locked-avatar.png",
+    selectable: false,
+  });
+  assert.equal(locked.at(-1).id, undefined);
+  assert.equal(service.getTrottlAvatarById("locked-avatar"), null);
+  assert.equal(service.isValidTrottlAvatarId("locked-avatar"), false);
+  assert.equal(unlocked.length, 16);
+  assert.equal(unlocked.at(-1).id, "mystical-bobr");
+  assert.equal(unlocked.at(-1).displayName, "Mystical Bobr");
+});
+
 test("Trottl avatar registry snapshots cannot be mutated by consumers", () => {
   const service = loadService();
   const first = service.getTrottlAvatarById("turbo-lachs");

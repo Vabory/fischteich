@@ -4956,6 +4956,12 @@ button.is-release-pressed {
   transform: scale(0.97);
 }
 
+.trottl-avatar-option.is-locked {
+  cursor: default;
+  filter: brightness(0.94);
+  opacity: 0.78;
+}
+
 .trottl-avatar-option:focus-visible {
   outline: 2px solid rgb(151 226 255 / 76%);
   outline-offset: 1px;

@@ -22,15 +22,21 @@ function loadServices() {
   return { avatarService: window.trottlAvatarService, ui: window.TrottlClassicUI };
 }
 
-test("avatar modal presents exactly the fifteen default-visible registry entries while locked", () => {
+test("avatar modal presents sixteen slots with a non-selectable locked mystery", () => {
   const { avatarService, ui } = loadServices();
   const presentation = ui.createAvatarModalPresentation({
-    avatars: avatarService.getDefaultVisibleTrottlAvatars(),
+    avatars: avatarService.getTrottlAvatarChoices({ mysticalBobrUnlocked: false }),
   });
-  assert.equal(presentation.visibleAvatars.length, 15);
+  assert.equal(presentation.visibleAvatars.length, 16);
   assert.equal(presentation.visibleAvatars.some((avatar) => avatar.id === "mystical-bobr"), false);
+  assert.equal(presentation.visibleAvatars.at(-1).displayName, "Mystical ???");
+  assert.equal(presentation.visibleAvatars.at(-1).src, "./assets/avatars/locked-avatar.png");
+  assert.equal(presentation.visibleAvatars.at(-1).selectable, false);
+  assert.equal(presentation.selectableAvatars.length, 15);
+  assert.equal(presentation.selectedAvatarId, null);
+  assert.equal(presentation.canConfirm, false);
   assert.ok(presentation.visibleAvatars.every((avatar) => avatar.displayName.length > 0));
-  assert.match(uiSource, /getVisibleTrottlAvatars\(\{ mysticalBobrUnlocked \}\)/);
+  assert.match(uiSource, /getTrottlAvatarChoices\(\{ mysticalBobrUnlocked \}\)/);
   assert.match(uiSource, /bobrUnlockService[\s\S]*isMysticalBobrUnlocked\(profile\)/);
   assert.match(uiSource, /getAppAuthState\(\)\.currentProfile/);
   assert.doesNotMatch(uiSource, /assets\/avatars\//);
@@ -58,12 +64,13 @@ test("unlocked Mystical Bobr uses the normal registry presentation and selection
 test("locked profile with an existing Bobr remains defensive and never repairs the avatar", () => {
   const { avatarService, ui } = loadServices();
   const presentation = ui.createAvatarModalPresentation({
-    avatars: avatarService.getVisibleTrottlAvatars({ mysticalBobrUnlocked: false }),
+    avatars: avatarService.getTrottlAvatarChoices({ mysticalBobrUnlocked: false }),
     currentAvatarId: "mystical-bobr",
     pendingAvatarId: "mystical-bobr",
   });
-  assert.equal(presentation.visibleAvatars.length, 15);
+  assert.equal(presentation.visibleAvatars.length, 16);
   assert.equal(presentation.visibleAvatars.some((avatar) => avatar.id === "mystical-bobr"), false);
+  assert.equal(presentation.visibleAvatars.at(-1).displayName, "Mystical ???");
   assert.equal(presentation.currentAvatarId, "mystical-bobr");
   assert.equal(presentation.selectedAvatarId, null);
   assert.equal(presentation.canConfirm, false);
@@ -166,6 +173,19 @@ test("larger avatar selection keeps its ring, checkmark and pending confirmation
   assert.match(css, /\.trottl-avatar-option\.is-selected::after[\s\S]*content:\s*"✓"/);
   assert.match(uiSource, /state\.pendingAvatarId = avatar\.id/);
   assert.match(uiSource, /avatarConfirmButton\.disabled = !presentation\.canConfirm/);
+});
+
+test("locked mystery is disabled and never participates in radio selection or persistence", () => {
+  const renderer = uiSource.match(/function renderAvatarModal\([\s\S]*?\n    }\n\n    function openAvatarModal/)?.[0] ?? "";
+  const selector = uiSource.match(/function selectPendingAvatar\([\s\S]*?\n    }/)?.[0] ?? "";
+  assert.match(renderer, /avatar\.selectable !== false/);
+  assert.match(renderer, /aria-disabled", "true"/);
+  assert.match(renderer, /button\.disabled = !selectable/);
+  assert.match(renderer, /if \(selectable\) button\.addEventListener/);
+  assert.match(selector, /candidate\.selectable !== false/);
+  assert.doesNotMatch(selector, /locked-avatar/);
+  assert.doesNotMatch(uiSource, /setAvatar\([^\n]*locked-avatar/);
+  assert.match(css, /\.trottl-avatar-option\.is-locked\s*\{[^}]*cursor:\s*default[^}]*opacity:\s*0\.78/s);
 });
 
 test("invalid pending registry IDs remain non-confirmable without crashing", () => {

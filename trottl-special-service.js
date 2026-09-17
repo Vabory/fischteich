@@ -60,6 +60,8 @@
     if (!s.data) throw new Error("TROTTL_SPECIAL_SESSION_NOT_FOUND");
     const reactionRun = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_03"
       ? await rpc("get_trottl_special_reaction_view", { p_session_id: sessionId }) : null;
+    const colorChaosView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_04"
+      ? await rpc("get_trottl_special_color_chaos_view", { p_session_id: sessionId }) : null;
     const players = (p.data ?? []).filter(row => row.lifecycle_status !== "left").map(row => {
       const base = presentation.normalizePlayer(row);
       if (!base) return null;
@@ -83,9 +85,20 @@
       || !Number.isInteger(Number(reactionRun.delay_ms)) || Number(reactionRun.delay_ms) < 2000 || Number(reactionRun.delay_ms) > 8500
       || !Number.isFinite(Date.parse(reactionRun.signal_at)) || (reactionRun.reaction_ms !== null && (!Number.isInteger(Number(reactionRun.reaction_ms)) || Number(reactionRun.reaction_ms) < 0))
       || (reactionRun.status === "completed") !== (reactionRun.reaction_ms !== null))) throw new Error("Invalid reaction run response");
+    const colorNames = ["RED", "BLUE", "GREEN", "YELLOW"];
+    if (colorChaosView !== null && (typeof colorChaosView !== "object" || typeof colorChaosView.player_id !== "string"
+      || !Number.isInteger(Number(colorChaosView.progress)) || Number(colorChaosView.progress) < 0 || Number(colorChaosView.progress) > 5
+      || !Number.isInteger(Number(colorChaosView.challenge_index)) || Number(colorChaosView.challenge_index) < 0
+      || typeof colorChaosView.completed !== "boolean" || (colorChaosView.elapsed_ms !== null && (!Number.isInteger(Number(colorChaosView.elapsed_ms)) || Number(colorChaosView.elapsed_ms) < 0))
+      || (!colorChaosView.completed && (!colorNames.includes(colorChaosView.target_color) || !colorNames.includes(colorChaosView.ink_color)
+        || colorChaosView.target_color === colorChaosView.ink_color || !Array.isArray(colorChaosView.fish_order)
+        || colorChaosView.fish_order.length !== 4 || new Set(colorChaosView.fish_order).size !== 4
+        || colorChaosView.fish_order.some(color => !colorNames.includes(color)))))) throw new Error("Invalid color chaos view response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
       membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount,
-      reactionRun: reactionRun === null ? null : Object.freeze({ ...reactionRun, delay_ms: Number(reactionRun.delay_ms), reaction_ms: reactionRun.reaction_ms === null ? null : Number(reactionRun.reaction_ms) }) });
+      reactionRun: reactionRun === null ? null : Object.freeze({ ...reactionRun, delay_ms: Number(reactionRun.delay_ms), reaction_ms: reactionRun.reaction_ms === null ? null : Number(reactionRun.reaction_ms) }),
+      colorChaosView: colorChaosView === null ? null : Object.freeze({ ...colorChaosView, progress: Number(colorChaosView.progress), challenge_index: Number(colorChaosView.challenge_index),
+        elapsed_ms: colorChaosView.elapsed_ms === null ? null : Number(colorChaosView.elapsed_ms), fish_order: Object.freeze([...(colorChaosView.fish_order ?? [])]) }) });
   }
   async function loadMembership(sessionId) {
     const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
@@ -151,6 +164,10 @@
     saveFishCatch: async (id, roundId, score, hits, final) => { await rpc("save_trottl_special_fish_catch", { p_session_id: id, p_round_id: roundId, p_score: score, p_hits: hits, p_final: final }); return loadSession(id); },
     submitReaction: async (id, roundId, elapsed) => { await rpc("submit_trottl_special_reaction", { p_session_id: id, p_round_id: roundId, p_tap_elapsed_ms: elapsed }); return loadSession(id); },
     finalizeReaction: async (id, roundId) => { await rpc("finalize_trottl_special_reaction", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
+    answerColorChaos: async (id, roundId, challengeIndex, selectedColor, elapsed) => {
+      await rpc("answer_trottl_special_color_chaos", { p_session_id: id, p_round_id: roundId, p_challenge_index: challengeIndex, p_selected_color: selectedColor, p_tap_elapsed_ms: elapsed });
+      return loadSession(id);
+    },
     actRoulette: async (id, roundId, action, value = null, target = null) => {
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
       return loadSession(id);

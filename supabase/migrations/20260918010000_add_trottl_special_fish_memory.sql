@@ -58,7 +58,7 @@ returns integer language sql immutable security definer set search_path='' as $$
 $$;
 create function public.special_fish_memory_error_count(p_pattern jsonb,p_guesses jsonb,p_expected_count integer)
 returns integer language sql immutable security definer set search_path='' as $$
- select p_expected_count-count(*)::integer+count(*) filter(where guess.value#>>'{}' is distinct from p_pattern->>(guess.ordinality-1))::integer
+ select p_expected_count-count(*)::integer+count(*) filter(where guess.value#>>'{}' is distinct from p_pattern->>((guess.ordinality-1)::integer))::integer
  from jsonb_array_elements(p_guesses) with ordinality as guess(value,ordinality);
 $$;
 

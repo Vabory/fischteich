@@ -32,6 +32,7 @@
     return Object.freeze(pattern);
   }
   const targetCount = memoryRound => Math.max(1, Math.min(CONFIG.rounds, Number(memoryRound) || 1)) * CONFIG.entriesPerRound;
+  const watchDurationMs = memoryRound => targetCount(memoryRound) * (CONFIG.activeFlashMs + CONFIG.flashPauseMs);
   function flashFrame(pattern, memoryRound, elapsedMs) {
     const count = targetCount(memoryRound), span = CONFIG.activeFlashMs + CONFIG.flashPauseMs;
     if (!Array.isArray(pattern) || pattern.length !== CONFIG.patternLength || elapsedMs < 0) return Object.freeze({ index: -1, color: null, active: false });
@@ -202,5 +203,5 @@
     return Object.freeze({ update, suspend });
   }
 
-  global.TrottlSpecialFishMemory = Object.freeze({ COLORS, COLOR_META, CONFIG, deterministicValue, generatePattern, targetCount, flashFrame, countErrors, preloadAssets, create });
+  global.TrottlSpecialFishMemory = Object.freeze({ COLORS, COLOR_META, CONFIG, deterministicValue, generatePattern, targetCount, watchDurationMs, flashFrame, countErrors, preloadAssets, create });
 })(typeof window === "undefined" ? {} : window);

@@ -285,11 +285,11 @@
 .trottl-special-color-chaos-result { color: #fff; font-size: clamp(30px, 9vw, 46px); font-variant-numeric: tabular-nums; text-align: center; }
 @keyframes trottl-special-color-chaos-in { 0% { opacity: 0; transform: scale(.98); } 100% { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .trottl-special-color-chaos-task-zone, .trottl-special-color-chaos-grid-zone { transition-duration: 1ms; } .trottl-special-color-chaos-game.is-entering .trottl-special-color-chaos-task-zone, .trottl-special-color-chaos-game.is-entering .trottl-special-color-chaos-grid-zone { animation-duration: 1ms; } }
-.trottl-special-minigame-shell.is-fish-memory { bottom: calc(env(safe-area-inset-bottom, 0px) + 105px); overflow: hidden; }
-.trottl-special-minigame-shell.is-fish-memory.is-countdown .trottl-special-minigame-countdown { position: relative; z-index: 2; display: block; margin: auto; text-align: center; }
+.trottl-special-minigame-shell.is-fish-memory { bottom: calc(env(safe-area-inset-bottom, 0px) + 105px); overflow: visible; }
+.trottl-special-minigame-shell.is-fish-memory.is-countdown .trottl-special-minigame-countdown { position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; margin: 0; text-align: center; pointer-events: none; }
 .trottl-special-minigame-shell.is-fish-memory.is-countdown .trottl-special-minigame-content { position: relative; z-index: 1; }
 .trottl-special-minigame-shell.is-fish-memory .trottl-special-minigame-content { display: grid; width: min(100%, 330px); min-height: 0; place-items: center; }
-.trottl-special-fish-memory-game { position: relative; display: grid; box-sizing: border-box; width: 100%; height: clamp(310px, 44dvh, 400px); min-height: 0; grid-template-rows: clamp(78px, 10dvh, 92px) minmax(0, 1fr) 24px; gap: 8px; padding: 10px; border-radius: 18px; background: rgb(7 22 31 / 38%); }
+.trottl-special-fish-memory-game { position: relative; display: grid; box-sizing: border-box; width: 100%; height: clamp(370px, 52dvh, 470px); min-height: 0; grid-template-rows: clamp(78px, 10dvh, 92px) minmax(0, 1fr) 24px; gap: 8px; padding: 10px; border-radius: 18px; background: rgb(7 22 31 / 38%); }
 .trottl-special-fish-memory-game::before { position: absolute; inset: 0; box-sizing: border-box; border: 2px solid rgb(255 248 219 / 78%); border-radius: inherit; box-shadow: inset 0 0 14px rgb(255 244 199 / 22%); content: ""; pointer-events: none; }
 .trottl-special-fish-memory-game.is-watch::before { border-color: rgb(255 248 219 / 90%); box-shadow: inset 0 0 16px rgb(255 244 199 / 30%), inset 0 0 12px rgb(255 250 225 / 7%); animation: trottl-special-memory-attention 1.6s ease-in-out infinite alternate; }
 .trottl-special-fish-memory-game.is-input::before { border-color: rgb(101 231 151 / 88%); box-shadow: inset 0 0 16px rgb(55 211 118 / 30%), inset 0 0 12px rgb(70 221 132 / 8%); }

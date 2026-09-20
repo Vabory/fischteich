@@ -54,7 +54,7 @@ returns integer language sql immutable security definer set search_path='' as $$
 $$;
 create function public.special_fish_memory_watch_ms(p_memory_round integer)
 returns integer language sql immutable security definer set search_path='' as $$
- select case when p_memory_round between 1 and 3 then p_memory_round*4*600 else null end;
+ select case when p_memory_round between 1 and 3 then p_memory_round*4*1020 else null end;
 $$;
 create function public.special_fish_memory_error_count(p_pattern jsonb,p_guesses jsonb,p_expected_count integer)
 returns integer language sql immutable security definer set search_path='' as $$
@@ -79,7 +79,7 @@ begin
  values(p_id,memory_round_id,seed_value,pattern_value);
  for p in select value from jsonb_array_elements(g->'minigame'->'participants') loop
   insert into public.trottl_special_fish_memory_runs(session_id,round_id,player_id,phase_started_at,phase_ends_at)
-   values(p_id,memory_round_id,(p->>'player_id')::uuid,start_at+400*interval '1 millisecond',start_at+2800*interval '1 millisecond');
+   values(p_id,memory_round_id,(p->>'player_id')::uuid,start_at+400*interval '1 millisecond',start_at+4480*interval '1 millisecond');
   runs:=runs||jsonb_build_object(p->>'player_id',jsonb_build_object('memory_round',1,'phase','watch','guess_count',0,'completed',false));
  end loop;
  update public.trottl_special_sessions set game_state=(g-'roulette')||jsonb_build_object('minigame',g->'minigame'||jsonb_build_object(

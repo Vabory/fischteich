@@ -11,7 +11,7 @@ begin
  for i in 0..9 loop
   if p->>i=p->>(i+1) and p->>i=p->>(i+2) then raise exception 'Fish-Memory triple color'; end if;
  end loop;
- if public.special_fish_memory_watch_ms(1)<>2400 or public.special_fish_memory_watch_ms(2)<>4800 or public.special_fish_memory_watch_ms(3)<>7200
+ if public.special_fish_memory_watch_ms(1)<>4080 or public.special_fish_memory_watch_ms(2)<>8160 or public.special_fish_memory_watch_ms(3)<>12240
   or public.special_fish_memory_timeout_ms(1)<>8000 or public.special_fish_memory_timeout_ms(2)<>13000 or public.special_fish_memory_timeout_ms(3)<>18000 then
   raise exception 'Fish-Memory tuning';
  end if;

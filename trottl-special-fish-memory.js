@@ -8,7 +8,7 @@
     YELLOW: Object.freeze({ label: "GELB", asset: "./assets/mini-games/yellow-fish.png" }),
   });
   const CONFIG = Object.freeze({
-    rounds: 3, entriesPerRound: 4, patternLength: 12, activeFlashMs: 420, flashPauseMs: 180,
+    rounds: 3, entriesPerRound: 4, patternLength: 12, activeFlashMs: 800, flashPauseMs: 220,
     inputTimeoutMs: Object.freeze([8000, 13000, 18000]), tickMs: 40,
   });
   let preloadPromise = null;
@@ -68,9 +68,6 @@
     grid.className = "trottl-special-fish-memory-grid";
     timerLabel.className = "trottl-special-fish-memory-timer"; timerLabel.setAttribute("aria-live", "polite");
     result.className = "trottl-special-fish-memory-result"; result.hidden = true;
-    for (let index = 0; index < CONFIG.patternLength; index += 1) {
-      const dot = doc.createElement("span"); dot.className = "trottl-special-fish-memory-dot"; dot.setAttribute("aria-hidden", "true"); dots.append(dot);
-    }
     for (const color of COLORS) {
       const button = doc.createElement("button"), image = doc.createElement("img");
       button.type = "button"; button.className = "trottl-special-fish-memory-choice"; button.dataset.color = color;
@@ -127,8 +124,15 @@
     }
     function renderDots(current) {
       const needed = targetCount(current.memory_round), shown = current.phase === "input" ? optimisticCount : 0;
+      if (dots.childElementCount !== needed) {
+        const nextDots = [];
+        for (let index = 0; index < needed; index += 1) {
+          const dot = doc.createElement("span"); dot.className = "trottl-special-fish-memory-dot"; dot.setAttribute("aria-hidden", "true"); nextDots.push(dot);
+        }
+        dots.replaceChildren(...nextDots);
+      }
       [...dots.children].forEach((dot, index) => {
-        dot.classList.toggle("is-unused", index >= needed); dot.classList.toggle("is-filled", index < shown && index < needed);
+        dot.classList.toggle("is-filled", index < shown);
       });
       dots.classList.toggle("is-passive", current.phase !== "input");
       dots.setAttribute("aria-label", current.phase === "input" ? `${Math.min(shown, needed)} von ${needed} Eingaben` : `${needed} Eingaben nach der Vorführung`);
@@ -151,19 +155,29 @@
       } else timerLabel.textContent = "";
       setDisabled(phase !== "input" || !ownParticipant() || snapshot.membershipRole === "spectator" || optimisticCount >= targetCount(current.memory_round));
     }
+    function renderCountdownPreview() {
+      gameArea.classList.remove("is-watch", "is-input");
+      instruction.textContent = "MERKE DIR DIE REIHENFOLGE!";
+      round.textContent = ""; dots.replaceChildren(); dots.classList.remove("is-passive"); dots.setAttribute("aria-label", "Vorbereitung");
+      timerLabel.textContent = "";
+      for (const button of grid.querySelectorAll("button")) button.classList.remove("is-sequence-active");
+      setDisabled(true);
+    }
     function tick() {
       if (suspended || !snapshot || root.hidden || doc.visibilityState === "hidden") { shell.hide(); return; }
       const m = snapshot.session.gameState.minigame, now = service.serverNow(), frame = shell.frame(m, now), current = view();
       const completed = current?.completed === true;
       const gameplayVisible = frame.phase === "active" && frame.label === "" && Boolean(current) && !completed;
+      const countdownPreview = Boolean(current) && !completed && (frame.phase === "countdown" || frame.label === "START!");
       shell.panel.classList.toggle("is-countdown", ["title", "countdown"].includes(frame.phase) || frame.label === "START!");
       shell.panel.classList.toggle("is-active", gameplayVisible); shell.panel.classList.toggle("is-finished", completed);
-      shell.content.hidden = !gameplayVisible && !completed; shell.panel.classList.toggle("is-waiting", !current || completed);
-      gameArea.hidden = !gameplayVisible; result.hidden = !completed;
+      shell.content.hidden = !gameplayVisible && !countdownPreview && !completed; shell.panel.classList.toggle("is-waiting", !current || completed);
+      gameArea.hidden = !gameplayVisible && !countdownPreview; result.hidden = !completed;
       if (completed) {
         const title = doc.createElement("strong"); title.textContent = "FERTIG"; result.replaceChildren(title);
         if (Number.isInteger(current.errors)) { const score = doc.createElement("span"); score.textContent = `${current.errors} Fehler`; result.append(score); }
       }
+      if (countdownPreview) renderCountdownPreview();
       if (gameplayVisible && now !== null) {
         renderState(now);
         const deadline = current.phase === "watch" ? Date.parse(current.phase_ends_at) : current.phase === "input" ? Date.parse(current.input_deadline) : Infinity;

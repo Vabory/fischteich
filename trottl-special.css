@@ -313,6 +313,21 @@
 .trottl-special-fish-memory-result span { font-size: clamp(15px, 4vw, 19px); font-weight: 850; }
 @keyframes trottl-special-memory-attention { 0% { box-shadow: inset 0 0 13px rgb(255 244 199 / 22%), inset 0 0 10px rgb(255 250 225 / 5%); } 100% { box-shadow: inset 0 0 19px rgb(255 244 199 / 36%), inset 0 0 14px rgb(255 250 225 / 9%); } }
 @media (prefers-reduced-motion: reduce) { .trottl-special-fish-memory-game.is-watch::before { animation: none; } .trottl-special-fish-memory-choice { transition: none; } }
+.trottl-special-minigame-shell.is-stop-fish { bottom: calc(env(safe-area-inset-bottom, 0px) + 105px); overflow: hidden; }
+.trottl-special-minigame-shell.is-stop-fish.is-countdown .trottl-special-minigame-countdown { position: relative; z-index: 2; text-align: center; }
+.trottl-special-stop-fish-game { display: grid; width: min(100%, 330px); height: clamp(260px, 38dvh, 340px); grid-template-rows: 40px minmax(0,1fr) 28px; gap: 8px; }
+.trottl-special-stop-fish-timer { color:#f7fbff; font-size:26px; font-variant-numeric:tabular-nums; text-align:center; }
+.trottl-special-stop-fish-timer.is-urgent { color:#ff756d; font-size:34px; animation:trottl-special-stop-fish-pulse 700ms ease-in-out infinite alternate; }
+.trottl-special-stop-fish-track { position:relative; display:block; width:100%; min-height:0; overflow:hidden; padding:0; border:1px solid rgb(130 196 216 / 40%); border-radius:16px; background:linear-gradient(180deg,rgb(25 58 72 / 94%),rgb(9 27 38 / 94%)); touch-action:manipulation; }
+.trottl-special-stop-fish-track:disabled { opacity:1; }
+.trottl-special-stop-fish-shadow,.trottl-special-stop-fish-moving { position:absolute; top:50%; left:50%; width:50%; height:auto; aspect-ratio:2/1; object-fit:contain; translate:-50% -50%; pointer-events:none; }
+.trottl-special-stop-fish-shadow { opacity:.34; filter:brightness(.5); }
+.trottl-special-stop-fish-moving { transition:none; will-change:transform; }
+.trottl-special-stop-fish-local { min-height:1.3em; color:#f7fbff; text-align:center; }
+.trottl-special-stop-fish-local.is-perfect { color:#a7f3c5; text-shadow:0 0 9px rgb(105 239 158 / 60%); }
+.trottl-special-result-perfect { display:block; color:#a7f3c5; font-size:11px; white-space:nowrap; }
+@keyframes trottl-special-stop-fish-pulse { 100% { text-shadow:0 0 12px rgb(255 90 80 / 70%); transform:scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .trottl-special-stop-fish-timer.is-urgent { animation:none; } }
 .trottl-special-minigame-title { color: white; text-align: center; font-size: clamp(24px, 7vw, 36px); margin: 0; }
 .trottl-special-minigame-countdown { color: white; font-size: 30px; min-height: 36px; text-shadow: 0 0 16px rgb(255 255 255 / 40%); }
 .trottl-special-minigame-copy, .trottl-special-number-hunt-progress { margin: 0; color: white; font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }

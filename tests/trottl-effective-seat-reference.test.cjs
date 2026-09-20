@@ -18,7 +18,7 @@ test("seat CSS geometry remains frozen after final polish", () => {
 test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI cache metadata", () => {
   const html=read("index.html")
     .replace(/^    <(?:script|link)[^\n]*trottl-special[^\n]*\n/gm, "")
-    .replace(/^    <link rel="preload" as="image" href="\.\/assets\/mini-games\/(?:lachs|red|blue|green|yellow)-fish\.png">\n/gm, "")
+    .replace(/^    <link rel="preload" as="image" href="\.\/assets\/mini-games\/(?:lachs|red|blue|green|yellow)-(?:fish|shadow)\.png">\n/gm, "")
     .replace(/script.js\?v=\d+/, "script.js?v=87")
     .replace(/^    <script src="\.\/team-division-v2-logic\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/^            <section class="settings-trottl-admin-reset" aria-labelledby="settings-special-reset-title">[\s\S]*?^            <\/section>\n/m, "")

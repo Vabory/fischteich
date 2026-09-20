@@ -52,6 +52,9 @@
     const fishMemory = global.TrottlSpecialFishMemory?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fisch-Memory wird erneut geladen."; void refresh(); } });
+    const stopFish = global.TrottlSpecialStopFish?.create({ root: game, service,
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
+      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Stop den Fisch wird erneut geladen."; void refresh(); } });
     const debug = global.TrottlSpecialDebug?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id) { acceptSnapshot(next); renderSession(); } } });
     // Results and transitions come exclusively from the Special intent RPC.
@@ -242,6 +245,7 @@
           const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
           const item = node("li", `${row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : ""}${row.is_penalty ? " is-penalty" : ""}`.trim());
           const identity = node("span", "trottl-special-result-identity"); identity.append(node("strong", "", name));
+          if (row.is_winner && row.perfect) identity.append(node("small", "trottl-special-result-perfect", "Perfekt gestoppt!"));
           if (row.life_loss === 1) identity.append(node("small", "trottl-special-result-life-loss", "−1 Leben"));
           item.append(node("span", "", row.rank == null ? "" : String(row.rank)), identity, node("span", "trottl-special-result-value", row.display_value));
           item.setAttribute("aria-label", `${row.rank == null ? "" : `${row.rank}. `}${name}: ${row.display_value}${row.is_winner ? ", Gewinner" : row.is_loser ? ", Verlierer" : ""}`);
@@ -394,6 +398,7 @@
       reactionTest?.update(snapshot);
       colorChaos?.update(snapshot);
       fishMemory?.update(snapshot);
+      stopFish?.update(snapshot);
       debug?.update(snapshot);
     }
     function distributionCount() {
@@ -595,6 +600,7 @@
       numberHunt?.suspend();
       fishCatch?.suspend();
       fishMemory?.suspend();
+      stopFish?.suspend();
       debug?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearTimeout(state.hintTimer); state.hintTimer = null;

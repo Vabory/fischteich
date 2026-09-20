@@ -64,6 +64,8 @@
       ? await rpc("get_trottl_special_color_chaos_view", { p_session_id: sessionId }) : null;
     const fishMemoryView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_05"
       ? await rpc("get_trottl_special_fish_memory_view", { p_session_id: sessionId }) : null;
+    const stopFishView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_06"
+      ? await rpc("get_trottl_special_stop_fish_view", { p_session_id: sessionId }) : null;
     const players = (p.data ?? []).filter(row => row.lifecycle_status !== "left").map(row => {
       const base = presentation.normalizePlayer(row);
       if (!base) return null;
@@ -107,13 +109,17 @@
       || (fishMemoryView.phase === "input" && !Number.isFinite(Date.parse(fishMemoryView.input_deadline)))
       || (fishMemoryView.errors !== null && (!Number.isInteger(Number(fishMemoryView.errors)) || Number(fishMemoryView.errors) < 0 || Number(fishMemoryView.errors) > 24))
       || (fishMemoryView.completed && membership.membershipRole === "player" && fishMemoryView.errors === null))) throw new Error("Invalid fish memory view response");
+    if (stopFishView !== null && (typeof stopFishView !== "object" || typeof stopFishView.player_id !== "string" || !["open","stopped","timeout"].includes(stopFishView.status)
+      || !Number.isInteger(Number(stopFishView.distance_units)) || Number(stopFishView.distance_units) < 0 || Number(stopFishView.distance_units) > 100001
+      || typeof stopFishView.perfect !== "boolean" || (stopFishView.tap_elapsed_ms !== null && (!Number.isInteger(Number(stopFishView.tap_elapsed_ms)) || Number(stopFishView.tap_elapsed_ms) < 0 || Number(stopFishView.tap_elapsed_ms) > 15000)))) throw new Error("Invalid stop fish view response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
       membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount,
       reactionRun: reactionRun === null ? null : Object.freeze({ ...reactionRun, delay_ms: Number(reactionRun.delay_ms), reaction_ms: reactionRun.reaction_ms === null ? null : Number(reactionRun.reaction_ms) }),
       colorChaosView: colorChaosView === null ? null : Object.freeze({ ...colorChaosView, progress: Number(colorChaosView.progress), challenge_index: Number(colorChaosView.challenge_index),
         elapsed_ms: colorChaosView.elapsed_ms === null ? null : Number(colorChaosView.elapsed_ms), fish_order: Object.freeze([...(colorChaosView.fish_order ?? [])]) }),
       fishMemoryView: fishMemoryView === null ? null : Object.freeze({ ...fishMemoryView, memory_round: Number(fishMemoryView.memory_round),
-        guess_count: Number(fishMemoryView.guess_count), errors: fishMemoryView.errors === null ? null : Number(fishMemoryView.errors), pattern: Object.freeze([...fishMemoryView.pattern]) }) });
+        guess_count: Number(fishMemoryView.guess_count), errors: fishMemoryView.errors === null ? null : Number(fishMemoryView.errors), pattern: Object.freeze([...fishMemoryView.pattern]) }),
+      stopFishView: stopFishView === null ? null : Object.freeze({ ...stopFishView, distance_units: Number(stopFishView.distance_units), tap_elapsed_ms: stopFishView.tap_elapsed_ms === null ? null : Number(stopFishView.tap_elapsed_ms) }) });
   }
   async function loadMembership(sessionId) {
     const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
@@ -192,6 +198,8 @@
       await rpc("sync_trottl_special_fish_memory", { p_session_id: id, p_round_id: roundId });
       return loadSession(id);
     },
+    stopFish: async (id, roundId, elapsed) => { await rpc("stop_trottl_special_stop_fish", { p_session_id: id, p_round_id: roundId, p_tap_elapsed_ms: elapsed }); return loadSession(id); },
+    finalizeStopFish: async (id, roundId) => { await rpc("finalize_trottl_special_stop_fish", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     actRoulette: async (id, roundId, action, value = null, target = null) => {
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
       return loadSession(id);

@@ -8,7 +8,7 @@
     lateSpawnCountMin: 6, lateSpawnCountMax: 8, lastSpawnMinMs: 9400, lastSpawnMaxMs: 9600, sameSlotCooldownMs: 180,
     popAnimationMs: 120, fishSizePx: 52, slotSizePx: 46, checkpointMs: 500, retryMs: 750,
   });
-  const FISH_CATCH_ASSETS = Object.freeze(Array.from({ length: 8 }, (_, index) => `./assets/mini-games/${index + 1}-fish.png`));
+  const FISH_CATCH_ASSETS = Object.freeze(Array.from({ length: 8 }, (_, index) => `./assets/mini-games/${index + 1}-fish.webp`));
 
   function preloadAssets() {
     if (typeof global.Image !== "function") return;

@@ -75,9 +75,9 @@ const ROULETTE_GOLD_EVENT_TOAST_DURATION = 2200;
 const ROULETTE_GOLD_EVENT_SEEN_LIMIT = 100;
 const ROULETTE_TILE_COUNT = 52;
 const ROULETTE_TILE_ASSETS = Object.freeze([
-  Object.freeze({ colorIndex: 0, url: "./assets/turbolachs-feld.png?v=1" }),
-  Object.freeze({ colorIndex: 1, url: "./assets/nitroforelle-feld.png?v=1" }),
-  Object.freeze({ colorIndex: 2, url: "./assets/gold-feld.png?v=1" }),
+  Object.freeze({ colorIndex: 0, url: "./assets/turbolachs-feld.webp?v=1" }),
+  Object.freeze({ colorIndex: 1, url: "./assets/nitroforelle-feld.webp?v=1" }),
+  Object.freeze({ colorIndex: 2, url: "./assets/gold-feld.webp?v=1" }),
 ]);
 const ROULETTE_WINNERS = Object.freeze([
   Object.freeze({ name: TEAM_COLORS[0].name, color: TEAM_COLORS[0].color }),

@@ -27,7 +27,7 @@ test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI ca
     .replace(/<meta name=.fischteich-build.[^>]+>/,"protected build")
     .replace(/style.css\?v=\d+/,"style.css?v=cache")
     .replace(/trottl-classic-ui.js\?v=\d+/,"trottl-classic-ui.js?v=cache");
-  assert.equal(hash(html),"1f43ee6944c4c0c0f7b241e2e86ecf0c68a4de6d283392d841ca94ec5facbf37",reference);
+  assert.equal(hash(html),"b8060cd7358e8c0322c4dd5b9b06486e844d3ae82a2674b17796c064dea0ca4b",reference);
 });
 
 test("two-player avatar centers use the existing layer basis, not label or avatar height", () => {

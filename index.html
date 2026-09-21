@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260921.2">
+    <meta name="fischteich-build" content="20260921.3">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
@@ -49,7 +49,7 @@
     <script src="./trottl-special-roulette.js?v=3" defer></script>
     <script src="./trottl-special-minigames.js?v=6" defer></script>
     <script src="./trottl-special-number-hunt.js?v=2" defer></script>
-    <script src="./trottl-special-fish-catch.js?v=3" defer></script>
+    <script src="./trottl-special-fish-catch.js?v=4" defer></script>
     <script src="./trottl-special-reaction-test.js?v=1" defer></script>
     <script src="./trottl-special-color-chaos.js?v=2" defer></script>
     <script src="./trottl-special-fish-memory.js?v=3" defer></script>
@@ -59,7 +59,7 @@
     <script src="./trottl-special-admin.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./team-division-v2-logic.js?v=2" defer></script>
-    <script src="./script.js?v=93" defer></script>
+    <script src="./script.js?v=94" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -236,7 +236,7 @@
             <p class="visually-hidden" id="fischteich-dice-status" aria-live="polite"></p>
           </div>
           <button class="fischteich-dice-toggle" id="fischteich-dice-toggle" type="button" aria-pressed="false" aria-label="Zweiten Würfel einschalten">
-            <img src="./assets/button-2würfel.png" alt="2. Würfel" width="256" height="256" draggable="false">
+            <img src="./assets/button-2würfel.webp" alt="2. Würfel" width="256" height="256" draggable="false">
           </button>
         </main>
       </section>
@@ -612,10 +612,10 @@
               <div class="roulette-stat-gold-main">
                 <img
                   class="roulette-stat-icon roulette-stat-icon--gold"
-                  src="./assets/gold-icon.png"
+                  src="./assets/gold-icon.webp"
                   alt=""
-                  width="1379"
-                  height="1141"
+                  width="320"
+                  height="265"
                   draggable="false"
                 >
                 <strong class="roulette-stat-value roulette-stat-value--gold" id="roulette-stat-gold">0</strong>
@@ -633,10 +633,10 @@
             <div class="roulette-stat-row roulette-stat-row--turbolachs">
               <img
                 class="roulette-stat-icon roulette-stat-icon--fish"
-                src="./assets/turbolachs-icon.png"
+                  src="./assets/turbolachs-icon.webp"
                 alt=""
-                width="1536"
-                height="1024"
+                  width="192"
+                  height="128"
                 draggable="false"
               >
               <span class="roulette-stat-label">TURBOLACHS</span>
@@ -645,10 +645,10 @@
             <div class="roulette-stat-row roulette-stat-row--nitroforelle">
               <img
                 class="roulette-stat-icon roulette-stat-icon--fish"
-                src="./assets/nitroforelle-icon.png"
+                  src="./assets/nitroforelle-icon.webp"
                 alt=""
-                width="1536"
-                height="1024"
+                  width="192"
+                  height="128"
                 draggable="false"
               >
               <span class="roulette-stat-label">NITROFORELLE</span>
@@ -658,10 +658,10 @@
           <div class="roulette-stat-row roulette-stat-row--total">
             <img
               class="roulette-stat-icon roulette-stat-icon--total"
-              src="./assets/total-spins-icon.png"
+              src="./assets/total-spins-icon.webp"
               alt=""
-              width="1536"
-              height="1024"
+              width="192"
+              height="175"
               draggable="false"
             >
             <span class="roulette-stat-label">Fische gesamt</span>
@@ -813,15 +813,15 @@
         <p class="settings-app-version" id="settings-app-version">
           <span class="version-beaver-scene" data-bobr-tap-target aria-hidden="true">
             <span class="version-beaver-scene-inner">
-              <img class="version-beaver" src="./assets/settings/beaver.png?v=1" alt="">
-              <img class="version-water" src="./assets/settings/water.png?v=1" alt="">
+              <img class="version-beaver" src="./assets/settings/beaver.webp?v=1" alt="">
+              <img class="version-water" src="./assets/settings/water.webp?v=1" alt="">
             </span>
           </span>
           <span class="settings-app-version-text" id="settings-app-version-text"></span>
           <span class="version-beaver-scene version-beaver-scene--right" data-bobr-tap-target aria-hidden="true">
             <span class="version-beaver-scene-inner">
-              <img class="version-beaver" src="./assets/settings/beaver.png?v=1" alt="">
-              <img class="version-water" src="./assets/settings/water.png?v=1" alt="">
+              <img class="version-beaver" src="./assets/settings/beaver.webp?v=1" alt="">
+              <img class="version-water" src="./assets/settings/water.webp?v=1" alt="">
             </span>
           </span>
         </p>

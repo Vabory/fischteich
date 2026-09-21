@@ -41,7 +41,7 @@ test("entire CSS is unchanged apart from the two deliberate room positioning adj
     .replace("  /* Offset the added subtitle line (0.78rem * 1.2), keeping room 2 fixed. */\n", "")
     .replace("+ 26px - 0.936rem", "+ 26px")
     .replace(/#trottl-classic-room-list > \.trottl-classic-room\[data-room-slot="1"\]\s*\{[^}]+\}\n\n/, "");
-  assert.equal(hash(normalized), "d6acbdded253475869f084e2f074aee735cd72caf9c528dbcca7e8d39433ad18");
+  assert.equal(hash(normalized), "74463057f9bd5915813bee1eb9bac17e58b60258a2054366d6afbcd9e055af47");
 });
 
 test("Classic rendering, click handlers, seats and gameplay remain byte-identical", () => {

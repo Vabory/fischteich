@@ -352,6 +352,7 @@
 .trottl-special-poison-fish-timer.is-urgent { color: #ff8e95; text-shadow: 0 0 10px rgb(255 84 105 / 65%); }
 .trottl-special-poison-fish-field { position: relative; width: 100%; min-height: 0; overflow: hidden; border: 1px solid rgb(135 204 224 / 36%); border-radius: 16px; background: radial-gradient(ellipse at 50% 35%, rgb(35 78 85 / 72%), rgb(7 28 39 / 94%)); touch-action: none; }
 .trottl-special-poison-fish-fish { position: absolute; top: 0; left: 0; display: block; width: clamp(42px, 11vw, 62px); height: clamp(42px, 11vw, 62px); object-fit: contain; pointer-events: none; -webkit-user-drag: none; will-change: transform; }
+.trottl-special-poison-fish-field.is-preview .trottl-special-poison-fish-fish { visibility: hidden; }
 .trottl-special-poison-fish-field.is-finished .trottl-special-poison-fish-fish { opacity: .55; }
 .trottl-special-poison-fish-countdown { position: absolute; z-index: 100002; top: 50%; left: 50%; margin: 0; translate: -50% -50%; pointer-events: none; text-shadow: 0 0 14px #04131c, 0 0 18px #fff; }
 .trottl-special-poison-fish-hit { position: absolute; z-index: 100001; translate: -50% -50%; color: #e7fff0; font-size: 23px; font-weight: 950; text-shadow: 0 1px 7px #061923; pointer-events: none; animation: trottl-special-poison-hit 350ms ease-out forwards; }

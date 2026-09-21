@@ -345,6 +345,21 @@
 @media (prefers-reduced-motion: reduce) { .trottl-special-minigame-title { transition: none; } }
 .trottl-special-minigame-shell.is-poison-fish .trottl-special-minigame-copy { white-space: pre-line; font-size: 14px; line-height: 1.5; }
 .trottl-special-minigame-shell.is-poison-fish.is-gameplay { top: calc(env(safe-area-inset-top, 0px) + clamp(84px, 11dvh, 108px)); bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(58px, 8dvh, 80px)); justify-content: stretch; padding: 10px; overflow: hidden; }
+.trottl-special-minigame-shell.is-fish-count.is-gameplay { top: calc(env(safe-area-inset-top, 0px) + clamp(82px, 11dvh, 108px)); bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(58px, 8dvh, 80px)); padding: 12px; overflow: hidden; }
+.trottl-special-minigame-shell.is-fish-count.is-gameplay .trottl-special-minigame-content { display: flex; flex: 1 1 auto; width: 100%; min-height: 0; }
+.trottl-special-fish-count-game { display: flex; flex-direction: column; width: 100%; min-height: 0; gap: 12px; }
+.trottl-special-fish-count-heading { flex: 0 0 auto; margin: 4px 0; text-align: center; font-size: clamp(18px, 5vw, 25px); line-height: 1.2; color: #fff; }
+.trottl-special-fish-count-field { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; overflow: hidden; border-radius: 16px; background: rgb(255 255 255 / 6%); }
+.trottl-special-fish-count-attention,.trottl-special-fish-count-waiting { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-weight: 800; font-size: clamp(22px, 7vw, 32px); color: #fff; text-align: center; }
+.trottl-special-fish-count-fishes { position: absolute; inset: 0; }
+.trottl-special-fish-count-fishes img { position: absolute; width: var(--fish-count-size); height: var(--fish-count-size); object-fit: contain; pointer-events: none; }
+.trottl-special-fish-count-game[data-size="large"] { --fish-count-size: clamp(46px, 13vw, 70px); }
+.trottl-special-fish-count-game[data-size="medium"] { --fish-count-size: clamp(40px, 11vw, 58px); }
+.trottl-special-fish-count-game[data-size="small"] { --fish-count-size: clamp(33px, 9vw, 48px); }
+.trottl-special-fish-count-choices { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: clamp(10px, 3vw, 18px); padding: clamp(12px, 4vw, 24px); }
+.trottl-special-fish-count-choices button { min-width: 0; min-height: 54px; border: 1px solid rgb(255 255 255 / 42%); border-radius: 16px; background: rgb(255 255 255 / 14%); color: #fff; font: inherit; font-size: clamp(25px, 8vw, 40px); font-weight: 900; touch-action: manipulation; }
+.trottl-special-fish-count-choices button:active:not(:disabled) { background: rgb(255 255 255 / 28%); transform: scale(.98); }
+.trottl-special-fish-count-choices button:disabled { opacity: .7; }
 .trottl-special-minigame-shell.is-poison-fish.is-gameplay .trottl-special-minigame-content { display: flex; flex: 1 1 auto; width: 100%; min-height: 0; }
 .trottl-special-poison-fish-game { display: grid; flex: 1 1 auto; width: 100%; min-height: 0; grid-template-rows: 48px minmax(0, 1fr); gap: 8px; }
 .trottl-special-poison-fish-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border: 1px solid rgb(135 204 224 / 36%); border-radius: 14px; background: rgb(8 28 39 / 85%); color: #f2fbff; font-size: clamp(16px, 4.5vw, 20px); font-weight: 900; font-variant-numeric: tabular-nums; }

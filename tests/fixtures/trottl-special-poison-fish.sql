@@ -22,7 +22,7 @@ begin
   exit when found_normal and found_gold and found_poison;
  end loop;
  if not (found_normal and found_gold and found_poison) then raise exception 'Fish score cases missing';end if;
- if (select count(*) from public.trottl_special_minigame_registry where implemented and enabled)<>7 then raise exception 'Productive pool must contain seven games';end if;
+ if (select count(*) from public.trottl_special_minigame_registry where implemented and enabled)<>8 then raise exception 'Productive pool must contain eight games';end if;
 end; $$;
 
 rollback;

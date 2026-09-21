@@ -28,9 +28,9 @@ function harness(role="player") {
  return {c,root,snapshot,calls,updates,clock,tap,sequence:win.TrottlSpecialMinigames.sequence,registry:win.TrottlSpecialMinigames.registry,
   setFail:v=>{fail=v;},setHold:v=>{hold=v;},release:()=>release?.()};
 }
-test("fixed registry has ten stable IDs with the first seven minigames playable",()=>{
- const h=harness();assert.equal(h.registry.length,10);assert.deepEqual(Array.from(h.registry.filter(r=>r.active),r=>r.id),["special_minigame_01","special_minigame_02","special_minigame_03","special_minigame_04","special_minigame_05","special_minigame_06","special_minigame_07"]);
- assert.ok(h.registry.slice(7).every(r=>r.title===null && !r.implemented));
+test("fixed registry has ten stable IDs with the first eight minigames playable",()=>{
+ const h=harness();assert.equal(h.registry.length,10);assert.deepEqual(Array.from(h.registry.filter(r=>r.active),r=>r.id),["special_minigame_01","special_minigame_02","special_minigame_03","special_minigame_04","special_minigame_05","special_minigame_06","special_minigame_07","special_minigame_08"]);
+ assert.ok(h.registry.slice(8).every(r=>r.title===null && !r.implemented));
 });
 test("title fades, then exact 3/2/1/START sequence; active timing cannot start early",()=>{
  const h=harness(),m=h.snapshot.session.gameState.minigame;

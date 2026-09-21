@@ -315,22 +315,22 @@ test("large shell, field clipping, normalized hitbox and wiring leave older game
   assert.match(css,/poison-fish-game[^}]*grid-template-rows: 48px minmax\(0, 1fr\)/);
   assert.match(css,/poison-fish-field[^}]*overflow: hidden/); assert.match(css,/poison-fish-field[^}]*touch-action: none/); assert.match(css,/poison-fish-fish[^}]*width: clamp\(42px, 11vw, 62px\)/);
   assert.match(source,/hitRadiusX: 0\.08, hitRadiusY: 0\.065/); assert.match(source,/HITBOX_SCALE = 1\.25/); assert.match(source,/bounds\.width/); assert.match(source,/bounds\.height/);
-  const html = read("index.html"); for (const part of ["trottl-special-poison-fish.js?v=4","trottl-special-minigames.js?v=7","trottl-special-service.js?v=18","trottl-special-ui.js?v=21","trottl-special.css?v=29"]) assert.ok(html.includes(part));
-  const registry = read("trottl-special-minigames.js"); assert.match(registry,/active: i < 7, implemented: i < 7/); assert.match(read("trottl-special-debug.js"),/registry\.filter\(r => r\.active && r\.implemented\)/);
+  const html = read("index.html"); for (const part of ["trottl-special-poison-fish.js?v=4","trottl-special-minigames.js?v=8","trottl-special-service.js?v=19","trottl-special-ui.js?v=22","trottl-special.css?v=30"]) assert.ok(html.includes(part));
+  const registry = read("trottl-special-minigames.js"); assert.match(registry,/active: i < 8, implemented: i < 8/); assert.match(read("trottl-special-debug.js"),/registry\.filter\(r => r\.active && r\.implemented\)/);
   assert.match(read("trottl-special-service.js"), /submitPoisonFish:[^\n]*return final \? loadSession\(id\) : null/);
   assert.match(read("trottl-special-ui.js"), /sharedWithoutRevision\) === JSON\.stringify\(incomingWithoutRevision\)/);
 });
-test("the live pool has seven equal random intervals and TEST consumes the one-shot override", () => {
-  const pick = value => 1 + Math.floor(value * 7);
-  for (let index = 0; index < 7; index++) { assert.equal(pick(index / 7), index + 1); assert.equal(pick((index + .9999) / 7), index + 1); }
+test("the live pool has eight equal random intervals and TEST consumes the one-shot override", () => {
+  const pick = value => 1 + Math.floor(value * 8);
+  for (let index = 0; index < 8; index++) { assert.equal(pick(index / 8), index + 1); assert.equal(pick((index + .9999) / 8), index + 1); }
   assert.match(read("supabase/migrations/20260914010000_add_trottl_special_fish_catch_and_test_controls.sql"),/pool\[1\+floor\(p_random\*array_length\(pool,1\)\)::integer\]/);
   assert.match(sql,/chosen='special_minigame_07' then perform public\.special_poison_fish_begin_locked\(p_id\)/);
   assert.match(sql,/debug_test=debug_test-'next_minigame'/);
 });
-test("transactional SQL fixture covers version, seed, reflection, scores and seven-game pool", () => {
+test("transactional SQL fixture covers version, seed, reflection, scores and eight-game pool", () => {
   const fixture = read("tests/fixtures/trottl-special-poison-fish.sql");
   assert.ok(fixture.startsWith("begin;\n")); assert.ok(fixture.endsWith("rollback;\n"));
-  for (const pattern of [/special_poison_fish_config\(1\)/,/special_poison_fish_state\(12345,0,0,0,null,null,4300,1\)/,/special_poison_fish_replay\(12345,'\[\]'::jsonb,1\)/,/found_normal and found_gold and found_poison/,/implemented and enabled\)<>7/]) assert.match(fixture, pattern);
+  for (const pattern of [/special_poison_fish_config\(1\)/,/special_poison_fish_state\(12345,0,0,0,null,null,4300,1\)/,/special_poison_fish_replay\(12345,'\[\]'::jsonb,1\)/,/found_normal and found_gold and found_poison/,/implemented and enabled\)<>8/]) assert.match(fixture, pattern);
   const next = read("tests/fixtures/trottl-special-poison-fish-balance.sql");
   assert.ok(next.startsWith("begin;\n")); assert.ok(next.endsWith("rollback;\n"));
   for (const pattern of [/special_poison_fish_config\(1\)/,/special_poison_fish_config\(2\)/,/29999/,/30000/,/20000/,/0\.08125/,/1\.25/]) assert.match(next, pattern);

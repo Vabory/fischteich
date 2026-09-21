@@ -68,6 +68,8 @@
       ? await rpc("get_trottl_special_stop_fish_view", { p_session_id: sessionId }) : null;
     const poisonFishView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_07"
       ? await rpc("get_trottl_special_poison_fish_view", { p_session_id: sessionId }) : null;
+    const fishCountView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_08"
+      ? await rpc("get_trottl_special_fish_count_view", { p_session_id: sessionId }) : null;
     const players = (p.data ?? []).filter(row => row.lifecycle_status !== "left").map(row => {
       const base = presentation.normalizePlayer(row);
       if (!base) return null;
@@ -118,6 +120,14 @@
       || !Number.isInteger(Number(poisonFishView.movement_seed)) || Number(poisonFishView.movement_seed) < 1 || Number(poisonFishView.movement_seed) > 2147483646
       || ![1, 2, 3].includes(Number(poisonFishView.simulation_version)) || !Array.isArray(poisonFishView.events) || poisonFishView.events.length > 500
       || typeof poisonFishView.completed !== "boolean" || !Number.isInteger(Number(poisonFishView.score)))) throw new Error("Invalid poison fish view response");
+    if (fishCountView !== null && (typeof fishCountView !== "object" || !Number.isInteger(Number(fishCountView.seed))
+      || Number(fishCountView.seed) < 1 || Number(fishCountView.seed) > 2147483646
+      || !Array.isArray(fishCountView.choices) || fishCountView.choices.length !== 4
+      || new Set(fishCountView.choices).size !== 4 || fishCountView.choices.some(n => !Number.isInteger(n) || n < 1 || n > 21)
+      || !Number.isInteger(Number(fishCountView.reveal_duration_ms)) || Number(fishCountView.reveal_duration_ms) < 1000 || Number(fishCountView.reveal_duration_ms) > 2000
+      || !Number.isFinite(Date.parse(fishCountView.answer_started_at)) || !Number.isFinite(Date.parse(fishCountView.answer_deadline))
+      || Date.parse(fishCountView.answer_deadline) - Date.parse(fishCountView.answer_started_at) !== 10000
+      || typeof fishCountView.answered !== "boolean" || typeof fishCountView.player_id !== "string")) throw new Error("Invalid fish count view response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
       membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount,
       reactionRun: reactionRun === null ? null : Object.freeze({ ...reactionRun, delay_ms: Number(reactionRun.delay_ms), reaction_ms: reactionRun.reaction_ms === null ? null : Number(reactionRun.reaction_ms) }),
@@ -126,7 +136,8 @@
       fishMemoryView: fishMemoryView === null ? null : Object.freeze({ ...fishMemoryView, memory_round: Number(fishMemoryView.memory_round),
         guess_count: Number(fishMemoryView.guess_count), errors: fishMemoryView.errors === null ? null : Number(fishMemoryView.errors), pattern: Object.freeze([...fishMemoryView.pattern]) }),
       stopFishView: stopFishView === null ? null : Object.freeze({ ...stopFishView, distance_units: Number(stopFishView.distance_units), tap_elapsed_ms: stopFishView.tap_elapsed_ms === null ? null : Number(stopFishView.tap_elapsed_ms) }),
-      poisonFishView: poisonFishView === null ? null : Object.freeze({ ...poisonFishView, movement_seed: Number(poisonFishView.movement_seed), score: Number(poisonFishView.score), events: Object.freeze([...poisonFishView.events]) }) });
+      poisonFishView: poisonFishView === null ? null : Object.freeze({ ...poisonFishView, movement_seed: Number(poisonFishView.movement_seed), score: Number(poisonFishView.score), events: Object.freeze([...poisonFishView.events]) }),
+      fishCountView: fishCountView === null ? null : Object.freeze({ ...fishCountView, seed: Number(fishCountView.seed), reveal_duration_ms: Number(fishCountView.reveal_duration_ms), choices: Object.freeze([...fishCountView.choices]) }) });
   }
   async function loadMembership(sessionId) {
     const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
@@ -209,6 +220,8 @@
     finalizeStopFish: async (id, roundId) => { await rpc("finalize_trottl_special_stop_fish", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     submitPoisonFish: async (id, roundId, events, final) => { await rpc("submit_trottl_special_poison_fish", { p_session_id: id, p_round_id: roundId, p_events: events, p_final: final }); return final ? loadSession(id) : null; },
     finalizePoisonFish: async (id, roundId) => { await rpc("finalize_trottl_special_poison_fish", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
+    answerFishCount: async (id, roundId, answer, elapsed) => { await rpc("answer_trottl_special_fish_count", { p_session_id: id, p_round_id: roundId, p_selected_answer: answer, p_tap_elapsed_ms: elapsed }); return loadSession(id); },
+    finalizeFishCount: async (id, roundId) => { await rpc("finalize_trottl_special_fish_count", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     actRoulette: async (id, roundId, action, value = null, target = null) => {
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
       return loadSession(id);

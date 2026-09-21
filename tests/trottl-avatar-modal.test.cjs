@@ -30,7 +30,7 @@ test("avatar modal presents sixteen slots with a non-selectable locked mystery",
   assert.equal(presentation.visibleAvatars.length, 16);
   assert.equal(presentation.visibleAvatars.some((avatar) => avatar.id === "mystical-bobr"), false);
   assert.equal(presentation.visibleAvatars.at(-1).displayName, "Mystical ???");
-  assert.equal(presentation.visibleAvatars.at(-1).src, "./assets/avatars/locked-avatar.png");
+  assert.equal(presentation.visibleAvatars.at(-1).src, "./assets/avatars/locked-avatar.webp");
   assert.equal(presentation.visibleAvatars.at(-1).selectable, false);
   assert.equal(presentation.selectableAvatars.length, 15);
   assert.equal(presentation.selectedAvatarId, null);
@@ -53,7 +53,7 @@ test("unlocked Mystical Bobr uses the normal registry presentation and selection
   assert.equal(presentation.visibleAvatars.length, 16);
   assert.equal(presentation.visibleAvatars.at(-1).id, "mystical-bobr");
   assert.equal(presentation.visibleAvatars.at(-1).displayName, "Mystical Bobr");
-  assert.equal(presentation.visibleAvatars.at(-1).src, "./assets/avatars/mystical-bobr.png");
+  assert.equal(presentation.visibleAvatars.at(-1).src, "./assets/avatars/mystical-bobr.webp");
   assert.equal(presentation.currentAvatarId, "mystical-bobr");
   assert.equal(presentation.selectedAvatarId, "mystical-bobr");
   assert.equal(presentation.canConfirm, true);

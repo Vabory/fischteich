@@ -45,16 +45,16 @@ test("locked and unlocked display choices preload the appropriate sixteenth avat
   const locked = createHarness();
   const lockedPending = locked.service.preloadVisibleTrottlAvatars({ mysticalBobrUnlocked: false });
   assert.equal(locked.images.length, 16);
-  assert.equal(locked.images.filter((image) => image.src.endsWith("locked-avatar.png")).length, 1);
-  assert.equal(locked.images.some((image) => image.src.endsWith("mystical-bobr.png")), false);
+  assert.equal(locked.images.filter((image) => image.src.endsWith("locked-avatar.webp")).length, 1);
+  assert.equal(locked.images.some((image) => image.src.endsWith("mystical-bobr.webp")), false);
   locked.images.forEach((image) => image.load());
   await lockedPending;
 
   const unlocked = createHarness();
   const unlockedPending = unlocked.service.preloadVisibleTrottlAvatars({ mysticalBobrUnlocked: true });
   assert.equal(unlocked.images.length, 16);
-  assert.equal(unlocked.images.filter((image) => image.src.endsWith("mystical-bobr.png")).length, 1);
-  assert.equal(unlocked.images.some((image) => image.src.endsWith("locked-avatar.png")), false);
+  assert.equal(unlocked.images.filter((image) => image.src.endsWith("mystical-bobr.webp")).length, 1);
+  assert.equal(unlocked.images.some((image) => image.src.endsWith("locked-avatar.webp")), false);
   unlocked.images.forEach((image) => image.load());
   await unlockedPending;
 });

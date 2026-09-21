@@ -42,7 +42,7 @@ test("Trottl avatar resolver handles hidden and unknown avatar IDs safely", () =
   assert.deepEqual(JSON.parse(JSON.stringify(bobr)), {
     id: "mystical-bobr",
     displayName: "Mystical Bobr",
-    src: "./assets/avatars/mystical-bobr.png",
+    src: "./assets/avatars/mystical-bobr.webp",
     hiddenByDefault: true,
     unlockKey: "mystical-bobr",
   });
@@ -67,7 +67,7 @@ test("visible avatar filtering adds an unlocked Mystical Bobr last without reord
   assert.deepEqual(JSON.parse(JSON.stringify(unlocked.at(-1))), {
     id: "mystical-bobr",
     displayName: "Mystical Bobr",
-    src: "./assets/avatars/mystical-bobr.png",
+    src: "./assets/avatars/mystical-bobr.webp",
     hiddenByDefault: true,
     unlockKey: "mystical-bobr",
   });
@@ -83,7 +83,7 @@ test("display choices reserve the sixteenth slot for a non-persistable locked my
   assert.deepEqual(Array.from(locked.slice(0, 15), (avatar) => avatar.id), expectedIds.slice(0, 15));
   assert.deepEqual(JSON.parse(JSON.stringify(locked.at(-1))), {
     displayName: "Mystical ???",
-    src: "./assets/avatars/locked-avatar.png",
+    src: "./assets/avatars/locked-avatar.webp",
     selectable: false,
   });
   assert.equal(locked.at(-1).id, undefined);

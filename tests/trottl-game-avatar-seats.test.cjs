@@ -26,7 +26,7 @@ test("game avatars resolve valid ids only through the central registry", () => {
     displayName: "Fabian",
   });
   assert.equal(avatar.hasAvatar, true);
-  assert.equal(avatar.src, "./assets/avatars/turbo-lachs.png");
+  assert.equal(avatar.src, "./assets/avatars/turbo-lachs.webp");
   assert.equal(avatar.avatar.displayName, "Turbo Lachs");
   assert.equal(avatar.alt, "Turbo Lachs, Avatar von Fabian");
   assert.match(uiSource, /createGameAvatarPresentation\(player\)/);

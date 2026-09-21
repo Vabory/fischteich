@@ -21,7 +21,7 @@
   ].map(([id, displayName, hiddenByDefault = false, unlockKey = null]) => Object.freeze({
     id,
     displayName,
-    src: `./assets/avatars/${id}.png`,
+    src: `./assets/avatars/${id}.webp`,
     hiddenByDefault,
     unlockKey,
   })));
@@ -30,7 +30,7 @@
   // Display-only: deliberately has no avatar ID and is never part of the playable registry.
   const LOCKED_MYSTERY_AVATAR = Object.freeze({
     displayName: "Mystical ???",
-    src: "./assets/avatars/locked-avatar.png",
+    src: "./assets/avatars/locked-avatar.webp",
     selectable: false,
   });
   const PRELOAD_STATUS_BY_SRC = new Map();

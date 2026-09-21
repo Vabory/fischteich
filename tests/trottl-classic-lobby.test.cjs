@@ -41,7 +41,7 @@ test("lobby avatars resolve only through the shared registry and null stays empt
   const ui = loadUi();
   const avatar = ui.getLobbyAvatarById("party-piranha");
   assert.equal(avatar.id, "party-piranha");
-  assert.equal(avatar.src, "./assets/avatars/party-piranha.png");
+  assert.equal(avatar.src, "./assets/avatars/party-piranha.webp");
   assert.equal(ui.getLobbyAvatarById(null), null);
   assert.equal(ui.getLobbyAvatarById("obsolete-avatar"), null);
   assert.match(uiSource, /getLobbyAvatarById\(player\.avatarId\)/);

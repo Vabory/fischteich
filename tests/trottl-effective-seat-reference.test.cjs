@@ -26,6 +26,7 @@ test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI ca
     .replace(/^    <script src="\.\/classic-background-fit\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/<meta name=.fischteich-build.[^>]+>/,"protected build")
     .replace(/style.css\?v=\d+/,"style.css?v=cache")
+    .replace(/trottl-avatar-service.js\?v=\d+/,"trottl-avatar-service.js?v=4")
     .replace(/trottl-classic-ui.js\?v=\d+/,"trottl-classic-ui.js?v=cache");
   assert.equal(hash(html),"b8060cd7358e8c0322c4dd5b9b06486e844d3ae82a2674b17796c064dea0ca4b",reference);
 });

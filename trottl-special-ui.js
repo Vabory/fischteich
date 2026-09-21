@@ -55,6 +55,9 @@
     const stopFish = global.TrottlSpecialStopFish?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Stop den Fisch wird erneut geladen."; void refresh(); } });
+    const poisonFish = global.TrottlSpecialPoisonFish?.create({ root: game, service,
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
+      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Giftfisch wird erneut geladen."; void refresh(); } });
     const debug = global.TrottlSpecialDebug?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id) { acceptSnapshot(next); renderSession(); } } });
     // Results and transitions come exclusively from the Special intent RPC.
@@ -296,7 +299,7 @@
           if (attackMark.fading) crosshair.style.animationDelay = `-${attackMark.elapsed}ms`;
           wrap.append(crosshair);
         }
-        if (g.phase === "minigame_active" && ["special_minigame_01", "special_minigame_02", "special_minigame_03", "special_minigame_04", "special_minigame_05"].includes(g.minigame?.minigame_type) && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
+        if (g.phase === "minigame_active" && ["special_minigame_01", "special_minigame_02", "special_minigame_03", "special_minigame_04", "special_minigame_05", "special_minigame_07"].includes(g.minigame?.minigame_type) && g.minigame.runs && g.minigame.participants.some(p => p.player_id === player.userId)) {
           wrap.classList.add(g.minigame.runs?.[player.userId]?.completed ? "trottl-special-minigame-done" : "trottl-special-minigame-waiting");
         }
         const hearts = node("span", "trottl-special-hearts");
@@ -399,6 +402,7 @@
       colorChaos?.update(snapshot);
       fishMemory?.update(snapshot);
       stopFish?.update(snapshot);
+      poisonFish?.update(snapshot);
       debug?.update(snapshot);
     }
     function distributionCount() {
@@ -602,6 +606,7 @@
       fishCatch?.suspend();
       fishMemory?.suspend();
       stopFish?.suspend();
+      poisonFish?.suspend();
       debug?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearTimeout(state.hintTimer); state.hintTimer = null;

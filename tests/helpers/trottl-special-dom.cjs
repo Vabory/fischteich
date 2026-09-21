@@ -2,7 +2,8 @@
 // Minimal DOM fixture for existing structure/value tests; not a screenshot engine.
 function createDocument(html) {
   const doc = { visibilityState: "visible", readyState: "complete", listeners: {},
-    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); } };
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] ?? []).filter(item => item !== fn); } };
   class Element {
     constructor(tag = "div") {
       this.tagName = tag.toLowerCase(); this.attributes = {}; this.children = []; this.parentNode = null;

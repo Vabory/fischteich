@@ -1,7 +1,7 @@
 "use strict";
 (function installReactionTest(global) {
   const CONFIG = Object.freeze({ roundDurationMs: 10000, delayMinMs: 2000, delayMaxMs: 8500, tickMs: 25, retryMs: 750 });
-  const SALMON_ASSET = "./assets/mini-games/lachs-fish.png";
+  const SALMON_ASSET = "./assets/mini-games/lachs-fish.webp";
   let preloadPromise = null;
 
   function preloadAsset() {

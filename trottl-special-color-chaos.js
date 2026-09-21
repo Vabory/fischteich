@@ -2,10 +2,10 @@
 (function installColorChaos(global) {
   const COLORS = Object.freeze(["RED", "BLUE", "GREEN", "YELLOW"]);
   const COLOR_META = Object.freeze({
-    RED: Object.freeze({ label: "ROT", asset: "./assets/mini-games/red-fish.png", ink: "#ff6575" }),
-    BLUE: Object.freeze({ label: "BLAU", asset: "./assets/mini-games/blue-fish.png", ink: "#63b9ff" }),
-    GREEN: Object.freeze({ label: "GRÜN", asset: "./assets/mini-games/green-fish.png", ink: "#69e99a" }),
-    YELLOW: Object.freeze({ label: "GELB", asset: "./assets/mini-games/yellow-fish.png", ink: "#ffd85a" }),
+    RED: Object.freeze({ label: "ROT", asset: "./assets/mini-games/red-fish.webp", ink: "#ff6575" }),
+    BLUE: Object.freeze({ label: "BLAU", asset: "./assets/mini-games/blue-fish.webp", ink: "#63b9ff" }),
+    GREEN: Object.freeze({ label: "GRÜN", asset: "./assets/mini-games/green-fish.webp", ink: "#69e99a" }),
+    YELLOW: Object.freeze({ label: "GELB", asset: "./assets/mini-games/yellow-fish.webp", ink: "#ffd85a" }),
   });
   const CONFIG = Object.freeze({ requiredCorrect: 5, correctDelayMs: 120, wrongDelayMs: 300, fadeOutMs: 150, fadeInMs: 150, tickMs: 50 });
   let preloadPromise = null;

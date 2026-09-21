@@ -2,10 +2,10 @@
 (function installFishMemory(global) {
   const COLORS = Object.freeze(["RED", "BLUE", "GREEN", "YELLOW"]);
   const COLOR_META = Object.freeze({
-    RED: Object.freeze({ label: "ROT", asset: "./assets/mini-games/red-fish.png" }),
-    BLUE: Object.freeze({ label: "BLAU", asset: "./assets/mini-games/blue-fish.png" }),
-    GREEN: Object.freeze({ label: "GRÜN", asset: "./assets/mini-games/green-fish.png" }),
-    YELLOW: Object.freeze({ label: "GELB", asset: "./assets/mini-games/yellow-fish.png" }),
+    RED: Object.freeze({ label: "ROT", asset: "./assets/mini-games/red-fish.webp" }),
+    BLUE: Object.freeze({ label: "BLAU", asset: "./assets/mini-games/blue-fish.webp" }),
+    GREEN: Object.freeze({ label: "GRÜN", asset: "./assets/mini-games/green-fish.webp" }),
+    YELLOW: Object.freeze({ label: "GELB", asset: "./assets/mini-games/yellow-fish.webp" }),
   });
   const CONFIG = Object.freeze({
     rounds: 3, entriesPerRound: 4, patternLength: 12, activeFlashMs: 800, flashPauseMs: 220,

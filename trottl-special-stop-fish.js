@@ -1,7 +1,7 @@
 "use strict";
 (function installStopFish(global) {
   const CONFIG = Object.freeze({ roundDurationMs: 15000, startLabelMs: 400, passDurationMs: 700, respawnDelayMs: 500, fishWidthNorm: .5, outsideMarginFishWidths: .08, perfectThreshold: .005, offscreenDistanceUnits: 100001, tickMs: 25 });
-  const FISH_ASSET = "./assets/mini-games/lachs-fish.png", SHADOW_ASSET = "./assets/mini-games/lachs-shadow.png";
+  const FISH_ASSET = "./assets/mini-games/lachs-fish.webp", SHADOW_ASSET = "./assets/mini-games/lachs-shadow.webp";
   let preloadPromise = null;
   const centerAtProgress = progress => { const outside = CONFIG.fishWidthNorm * (.5 + CONFIG.outsideMarginFishWidths); return 1 + outside - (1 + 2 * outside) * progress; };
   const centerAt = elapsed => { const cycle = CONFIG.passDurationMs + CONFIG.respawnDelayMs, time = ((elapsed % cycle) + cycle) % cycle; return time >= CONFIG.passDurationMs ? null : centerAtProgress(time / CONFIG.passDurationMs); };

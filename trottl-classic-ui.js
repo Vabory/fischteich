@@ -346,13 +346,6 @@
     const roomBackButton = document.querySelector("#close-trottl-classic-rooms");
     const sessionBackButton = document.querySelector("#close-trottl-classic-session");
 
-    if (typeof global.Image === "function") {
-      for (const source of [LOBBY_BACKGROUND_ASSET, GAME_BACKGROUND_ASSET, getLobbyHeaderAsset(1), getLobbyHeaderAsset(2)]) {
-        const image = new global.Image();
-        image.src = source;
-      }
-    }
-
     const state = {
       rooms: [],
       snapshot: null,

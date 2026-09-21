@@ -11,16 +11,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260921.6">
+    <meta name="fischteich-build" content="20260921.7">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
-    <link rel="preload" as="image" href="./assets/mini-games/lachs-fish.webp">
-    <link rel="preload" as="image" href="./assets/mini-games/red-fish.webp">
-    <link rel="preload" as="image" href="./assets/mini-games/blue-fish.webp">
-    <link rel="preload" as="image" href="./assets/mini-games/green-fish.webp">
-    <link rel="preload" as="image" href="./assets/mini-games/yellow-fish.webp">
-    <link rel="preload" as="image" href="./assets/mini-games/lachs-shadow.webp">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
     <link rel="stylesheet" href="./style.css?v=192">
     <link rel="stylesheet" href="./trottl-special.css?v=24">
@@ -41,7 +35,7 @@
     <script src="./trottl-avatar-service.js?v=5" defer></script>
     <script src="./trottl-classic-service.js?v=17" defer></script>
     <script src="./trottl-classic-preview.js?v=3" defer></script>
-    <script src="./trottl-classic-ui.js?v=43" defer></script>
+    <script src="./trottl-classic-ui.js?v=44" defer></script>
     <script src="./classic-background-fit.js?v=1" defer></script>
     <script src="./trottl-special-service.js?v=14" defer></script>
     <script src="./trottl-special-presentation.js?v=3" defer></script>
@@ -59,7 +53,7 @@
     <script src="./trottl-special-admin.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./team-division-v2-logic.js?v=2" defer></script>
-    <script src="./script.js?v=94" defer></script>
+    <script src="./script.js?v=95" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -143,7 +137,7 @@
         <h1 class="visually-hidden" id="teams-menu-title">Teams aufteilen</h1>
         <img
           class="sidemenu-background"
-          src="./assets/sidemenu-background.webp"
+          data-src="./assets/sidemenu-background.webp"
           alt=""
           width="854"
           height="1842"
@@ -152,7 +146,7 @@
         >
         <img
           class="sidemenu-fish-asset"
-          src="./assets/sidemenu-fisch-asset.webp?v=1"
+          data-src="./assets/sidemenu-fisch-asset.webp?v=1"
           alt=""
           width="1880"
           height="836"
@@ -162,7 +156,7 @@
         <button class="close-button navigation-back-button" id="close-teams-menu" type="button" aria-label="Zurück zum Hauptmenü">←</button>
         <img
           class="teams-menu-logo"
-          src="./assets/teams-aufteilen-logo.webp"
+          data-src="./assets/teams-aufteilen-logo.webp"
           alt=""
           width="1774"
           height="887"
@@ -171,13 +165,13 @@
         >
         <nav class="teams-menu-actions sidemenu-asset-actions" aria-label="Methode zur Teamaufteilung auswählen">
           <button id="start-finger-selection" type="button" aria-label="Finger Auswahl">
-            <img src="./assets/button-finger-auswahl.webp" alt="" width="2179" height="722" draggable="false">
+            <img data-src="./assets/button-finger-auswahl.webp" alt="" width="2179" height="722" draggable="false">
           </button>
           <button id="start-random-participants" type="button" aria-label="Mitspieler Zufall">
-            <img src="./assets/button-team-aufteilung.webp?v=1" alt="" width="2048" height="768" draggable="false">
+            <img data-src="./assets/button-team-aufteilung.webp?v=1" alt="" width="2048" height="768" draggable="false">
           </button>
           <button id="start-manual-participants" type="button" aria-label="Mitspieler Manuell">
-            <img src="./assets/button-rage-cage-verteilung.webp?v=1" alt="" width="2172" height="724" draggable="false">
+            <img data-src="./assets/button-rage-cage-verteilung.webp?v=1" alt="" width="2172" height="724" draggable="false">
           </button>
         </nav>
       </section>
@@ -185,7 +179,7 @@
       <section class="screen trottl-menu-screen" id="trottl-menu-screen" aria-labelledby="trottl-menu-title" hidden>
         <img
           class="sidemenu-background trottl-menu-background"
-          src="./assets/dice-game-background.webp"
+          data-src="./assets/dice-game-background.webp"
           alt=""
           width="883"
           height="1781"
@@ -196,18 +190,18 @@
         <main class="trottl-menu-shell">
           <header class="trottl-menu-header">
             <h1 class="visually-hidden" id="trottl-menu-title">3er Trottl – Spielmodus wählen</h1>
-            <img class="trottl-menu-title-asset" src="./assets/text-3er-trottl.webp?v=1" alt="" width="1448" height="1086" draggable="false">
-            <img class="trottl-menu-subtitle-asset" src="./assets/text-spielmodus-wählen.webp?v=1" alt="" width="2172" height="724" draggable="false">
+            <img class="trottl-menu-title-asset" data-src="./assets/text-3er-trottl.webp?v=1" alt="" width="1448" height="1086" draggable="false">
+            <img class="trottl-menu-subtitle-asset" data-src="./assets/text-spielmodus-wählen.webp?v=1" alt="" width="2172" height="724" draggable="false">
           </header>
           <nav class="trottl-menu-actions sidemenu-asset-actions" aria-label="3er-Trottl-Modus auswählen">
             <button id="open-fischteich-dice" type="button" aria-label="Fischteich Würfel">
-              <img src="./assets/button-fischteich-würfel.webp?v=1" alt="" width="2172" height="724" draggable="false">
+              <img data-src="./assets/button-fischteich-würfel.webp?v=1" alt="" width="2172" height="724" draggable="false">
             </button>
             <button id="open-trottl-classic" type="button" aria-label="3er Trottl Classic">
-              <img src="./assets/button-dice-game-classic.webp?v=1" alt="" width="2172" height="724" draggable="false">
+              <img data-src="./assets/button-dice-game-classic.webp?v=1" alt="" width="2172" height="724" draggable="false">
             </button>
             <button id="open-trottl-deluxe" type="button" aria-label="3er Trottl Special">
-              <img src="./assets/button-dice-game-special.webp?v=1" alt="" width="2172" height="724" draggable="false">
+              <img data-src="./assets/button-dice-game-special.webp?v=1" alt="" width="2172" height="724" draggable="false">
             </button>
             <p class="trottl-menu-feedback" id="trottl-menu-feedback" aria-live="polite"></p>
           </nav>
@@ -217,7 +211,7 @@
       <section class="screen trottl-dice-screen" id="fischteich-dice-screen" aria-labelledby="fischteich-dice-title" hidden>
         <img
           class="fischteich-dice-background"
-          src="./assets/fischteich-würfel-background.webp"
+          data-src="./assets/fischteich-würfel-background.webp"
           alt=""
           width="854"
           height="1842"
@@ -228,7 +222,7 @@
         <main class="trottl-dice-shell" id="fischteich-dice-container">
           <header class="trottl-dice-header">
             <h1 class="visually-hidden" id="fischteich-dice-title">Fischteich Würfel</h1>
-            <img class="fischteich-dice-title-asset" src="./assets/text-fischteich-würfel.webp" alt="" width="640" height="240" draggable="false" aria-hidden="true">
+            <img class="fischteich-dice-title-asset" data-src="./assets/text-fischteich-würfel.webp" alt="" width="640" height="240" draggable="false" aria-hidden="true">
           </header>
           <div class="fischteich-dice-stage">
             <div class="fischteich-dice-mount" id="fischteich-dice-mount"></div>
@@ -236,18 +230,18 @@
             <p class="visually-hidden" id="fischteich-dice-status" aria-live="polite"></p>
           </div>
           <button class="fischteich-dice-toggle" id="fischteich-dice-toggle" type="button" aria-pressed="false" aria-label="Zweiten Würfel einschalten">
-            <img src="./assets/button-2würfel.webp" alt="2. Würfel" width="256" height="256" draggable="false">
+            <img data-src="./assets/button-2würfel.webp" alt="2. Würfel" width="256" height="256" draggable="false">
           </button>
         </main>
       </section>
 
       <section class="screen trottl-classic-screen" id="trottl-classic-rooms-screen" aria-labelledby="trottl-classic-rooms-title" hidden>
-        <img class="sidemenu-background trottl-classic-room-background" src="./assets/raum-wählen-background.webp" alt="" width="887" height="1774" draggable="false" aria-hidden="true">
+        <img class="sidemenu-background trottl-classic-room-background" data-src="./assets/raum-wählen-background.webp" alt="" width="887" height="1774" draggable="false" aria-hidden="true">
         <button class="close-button navigation-back-button" id="close-trottl-classic-rooms" type="button" aria-label="Zurück zum 3er-Trottl-Menü">←</button>
         <main class="trottl-classic-shell trottl-classic-room-shell">
           <header class="trottl-classic-header">
             <h1 class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen</h1>
-            <img class="trottl-classic-room-title-asset" src="./assets/text-raum-wählen.webp?v=1" alt="" width="2172" height="724" draggable="false" aria-hidden="true">
+            <img class="trottl-classic-room-title-asset" data-src="./assets/text-raum-wählen.webp?v=1" alt="" width="2172" height="724" draggable="false" aria-hidden="true">
             <p class="trottl-classic-room-context">3er Trottl<br>CLASSIC</p>
           </header>
           <div class="trottl-classic-room-list" id="trottl-classic-room-list" aria-label="Verfügbare Räume">
@@ -259,12 +253,12 @@
       </section>
 
       <section class="screen trottl-classic-screen" id="trottl-classic-session-screen" aria-labelledby="trottl-classic-session-title" hidden>
-        <img class="trottl-classic-lobby-background" id="trottl-classic-session-background" src="./assets/lobby-room1-background.webp" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
+        <img class="trottl-classic-lobby-background" id="trottl-classic-session-background" data-src="./assets/lobby-room1-background.webp" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
         <button class="close-button navigation-back-button" id="close-trottl-classic-session" type="button" aria-label="Raum verlassen">←</button>
         <main class="trottl-classic-shell trottl-classic-session-shell">
           <header class="trottl-classic-header" id="trottl-classic-session-header">
             <h1 id="trottl-classic-session-title" class="visually-hidden">3er Trottl Klassik Lobby</h1>
-            <img class="trottl-classic-lobby-title-asset" id="trottl-classic-lobby-title-asset" src="./assets/text-room1-lobby.webp" alt="Raum 1 Lobby" width="640" height="240" draggable="false">
+            <img class="trottl-classic-lobby-title-asset" id="trottl-classic-lobby-title-asset" data-src="./assets/text-room1-lobby.webp" alt="Raum 1 Lobby" width="640" height="240" draggable="false">
           </header>
           <div class="trottl-classic-lobby-view" id="trottl-classic-lobby-view">
             <section class="trottl-classic-player-panel" aria-labelledby="trottl-classic-player-title">
@@ -542,7 +536,7 @@
       <section class="screen roulette-screen" id="roulette-screen" aria-label="Fisch Roulette" hidden>
         <img
           class="roulette-background"
-          src="./assets/background-fisch-roulette.webp"
+          data-src="./assets/background-fisch-roulette.webp"
           alt=""
           width="853"
           height="1844"
@@ -551,7 +545,7 @@
         >
         <img
           class="roulette-title-image"
-          src="./assets/title-fisch-roulette.webp?v=1"
+          data-src="./assets/title-fisch-roulette.webp?v=1"
           alt=""
           width="1723"
           height="913"
@@ -593,7 +587,7 @@
           hidden
           disabled
         >
-          <img src="./assets/button-drehen.webp?v=1" alt="" width="2172" height="724" draggable="false">
+          <img data-src="./assets/button-drehen.webp?v=1" alt="" width="2172" height="724" draggable="false">
         </button>
         <div class="roulette-speed-selector" id="roulette-speed-selector" role="group" aria-label="Roulette-Geschwindigkeit">
           <button type="button" data-roulette-speed="1" aria-pressed="true">1x</button>
@@ -612,7 +606,7 @@
               <div class="roulette-stat-gold-main">
                 <img
                   class="roulette-stat-icon roulette-stat-icon--gold"
-                  src="./assets/gold-icon.webp"
+                  data-src="./assets/gold-icon.webp"
                   alt=""
                   width="320"
                   height="265"
@@ -633,7 +627,7 @@
             <div class="roulette-stat-row roulette-stat-row--turbolachs">
               <img
                 class="roulette-stat-icon roulette-stat-icon--fish"
-                  src="./assets/turbolachs-icon.webp"
+                  data-src="./assets/turbolachs-icon.webp"
                 alt=""
                   width="192"
                   height="128"
@@ -645,7 +639,7 @@
             <div class="roulette-stat-row roulette-stat-row--nitroforelle">
               <img
                 class="roulette-stat-icon roulette-stat-icon--fish"
-                  src="./assets/nitroforelle-icon.webp"
+                  data-src="./assets/nitroforelle-icon.webp"
                 alt=""
                   width="192"
                   height="128"
@@ -658,7 +652,7 @@
           <div class="roulette-stat-row roulette-stat-row--total">
             <img
               class="roulette-stat-icon roulette-stat-icon--total"
-              src="./assets/total-spins-icon.webp"
+              data-src="./assets/total-spins-icon.webp"
               alt=""
               width="192"
               height="175"
@@ -813,15 +807,15 @@
         <p class="settings-app-version" id="settings-app-version">
           <span class="version-beaver-scene" data-bobr-tap-target aria-hidden="true">
             <span class="version-beaver-scene-inner">
-              <img class="version-beaver" src="./assets/settings/beaver.webp?v=1" alt="">
-              <img class="version-water" src="./assets/settings/water.webp?v=1" alt="">
+              <img class="version-beaver" data-src="./assets/settings/beaver.webp?v=1" alt="">
+              <img class="version-water" data-src="./assets/settings/water.webp?v=1" alt="">
             </span>
           </span>
           <span class="settings-app-version-text" id="settings-app-version-text"></span>
           <span class="version-beaver-scene version-beaver-scene--right" data-bobr-tap-target aria-hidden="true">
             <span class="version-beaver-scene-inner">
-              <img class="version-beaver" src="./assets/settings/beaver.webp?v=1" alt="">
-              <img class="version-water" src="./assets/settings/water.webp?v=1" alt="">
+              <img class="version-beaver" data-src="./assets/settings/beaver.webp?v=1" alt="">
+              <img class="version-water" data-src="./assets/settings/water.webp?v=1" alt="">
             </span>
           </span>
         </p>

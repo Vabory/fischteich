@@ -526,7 +526,35 @@ for (const asset of ROULETTE_TILE_ASSETS) {
   );
 }
 
+const pendingImageLoads = new WeakMap();
+
+function ensureImageLoaded(image) {
+  if (!(image instanceof HTMLImageElement) || image.getAttribute("src")) {
+    return Promise.resolve(image);
+  }
+  if (pendingImageLoads.has(image)) return pendingImageLoads.get(image);
+  const source = image.dataset.src;
+  if (!source) return Promise.resolve(image);
+
+  const pending = new Promise((resolve) => {
+    image.addEventListener("load", () => resolve(image), { once: true });
+    image.addEventListener("error", () => resolve(image), { once: true });
+    image.src = source;
+  });
+  pendingImageLoads.set(image, pending);
+  return pending;
+}
+
+function ensureImagesLoaded(container) {
+  if (!container) return Promise.resolve([]);
+  const images = container.matches?.("img[data-src]")
+    ? [container, ...container.querySelectorAll("img[data-src]")]
+    : [...container.querySelectorAll("img[data-src]")];
+  return Promise.all(images.map(ensureImageLoaded));
+}
+
 function showScreen(screen) {
+  void ensureImagesLoaded(screen);
   for (const item of screens) {
     item.hidden = item !== screen;
     item.classList.toggle("is-active", item === screen);
@@ -544,7 +572,14 @@ const trottlClassic = window.TrottlClassicUI.create({
   showTrottlMenu,
 });
 
-const trottlSpecial = window.TrottlSpecialUI.create({ showScreen, showTrottlMenu });
+let trottlSpecial = null;
+
+function ensureTrottlSpecial() {
+  if (!trottlSpecial) {
+    trottlSpecial = window.TrottlSpecialUI.create({ showScreen, showTrottlMenu });
+  }
+  return trottlSpecial;
+}
 
 function showMenu() {
   stopRoulette();
@@ -1830,6 +1865,7 @@ async function handleBobrEasterEggTap(event) {
 }
 
 function openSettingsModal() {
+  void ensureImagesLoaded(settingsModal);
   state.bobrTapSequence.enable();
   renderBobrUnlockState(getAppAuthState().currentProfile);
   renderSettingsIdentity();
@@ -5226,7 +5262,7 @@ document.querySelector("#open-trottl-classic").addEventListener("click", () => {
   void trottlClassic.openRooms();
 });
 document.querySelector("#open-trottl-deluxe").addEventListener("click", () => {
-  void trottlSpecial.openRooms();
+  void ensureTrottlSpecial().openRooms();
 });
 document.querySelector("#start-finger-selection").addEventListener("click", () => {
   state.gameReturnTarget = "teams-menu";
@@ -5707,7 +5743,7 @@ document.addEventListener("keydown", (event) => {
       closeManualTeamScreen();
     } else if (!participantScreen.hidden) {
       closeParticipantSelection();
-    } else if (trottlSpecial.isSessionScreenActive() || trottlSpecial.isRoomScreenActive()) {
+    } else if (trottlSpecial?.isSessionScreenActive() || trottlSpecial?.isRoomScreenActive()) {
       void trottlSpecial.goBack();
     } else if (trottlClassic.isSessionScreenActive() || trottlClassic.isRoomScreenActive()) {
       void trottlClassic.goBack();
@@ -5746,7 +5782,7 @@ subscribeToAppAuthState((auth) => {
 void initializeAppAuth().then(async () => {
   const reconnectMode = window.TrottlStartupRouting?.getStartupReconnectMode() ?? null;
   if (reconnectMode === "special") {
-    if (!(await trottlSpecial.restoreMembership())) {
+    if (!(await ensureTrottlSpecial().restoreMembership())) {
       window.TrottlStartupRouting.clearReconnectIntent("special");
     }
   } else if (reconnectMode === "classic") {

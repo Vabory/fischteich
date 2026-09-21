@@ -15,11 +15,11 @@ const service = read("roulette-service.js");
 assert.match(html, /style\.css\?v=192/);
 assert.match(html, /roulette-service\.js\?v=6/);
 assert.match(html, /button-release\.js\?v=1/);
-assert.match(html, /script\.js\?v=94/);
+assert.match(html, /script\.js\?v=95/);
 
 assert.match(html, /class="version-beaver-scene"/);
-assert.match(html, /class="version-beaver" src="\.\/assets\/settings\/beaver\.webp\?v=1"/);
-assert.match(html, /class="version-water" src="\.\/assets\/settings\/water\.webp\?v=1"/);
+assert.match(html, /class="version-beaver" data-src="\.\/assets\/settings\/beaver\.webp\?v=1"/);
+assert.match(html, /class="version-water" data-src="\.\/assets\/settings\/water\.webp\?v=1"/);
 assert.match(html, /class="version-beaver-scene version-beaver-scene--right"/);
 assert.equal((html.match(/class="version-beaver-scene-inner"/g) ?? []).length, 2);
 assert.doesNotMatch(html, /version-stump|assets\/settings\/stump\.png/);

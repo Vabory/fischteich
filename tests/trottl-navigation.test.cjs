@@ -59,7 +59,7 @@ test("Classic and Special open their separate room selection flows", () => {
   assert.match(placeholderFunction, /textContent = `\$\{label\} ist noch nicht verfügbar\.`/);
   assert.doesNotMatch(placeholderFunction, /showScreen|fetch|supabase|startGame/);
   assert.match(script, /#open-trottl-classic"\)\.addEventListener[\s\S]*trottlClassic\.openRooms\(\)/);
-  assert.match(script, /#open-trottl-deluxe"\)\.addEventListener[\s\S]*trottlSpecial\.openRooms\(\)/);
+  assert.match(script, /#open-trottl-deluxe"\)\.addEventListener[\s\S]*ensureTrottlSpecial\(\)\.openRooms\(\)/);
   assert.doesNotMatch(script, /3er Trottl Deluxe/);
 });
 

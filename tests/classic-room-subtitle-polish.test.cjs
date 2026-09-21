@@ -44,6 +44,6 @@ test("entire CSS is unchanged apart from the two deliberate room positioning adj
   assert.equal(hash(normalized), "74463057f9bd5915813bee1eb9bac17e58b60258a2054366d6afbcd9e055af47");
 });
 
-test("Classic rendering, click handlers, seats and gameplay remain byte-identical", () => {
-  assert.equal(hash(read("trottl-classic-ui.js")), "a82b8c01a117d5ffba2e2751df3c334b18f37ac8ed6ba595920c27a063d77953");
+test("Classic rendering, click handlers, seats and gameplay remain frozen after removing startup preloads", () => {
+  assert.equal(hash(read("trottl-classic-ui.js")), "d888d0328ce81b83a161ec8692623591a5215bcafcea95a97ecdceb154d36981");
 });

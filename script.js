@@ -5744,9 +5744,14 @@ subscribeToAppAuthState((auth) => {
   }
 });
 void initializeAppAuth().then(async () => {
-  if (window.TrottlSpecialUI.preferredMode() === "special") {
-    if (!(await trottlSpecial.restoreMembership())) void trottlSpecial.openRooms();
-    return;
+  const reconnectMode = window.TrottlStartupRouting?.getStartupReconnectMode() ?? null;
+  if (reconnectMode === "special") {
+    if (!(await trottlSpecial.restoreMembership())) {
+      window.TrottlStartupRouting.clearReconnectIntent("special");
+    }
+  } else if (reconnectMode === "classic") {
+    if (!(await trottlClassic.restoreMembership())) {
+      window.TrottlStartupRouting.clearReconnectIntent("classic");
+    }
   }
-  await trottlClassic.restoreMembership();
 });

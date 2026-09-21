@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fischteich">
-    <meta name="fischteich-build" content="20260921.1">
+    <meta name="fischteich-build" content="20260921.2">
     <title>Fischteich</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
@@ -28,6 +28,7 @@
     <script src="./vendor/supabase.js?v=2.112.4" defer></script>
     <script src="./supabase-client.js?v=2" defer></script>
     <script src="./local-identity.js?v=2" defer></script>
+    <script src="./trottl-startup-routing.js?v=1" defer></script>
     <script src="./device-credential.js?v=1" defer></script>
     <script src="./auth.js?v=4" defer></script>
     <script src="./bobr-unlock.js?v=2" defer></script>
@@ -40,10 +41,10 @@
     <script src="./trottl-avatar-service.js?v=4" defer></script>
     <script src="./trottl-classic-service.js?v=17" defer></script>
     <script src="./trottl-classic-preview.js?v=3" defer></script>
-    <script src="./trottl-classic-ui.js?v=41" defer></script>
+    <script src="./trottl-classic-ui.js?v=42" defer></script>
     <script src="./classic-background-fit.js?v=1" defer></script>
     <script src="./trottl-special-service.js?v=14" defer></script>
-    <script src="./trottl-special-presentation.js?v=2" defer></script>
+    <script src="./trottl-special-presentation.js?v=3" defer></script>
     <script src="./trottl-special-panic.js?v=1" defer></script>
     <script src="./trottl-special-roulette.js?v=3" defer></script>
     <script src="./trottl-special-minigames.js?v=6" defer></script>
@@ -54,11 +55,11 @@
     <script src="./trottl-special-fish-memory.js?v=3" defer></script>
     <script src="./trottl-special-stop-fish.js?v=2" defer></script>
     <script src="./trottl-special-debug.js?v=1" defer></script>
-    <script src="./trottl-special-ui.js?v=18" defer></script>
+    <script src="./trottl-special-ui.js?v=19" defer></script>
     <script src="./trottl-special-admin.js?v=1" defer></script>
     <script src="./button-release.js?v=1" defer></script>
     <script src="./team-division-v2-logic.js?v=2" defer></script>
-    <script src="./script.js?v=92" defer></script>
+    <script src="./script.js?v=93" defer></script>
     <script src="./tournament-create.js?v=7" defer></script>
     <script src="./tournament-live.js?v=12" defer></script>
     <script src="./tournament-archive.js?v=2" defer></script>
@@ -69,7 +70,7 @@
       <section class="screen menu-screen is-active" id="menu-screen" aria-label="Hauptmenü">
         <img
           class="menu-background"
-          src="./assets/menu-background.png?v=7"
+          src="./assets/menu-background.webp"
           alt=""
           width="853"
           height="1844"
@@ -142,7 +143,7 @@
         <h1 class="visually-hidden" id="teams-menu-title">Teams aufteilen</h1>
         <img
           class="sidemenu-background"
-          src="./assets/sidemenu-background.png?v=2"
+          src="./assets/sidemenu-background.webp"
           alt=""
           width="854"
           height="1842"
@@ -184,7 +185,7 @@
       <section class="screen trottl-menu-screen" id="trottl-menu-screen" aria-labelledby="trottl-menu-title" hidden>
         <img
           class="sidemenu-background trottl-menu-background"
-          src="./assets/dice-game-background.png?v=1"
+          src="./assets/dice-game-background.webp"
           alt=""
           width="883"
           height="1781"
@@ -216,7 +217,7 @@
       <section class="screen trottl-dice-screen" id="fischteich-dice-screen" aria-labelledby="fischteich-dice-title" hidden>
         <img
           class="fischteich-dice-background"
-          src="./assets/fischteich-würfel-background.png"
+          src="./assets/fischteich-würfel-background.webp"
           alt=""
           width="854"
           height="1842"
@@ -241,7 +242,7 @@
       </section>
 
       <section class="screen trottl-classic-screen" id="trottl-classic-rooms-screen" aria-labelledby="trottl-classic-rooms-title" hidden>
-        <img class="sidemenu-background trottl-classic-room-background" src="./assets/raum-wählen-background.png?v=1" alt="" width="887" height="1774" draggable="false" aria-hidden="true">
+        <img class="sidemenu-background trottl-classic-room-background" src="./assets/raum-wählen-background.webp" alt="" width="887" height="1774" draggable="false" aria-hidden="true">
         <button class="close-button navigation-back-button" id="close-trottl-classic-rooms" type="button" aria-label="Zurück zum 3er-Trottl-Menü">←</button>
         <main class="trottl-classic-shell trottl-classic-room-shell">
           <header class="trottl-classic-header">
@@ -258,7 +259,7 @@
       </section>
 
       <section class="screen trottl-classic-screen" id="trottl-classic-session-screen" aria-labelledby="trottl-classic-session-title" hidden>
-        <img class="trottl-classic-lobby-background" id="trottl-classic-session-background" src="./assets/lobby-room1-background.png" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
+        <img class="trottl-classic-lobby-background" id="trottl-classic-session-background" src="./assets/lobby-room1-background.webp" alt="" width="854" height="1842" draggable="false" aria-hidden="true">
         <button class="close-button navigation-back-button" id="close-trottl-classic-session" type="button" aria-label="Raum verlassen">←</button>
         <main class="trottl-classic-shell trottl-classic-session-shell">
           <header class="trottl-classic-header" id="trottl-classic-session-header">
@@ -541,7 +542,7 @@
       <section class="screen roulette-screen" id="roulette-screen" aria-label="Fisch Roulette" hidden>
         <img
           class="roulette-background"
-          src="./assets/background-fisch-roulette.png?v=1"
+          src="./assets/background-fisch-roulette.webp"
           alt=""
           width="853"
           height="1844"

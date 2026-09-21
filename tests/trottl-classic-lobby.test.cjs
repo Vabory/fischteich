@@ -83,10 +83,10 @@ test("single lobby status control derives all four states from the current snaps
 
 test("classic lobby uses the supplied room assets and one accessible bottom status control", () => {
   const ui = loadUi();
-  assert.equal(ui.lobbyBackgroundAsset, "./assets/lobby-room1-background.png");
+  assert.equal(ui.lobbyBackgroundAsset, "./assets/lobby-room1-background.webp");
   assert.equal(ui.getLobbyHeaderAsset(1), "./assets/text-room1-lobby.png");
   assert.equal(ui.getLobbyHeaderAsset(2), "./assets/text-room2-lobby.png");
-  assert.match(html, /id="trottl-classic-session-background"[\s\S]*lobby-room1-background\.png/);
+  assert.match(html, /id="trottl-classic-session-background"[\s\S]*lobby-room1-background\.webp/);
   assert.match(html, /id="trottl-classic-lobby-title-asset"[\s\S]*text-room1-lobby\.png/);
   assert.doesNotMatch(html, /id="trottl-classic-leave"/);
   assert.match(html, /id="close-trottl-classic-session"[\s\S]*aria-label="Raum verlassen"/);

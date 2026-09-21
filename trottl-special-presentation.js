@@ -80,7 +80,7 @@
     createPlayerCardPresentation: master.createPlayerCardPresentation,
     createAvatarModalPresentation: master.createAvatarModalPresentation,
     getLobbyAvatarById: master.getLobbyAvatarById,
-    gameBackgroundAsset: "./assets/3er-trottl-ingame-background-v2.png?v=2",
+    gameBackgroundAsset: "./assets/3er-trottl-ingame-background-v2.webp",
     lobbyBackgroundAsset: master.lobbyBackgroundAsset,
     bindBackgroundFit,
   });

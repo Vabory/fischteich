@@ -4,8 +4,8 @@
   const AVATAR_SELECT_REQUEST_EVENT = "fischteich:trottl-avatar-select-request";
   const LOBBY_HEARTBEAT_INTERVAL_MS = 30_000;
   const LOBBY_CLEANUP_INTERVAL_MS = 20_000;
-  const LOBBY_BACKGROUND_ASSET = "./assets/lobby-room1-background.png";
-  const GAME_BACKGROUND_ASSET = "./assets/3er-trottl-ingame-background-v2.png?v=2";
+  const LOBBY_BACKGROUND_ASSET = "./assets/lobby-room1-background.webp";
+  const GAME_BACKGROUND_ASSET = "./assets/3er-trottl-ingame-background-v2.webp";
 
   // Screen coordinates in clockwise order, starting with the local bottom seat.
   const TABLE_SEAT_PRESETS = Object.freeze(Object.fromEntries(Object.entries({
@@ -2173,6 +2173,7 @@
       stopLobbyCleanup();
       resetDiceTracking(snapshot.session.id);
       state.snapshot = snapshot;
+      global.TrottlStartupRouting?.markReconnectIntent("classic");
       setConnectionChecking(false);
       sessionFeedback.textContent = "";
       showScreen(sessionScreen);
@@ -2231,6 +2232,7 @@
       closeAvatarModal({ force: true, restoreFocus: false });
       closeLeaveModal({ force: true, restoreFocus: false });
       state.snapshot = null;
+      global.TrottlStartupRouting?.clearReconnectIntent("classic");
       await stopSessionRealtime();
       if (state.sessionLifecycleGeneration !== exitGeneration) return false;
       await openRooms({ feedback });
@@ -2387,6 +2389,7 @@
       sessionFeedback.textContent = "Raum wird verlassen …";
       try {
         await service.leaveSession(sessionId);
+        global.TrottlStartupRouting?.clearReconnectIntent("classic");
         closeLeaveModal({ force: true, restoreFocus: false });
         if (state.snapshot?.session.id === sessionId) await openRooms({ feedback: "Raum verlassen." });
         return true;

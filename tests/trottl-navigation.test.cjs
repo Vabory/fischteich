@@ -13,12 +13,12 @@ const script = read("script.js");
 const buttonRelease = read("button-release.js");
 
 const trottlAssets = [
-  ["dice-game-background.png", 883, 1781],
-  ["text-3er-trottl.png", 1448, 1086],
-  ["text-spielmodus-wählen.png", 2172, 724],
-  ["button-fischteich-würfel.png", 2172, 724],
-  ["button-dice-game-classic.png", 2172, 724],
-  ["button-dice-game-special.png", 2164, 727],
+  ["dice-game-background.webp", "dice-game-background.png", 883, 1781],
+  ["text-3er-trottl.png", "text-3er-trottl.png", 1448, 1086],
+  ["text-spielmodus-wählen.png", "text-spielmodus-wählen.png", 2172, 724],
+  ["button-fischteich-würfel.png", "button-fischteich-würfel.png", 2172, 724],
+  ["button-dice-game-classic.png", "button-dice-game-classic.png", 2172, 724],
+  ["button-dice-game-special.png", "button-dice-game-special.png", 2164, 727],
 ];
 
 function pngDimensions(file) {
@@ -33,10 +33,10 @@ test("the existing main-menu entry opens one central 3er-Trottl screen", () => {
   assert.match(script, /#close-trottl-menu"\)\.addEventListener\("click", showMenu\)/);
 });
 
-test("the menu uses all six supplied PNG assets and exposes Special instead of Deluxe", () => {
-  for (const [file, width, height] of trottlAssets) {
-    assert.match(html, new RegExp(`\\./assets/${file.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\?v=1`));
-    assert.deepEqual(pngDimensions(file), [width, height]);
+test("the menu uses all six supplied assets and exposes Special instead of Deluxe", () => {
+  for (const [file, dimensionSource, width, height] of trottlAssets) {
+    assert.match(html, new RegExp(`\\./assets/${file.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}(?:\\?v=1)?`));
+    assert.deepEqual(pngDimensions(dimensionSource), [width, height]);
   }
   assert.match(html, /id="trottl-menu-title">3er Trottl – Spielmodus wählen</);
   assert.match(html, /id="open-trottl-deluxe"[^>]*aria-label="3er Trottl Special"/);
@@ -175,7 +175,7 @@ test("Trottl polish remains collision-free across the supported phone viewports"
 });
 
 test("Spieler Aufteilen keeps its original assets and per-button alignment corrections", () => {
-  for (const asset of ["sidemenu-background.png?v=2", "sidemenu-fisch-asset.png?v=1", "teams-aufteilen-logo.png", "button-finger-auswahl.png", "button-team-aufteilung.png?v=1", "button-rage-cage-verteilung.png?v=1"]) {
+  for (const asset of ["sidemenu-background.webp", "sidemenu-fisch-asset.png?v=1", "teams-aufteilen-logo.png", "button-finger-auswahl.png", "button-team-aufteilung.png?v=1", "button-rage-cage-verteilung.png?v=1"]) {
     assert.ok(html.includes(`./assets/${asset}`));
   }
   assert.match(css, /\.teams-menu-actions #start-random-participants img[\s\S]*-0\.01135/);

@@ -13,15 +13,17 @@ const rule = (selector) => {
   return css.slice(start,css.indexOf("}",start)+1);
 };
 
-test("Classic ingame uses a new asset URL without changing its pixel contents", () => {
-  assert.match(ui,/GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background-v2\.png\?v=2"/);
+test("Classic ingame uses the optimized WebP while retaining both PNG backups", () => {
+  assert.match(ui,/GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background-v2\.webp"/);
   for (const file of ["index.html","style.css","trottl-classic-ui.js","script.js","service-worker.js"]) {
     assert.doesNotMatch(read(file),/3er-trottl-ingame-background\.png/);
   }
   const oldImage=fs.readFileSync(path.join(__dirname,"..","assets/3er-trottl-ingame-background.png"));
-  const image=fs.readFileSync(path.join(__dirname,"..","assets/3er-trottl-ingame-background-v2.png"));
-  assert.deepEqual(image,oldImage);
-  assert.ok(image.readUInt32BE(16)>0 && image.readUInt32BE(20)>0);
+  const pngBackup=fs.readFileSync(path.join(__dirname,"..","assets/3er-trottl-ingame-background-v2.png"));
+  const image=fs.readFileSync(path.join(__dirname,"..","assets/3er-trottl-ingame-background-v2.webp"));
+  assert.deepEqual(pngBackup,oldImage);
+  assert.equal(image.toString("ascii",0,4),"RIFF");
+  assert.equal(image.toString("ascii",8,12),"WEBP");
 });
 
 test("fullscreen screen and compensating image height keep the -30px offset covered", () => {

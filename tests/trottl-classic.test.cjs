@@ -979,9 +979,9 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=41[\s\S]*script\.js\?v=92/);
+  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=42[\s\S]*script\.js\?v=93/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
-  assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.png\?v=1/);
+  assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.webp/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.png\?v=1[\s\S]*class="trottl-classic-room-context">3er Trottl<br>CLASSIC<\/p>/);
   assert.doesNotMatch(html.match(/id="trottl-classic-rooms-screen"[\s\S]*?<\/section>/)?.[0] ?? "", /<p class="eyebrow">3er Trottl Klassik<\/p>/);
   assert.match(css, /\.trottl-classic-room-background[\s\S]*height:\s*calc\(100% \+ 59px\)[\s\S]*filter:\s*brightness\(0\.75\)[\s\S]*transform:\s*translateY\(-59px\)/);
@@ -1019,7 +1019,7 @@ test("Klassik UI provides two rooms, lobby controls and the responsive game tabl
   assert.match(ui, /hostUserId:\s*session\.hostUserId/);
   assert.doesNotMatch(html, /Pokertisch|Situationserklärer|Reaktionsspiel/);
   assert.match(css, /\.trottl-classic-lobby-player\s*\{[\s\S]*background:\s*rgb\(255 255 255 \/ 5%\)/);
-  assert.match(ui, /GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background-v2\.png\?v=2"/);
+  assert.match(ui, /GAME_BACKGROUND_ASSET = "\.\/assets\/3er-trottl-ingame-background-v2\.webp"/);
   assert.match(ui, /sessionBackground\.classList\.toggle\("is-ingame-background", isPlaying\)/);
   assert.match(css, /\.trottl-classic-lobby-background\.is-ingame-background\s*\{[^}]*object-position:\s*50% 67\.12%[^}]*transform:\s*translateY\(-30px\)/s);
   assert.match(css, /\.trottl-classic-player--self\s*\{[^}]*--player-scale:\s*1;/s);

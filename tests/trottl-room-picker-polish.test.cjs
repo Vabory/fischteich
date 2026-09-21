@@ -53,7 +53,7 @@ test("room cards move down independently while retaining gap and card geometry",
 });
 
 test("room background and functional room identities stay unchanged", () => {
-  assert.match(roomMarkup, /raum-wählen-background\.png\?v=1/);
+  assert.match(roomMarkup, /raum-wählen-background\.webp/);
   const background = rule(".trottl-classic-room-background");
   assert.match(background, /height: calc\(100% \+ 59px\)/);
   assert.match(background, /filter: brightness\(0\.75\)/);

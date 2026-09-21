@@ -973,7 +973,7 @@ test("Special uses exactly the same frozen seat, avatar and background-fit prese
   assert.equal(p.createGameAvatarPresentation,c.createGameAvatarPresentation);
   assert.equal(p.createPlayerCardPresentation,c.createPlayerCardPresentation);
   assert.match(read("trottl-special-presentation.js"),/FischteichClassicBackgroundFit\.calculateFit/);
-  assert.equal(p.gameBackgroundAsset,"./assets/3er-trottl-ingame-background-v2.png?v=2");
+  assert.equal(p.gameBackgroundAsset,"./assets/3er-trottl-ingame-background-v2.webp");
   assert.match(read("trottl-special-ui.js"),/rollOnClick: false/);
   assert.doesNotMatch(read("trottl-special-service.js"),/roll_trottl|assign_trottl|ack_trottl/);
 });
@@ -992,7 +992,7 @@ test("server migration has independent keys, locked join/start validation and no
 });
 test("Classic code and stylesheet stay byte-identical to the finished current master",()=>{
   const hashes={"style.css":"d714aec5128d8fa2712c5937433c1a73f170fbe52c8dde719a6e5b45ab99e52e",
-    "trottl-classic-ui.js":"62d78d5995f9211ead23419309e1a385d1bb61ee925943b10e103c95ec77fb71",
+    "trottl-classic-ui.js":"0b2ee46e5a9f8120829533ac65cb7c0d58f23a5d4b49275bf29d46da98581e89",
     "trottl-classic-service.js":"cfb53ae6de0d9133275849a7d5a11551ff6962e63de61e77c05aebb4a45f14c0",
     "classic-background-fit.js":"99c7395479f98673ab6a17299d6b54c8237038252569a23149ea19cce47b44b3"};
   for(const [f,hash]of Object.entries(hashes))assert.equal(crypto.createHash("sha256").update(read(f)).digest("hex"),hash,f);

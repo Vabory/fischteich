@@ -69,7 +69,7 @@ test("the menu leaves its hero composition to the background and keeps the crest
     assert.equal(png.readUInt32BE(16), width);
     assert.equal(png.readUInt32BE(20), height);
   }
-  assert.match(html, /menu-background\.png\?v=7/);
+  assert.match(html, /menu-background\.webp/);
   assert.doesNotMatch(html, /main-(?:turbo-lachs|nitro-forelle)\.png/);
   assert.match(html, /class="menu-crest"[\s\S]*turbolachs-wappen\.png\?v=2/);
   assert.match(html, /button-buffalo-timer\.png\?v=1/);

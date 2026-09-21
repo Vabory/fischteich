@@ -590,6 +590,7 @@
       for (const modal of Object.values(modals)) { modal.hidden = true; for (const b of modal.querySelectorAll("button")) b.disabled = false; }
       state.modal = null; returnFocus = null; feedback.textContent = ""; q("game-feedback").textContent = "";
       try { global.localStorage.removeItem("fischteich:trottl-special-session"); } catch {}
+      global.TrottlStartupRouting?.clearReconnectIntent("special");
       showScreen(rooms);
       await stopConnection(); if (generation === state.generation) await openRooms();
     }
@@ -630,6 +631,7 @@
       const generation = ++state.generation; await stopConnection();
       if (generation !== state.generation) return;
       state.snapshot = snapshot;
+      global.TrottlStartupRouting?.markReconnectIntent("special");
       state.resolveFlight = null; state.resolveNotBefore = 0; q("game-feedback").textContent = "";
       state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       try { global.localStorage.setItem("fischteich:trottl-special-session", snapshot.session.id); } catch {}
@@ -704,12 +706,21 @@
       if (state.snapshot.membershipRole === "spectator") {
         const generation = state.generation, id = state.snapshot.session.id;
         state.busy = true;
-        try { await service.leaveSpectator(id); if (generation !== state.generation) return;state.busy = false; await openRooms(); }
+        try {
+          await service.leaveSpectator(id);
+          if (generation !== state.generation) return;
+          global.TrottlStartupRouting?.clearReconnectIntent("special");
+          state.busy = false;
+          await openRooms();
+        }
         catch (error) { if (generation === state.generation) feedback.textContent = errorText(error); }
         finally { if (generation === state.generation) state.busy = false; }
         return;
       }
-      if (await mutate(async () => { await service.leaveSession(state.snapshot.session.id); return state.snapshot; })) await openRooms();
+      if (await mutate(async () => { await service.leaveSession(state.snapshot.session.id); return state.snapshot; })) {
+        global.TrottlStartupRouting?.clearReconnectIntent("special");
+        await openRooms();
+      }
     }
     function goBack() {
       if (state.busy) return;

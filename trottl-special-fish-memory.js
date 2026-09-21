@@ -59,7 +59,7 @@
     const doc = global.document, shell = global.TrottlSpecialMinigames.createShell(root);
     const gameArea = doc.createElement("div"), header = doc.createElement("div"), instruction = doc.createElement("p");
     const round = doc.createElement("strong"), dots = doc.createElement("div"), grid = doc.createElement("div");
-    const timerLabel = doc.createElement("span"), result = doc.createElement("div");
+    const timerLabel = doc.createElement("span"), result = doc.createElement("div"), countdown = shell.panel.querySelector(".trottl-special-minigame-countdown");
     shell.panel.classList.add("is-fish-memory"); shell.copy.textContent = ""; shell.copy.hidden = true;
     gameArea.className = "trottl-special-fish-memory-game";
     header.className = "trottl-special-fish-memory-header";
@@ -68,6 +68,7 @@
     dots.className = "trottl-special-fish-memory-dots"; dots.setAttribute("aria-label", "Eingabefortschritt");
     grid.className = "trottl-special-fish-memory-grid";
     timerLabel.className = "trottl-special-fish-memory-timer"; timerLabel.setAttribute("aria-live", "polite");
+    countdown.classList.add("trottl-special-fish-memory-countdown");
     result.className = "trottl-special-fish-memory-result"; result.hidden = true;
     for (const color of COLORS) {
       const button = doc.createElement("button"), image = doc.createElement("img");
@@ -82,7 +83,7 @@
       button.addEventListener("click", event => { if (event.detail === 0) queueGuess(color); });
       grid.append(button);
     }
-    header.append(instruction, round, dots); gameArea.append(header, grid, timerLabel); shell.content.append(gameArea, result); void preloadAssets();
+    grid.append(countdown); header.append(instruction, round, dots); gameArea.append(header, grid, timerLabel); shell.content.append(gameArea, result); void preloadAssets();
 
     let snapshot = null, key = null, interval = null, suspended = true, syncing = false, processing = false;
     let queued = [], optimisticCount = 0, lastFlashIndex = -1;
@@ -142,6 +143,7 @@
       const current = view(); if (!current || now === null) return;
       const phase = current.phase;
       gameArea.classList.toggle("is-watch", phase === "watch"); gameArea.classList.toggle("is-input", phase === "input");
+      instruction.classList.toggle("is-watch", phase === "watch"); instruction.classList.toggle("is-input", phase === "input");
       instruction.textContent = phase === "watch" ? "MERKE DIR DIE REIHENFOLGE!" : phase === "input" ? "TIPPE JETZT RICHTIG NACH!" : "FERTIG";
       round.textContent = `Runde ${current.memory_round} / ${CONFIG.rounds}`; renderDots(current);
       let activeColor = null;
@@ -157,7 +159,7 @@
       setDisabled(phase !== "input" || !ownParticipant() || snapshot.membershipRole === "spectator" || optimisticCount >= targetCount(current.memory_round));
     }
     function renderCountdownPreview() {
-      gameArea.classList.remove("is-watch", "is-input");
+      gameArea.classList.remove("is-watch", "is-input"); instruction.classList.add("is-watch"); instruction.classList.remove("is-input");
       instruction.textContent = "MERKE DIR DIE REIHENFOLGE!";
       round.textContent = ""; dots.replaceChildren(); dots.classList.remove("is-passive"); dots.setAttribute("aria-label", "Vorbereitung");
       timerLabel.textContent = "";
@@ -171,6 +173,7 @@
       const gameplayVisible = frame.phase === "active" && frame.label === "" && Boolean(current) && !completed;
       const countdownPreview = Boolean(current) && !completed && (frame.phase === "countdown" || frame.label === "START!");
       shell.panel.classList.toggle("is-countdown", ["title", "countdown"].includes(frame.phase) || frame.label === "START!");
+      shell.panel.classList.toggle("is-gameplay", gameplayVisible || countdownPreview);
       shell.panel.classList.toggle("is-active", gameplayVisible); shell.panel.classList.toggle("is-finished", completed);
       shell.content.hidden = !gameplayVisible && !countdownPreview && !completed; shell.panel.classList.toggle("is-waiting", !current || completed);
       gameArea.hidden = !gameplayVisible && !countdownPreview; result.hidden = !completed;

@@ -575,6 +575,9 @@
     }
     function lifecycleEvent(payload) {
       const s = state.snapshot; if (!s) return;
+      const shared = s.session.gameState;
+      const { revision: _oldRevision, debug_test: _debugTest, ...sharedWithoutRevision } = shared;
+      const { revision: _newRevision, ...incomingWithoutRevision } = payload?.new?.game_state ?? {};
       const ownTable = s.membershipRole === "spectator" ? service.tables.spectators : service.tables.players;
       if ((payload?.eventType === "DELETE" && payload.table === ownTable && payload.old?.session_id === s.session.id && payload.old?.user_id === s.identity.userId)
         || (payload?.eventType === "DELETE" && payload.table === service.tables.sessions && payload.old?.id === s.session.id)
@@ -582,7 +585,32 @@
         || (payload?.eventType === "UPDATE" && payload.table === service.tables.players && payload.new?.session_id === s.session.id && payload.new?.user_id === s.identity.userId && payload.new.lifecycle_status === "left")) {
         void forceExit(s.session.id); return;
       }
+      // Checkpoint writes only advance revision. The local deterministic run is
+      // already current; other players' checkpoints cannot change its fish.
+      if (payload?.eventType === "UPDATE" && payload.table === service.tables.sessions
+        && payload.new?.id === s.session.id && payload.new.status === "playing"
+        && s.session.gameState.phase === "minigame_active" && s.session.gameState.minigame?.minigame_type === "special_minigame_07"
+        && payload.new?.game_state && JSON.stringify(sharedWithoutRevision) === JSON.stringify(incomingWithoutRevision)) {
+        if (s.membershipRole === "spectator") void refreshPoisonSpectator();
+        return;
+      }
       void refresh();
+    }
+    let poisonSpectatorFlight = null, poisonSpectatorUntil = 0;
+    async function refreshPoisonSpectator() {
+      if (poisonSpectatorFlight || Date.now() < poisonSpectatorUntil || !state.snapshot || doc.visibilityState === "hidden") return;
+      const generation = state.generation, roundId = state.snapshot.session.gameState.minigame?.minigame_id;
+      poisonSpectatorUntil = Date.now() + 500;
+      poisonSpectatorFlight = service.loadSession(state.snapshot.session.id);
+      try {
+        const loaded = await poisonSpectatorFlight;
+        if (generation !== state.generation) return;
+        if (loaded.session.gameState.phase !== "minigame_active" || loaded.session.gameState.minigame?.minigame_id !== roundId) {
+          acceptSnapshot(loaded); renderSession(); return;
+        }
+        acceptSnapshot(loaded); poisonFish?.update(state.snapshot);
+      } catch { void refresh(); }
+      finally { poisonSpectatorFlight = null; }
     }
     async function forceExit(id) {
       if (state.snapshot?.session.id !== id) return;

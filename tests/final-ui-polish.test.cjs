@@ -46,7 +46,7 @@ test("Special alone raises the shared action/status overlay without moving indep
 
 test("final UI polish assets use their dedicated cache versions", () => {
   const html = read("index.html");
-  assert.match(html, /trottl-special\.css\?v=27/);
+  assert.match(html, /trottl-special\.css\?v=28/);
   assert.match(html, /team-division-v2-logic\.js\?v=2/);
   assert.match(html, /script\.js\?v=95/);
 });

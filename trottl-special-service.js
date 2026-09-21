@@ -207,7 +207,7 @@
     },
     stopFish: async (id, roundId, elapsed) => { await rpc("stop_trottl_special_stop_fish", { p_session_id: id, p_round_id: roundId, p_tap_elapsed_ms: elapsed }); return loadSession(id); },
     finalizeStopFish: async (id, roundId) => { await rpc("finalize_trottl_special_stop_fish", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
-    submitPoisonFish: async (id, roundId, events, final) => { await rpc("submit_trottl_special_poison_fish", { p_session_id: id, p_round_id: roundId, p_events: events, p_final: final }); return loadSession(id); },
+    submitPoisonFish: async (id, roundId, events, final) => { await rpc("submit_trottl_special_poison_fish", { p_session_id: id, p_round_id: roundId, p_events: events, p_final: final }); return final ? loadSession(id) : null; },
     finalizePoisonFish: async (id, roundId) => { await rpc("finalize_trottl_special_poison_fish", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     actRoulette: async (id, roundId, action, value = null, target = null) => {
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });

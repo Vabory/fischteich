@@ -2,22 +2,35 @@
 const test = require("node:test"), assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
 const { createDocument } = require("./helpers/trottl-special-dom.cjs");
 const read = file => fs.readFileSync(path.join(__dirname, "..", file), "utf8").replace(/\r/g, "");
-const source = read("trottl-special-poison-fish.js"), sql = read("supabase/migrations/20260921010000_add_trottl_special_poison_fish.sql"), css = read("trottl-special.css"), start = 200000;
+const source = read("trottl-special-poison-fish.js"), sql = read("supabase/migrations/20260921010000_add_trottl_special_poison_fish.sql"), followup = read("supabase/migrations/20260921020000_polish_trottl_special_poison_fish_duration.sql"), css = read("trottl-special.css"), start = 200000;
 function harness({ seed = 12345, role = "player", now = start - 3000, initialEvents = [] } = {}) {
-  const doc = createDocument('<body><div id="root"></div></body>'), root = doc.querySelector("#root"), intervals = new Set(), submissions = [], decoded = [];
+  const doc = createDocument('<body><div id="root"></div></body>'), root = doc.querySelector("#root"), frames = new Map(), timers = new Map(), listeners = {}, submissions = [], decoded = [];
+  let nextId = 1, layoutReads = 0, frameCount = 0;
   class Image { set src(value) { this._src = value; Promise.resolve().then(() => this.onload?.()); } get src() { return this._src; } decode() { decoded.push(this._src); return Promise.resolve(); } }
-  const win = { document: doc, Image, setTimeout: () => 1, clearTimeout() {}, setInterval(fn) { intervals.add(fn); return fn; }, clearInterval(fn) { intervals.delete(fn); } };
+  const win = { document: doc, Image, innerWidth: 390,
+    requestAnimationFrame(fn) { const id = nextId++; frames.set(id, fn); return id; }, cancelAnimationFrame(id) { frames.delete(id); },
+    setTimeout(fn, ms) { const id = nextId++; timers.set(id, { fn, at: now + ms }); return id; }, clearTimeout(id) { timers.delete(id); },
+    addEventListener(type, fn) { (listeners[type] ??= new Set()).add(fn); }, removeEventListener(type, fn) { listeners[type]?.delete(fn); } };
   vm.runInNewContext(read("trottl-special-minigames.js"), { window: win, Date, Number, Math, Object, Array, Set, Map, JSON, Promise });
   vm.runInNewContext(source, { window: win, Date, Number, Math, Object, Array, Set, Map, JSON, Promise });
   const api = win.TrottlSpecialPoisonFish;
   const view = { player_id: "u0", movement_seed: seed, simulation_version: 1, events: [...initialEvents], score: api.replay(seed, initialEvents).score, completed: false };
   const snapshot = { membershipRole: role, identity: { userId: role === "spectator" ? "watcher" : "u0" }, players: [{ userId: "u0", lifecycle: "alive" }], poisonFishView: view,
-    session: { id: "s1", hostUserId: "u0", status: "playing", gameState: { phase: "minigame_active", minigame: { minigame_id: "r7", minigame_type: "special_minigame_07", title: "Giftfisch", title_started_at: new Date(start - 5000).toISOString(), title_ends_at: new Date(start - 3000).toISOString(), start_at: new Date(start).toISOString(), end_at: new Date(start + 10400).toISOString(), participants: [{ player_id: "u0" }] } } } };
+    session: { id: "s1", hostUserId: "u0", status: "playing", gameState: { phase: "minigame_active", minigame: { minigame_id: "r7", minigame_type: "special_minigame_07", title: "Giftfisch", title_started_at: new Date(start - 5000).toISOString(), title_ends_at: new Date(start - 3000).toISOString(), start_at: new Date(start).toISOString(), end_at: new Date(start + 20400).toISOString(), participants: [{ player_id: "u0" }] } } } };
   const service = { serverNow: () => now, submitPoisonFish: async (_id, _round, events, final) => { submissions.push({ events: structuredClone(events), final }); view.events = structuredClone(events); view.score = api.replay(seed, events).score; view.completed = final; return snapshot; }, finalizePoisonFish: async () => snapshot };
   let controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => { throw error; } }); controller.update(snapshot);
-  const clock = value => { now = value; for (const fn of [...intervals]) fn(); };
-  const tap = (x, y, width = 390, height = 844) => { const field = root.querySelector(".trottl-special-poison-fish-field"); field.getBoundingClientRect = () => ({ left: 0, top: 0, width, height }); for (const fn of field.listeners.pointerdown ?? []) fn({ isTrusted: true, pointerType: "touch", clientX: x * width, clientY: y * height, preventDefault() {} }); };
-  return { api, doc, root, view, snapshot, submissions, decoded, clock, tap, recreate() { controller.suspend(); controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => { throw error; } }); controller.update(snapshot); } };
+  const field = root.querySelector(".trottl-special-poison-fish-field");
+  field.getBoundingClientRect = () => { layoutReads++; return { left: 0, top: 0, width: fieldWidth, height: fieldHeight }; };
+  let fieldWidth = 390, fieldHeight = 844;
+  const resize = (width, height) => { fieldWidth = width; fieldHeight = height; win.innerWidth = width; for (const fn of listeners.resize ?? []) fn(); };
+  const clock = value => { now = value; for (const [id, item] of [...timers]) if (item.at <= now) { timers.delete(id); item.fn(); }
+    const current = [...frames]; frames.clear(); for (const [, fn] of current) { frameCount++; fn(); } };
+  const tap = (x, y, width = 390, height = 844) => { if (fieldWidth !== width || fieldHeight !== height) resize(width, height);
+    for (const fn of field.listeners.pointerdown ?? []) fn({ isTrusted: true, pointerType: "touch", clientX: x * width, clientY: y * height, preventDefault() {} }); };
+  return { api, doc, root, view, snapshot, submissions, decoded, clock, tap, resize, service, get metrics() { return { layoutReads, frameCount, queuedFrames: frames.size }; },
+    hide() { doc.visibilityState = "hidden"; for (const fn of doc.listeners.visibilitychange ?? []) fn(); },
+    show() { doc.visibilityState = "visible"; for (const fn of doc.listeners.visibilitychange ?? []) fn(); },
+    recreate() { controller.suspend(); controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => { throw error; } }); controller.update(snapshot); } };
 }
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function target(api, seed, type, slots = api.initialSlots(), elapsed = 0) {
@@ -35,6 +48,8 @@ test("counts, assets and versioned balance are exact and centralized", () => {
   for (const asset of [...api.NORMAL_ASSETS, api.GOLD_ASSET, api.POISON_ASSET]) assert.ok(fs.existsSync(path.join(__dirname, "..", asset)));
   assert.equal(api.GOLD_ASSET, "./assets/mini-games/gold-fish.png"); assert.equal(api.POISON_ASSET, "./assets/mini-games/poison-fish.png");
   assert.match(sql, /'normal',8,'gold',2,'poison',3,'duration_ms',10000,'max_events',500/);
+  assert.equal(api.CONFIG.durationMs, 20000);
+  assert.deepEqual(Array.from({ length: 8 }, (_, spawn) => api.fishAsset(0, spawn)), Array.from({ length: 8 }, (_, index) => api.NORMAL_ASSETS[index]));
 });
 test("all ten actual asset paths preload and decode before the play window", async () => {
   const h = harness(); await h.api.preloadAssets();
@@ -87,13 +102,14 @@ test("overlap uses the highest deterministic visual z-order", () => {
   const all = found.slots.map((state, slot) => ({ slot, fish: api.stateAt(found.seed, slot, state, 0) })).filter(({ fish }) => Math.abs(found.x - fish.x) <= api.CONFIG.hitRadiusX && Math.abs(found.y - fish.y) <= api.CONFIG.hitRadiusY).sort((a,b) => b.fish.z - a.fish.z || b.slot - a.slot);
   assert.equal(hit.slot, all[0].slot); assert.equal(api.replay(found.seed, [{ t: 0, x: found.x, y: found.y }]).score, api.fishType(hit.slot) === "normal" ? 1 : api.fishType(hit.slot) === "gold" ? 3 : -3);
 });
-test("countdown preview is large and still; active play accepts normalized taps and locks at ten seconds", async () => {
+test("countdown preview is still; active play accepts taps until twenty seconds", async () => {
   const h = harness(), field = h.root.querySelector(".trottl-special-poison-fish-field"), fish = h.root.querySelector(".trottl-special-poison-fish-fish"), shell = h.root.querySelector(".trottl-special-minigame-shell");
   assert.equal(shell.classList.contains("is-gameplay"), true); assert.equal(h.root.querySelectorAll(".trottl-special-poison-fish-fish").length, 13);
-  const previewX = fish.style.left; h.clock(start + 399); assert.equal(fish.style.left, previewX); h.tap(.5, .5); assert.equal(h.submissions.length, 0);
+  const previewX = fish.style.transform; h.clock(start + 399); assert.equal(fish.style.transform, previewX); h.tap(.5, .5); assert.equal(h.submissions.length, 0);
   h.clock(start + 400); const pick = target(h.api, h.view.movement_seed, "normal"); h.tap(pick.fish.x, pick.fish.y); assert.equal(h.root.querySelector(".trottl-special-poison-fish-score").textContent, "Punkte: 1");
   await flush(); assert.equal(h.submissions.length, 1); assert.equal(h.submissions[0].events.length, 1);
-  h.clock(start + 10400); h.tap(.5, .5); await flush(); assert.equal(h.submissions.at(-1).final, true); assert.equal(h.submissions.at(-1).events.length, 1);
+  h.clock(start + 20300); const latePick = target(h.api, h.view.movement_seed, "normal", h.api.replay(h.view.movement_seed, h.view.events).slots, 19900); h.tap(latePick.fish.x, latePick.fish.y); await flush();
+  h.clock(start + 20400); h.tap(.5, .5); await flush(); assert.equal(h.submissions.at(-1).final, true); assert.equal(h.submissions.at(-1).events.length, 2);
   assert.equal(field.classList.contains("is-finished"), true);
 });
 test("equal normalized geometry scores identically on small and large mobile fields", async () => {
@@ -103,11 +119,44 @@ test("equal normalized geometry scores identically on small and large mobile fie
     assert.equal(h.view.score, 1);
   }
 });
+test("one rAF drives stable fish nodes with transform-only motion and cached geometry", () => {
+  const h = harness({ now: start + 400 }), fish = h.root.querySelectorAll(".trottl-special-poison-fish-fish");
+  h.resize(320, 600); const reads = h.metrics.layoutReads;
+  assert.equal(h.metrics.queuedFrames, 1);
+  for (let n = 1; n <= 120; n++) h.clock(start + 400 + n * 16);
+  assert.equal(h.metrics.frameCount, 120); assert.equal(h.metrics.queuedFrames, 1);
+  assert.equal(h.metrics.layoutReads, reads);
+  assert.deepEqual(h.root.querySelectorAll(".trottl-special-poison-fish-fish"), fish);
+  for (const image of fish) { assert.match(image.style.transform, /^translate3d\(/); assert.equal(image.style.left, undefined); assert.equal(image.style.top, undefined); }
+  const before = fish[0].style.transform; h.resize(430, 900); assert.notEqual(fish[0].style.transform, before); assert.equal(h.metrics.layoutReads, reads + 1);
+  h.hide(); assert.equal(h.metrics.queuedFrames, 0); h.clock(start + 5000); h.show(); assert.equal(h.metrics.queuedFrames, 1);
+  h.clock(start + 5016); assert.equal(h.metrics.queuedFrames, 1); assert.equal(h.root.querySelector(".trottl-special-minigame-shell").hidden, false);
+});
+test("timer and score text are stable between changes; reconnect at 5, 12 and 19 seconds keeps absolute time", () => {
+  for (const elapsed of [5000, 12000, 19000]) {
+    const h = harness({ now: start + 400 + elapsed }), timer = h.root.querySelector(".trottl-special-poison-fish-timer");
+    assert.equal(timer.textContent, String(20 - elapsed / 1000));
+    const fish = h.root.querySelector(".trottl-special-poison-fish-fish"), expected = fish.style.transform;
+    h.recreate(); assert.equal(h.root.querySelectorAll(".trottl-special-poison-fish-fish").at(-13).style.transform, expected);
+    h.hide(); h.clock(start + 400 + elapsed + 250); h.show();
+    assert.equal(h.root.querySelectorAll(".trottl-special-poison-fish-timer").at(-1).textContent, String(20 - elapsed / 1000));
+  }
+});
+test("unchanged score and visible timer seconds cause no repeated text writes", () => {
+  const h = harness({ now: start + 400 }), timer = h.root.querySelector(".trottl-special-poison-fish-timer"), score = h.root.querySelector(".trottl-special-poison-fish-score");
+  const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(timer), "textContent");
+  let timerWrites = 0, scoreWrites = 0;
+  Object.defineProperty(timer, "textContent", { get() { return descriptor.get.call(this); }, set(value) { timerWrites++; descriptor.set.call(this, value); } });
+  Object.defineProperty(score, "textContent", { get() { return descriptor.get.call(this); }, set(value) { scoreWrites++; descriptor.set.call(this, value); } });
+  for (let n = 1; n <= 30; n++) h.clock(start + 400 + n * 16);
+  assert.equal(timerWrites, 0); assert.equal(scoreWrites, 0);
+  h.clock(start + 1500); assert.equal(timerWrites, 1); assert.equal(scoreWrites, 0);
+});
 test("reconnect restores seed, event log, score and position without restarting time; spectator cannot tap", () => {
   const first = harness({ now: start + 1400 }), pick = target(first.api, first.view.movement_seed, "gold", first.api.initialSlots(), 1000);
   first.view.events = [{ t: 1000, x: pick.fish.x, y: pick.fish.y }]; first.view.score = 3; first.recreate();
   assert.equal(first.root.querySelectorAll(".trottl-special-poison-fish-score").at(-1).textContent, "Punkte: 3");
-  assert.equal(first.root.querySelectorAll(".trottl-special-poison-fish-timer").at(-1).textContent, "9");
+  assert.equal(first.root.querySelectorAll(".trottl-special-poison-fish-timer").at(-1).textContent, "19");
   const watcher = harness({ role: "spectator", now: start + 1400, initialEvents: first.view.events }); watcher.tap(.5, .5); assert.equal(watcher.submissions.length, 0);
   assert.equal(watcher.root.querySelector(".trottl-special-poison-fish-score").textContent, "Punkte: 3");
 });
@@ -122,14 +171,18 @@ test("migration keeps seeds private, validates full event logs and reuses common
   assert.match(sql,/perform public\.special_poison_fish_begin_locked\(p_id\)/);
   assert.match(sql,/debug_test=debug_test-'next_minigame'/);
   assert.ok(sql.startsWith("begin;\n")); assert.ok(sql.endsWith("commit;\n"));
+  for (const pattern of [/special_poison_fish_config\(integer\)/,/special_poison_fish_replay\(bigint,jsonb,integer\)/,/special_poison_fish_begin_locked\(uuid\)/,/submit_trottl_special_poison_fish\(uuid,uuid,jsonb,boolean\)/,
+    /'t>=10000','t>=20000'/,/'10.4 seconds''','''20.4 seconds'/,/'13 seconds''','''23 seconds'/,/'10 seconds''','''20 seconds'/]) assert.match(followup, pattern);
 });
 test("large shell, field clipping, normalized hitbox and wiring leave older games untouched", () => {
   assert.match(css,/is-poison-fish\.is-gameplay[^}]*top: calc\([^}]*clamp\(84px, 11dvh, 108px\)[^}]*bottom: calc\([^}]*clamp\(58px, 8dvh, 80px\)/);
   assert.match(css,/poison-fish-game[^}]*grid-template-rows: 48px minmax\(0, 1fr\)/);
   assert.match(css,/poison-fish-field[^}]*overflow: hidden/); assert.match(css,/poison-fish-fish[^}]*width: clamp\(42px, 11vw, 62px\)/);
   assert.match(source,/hitRadiusX: 0\.08, hitRadiusY: 0\.065/); assert.match(source,/bounds\.width/); assert.match(source,/bounds\.height/);
-  const html = read("index.html"); for (const part of ["trottl-special-poison-fish.js?v=1","trottl-special-minigames.js?v=7","trottl-special-service.js?v=15","trottl-special-ui.js?v=20","trottl-special.css?v=27"]) assert.ok(html.includes(part));
+  const html = read("index.html"); for (const part of ["trottl-special-poison-fish.js?v=2","trottl-special-minigames.js?v=7","trottl-special-service.js?v=16","trottl-special-ui.js?v=21","trottl-special.css?v=28"]) assert.ok(html.includes(part));
   const registry = read("trottl-special-minigames.js"); assert.match(registry,/active: i < 7, implemented: i < 7/); assert.match(read("trottl-special-debug.js"),/registry\.filter\(r => r\.active && r\.implemented\)/);
+  assert.match(read("trottl-special-service.js"), /submitPoisonFish:[^\n]*return final \? loadSession\(id\) : null/);
+  assert.match(read("trottl-special-ui.js"), /sharedWithoutRevision\) === JSON\.stringify\(incomingWithoutRevision\)/);
 });
 test("the live pool has seven equal random intervals and TEST consumes the one-shot override", () => {
   const pick = value => 1 + Math.floor(value * 7);

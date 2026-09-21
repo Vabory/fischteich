@@ -21,8 +21,8 @@ test("room title keeps its final size, brightness, centering and safe-area posit
 
 test("room picker removes the graphic footer and places exact small context below the title", () => {
   assert.doesNotMatch(roomMarkup + css, /trottl-classic-room-footer-asset/);
-  assert.doesNotMatch(roomMarkup, /text-3er-trottl\.png/);
-  assert.match(roomMarkup, /text-raum-wählen\.png[^>]*>[\s\S]*<p class="trottl-classic-room-context">3er Trottl<br>CLASSIC<\/p>[\s\S]*<\/header>[\s\S]*trottl-classic-room-list/);
+  assert.doesNotMatch(roomMarkup, /text-3er-trottl\.webp/);
+  assert.match(roomMarkup, /text-raum-wählen\.webp[^>]*>[\s\S]*<p class="trottl-classic-room-context">3er Trottl<br>CLASSIC<\/p>[\s\S]*<\/header>[\s\S]*trottl-classic-room-list/);
   const context = rule(".trottl-classic-room-context");
   assert.match(context, /margin: 12px 0 0/);
   assert.match(context, /font-size: 0\.78rem/);

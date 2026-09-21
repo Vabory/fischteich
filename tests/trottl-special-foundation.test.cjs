@@ -992,7 +992,7 @@ test("server migration has independent keys, locked join/start validation and no
 });
 test("Classic code and stylesheet stay byte-identical to the finished current master",()=>{
   const hashes={"style.css":"d714aec5128d8fa2712c5937433c1a73f170fbe52c8dde719a6e5b45ab99e52e",
-    "trottl-classic-ui.js":"0b2ee46e5a9f8120829533ac65cb7c0d58f23a5d4b49275bf29d46da98581e89",
+    "trottl-classic-ui.js":"a82b8c01a117d5ffba2e2751df3c334b18f37ac8ed6ba595920c27a063d77953",
     "trottl-classic-service.js":"cfb53ae6de0d9133275849a7d5a11551ff6962e63de61e77c05aebb4a45f14c0",
     "classic-background-fit.js":"99c7395479f98673ab6a17299d6b54c8237038252569a23149ea19cce47b44b3"};
   for(const [f,hash]of Object.entries(hashes))assert.equal(crypto.createHash("sha256").update(read(f)).digest("hex"),hash,f);

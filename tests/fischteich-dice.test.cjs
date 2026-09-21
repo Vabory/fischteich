@@ -272,7 +272,7 @@ test("the dice screen uses the supplied assets and keeps central navigation", ()
   assert.match(html, /dice-service\.js\?v=3/);
   assert.match(html, /id="fischteich-dice-mount"/);
   assert.match(html, /fischteich-würfel-background\.webp/);
-  assert.match(html, /text-fischteich-würfel\.png/);
+  assert.match(html, /text-fischteich-würfel\.webp/);
   assert.match(html, /id="fischteich-dice-toggle"[\s\S]*button-2würfel\.webp/);
   assert.match(html, /id="fischteich-dice-second-mount"[\s\S]*hidden/);
   assert.doesNotMatch(html, />Würfel antippen</);

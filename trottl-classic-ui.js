@@ -28,8 +28,8 @@
 
   function getLobbyHeaderAsset(roomSlot) {
     return Number(roomSlot) === 2
-      ? "./assets/text-room2-lobby.png"
-      : "./assets/text-room1-lobby.png";
+      ? "./assets/text-room2-lobby.webp"
+      : "./assets/text-room1-lobby.webp";
   }
 
   function getLobbyAvatarById(avatarId, avatarService = global.trottlAvatarService) {

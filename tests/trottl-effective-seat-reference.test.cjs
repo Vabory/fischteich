@@ -24,6 +24,7 @@ test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI ca
     .replace(/^            <section class="settings-trottl-admin-reset" aria-labelledby="settings-special-reset-title">[\s\S]*?^            <\/section>\n/m, "")
     .replace("3er Trottl<br>CLASSIC", "3ER TROTTL Classic")
     .replace(/^    <script src="\.\/classic-background-fit\.js\?v=\d+" defer><\/script>\n/m, "")
+    .replace(/(assets\/(?:turbolachs-wappen|button-(?:buffalo-timer|spieler-aufteilen|fisch-roulette|turnier-erstellen|würfelspiel|einstellungen|vergangene-tuniere|finger-auswahl|team-aufteilung|rage-cage-verteilung|fischteich-würfel|dice-game-classic|dice-game-special|drehen)|sidemenu-fisch-asset|teams-aufteilen-logo|text-(?:3er-trottl|spielmodus-wählen|fischteich-würfel|raum-wählen|room1-lobby)|title-fisch-roulette))\.webp/g,"$1.png")
     .replace(/<meta name=.fischteich-build.[^>]+>/,"protected build")
     .replace(/style.css\?v=\d+/,"style.css?v=cache")
     .replace(/trottl-avatar-service.js\?v=\d+/,"trottl-avatar-service.js?v=4")

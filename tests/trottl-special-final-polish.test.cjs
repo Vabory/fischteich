@@ -31,5 +31,5 @@ assert.match(css, /\.trottl-special-result-ready/);
 assert.match(css, /trottl-special-critical-badge \{[^}]*top: -8px/);
 assert.match(html, /trottl-special\.css\?v=24/);
 assert.match(html, /trottl-special-ui\.js\?v=19/);
-assert.match(html, /trottl-classic-ui\.js\?v=42/);
+assert.match(html, /trottl-classic-ui\.js\?v=43/);
 console.log("trottl special final polish structure passed");

@@ -14,11 +14,11 @@ const buttonRelease = read("button-release.js");
 
 const trottlAssets = [
   ["dice-game-background.webp", "dice-game-background.png", 883, 1781],
-  ["text-3er-trottl.png", "text-3er-trottl.png", 1448, 1086],
-  ["text-spielmodus-wählen.png", "text-spielmodus-wählen.png", 2172, 724],
-  ["button-fischteich-würfel.png", "button-fischteich-würfel.png", 2172, 724],
-  ["button-dice-game-classic.png", "button-dice-game-classic.png", 2172, 724],
-  ["button-dice-game-special.png", "button-dice-game-special.png", 2164, 727],
+  ["text-3er-trottl.webp", "text-3er-trottl.png", 1448, 1086],
+  ["text-spielmodus-wählen.webp", "text-spielmodus-wählen.png", 2172, 724],
+  ["button-fischteich-würfel.webp", "button-fischteich-würfel.png", 2172, 724],
+  ["button-dice-game-classic.webp", "button-dice-game-classic.png", 2172, 724],
+  ["button-dice-game-special.webp", "button-dice-game-special.png", 2164, 727],
 ];
 
 function pngDimensions(file) {
@@ -175,7 +175,7 @@ test("Trottl polish remains collision-free across the supported phone viewports"
 });
 
 test("Spieler Aufteilen keeps its original assets and per-button alignment corrections", () => {
-  for (const asset of ["sidemenu-background.webp", "sidemenu-fisch-asset.png?v=1", "teams-aufteilen-logo.png", "button-finger-auswahl.png", "button-team-aufteilung.png?v=1", "button-rage-cage-verteilung.png?v=1"]) {
+  for (const asset of ["sidemenu-background.webp", "sidemenu-fisch-asset.webp?v=1", "teams-aufteilen-logo.webp", "button-finger-auswahl.webp", "button-team-aufteilung.webp?v=1", "button-rage-cage-verteilung.webp?v=1"]) {
     assert.ok(html.includes(`./assets/${asset}`));
   }
   assert.match(css, /\.teams-menu-actions #start-random-participants img[\s\S]*-0\.01135/);

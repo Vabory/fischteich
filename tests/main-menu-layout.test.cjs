@@ -71,12 +71,12 @@ test("the menu leaves its hero composition to the background and keeps the crest
   }
   assert.match(html, /menu-background\.webp/);
   assert.doesNotMatch(html, /main-(?:turbo-lachs|nitro-forelle)\.png/);
-  assert.match(html, /class="menu-crest"[\s\S]*turbolachs-wappen\.png\?v=2/);
-  assert.match(html, /button-buffalo-timer\.png\?v=1/);
+  assert.match(html, /class="menu-crest"[\s\S]*turbolachs-wappen\.webp\?v=2/);
+  assert.match(html, /button-buffalo-timer\.webp\?v=1/);
   assert.equal((html.match(/id="open-buffalo-timer"/g) ?? []).length, 1);
   const buffaloMarkup = html.match(/id="open-buffalo-timer"[\s\S]*?<\/button>/)?.[0] ?? "";
   assert.doesNotMatch(buffaloMarkup, />\s*Buffalo Timer\s*</);
-  assert.match(buffaloMarkup, /button-buffalo-timer\.png\?v=1/);
+  assert.match(buffaloMarkup, /button-buffalo-timer\.webp\?v=1/);
   const menuBackgroundRule = css.match(/\.menu-background\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
   assert.match(menuBackgroundRule, /height:\s*100%/);
   assert.match(menuBackgroundRule, /object-fit:\s*cover/);

@@ -3,9 +3,10 @@
   const LEGACY_CONFIG = Object.freeze({ simulationVersion: 1, normalFishCount: 8, goldFishCount: 2, poisonFishCount: 3,
     durationMs: 20000, checkpointMs: 250, hitboxScale: 1, hitRadiusX: 0.08, hitRadiusY: 0.065, maxEvents: 500 });
   const HITBOX_SCALE = 1.25;
-  const CONFIG = Object.freeze({ ...LEGACY_CONFIG, simulationVersion: 2, poisonFishCount: 5, durationMs: 30000,
+  const PREVIOUS_CONFIG = Object.freeze({ ...LEGACY_CONFIG, simulationVersion: 2, poisonFishCount: 5, durationMs: 30000,
     hitboxScale: HITBOX_SCALE, hitRadiusX: LEGACY_CONFIG.hitRadiusX * HITBOX_SCALE, hitRadiusY: LEGACY_CONFIG.hitRadiusY * HITBOX_SCALE });
-  const CONFIG_BY_VERSION = Object.freeze({ 1: LEGACY_CONFIG, 2: CONFIG });
+  const CONFIG = Object.freeze({ ...PREVIOUS_CONFIG, simulationVersion: 3, durationMs: 20000 });
+  const CONFIG_BY_VERSION = Object.freeze({ 1: LEGACY_CONFIG, 2: PREVIOUS_CONFIG, 3: CONFIG });
   const NORMAL_ASSETS = Object.freeze(Array.from({ length: 8 }, (_, index) => `./assets/mini-games/${index + 1}-fish.webp`));
   const GOLD_ASSET = "./assets/mini-games/gold-fish.png", POISON_ASSET = "./assets/mini-games/poison-fish.png";
   const TOTAL = CONFIG.normalFishCount + CONFIG.goldFishCount + CONFIG.poisonFishCount;
@@ -192,5 +193,5 @@
       shell.hide(); }
     return Object.freeze({ update, suspend });
   }
-  global.TrottlSpecialPoisonFish = Object.freeze({ CONFIG, LEGACY_CONFIG, HITBOX_SCALE, NORMAL_ASSETS, GOLD_ASSET, POISON_ASSET, fishType, fishAsset, hash, spawn, reflect, stateAt, initialSlots, hitTest, replay, preloadAssets, create });
+  global.TrottlSpecialPoisonFish = Object.freeze({ CONFIG, LEGACY_CONFIG, PREVIOUS_CONFIG, HITBOX_SCALE, NORMAL_ASSETS, GOLD_ASSET, POISON_ASSET, fishType, fishAsset, hash, spawn, reflect, stateAt, initialSlots, hitTest, replay, preloadAssets, create });
 })(window);

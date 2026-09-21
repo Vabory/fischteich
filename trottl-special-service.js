@@ -116,7 +116,7 @@
       || typeof stopFishView.perfect !== "boolean" || (stopFishView.tap_elapsed_ms !== null && (!Number.isInteger(Number(stopFishView.tap_elapsed_ms)) || Number(stopFishView.tap_elapsed_ms) < 0 || Number(stopFishView.tap_elapsed_ms) > 15000)))) throw new Error("Invalid stop fish view response");
     if (poisonFishView !== null && (typeof poisonFishView !== "object" || typeof poisonFishView.player_id !== "string"
       || !Number.isInteger(Number(poisonFishView.movement_seed)) || Number(poisonFishView.movement_seed) < 1 || Number(poisonFishView.movement_seed) > 2147483646
-      || ![1, 2].includes(Number(poisonFishView.simulation_version)) || !Array.isArray(poisonFishView.events) || poisonFishView.events.length > 500
+      || ![1, 2, 3].includes(Number(poisonFishView.simulation_version)) || !Array.isArray(poisonFishView.events) || poisonFishView.events.length > 500
       || typeof poisonFishView.completed !== "boolean" || !Number.isInteger(Number(poisonFishView.score)))) throw new Error("Invalid poison fish view response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
       membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount,

@@ -122,7 +122,7 @@ test("team headers and matchup cards reserve real responsive layout space", () =
 
 test("only the new local helper plus bumped app assets are loaded", () => {
   assert.match(html, /team-division-v2-logic\.js\?v=2/);
-  assert.match(html, /style\.css\?v=192/);
-  assert.match(html, /script\.js\?v=95/);
-  assert.ok(html.indexOf("team-division-v2-logic.js") < html.indexOf("script.js?v=95"));
+  assert.match(html, /style\.css\?v=193/);
+  assert.match(html, /script\.js\?v=96/);
+  assert.ok(html.indexOf("team-division-v2-logic.js") < html.indexOf("script.js?v=96"));
 });

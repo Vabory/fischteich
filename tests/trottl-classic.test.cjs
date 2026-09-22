@@ -979,7 +979,7 @@ test("personal reaction countdowns retain ten seconds from independent absolute 
 });
 
 test("Klassik UI provides two rooms, lobby controls and the responsive game table", () => {
-  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=44[\s\S]*script\.js\?v=95/);
+  assert.match(html, /trottl-classic-service\.js\?v=17[\s\S]*trottl-classic-preview\.js\?v=3[\s\S]*trottl-classic-ui\.js\?v=44[\s\S]*script\.js\?v=96/);
   assert.equal((html.match(/class="trottl-classic-room"/g) ?? []).length, 2);
   assert.match(html, /id="trottl-classic-rooms-screen"[\s\S]*raum-wählen-background\.webp/);
   assert.match(html, /class="visually-hidden" id="trottl-classic-rooms-title">Raum wählen<\/h1>[\s\S]*text-raum-wählen\.webp\?v=1[\s\S]*class="trottl-classic-room-context">3er Trottl<br>CLASSIC<\/p>/);
@@ -1317,7 +1317,8 @@ test("navigation, reconnect and lifecycle cleanup are wired without touching the
   assert.match(script, /#open-trottl-classic"\)\.addEventListener[\s\S]*trottlClassic\.openRooms/);
   assert.match(script, /visibilitychange[\s\S]*trottlClassic\.refresh\(\)/);
   assert.match(script, /pagehide[\s\S]*trottlClassic\.suspend\(\)/);
-  assert.match(script, /initializeAppAuth\(\)\.then\(async \(\) =>[\s\S]*ensureTrottlSpecial\(\)\.restoreMembership\(\)[\s\S]*await trottlClassic\.restoreMembership\(\)/);
+  assert.match(script, /async function restoreTrottlAfterAuth\(\)[\s\S]*ensureTrottlSpecial\(\)\.restoreMembership\(\)[\s\S]*await trottlClassic\.restoreMembership\(\)/);
+  assert.match(script, /initializeAppAuth\(\)\.then\(restoreTrottlAfterAuth\)/);
   assert.match(ui, /rooms\.find\(\(room\) => room\.isMember && room\.sessionId\)/);
   assert.match(ui, /roomRefreshQueued/);
   assert.match(ui, /sessionRefreshQueued/);

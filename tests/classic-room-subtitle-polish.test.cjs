@@ -37,7 +37,7 @@ test("room 1 moves twelve pixels independently of pressed transform; room 2 rema
 });
 
 test("entire CSS is unchanged apart from the two deliberate room positioning adjustments", () => {
-  const normalized = css
+  const normalized = (css.split("\n.connectivity-badge {")[0] + "\n")
     .replace("  /* Offset the added subtitle line (0.78rem * 1.2), keeping room 2 fixed. */\n", "")
     .replace("+ 26px - 0.936rem", "+ 26px")
     .replace(/#trottl-classic-room-list > \.trottl-classic-room\[data-room-slot="1"\]\s*\{[^}]+\}\n\n/, "");

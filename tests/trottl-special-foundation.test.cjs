@@ -995,7 +995,10 @@ test("Classic code and stylesheet stay frozen after the Phase 6 startup-preload 
     "trottl-classic-ui.js":"d888d0328ce81b83a161ec8692623591a5215bcafcea95a97ecdceb154d36981",
     "trottl-classic-service.js":"cfb53ae6de0d9133275849a7d5a11551ff6962e63de61e77c05aebb4a45f14c0",
     "classic-background-fit.js":"99c7395479f98673ab6a17299d6b54c8237038252569a23149ea19cce47b44b3"};
-  for(const [f,hash]of Object.entries(hashes))assert.equal(crypto.createHash("sha256").update(read(f)).digest("hex"),hash,f);
+  for(const [f,hash]of Object.entries(hashes)) {
+    const content = f === "style.css" ? read(f).split("\n.connectivity-badge {")[0] + "\n" : read(f);
+    assert.equal(crypto.createHash("sha256").update(content).digest("hex"),hash,f);
+  }
   const css=read("trottl-special.css");
   for(const selector of css.matchAll(/([^{}]+)\{/g))assert.ok(selector[1].includes("special")||selector[1].includes("@media")||/^\s*\d+%(?:,\s*\d+%)*\s*$/.test(selector[1]),selector[1]);
 });

@@ -79,6 +79,51 @@ const ROULETTE_TILE_ASSETS = Object.freeze([
   Object.freeze({ colorIndex: 1, url: "./assets/nitroforelle-feld.webp?v=1" }),
   Object.freeze({ colorIndex: 2, url: "./assets/gold-feld.webp?v=1" }),
 ]);
+const connectivityBadge = document.createElement("span");
+connectivityBadge.className = "connectivity-badge";
+connectivityBadge.textContent = "Offline";
+connectivityBadge.hidden = true;
+const connectivityNotice = document.createElement("p");
+connectivityNotice.className = "connectivity-notice";
+connectivityNotice.setAttribute("role", "status");
+connectivityNotice.setAttribute("aria-live", "polite");
+connectivityNotice.hidden = true;
+document.body.append(connectivityBadge, connectivityNotice);
+const rouletteOfflineStatus = document.createElement("p");
+rouletteOfflineStatus.className = "roulette-offline-status";
+rouletteOfflineStatus.textContent = "Offline: lokale Werte auf diesem Gerät. Globale Statistik nicht verfügbar.";
+rouletteOfflineStatus.hidden = true;
+document.querySelector(".roulette-stats").prepend(rouletteOfflineStatus);
+const connectivityListeners = new Set();
+let connectivityOnline = window.navigator?.onLine !== false;
+let connectivityNoticeTimer = null;
+let offlineStartup = !connectivityOnline;
+function showConnectivityNotice(message) {
+  if (!connectivityNotice) return;
+  connectivityNotice.textContent = message;
+  connectivityNotice.hidden = false;
+  window.clearTimeout(connectivityNoticeTimer);
+  connectivityNoticeTimer = window.setTimeout(() => { connectivityNotice.hidden = true; }, 3600);
+}
+function requireOnline(feature) {
+  if (connectivityOnline) return true;
+  showConnectivityNotice(`${feature} benötigt eine Internetverbindung.`);
+  return false;
+}
+function setConnectivityOnline(online) {
+  if (connectivityOnline === online) return;
+  connectivityOnline = online;
+  if (connectivityBadge) connectivityBadge.hidden = online;
+  showConnectivityNotice(online ? "Internetverbindung wiederhergestellt." : "Offline-Modus – lokale Funktionen bleiben verfügbar.");
+  for (const listener of connectivityListeners) listener(online);
+}
+if (connectivityBadge) connectivityBadge.hidden = connectivityOnline;
+window.addEventListener?.("online", () => setConnectivityOnline(true));
+window.addEventListener?.("offline", () => setConnectivityOnline(false));
+window.fischteichConnectivity = Object.freeze({
+  isOnline: () => connectivityOnline,
+  subscribe(listener) { connectivityListeners.add(listener); return () => connectivityListeners.delete(listener); },
+});
 const ROULETTE_WINNERS = Object.freeze([
   Object.freeze({ name: TEAM_COLORS[0].name, color: TEAM_COLORS[0].color }),
   Object.freeze({ name: TEAM_COLORS[1].name, color: TEAM_COLORS[1].color }),
@@ -772,6 +817,7 @@ async function confirmBuffaloStop() {
 }
 
 function openBuffaloTimerModal() {
+  if (!requireOnline("Buffalo Timer")) return;
   renderBuffaloPersonOptions();
   state.buffaloSelection = null;
   state.buffaloAddingAnother = false;
@@ -835,6 +881,7 @@ function startBuffaloTimerUi(events) {
 }
 
 async function startSelectedBuffaloTimer() {
+  if (!requireOnline("Buffalo Timer")) return false;
   if (
     !state.buffaloSelection
     || !window.buffaloService
@@ -934,6 +981,7 @@ function applyBuffaloServerEvents(events) {
 }
 
 async function refreshBuffaloTimer() {
+  if (!connectivityOnline) return [];
   if (!window.buffaloService?.loadActiveEvents) return [];
   if (state.buffaloRefreshPromise) return state.buffaloRefreshPromise;
 
@@ -955,6 +1003,7 @@ async function refreshBuffaloTimer() {
 }
 
 function initializeBuffaloTimer() {
+  if (!connectivityOnline) return;
   restoreBuffaloTimerFromCache();
   if (!state.buffaloRealtimeUnsubscribe && window.buffaloService?.subscribe) {
     state.buffaloRealtimeUnsubscribe = window.buffaloService.subscribe(
@@ -985,6 +1034,7 @@ function showTeamsMenu({ focusSelector = null } = {}) {
 }
 
 function showTrottlMenu({ focusSelector = null } = {}) {
+  if (!requireOnline("3ER TROTTL")) return;
   trottlMenuFeedback.textContent = "";
   showScreen(trottlMenuScreen);
 
@@ -1269,6 +1319,11 @@ function setBuffaloPushSettingsUi({ checked, status, error = false, active = fal
 }
 
 async function renderBuffaloPushSettings({ repair = true } = {}) {
+  if (!connectivityOnline) {
+    setBuffaloPushSettingsUi({ checked: window.buffaloPushService?.getPreference?.() === true,
+      status: "Offline – Einstellung unverändert.", disabled: false });
+    return;
+  }
   const requestId = state.buffaloPushSettingsRequestId + 1;
   state.buffaloPushSettingsRequestId = requestId;
   setBuffaloPushSettingsUi({
@@ -1332,6 +1387,7 @@ async function renderBuffaloPushSettings({ repair = true } = {}) {
 }
 
 async function toggleBuffaloPushSettings() {
+  if (!requireOnline("Buffalo Push")) return;
   if (state.buffaloPushSettingsRunning || !window.buffaloPushService) return;
   state.buffaloPushSettingsRunning = true;
   const currentlyEnabled = buffaloPushToggle.getAttribute("aria-checked") === "true";
@@ -1365,6 +1421,7 @@ async function toggleBuffaloPushSettings() {
 }
 
 async function initializeBuffaloPush() {
+  if (!connectivityOnline) return;
   if (!window.buffaloPushService || !hasLocalIdentity()) return;
   try {
     await window.buffaloPushService.repair();
@@ -1392,6 +1449,7 @@ function setBuffaloShortcutStatus(message, { active = false, error = false } = {
 }
 
 async function renderBuffaloShortcutStatus() {
+  if (!connectivityOnline) { setBuffaloShortcutStatus("Offline nicht verfügbar."); return; }
   if (state.buffaloShortcutPlatform === "other") return;
   const requestId = state.buffaloShortcutSettingsRequestId + 1;
   state.buffaloShortcutSettingsRequestId = requestId;
@@ -1527,6 +1585,7 @@ function clearShortcutCredentials() {
 }
 
 function openShortcutSetup(platform) {
+  if (!requireOnline("Buffalo Schnellzugriff")) return;
   if (!window.buffaloShortcutService || !["ios", "android"].includes(platform)) return;
   state.buffaloShortcutPlatform = platform;
   clearShortcutCredentials();
@@ -1888,6 +1947,7 @@ function setAdminLoginRunning(running) {
 }
 
 function openAdminLoginModal() {
+  if (!requireOnline("Admin-Anmeldung")) return;
   if (getAppAuthState().isAdmin) return;
   settingsModal.hidden = true;
   adminLoginError.hidden = true;
@@ -3894,14 +3954,14 @@ function getRouletteLastAnglerName(stats) {
   return getDisplayName() || "—";
 }
 
-function renderRouletteLastAngler(stats = state.globalRouletteStats ?? state.rouletteStats) {
+function renderRouletteLastAngler(stats = connectivityOnline ? state.globalRouletteStats ?? state.rouletteStats : state.rouletteStats) {
   const formattedTime = formatRouletteLastGoldHit(stats.lastGoldHit);
   rouletteLastAnglerNameElement.textContent = getRouletteLastAnglerName(stats);
   rouletteLastGoldHitElement.textContent = formattedTime;
   rouletteLastGoldHitElement.classList.toggle("is-gold-now", formattedTime === "JETZT");
 }
 
-function renderRouletteStats(stats = state.globalRouletteStats ?? state.rouletteStats) {
+function renderRouletteStats(stats = connectivityOnline ? state.globalRouletteStats ?? state.rouletteStats : state.rouletteStats) {
   renderRouletteStatCounts(stats);
   renderRouletteLastAngler(stats);
 }
@@ -3979,7 +4039,7 @@ function rememberRouletteGoldEvent(eventId) {
   }
 }
 
-function renderRouletteStatCounts(stats = state.globalRouletteStats ?? state.rouletteStats) {
+function renderRouletteStatCounts(stats = connectivityOnline ? state.globalRouletteStats ?? state.rouletteStats : state.rouletteStats) {
   for (const [key, element] of Object.entries(rouletteStatElements)) {
     element.textContent = String(stats[key]);
   }
@@ -4052,6 +4112,7 @@ function getRouletteGoldBroadcastEventId(message) {
 }
 
 async function loadRouletteGoldEvents(run) {
+  if (!connectivityOnline) return;
   if (
     run !== state.rouletteGoldEventSessionRun
     || state.rouletteGoldEventCursor === null
@@ -4165,6 +4226,7 @@ async function stopRouletteGoldEventUpdates() {
 }
 
 async function startRouletteGoldEventUpdates() {
+  if (!connectivityOnline) return;
   const run = state.rouletteGoldEventSessionRun + 1;
   state.rouletteGoldEventSessionRun = run;
   const previousChannel = state.rouletteGoldEventRealtimeChannel;
@@ -4200,7 +4262,7 @@ async function startRouletteGoldEventUpdates() {
       throw new Error("Roulette gold event cursor is invalid");
     }
 
-    if (run !== state.rouletteGoldEventSessionRun || rouletteScreen.hidden) {
+    if (run !== state.rouletteGoldEventSessionRun || rouletteScreen.hidden || !connectivityOnline) {
       return;
     }
 
@@ -4237,6 +4299,7 @@ async function startRouletteGoldEventUpdates() {
 }
 
 async function loadGlobalRouletteStats({ render = true } = {}) {
+  if (!connectivityOnline) return false;
   if (state.rouletteStatsLoading) {
     state.rouletteStatsRefreshQueued = true;
     state.rouletteStatsRefreshQueuedRender ||= render;
@@ -4259,7 +4322,7 @@ async function loadGlobalRouletteStats({ render = true } = {}) {
       throw new Error("Global roulette statistics response is invalid");
     }
 
-    if (requestId !== state.rouletteStatsRequestId) {
+    if (requestId !== state.rouletteStatsRequestId || !connectivityOnline) {
       return false;
     }
 
@@ -4273,7 +4336,7 @@ async function loadGlobalRouletteStats({ render = true } = {}) {
     }
     return true;
   } catch (error) {
-    if (requestId === state.rouletteStatsRequestId) {
+    if (requestId === state.rouletteStatsRequestId && connectivityOnline) {
       console.error("Globale Roulette-Statistik konnte nicht geladen werden.", error);
     }
 
@@ -4349,6 +4412,7 @@ async function stopRouletteStatsRealtime() {
 }
 
 async function startRouletteStatsRealtime() {
+  if (!connectivityOnline) return;
   const realtimeRun = state.rouletteStatsRealtimeRun + 1;
   state.rouletteStatsRealtimeRun = realtimeRun;
   const previousChannel = state.rouletteStatsRealtimeChannel;
@@ -4366,7 +4430,7 @@ async function startRouletteStatsRealtime() {
 
   await state.rouletteStatsRealtimeCleanupPromise;
 
-  if (realtimeRun !== state.rouletteStatsRealtimeRun || rouletteScreen.hidden) {
+  if (realtimeRun !== state.rouletteStatsRealtimeRun || rouletteScreen.hidden || !connectivityOnline) {
     return;
   }
 
@@ -4553,6 +4617,10 @@ function createRouletteMetric(label, value, modifier = "") {
 function renderRouletteLeaderboardPanel() {
   rouletteLeaderboardList.replaceChildren();
   rouletteLeaderboardStatus.hidden = false;
+  if (!connectivityOnline) {
+    rouletteLeaderboardStatus.textContent = "Offline nicht verfügbar – Internetverbindung erforderlich.";
+    return;
+  }
 
   if (state.rouletteLeaderboardLoading && state.rouletteLeaderboard === null) {
     rouletteLeaderboardStatus.textContent = "Wird geladen …";
@@ -4687,11 +4755,14 @@ function renderPersonalRouletteStatsPanel() {
       { sensitivity: "base" },
     ) === 0;
   const hasCachedStats = Boolean(cachedStatsMatchDisplayName);
-  const player = cachedStatsMatchDisplayName
-    ? state.personalRouletteStats
-    : createDefaultPersonalRouletteStats(displayName);
+  const player = !connectivityOnline
+    ? { ...state.rouletteStats, displayName }
+    : cachedStatsMatchDisplayName ? state.personalRouletteStats : createDefaultPersonalRouletteStats(displayName);
 
-  if (state.personalRouletteStatsLoading && !hasCachedStats) {
+  if (!connectivityOnline) {
+    personalRouletteStatus.hidden = false;
+    personalRouletteStatus.textContent = "Offline: lokale Statistik auf diesem Gerät.";
+  } else if (state.personalRouletteStatsLoading && !hasCachedStats) {
     personalRouletteStatus.hidden = false;
     personalRouletteStatus.textContent = "Wird geladen …";
   } else if (state.personalRouletteStatsError && !hasCachedStats) {
@@ -4718,6 +4789,7 @@ function renderPersonalRouletteStatsPanel() {
 }
 
 async function loadPersonalRouletteStats({ force = false } = {}) {
+  if (!connectivityOnline) { renderPersonalRouletteStatsPanel(); return false; }
   if (state.personalRouletteStatsLoading) {
     if (force) {
       state.personalRouletteStatsRefreshQueued = true;
@@ -4758,7 +4830,7 @@ async function loadPersonalRouletteStats({ force = false } = {}) {
       throw new Error("Personal roulette statistics response is invalid");
     }
 
-    if (requestId !== state.personalRouletteStatsRequestId) {
+    if (requestId !== state.personalRouletteStatsRequestId || !connectivityOnline) {
       return false;
     }
 
@@ -4767,7 +4839,7 @@ async function loadPersonalRouletteStats({ force = false } = {}) {
   } catch (error) {
     if (requestId === state.personalRouletteStatsRequestId) {
       state.personalRouletteStatsError = true;
-      console.error("Persönliche Roulette-Statistik konnte nicht geladen werden.", error);
+      if (connectivityOnline) console.error("Persönliche Roulette-Statistik konnte nicht geladen werden.", error);
     }
     return false;
   } finally {
@@ -4784,6 +4856,7 @@ async function loadPersonalRouletteStats({ force = false } = {}) {
 }
 
 async function loadRouletteLeaderboard({ force = false } = {}) {
+  if (!connectivityOnline) { renderRouletteLeaderboardPanel(); return false; }
   if (state.rouletteLeaderboardLoading) {
     if (force) {
       state.rouletteLeaderboardRefreshQueued = true;
@@ -4817,7 +4890,7 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
       throw new Error("Roulette leaderboard response is invalid");
     }
 
-    if (requestId !== state.rouletteLeaderboardRequestId) {
+    if (requestId !== state.rouletteLeaderboardRequestId || !connectivityOnline) {
       return false;
     }
 
@@ -4834,7 +4907,7 @@ async function loadRouletteLeaderboard({ force = false } = {}) {
   } catch (error) {
     if (requestId === state.rouletteLeaderboardRequestId) {
       state.rouletteLeaderboardError = true;
-      console.error("Roulette-Rangliste konnte nicht geladen werden.", error);
+      if (connectivityOnline) console.error("Roulette-Rangliste konnte nicht geladen werden.", error);
     }
     return false;
   } finally {
@@ -5159,9 +5232,12 @@ function openRoulette() {
   rouletteResult.classList.remove("is-visible");
   renderRouletteStats();
   startRouletteLastAnglerTimer();
-  void startRouletteStatsRealtime();
-  void startRouletteGoldEventUpdates();
-  void loadGlobalRouletteStats();
+  if (rouletteOfflineStatus) rouletteOfflineStatus.hidden = connectivityOnline;
+  if (connectivityOnline) {
+    void startRouletteStatsRealtime();
+    void startRouletteGoldEventUpdates();
+    void loadGlobalRouletteStats();
+  }
   void initializeRoulette();
 }
 
@@ -5189,6 +5265,7 @@ function finishRoulette(run, winnerIndex, targetIndex) {
 }
 
 function startRoulette() {
+  if (!requireOnline("Roulette-Drehungen")) return;
   if (state.rouletteSpinning || !state.rouletteReady) {
     return;
   }
@@ -5258,10 +5335,12 @@ document.querySelector("#close-fischteich-dice").addEventListener("click", () =>
   showTrottlMenu({ focusSelector: "#open-fischteich-dice" });
 });
 document.querySelector("#open-trottl-classic").addEventListener("click", () => {
+  if (!requireOnline("3ER TROTTL Classic")) return;
   window.TrottlSpecialUI.rememberMode("classic");
   void trottlClassic.openRooms();
 });
 document.querySelector("#open-trottl-deluxe").addEventListener("click", () => {
+  if (!requireOnline("3ER TROTTL Special")) return;
   void ensureTrottlSpecial().openRooms();
 });
 document.querySelector("#start-finger-selection").addEventListener("click", () => {
@@ -5457,12 +5536,12 @@ const openPersonalRouletteStatsButton = document.querySelector("#open-personal-r
 openRouletteLeaderboardButton.addEventListener("click", () => {
   renderRouletteLeaderboardPanel();
   openRouletteStatsModal(rouletteLeaderboardModal);
-  void loadRouletteLeaderboard({ force: true });
+  if (connectivityOnline) void loadRouletteLeaderboard({ force: true });
 });
 openPersonalRouletteStatsButton.addEventListener("click", () => {
   renderPersonalRouletteStatsPanel();
   openRouletteStatsModal(personalRouletteStatsModal);
-  void loadPersonalRouletteStats({ force: true });
+  if (connectivityOnline) void loadPersonalRouletteStats({ force: true });
 });
 document.querySelector("#close-roulette-leaderboard").addEventListener("click", () => {
   state.rouletteLeaderboardRealtimeChanges = [];
@@ -5758,10 +5837,54 @@ document.addEventListener("keydown", (event) => {
 });
 
 updateMarkerSize();
+document.addEventListener("click", (event) => {
+  if (connectivityOnline || !event.target.closest?.("#create-tournament, #open-past-tournaments, #active-tournament, #open-tournament-trash")) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  requireOnline("Turniere");
+}, true);
+connectivityListeners.add((online) => {
+  if (rouletteOfflineStatus) rouletteOfflineStatus.hidden = online || rouletteScreen.hidden;
+  if (!online) {
+    buffaloLiveStatus.hidden = true;
+    if (!settingsModal.hidden) {
+      void renderBuffaloShortcutStatus();
+      void renderBuffaloPushSettings();
+    }
+    if (!rouletteScreen.hidden) {
+      void stopRouletteStatsRealtime();
+      void stopRouletteGoldEventUpdates();
+    }
+    renderRouletteStats();
+    if (!rouletteLeaderboardModal.hidden) renderRouletteLeaderboardPanel();
+    if (!personalRouletteStatsModal.hidden) renderPersonalRouletteStatsPanel();
+    return;
+  }
+  if (offlineStartup) {
+    offlineStartup = false;
+    void initializeBuffaloPush();
+    void initializeAppAuth();
+  }
+  initializeBuffaloTimer();
+  if (!settingsModal.hidden) {
+    void renderBuffaloShortcutStatus();
+    void renderBuffaloPushSettings();
+  }
+  if (!rouletteScreen.hidden) {
+    renderRouletteStats();
+    void startRouletteStatsRealtime();
+    void startRouletteGoldEventUpdates();
+    void loadGlobalRouletteStats();
+    if (!rouletteLeaderboardModal.hidden) void loadRouletteLeaderboard({ force: true });
+    if (!personalRouletteStatsModal.hidden) void loadPersonalRouletteStats({ force: true });
+  }
+});
 renderRouletteStats();
 initializeLocalIdentity();
-initializeBuffaloTimer();
-void initializeBuffaloPush();
+if (connectivityOnline) {
+  initializeBuffaloTimer();
+  void initializeBuffaloPush();
+}
 subscribeToAppAuthState((auth) => {
   renderSettingsAdmin(auth);
   if (!state.bobrUnlockRunning) {
@@ -5779,7 +5902,7 @@ subscribeToAppAuthState((auth) => {
     }
   }
 });
-void initializeAppAuth().then(async () => {
+async function restoreTrottlAfterAuth() {
   const reconnectMode = window.TrottlStartupRouting?.getStartupReconnectMode() ?? null;
   if (reconnectMode === "special") {
     if (!(await ensureTrottlSpecial().restoreMembership())) {
@@ -5790,4 +5913,13 @@ void initializeAppAuth().then(async () => {
       window.TrottlStartupRouting.clearReconnectIntent("classic");
     }
   }
-});
+}
+if (connectivityOnline) {
+  void initializeAppAuth().then(restoreTrottlAfterAuth);
+} else {
+  const reconnectMode = window.TrottlStartupRouting?.getStartupReconnectMode() ?? null;
+  if (reconnectMode) {
+    window.TrottlStartupRouting.clearReconnectIntent(reconnectMode);
+    showConnectivityNotice("Die Online-Sitzung kann ohne Internet nicht wiederhergestellt werden.");
+  }
+}

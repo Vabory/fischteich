@@ -94,6 +94,18 @@ test("display choices reserve the sixteenth slot for a non-persistable locked my
   assert.equal(unlocked.at(-1).displayName, "Mystical Bobr");
 });
 
+test("an unknown unlock state stays safely locked and uses the existing WebP placeholder", () => {
+  const service = loadService();
+  const choices = service.getTrottlAvatarChoices({ mysticalBobrUnlocked: undefined });
+  const mystery = choices.at(-1);
+  assert.equal(choices.length, 16);
+  assert.equal(mystery.displayName, "Mystical ???");
+  assert.equal(mystery.src, "./assets/avatars/locked-avatar.webp");
+  assert.equal(mystery.selectable, false);
+  assert.equal(fs.existsSync(path.join(root, mystery.src.slice(2))), true);
+  assert.equal(choices.some((avatar) => avatar.id === "mystical-bobr"), false);
+});
+
 test("Trottl avatar registry snapshots cannot be mutated by consumers", () => {
   const service = loadService();
   const first = service.getTrottlAvatarById("turbo-lachs");

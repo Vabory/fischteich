@@ -59,6 +59,16 @@ test("locked and unlocked display choices preload the appropriate sixteenth avat
   await unlockedPending;
 });
 
+test("an unknown unlock state preloads the locked placeholder", async () => {
+  const { service, images } = createHarness();
+  const pending = service.preloadVisibleTrottlAvatars({ mysticalBobrUnlocked: undefined });
+  assert.equal(images.length, 16);
+  assert.equal(images.filter((image) => image.src.endsWith("locked-avatar.webp")).length, 1);
+  assert.equal(images.some((image) => image.src.endsWith("mystical-bobr.webp")), false);
+  images.forEach((image) => image.load());
+  await pending;
+});
+
 test("parallel and repeated preload calls never request the same avatar twice", async () => {
   const { service, images } = createHarness();
   const avatars = service.getDefaultVisibleTrottlAvatars();

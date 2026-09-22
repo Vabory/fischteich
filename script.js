@@ -132,15 +132,15 @@ const ROULETTE_WINNERS = Object.freeze([
   Object.freeze({ name: TEAM_COLORS[1].name, color: TEAM_COLORS[1].color }),
   Object.freeze({ name: "Goldfisch", color: "#FFD66E" }),
 ]);
-const ROULETTE_STAT_KEY_BY_WINNER_INDEX = Object.freeze({
-  0: "turbolachs",
-  1: "nitroforelle",
-  2: "gold",
-});
 const ROULETTE_RESULT_TYPE_BY_WINNER_INDEX = Object.freeze({
   0: "turbolachs",
   1: "nitroforelle",
   2: "goldfish",
+});
+const ROULETTE_STAT_KEY_BY_RESULT_TYPE = Object.freeze({
+  turbolachs: "turbolachs",
+  nitroforelle: "nitroforelle",
+  goldfish: "gold",
 });
 const MARKER_GAP = 7;
 const UI_CLEARANCE = 6;
@@ -410,6 +410,7 @@ function createDefaultRouletteStats() {
     nitroforelle: 0,
     gold: 0,
     lastGoldHit: null,
+    appliedSpinIds: [],
   };
 }
 
@@ -428,6 +429,9 @@ function normalizeRouletteStats(value) {
     && Number.isFinite(Date.parse(storedStats.lastGoldHit))
     ? new Date(storedStats.lastGoldHit).toISOString()
     : null;
+  const appliedSpinIds = Array.isArray(storedStats.appliedSpinIds)
+    ? [...new Set(storedStats.appliedSpinIds.filter((id) => typeof id === "string"))]
+    : [];
 
   return {
     totalSpins: turbolachs + nitroforelle + gold,
@@ -435,6 +439,7 @@ function normalizeRouletteStats(value) {
     nitroforelle,
     gold,
     lastGoldHit,
+    appliedSpinIds,
   };
 }
 
@@ -452,15 +457,11 @@ function loadRouletteStats() {
   }
 }
 
-function saveRouletteStats() {
-  try {
-    window.localStorage.setItem(
-      ROULETTE_STATS_STORAGE_KEY,
-      JSON.stringify(state.rouletteStats),
-    );
-  } catch {
-    // Die Session-Statistik läuft weiter, wenn persistenter Speicher nicht verfügbar ist.
-  }
+function saveRouletteStats(stats = state.rouletteStats) {
+  window.localStorage.setItem(
+    ROULETTE_STATS_STORAGE_KEY,
+    JSON.stringify(stats),
+  );
 }
 
 const state = {
@@ -4962,6 +4963,73 @@ async function refreshRoulettePendingCount() {
   }
 }
 
+function applyRouletteSpinToLocalStats(spin) {
+  const winnerStatKey = ROULETTE_STAT_KEY_BY_RESULT_TYPE[spin.result];
+  if (!winnerStatKey) throw new TypeError("Invalid local roulette result");
+  if (state.rouletteStats.appliedSpinIds.includes(spin.id)) return false;
+
+  const nextStats = {
+    ...state.rouletteStats,
+    totalSpins: state.rouletteStats.totalSpins + 1,
+    [winnerStatKey]: state.rouletteStats[winnerStatKey] + 1,
+    lastGoldHit: spin.result === "goldfish" ? spin.createdAt : state.rouletteStats.lastGoldHit,
+    appliedSpinIds: [...state.rouletteStats.appliedSpinIds, spin.id],
+  };
+  // Counter and idempotency marker share one synchronous localStorage write.
+  saveRouletteStats(nextStats);
+  state.rouletteStats = nextStats;
+  state.rouletteStatsRequestId += 1;
+  if (state.globalRouletteStats === null) renderRouletteStats();
+  if (spin.result === "goldfish") {
+    renderRouletteLastAngler({ ...state.rouletteStats, lastGoldHitDisplayName: spin.displayName });
+  }
+  return true;
+}
+
+function forgetAppliedRouletteSpinId(id) {
+  if (!state.rouletteStats.appliedSpinIds.includes(id)) return;
+  const nextStats = {
+    ...state.rouletteStats,
+    appliedSpinIds: state.rouletteStats.appliedSpinIds.filter((spinId) => spinId !== id),
+  };
+  try {
+    saveRouletteStats(nextStats);
+    state.rouletteStats = nextStats;
+  } catch (error) {
+    // A retained marker is harmless and can be cleaned during a later recovery.
+    console.warn("Lokaler Roulette-Marker konnte nicht bereinigt werden.", error);
+  }
+}
+
+let rouletteLocalRecoveryPromise = null;
+function recoverPendingRouletteLocalStats() {
+  if (rouletteLocalRecoveryPromise) return rouletteLocalRecoveryPromise;
+  if (!window.rouletteOfflineQueue?.getPendingSpins
+    || !window.rouletteOfflineQueue?.markLocalStatsApplied) return Promise.resolve({ recovered: 0 });
+
+  rouletteLocalRecoveryPromise = (async () => {
+    let recovered = 0;
+    const pending = await window.rouletteOfflineQueue.getPendingSpins();
+    for (const spin of pending) {
+      // Old queue entries have no field and were already counted by the former pipeline.
+      if (spin.localStatsApplied !== false) {
+        forgetAppliedRouletteSpinId(spin.id);
+        continue;
+      }
+      applyRouletteSpinToLocalStats(spin);
+      await window.rouletteOfflineQueue.markLocalStatsApplied(spin);
+      forgetAppliedRouletteSpinId(spin.id);
+      recovered += 1;
+    }
+    return { recovered };
+  })().catch((error) => {
+    console.error("Lokale Roulette-Statistik konnte nicht wiederhergestellt werden.", error);
+    showConnectivityNotice("Ein gespeicherter Spin konnte noch nicht wiederhergestellt werden.");
+    return { recovered: 0, error };
+  }).finally(() => { rouletteLocalRecoveryPromise = null; });
+  return rouletteLocalRecoveryPromise;
+}
+
 async function persistCompletedRouletteSpin(resultType) {
   let spin;
   try {
@@ -4974,12 +5042,31 @@ async function persistCompletedRouletteSpin(resultType) {
       result: resultType,
       createdAt: new Date().toISOString(),
       syncStatus: "pending",
+      localStatsApplied: false,
     };
     await window.rouletteOfflineQueue.enqueueSpin(spin);
     void refreshRoulettePendingCount();
   } catch (error) {
     console.error("Roulette-Spin konnte nicht für die spätere Synchronisierung gespeichert werden.", error);
     showConnectivityNotice("Der Spin konnte nicht für die spätere Synchronisierung gespeichert werden.");
+    return;
+  }
+
+  try {
+    applyRouletteSpinToLocalStats(spin);
+  } catch (error) {
+    console.error("Roulette-Spin konnte nicht lokal gezählt werden.", error);
+    showConnectivityNotice("Der gespeicherte Spin konnte noch nicht zur lokalen Statistik hinzugefügt werden.");
+    return;
+  }
+
+  try {
+    await window.rouletteOfflineQueue.markLocalStatsApplied(spin);
+    spin.localStatsApplied = true;
+    forgetAppliedRouletteSpinId(spin.id);
+  } catch (error) {
+    console.error("Lokale Roulette-Zählung konnte nicht bestätigt werden.", error);
+    showConnectivityNotice("Der Spin bleibt gespeichert und wird beim nächsten Start geprüft.");
     return;
   }
 
@@ -5017,20 +5104,10 @@ async function persistCompletedRouletteSpin(resultType) {
 }
 
 function recordCompletedRouletteSpin(winnerIndex) {
-  const winnerStatKey = ROULETTE_STAT_KEY_BY_WINNER_INDEX[winnerIndex];
   const resultType = ROULETTE_RESULT_TYPE_BY_WINNER_INDEX[winnerIndex];
 
-  if (!winnerStatKey || !resultType) {
+  if (!resultType) {
     return;
-  }
-
-  state.rouletteStats.totalSpins += 1;
-  state.rouletteStats[winnerStatKey] += 1;
-  saveRouletteStats();
-  state.rouletteStatsRequestId += 1;
-
-  if (state.globalRouletteStats === null) {
-    renderRouletteStats();
   }
 
   return persistCompletedRouletteSpin(resultType);
@@ -5236,12 +5313,7 @@ function handleGoldHit(run, targetIndex) {
       return;
     }
 
-    state.rouletteStats.lastGoldHit = new Date().toISOString();
     recordCompletedRouletteSpin(ROULETTE_GOLD_WINNER_INDEX);
-    renderRouletteLastAngler({
-      ...state.rouletteStats,
-      lastGoldHitDisplayName: getDisplayName(),
-    });
     rouletteGoldStatElement.classList.add("is-gold-updated");
     createGoldCelebration(reducedMotion);
 
@@ -5805,6 +5877,9 @@ document.addEventListener("gesturestart", (event) => event.preventDefault());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
+    // Installed PWAs can miss connectivity events while suspended.
+    if (window.navigator?.onLine === false && connectivityOnline) setConnectivityOnline(false);
+    else if (window.navigator?.onLine === true && !connectivityOnline) setConnectivityOnline(true);
     void refreshBuffaloTimer();
     trottlClassic.refresh();
     if (connectivityOnline) void runAutomaticRouletteSync();
@@ -5900,6 +5975,8 @@ function runAutomaticRouletteSync() {
   if (automaticRouletteSyncPromise) return automaticRouletteSyncPromise;
 
   automaticRouletteSyncPromise = (async () => {
+    const recovery = await recoverPendingRouletteLocalStats();
+    if (recovery.error || !connectivityOnline) return { confirmed: 0, recoveryError: recovery.error };
     const pendingBefore = await window.rouletteOfflineQueue.getPendingSpinCount();
     if (pendingBefore === 0 || !connectivityOnline) return { confirmed: 0 };
 
@@ -5973,6 +6050,7 @@ connectivityListeners.add((online) => {
 });
 renderRouletteStats();
 initializeLocalIdentity();
+void recoverPendingRouletteLocalStats();
 if (connectivityOnline) {
   initializeBuffaloTimer();
   void initializeBuffaloPush();

@@ -83,6 +83,17 @@ test("local team and roulette data-src images and roulette tiles are precached w
   assert.ok(!h.self.offlineTest.urls.some(url => /\/assets\/.*(?:mini-games\/|trottl-classic\/|lobby-room|raum-w%C3%A4hlen|avatar)/i.test(url)));
 });
 
+test("offline boot loads the queue before the main script so Roulette can spin immediately", async () => {
+  const h = harness(); await h.lifecycle("install"); h.setOnline(false);
+  const html = read("index.html");
+  const queueUrl = html.match(/<script src="(\.\/roulette-offline-queue\.js\?v=[^"]+)"/)[1];
+  const appUrl = html.match(/<script src="(\.\/script\.js\?v=[^"]+)"/)[1];
+  assert.ok(html.indexOf(queueUrl) < html.indexOf(appUrl));
+  assert.equal((await h.request("./", "navigate")).source, "cache");
+  assert.equal((await h.request(queueUrl)).source, "cache");
+  assert.equal((await h.request(appUrl)).source, "cache");
+});
+
 test("install caches the explicit shell, activate removes only old Fischteich offline caches", async () => {
   const h = harness();
   h.stores.set("other-product-cache", new Map());
@@ -98,16 +109,17 @@ test("install caches the explicit shell, activate removes only old Fischteich of
 
 test("navigation is network first online and falls back to cached index offline", async () => {
   const h = harness(); await h.lifecycle("install");
-  assert.equal((await h.request("./?app-build=20260922.9", "navigate")).source, "network");
+  const build = JSON.parse(read("version.json")).build;
+  assert.equal((await h.request(`./?app-build=${build}`, "navigate")).source, "network");
   h.setOnline(false);
-  const offline = await h.request("./?app-build=20260922.9", "navigate");
+  const offline = await h.request(`./?app-build=${build}`, "navigate");
   assert.equal(offline.source, "cache");
   assert.equal(offline.url, new URL("./index.html", scope).href);
 });
 
 test("only exact same-origin static URLs use cache; version and Supabase requests bypass it", async () => {
   const h = harness(); await h.lifecycle("install"); h.setOnline(false);
-  for (const url of ["./style.css?v=194", "./script.js?v=99", "./roulette-service.js?v=8", "./roulette-offline-queue.js?v=1", "./assets/menu-background.webp", "./assets/sidemenu-background.webp", "./assets/gold-feld.webp?v=1"]) {
+  for (const url of ["./style.css?v=194", "./script.js?v=101", "./roulette-service.js?v=9", "./roulette-offline-queue.js?v=2", "./assets/menu-background.webp", "./assets/sidemenu-background.webp", "./assets/gold-feld.webp?v=1"]) {
     assert.equal((await h.request(url)).source, "cache", url);
   }
   for (const url of ["./version.json?check=123", "./style.css?v=old", "./assets/mini-games/1-fish.webp", "https://qhgiqhuodkrevmmbwfeg.supabase.co/rest/v1/rooms", "https://example.test/fischteich/rest/v1/rooms"]) {
@@ -115,4 +127,20 @@ test("only exact same-origin static URLs use cache; version and Supabase request
   }
   assert.equal(h.networkCalls.length, 0);
   assert.match(read("pwa-service.js"), /cache: "no-store"/);
+});
+
+test("updated shell uses the exact new script URL offline even if the old version remains cached", async () => {
+  const h = harness();
+  h.stores.set("fischteich-offline-v1", new Map([["./script.js?v=99", { source: "cache", url: "./script.js?v=99" }]]));
+  await h.lifecycle("install");
+  h.setOnline(false);
+  const html = read("index.html");
+  const bootUrls = [...html.matchAll(/<script[^>]*src="([^"]+)"/g)].map(match => match[1]);
+  for (const url of bootUrls) {
+    assert.equal((await h.request(url)).source, "cache", url);
+    assert.ok(h.self.offlineTest.urls.includes(new URL(url, scope).href), `new shell missed ${url}`);
+  }
+  assert.ok(bootUrls.includes("./script.js?v=101"));
+  assert.equal((await h.request("./script.js?v=101")).url, new URL("./script.js?v=101", scope).href);
+  assert.equal(await h.request("./script.js?v=102"), null);
 });

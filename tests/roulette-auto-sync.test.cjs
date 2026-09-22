@@ -8,13 +8,16 @@ const vm = require("node:vm");
 const script = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
 const slice = (start, end) => script.slice(script.indexOf(start), script.indexOf(end, script.indexOf(start)));
 const connectivitySource = slice("const connectivityBadge", "const ROULETTE_WINNERS");
-const pendingSource = slice("let roulettePendingCountRequestId", "async function persistCompletedRouletteSpin");
+const pendingSource = slice("let roulettePendingCountRequestId", "function applyRouletteSpinToLocalStats");
 const autoSource = slice("let automaticRouletteSyncPromise", "connectivityListeners.add((online)");
+const visibilitySource = slice('document.addEventListener("visibilitychange", () => {', 'window.addEventListener("storage"');
 
-function harness({ online = true, count = 0, visible = false, sync = null } = {}) {
+function harness({ online = true, count = 0, visible = false, sync = null, recover = null } = {}) {
   const events = new Map(), notices = [], logs = [], calls = [];
   const stats = { children: [], prepend(...nodes) { this.children.unshift(...nodes); } };
-  const document = { body: { append() {} },
+  const documentEvents = new Map();
+  const document = { body: { append() {} }, visibilityState: "hidden",
+    addEventListener(name, fn) { documentEvents.set(name, fn); },
     createElement() { return { hidden: false, textContent: "", setAttribute() {} }; },
     querySelector: () => stats };
   let pending = count;
@@ -34,17 +37,20 @@ function harness({ online = true, count = 0, visible = false, sync = null } = {}
     loadRouletteLeaderboard: async () => calls.push("leaderboard"),
     loadPersonalRouletteStats: async () => calls.push("personal"),
     console: { warn: (...args) => logs.push(args) },
+    recoverPendingRouletteLocalStats: async () => recover ? recover(calls) : { recovered: 0 },
+    refreshBuffaloTimer: () => {}, trottlClassic: { refresh() {}, suspend() {} },
   });
   vm.runInContext(connectivitySource, context);
   vm.runInContext(pendingSource, context);
   vm.runInContext(autoSource, context);
+  vm.runInContext(visibilitySource, context);
   // The production listener also starts existing online services; this isolates
   // the auto-sync branch while using the real central state transition.
   vm.runInContext("connectivityListeners.add((isOnline) => { if (isOnline) void runAutomaticRouletteSync(); });", context);
   const originalNotice = vm.runInContext("showConnectivityNotice", context);
   vm.runInContext("showConnectivityNotice = (message) => window.testNotice(message)", context);
   window.testNotice = message => { notices.push(message); originalNotice(message); };
-  return { window, context, events, notices, logs, calls,
+  return { window, document, documentEvents, context, events, notices, logs, calls,
     run: () => vm.runInContext("runAutomaticRouletteSync()", context),
     refresh: () => vm.runInContext("refreshRoulettePendingCount()", context),
     status: () => vm.runInContext("roulettePendingStatus", context),
@@ -73,6 +79,28 @@ test("online startup syncs pending spins and shows one accurate success notice",
   assert.deepEqual(h.notices, ["3 Offline-Spins synchronisiert."]);
 });
 
+test("automatic sync awaits successful local recovery before reading or sending pending spins", async () => {
+  let release;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const h = harness({ count: 1,
+    recover: async calls => { calls.push("recover"); await waiting; return { recovered: 1 }; },
+    sync: async queue => { queue.setCount(0); return { confirmed: 1, offline: false }; } });
+  const run = h.run();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.calls, ["recover"]);
+  release();
+  await run;
+  assert.deepEqual(h.calls, ["recover", "count", "sync", "count"]);
+});
+
+test("recovery failure blocks automatic server sync", async () => {
+  const error = new Error("local recovery failed");
+  const h = harness({ count: 1, recover: async calls => { calls.push("recover"); return { recovered: 0, error }; } });
+  const result = await h.run();
+  assert.equal(result.recoveryError, error);
+  assert.deepEqual(h.calls, ["recover"]);
+});
+
 test("offline to online starts once; duplicate online events do not start a second sync", async () => {
   const h = harness({ online: false, count: 1,
     sync: async queue => { queue.setCount(0); return { confirmed: 1, offline: false }; } });
@@ -80,6 +108,29 @@ test("offline to online starts once; duplicate online events do not start a seco
   await vm.runInContext("automaticRouletteSyncPromise", h.context);
   assert.equal(h.calls.filter(value => value === "sync").length, 1);
   assert.equal(h.notices.filter(value => value.includes("Offline-Spin synchronisiert")).length, 1);
+});
+
+test("foreground return detects a missed online event and syncs pending spins once", async () => {
+  const h = harness({ online: false, count: 3,
+    sync: async queue => { queue.setCount(0); return { confirmed: 3, offline: false }; } });
+  h.window.navigator.onLine = true;
+  h.document.visibilityState = "visible";
+  h.documentEvents.get("visibilitychange")();
+  h.documentEvents.get("visibilitychange")();
+  await vm.runInContext("automaticRouletteSyncPromise", h.context);
+  assert.equal(vm.runInContext("connectivityOnline", h.context), true);
+  assert.equal(h.calls.filter(value => value === "sync").length, 1);
+  assert.deepEqual(h.notices, ["Internetverbindung wiederhergestellt.", "3 Offline-Spins synchronisiert."]);
+});
+
+test("foreground return detects a missed offline event without starting sync", async () => {
+  const h = harness({ online: true, count: 2 });
+  h.window.navigator.onLine = false;
+  h.document.visibilityState = "visible";
+  h.documentEvents.get("visibilitychange")();
+  assert.equal(vm.runInContext("connectivityOnline", h.context), false);
+  assert.equal(h.calls.filter(value => value === "sync").length, 0);
+  assert.deepEqual(h.notices, ["Offline-Modus – lokale Funktionen bleiben verfügbar."]);
 });
 
 test("rapid lifecycle triggers share one running sync", async () => {

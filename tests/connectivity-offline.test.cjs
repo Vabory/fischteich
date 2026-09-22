@@ -99,5 +99,5 @@ test("phase-one offline cache structure and push handlers remain intact", () => 
   assert.match(worker, /self\.addEventListener\("push"/);
   assert.match(worker, /self\.addEventListener\("notificationclick"/);
   assert.match(worker, /"\.\/style\.css\?v=194"/);
-  assert.match(worker, /"\.\/script\.js\?v=99"/);
+  assert.match(worker, /"\.\/script\.js\?v=101"/);
 });

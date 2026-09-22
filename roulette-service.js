@@ -48,6 +48,9 @@ function syncPendingRouletteSpins() {
       pending.sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
       for (const spin of pending) {
         if (window.fischteichConnectivity?.isOnline() === false) return { confirmed, offline: true };
+        if (spin.localStatsApplied === false) {
+          return { confirmed, offline: false, recoveryRequired: true };
+        }
         await recordRouletteSpin(spin);
         await window.rouletteOfflineQueue.removeSpin(spin.id);
         confirmed += 1;

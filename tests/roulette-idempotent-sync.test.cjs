@@ -111,6 +111,21 @@ test("pending sync uses timestamp then ID order, removes successes, and never ch
   assert.equal(h.calls.some(([kind]) => kind === "global" || kind === "local"), false);
 });
 
+test("sync stops before a locally unconfirmed event and accepts legacy entries without the field", async () => {
+  const blocked = { ...spin(1), localStatsApplied: false };
+  const h = harness([blocked, spin(2), spin(3)]);
+  const first = await h.service.syncPendingRouletteSpins();
+  assert.deepEqual(JSON.parse(JSON.stringify(first)), { confirmed: 0, offline: false, recoveryRequired: true });
+  assert.equal(h.calls.some(([kind]) => kind === "rpc"), false);
+  assert.equal(h.queue.size, 3);
+
+  h.queue.set(blocked.id, { ...blocked, localStatsApplied: true });
+  const second = await h.service.syncPendingRouletteSpins();
+  assert.equal(second.confirmed, 3);
+  assert.equal(h.calls.filter(([kind]) => kind === "rpc").length, 3);
+  assert.equal(h.queue.size, 0);
+});
+
 test("partial server failure stops after C and leaves C and D pending", async () => {
   const h = harness([spin(1), spin(2), spin(3), spin(4)]);
   h.setFailure(id(3));
@@ -119,6 +134,30 @@ test("partial server failure stops after C and leaves C and D pending", async ()
   assert.match(result.error.message, /network/);
   assert.deepEqual([...h.queue.keys()], [id(3), id(4)]);
   assert.deepEqual(h.calls.filter(([kind]) => kind === "rpc").map(([, , params]) => params.p_spin_id), [id(1), id(2), id(3)]);
+});
+
+test("server failure while browser is online keeps pending data and never falls back to a legacy RPC", async () => {
+  const h = harness([spin(1)]);
+  h.setFailure(id(1));
+  const result = await h.service.syncPendingRouletteSpins();
+  assert.equal(result.confirmed, 0);
+  assert.equal(result.offline, false);
+  assert.equal(h.window.fischteichConnectivity.isOnline(), true);
+  assert.equal(h.queue.size, 1);
+  assert.match(result.error.message, /network/);
+  assert.deepEqual(h.calls.filter(([kind]) => kind === "rpc").map(([, name]) => name), ["record_roulette_spin_event"]);
+  assert.doesNotMatch(source, /\.rpc\(["']record_roulette_(?:spin|gold_spin)["']/);
+});
+
+test("same display name on two devices adds all independent UUIDs to one personal total", async () => {
+  const events = [spin(1), spin(2), spin(3), spin(4), spin(5), spin(6), spin(7)];
+  events.slice(3).forEach(event => { event.deviceId = id(901); });
+  const h = harness(events);
+  assert.equal((await h.service.syncPendingRouletteSpins()).confirmed, 7);
+  assert.equal(h.receipts.size, 7);
+  assert.equal(h.stats.get("Fabian").total_spins, 7);
+  assert.deepEqual(new Set([...h.receipts.values()].map(params => params.p_device_id)), new Set([id(900), id(901)]));
+  assert.equal(h.queue.size, 0);
 });
 
 test("server success followed by app crash is cleared by already_processed on manual retry", async () => {

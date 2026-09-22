@@ -46,10 +46,18 @@ function createRouletteSpinId() {
 function enqueueSpin(spin) {
   if (!spin || typeof spin.id !== "string" || typeof spin.deviceId !== "string"
     || typeof spin.displayName !== "string" || !["turbolachs", "nitroforelle", "goldfish"].includes(spin.result)
-    || typeof spin.createdAt !== "string" || spin.syncStatus !== "pending") {
+    || typeof spin.createdAt !== "string" || spin.syncStatus !== "pending"
+    || (spin.localStatsApplied !== undefined && typeof spin.localStatsApplied !== "boolean")) {
     return Promise.reject(new TypeError("Invalid pending roulette spin"));
   }
   return withPendingStore("readwrite", store => store.add(spin));
+}
+
+function markLocalStatsApplied(spin) {
+  if (!spin || typeof spin.id !== "string" || spin.localStatsApplied === true) {
+    return Promise.reject(new TypeError("Invalid pending roulette spin update"));
+  }
+  return withPendingStore("readwrite", store => store.put({ ...spin, localStatsApplied: true }));
 }
 
 async function getPendingSpins() {
@@ -68,6 +76,7 @@ function removeSpin(id) {
 window.rouletteOfflineQueue = Object.freeze({
   createSpinId: createRouletteSpinId,
   enqueueSpin,
+  markLocalStatsApplied,
   getPendingSpins,
   getPendingSpinCount,
   removeSpin,

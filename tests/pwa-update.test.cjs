@@ -232,8 +232,9 @@ test("service worker is registered once globally and receives an explicit update
   assert.equal(harness.getUpdateCalls(), 1);
 });
 
-test("PWA update polish does not introduce an application fetch cache", () => {
+test("PWA update check stays network-only beside the offline shell", () => {
   const serviceWorker = read("service-worker.js");
-  assert.doesNotMatch(serviceWorker, /addEventListener\(["']fetch["']/);
-  assert.doesNotMatch(serviceWorker, /caches\.(?:open|match)|CacheStorage/);
+  assert.match(serviceWorker, /addEventListener\("fetch"/);
+  assert.doesNotMatch(serviceWorker, /version\.json/);
+  assert.match(read("pwa-service.js"), /cache: "no-store"/);
 });

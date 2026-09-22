@@ -51,7 +51,8 @@ test("fullscreen screen and compensating image height keep the -30px offset cove
   }
 });
 
-test("the service worker does not serve a stale application image cache", () => {
+test("the service worker excludes online gameplay imagery from its explicit offline cache", () => {
   const worker=read("service-worker.js");
-  assert.doesNotMatch(worker,/addEventListener\(["']fetch["']|caches\.(open|match)|CacheStorage|PRECACHE/);
+  assert.match(worker,/OFFLINE_ASSET_URLS\.has\(url\.href\)/);
+  assert.doesNotMatch(worker,/trottl-classic\/|mini-games\//);
 });

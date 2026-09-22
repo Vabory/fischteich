@@ -4937,34 +4937,56 @@ function closeRouletteStatsModal(modal, returnFocusElement) {
   returnFocusElement.focus();
 }
 
-function persistCompletedRouletteSpin(resultType) {
-  void Promise.resolve()
-    .then(() => {
-      if (!window.rouletteService?.recordRouletteSpin) {
-        throw new Error("Roulette service is unavailable");
-      }
+async function persistCompletedRouletteSpin(resultType) {
+  let spin;
+  try {
+    const identity = getLocalIdentity();
+    if (!identity || !window.rouletteOfflineQueue) throw new Error("Roulette queue or local identity unavailable");
+    spin = {
+      id: window.rouletteOfflineQueue.createSpinId(),
+      deviceId: identity.deviceId,
+      displayName: identity.displayName,
+      result: resultType,
+      createdAt: new Date().toISOString(),
+      syncStatus: "pending",
+    };
+    await window.rouletteOfflineQueue.enqueueSpin(spin);
+  } catch (error) {
+    console.error("Roulette-Spin konnte nicht für die spätere Synchronisierung gespeichert werden.", error);
+    showConnectivityNotice("Der Spin konnte nicht für die spätere Synchronisierung gespeichert werden.");
+    return;
+  }
 
-      return window.rouletteService.recordRouletteSpin(resultType);
-    })
-    .then((recordedStats) => {
-      const refreshes = [loadGlobalRouletteStats()];
+  if (!connectivityOnline) return;
+  let recordedStats;
+  try {
+    if (!window.rouletteService?.recordRouletteSpin) throw new Error("Roulette service is unavailable");
+    recordedStats = await window.rouletteService.recordRouletteSpin(resultType);
+  } catch (error) {
+    console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
+    showConnectivityNotice("Online-Speicherung fehlgeschlagen. Der Spin bleibt lokal gespeichert.");
+    return;
+  }
 
-      if (
-        !rouletteLeaderboardModal.hidden
-        && !updateOpenRouletteLeaderboardFromServerRow(recordedStats)
-      ) {
-        refreshes.push(loadRouletteLeaderboard({ force: true }));
-      }
+  try {
+    await window.rouletteOfflineQueue.removeSpin(spin.id);
+  } catch (error) {
+    console.error("Gespeicherter Roulette-Spin konnte nicht aus der lokalen Queue entfernt werden.", error);
+    showConnectivityNotice("Online gespeichert; die lokale Vormerkung konnte nicht bereinigt werden.");
+  }
 
-      if (!personalRouletteStatsModal.hidden) {
-        refreshes.push(loadPersonalRouletteStats({ force: true }));
-      }
-
-      return Promise.all(refreshes);
-    })
-    .catch((error) => {
-      console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
-    });
+  try {
+    const refreshes = [loadGlobalRouletteStats()];
+    if (!rouletteLeaderboardModal.hidden && !updateOpenRouletteLeaderboardFromServerRow(recordedStats)) {
+      refreshes.push(loadRouletteLeaderboard({ force: true }));
+    }
+    if (!personalRouletteStatsModal.hidden) {
+      refreshes.push(loadPersonalRouletteStats({ force: true }));
+    }
+    await Promise.all(refreshes);
+  } catch (error) {
+    console.error("Roulette-Statistik konnte nicht aktualisiert werden.", error);
+  }
 }
 
 function recordCompletedRouletteSpin(winnerIndex) {
@@ -4984,7 +5006,7 @@ function recordCompletedRouletteSpin(winnerIndex) {
     renderRouletteStats();
   }
 
-  persistCompletedRouletteSpin(resultType);
+  return persistCompletedRouletteSpin(resultType);
 }
 
 function setRouletteTileColor(tile, colorIndex) {
@@ -5265,7 +5287,6 @@ function finishRoulette(run, winnerIndex, targetIndex) {
 }
 
 function startRoulette() {
-  if (!requireOnline("Roulette-Drehungen")) return;
   if (state.rouletteSpinning || !state.rouletteReady) {
     return;
   }

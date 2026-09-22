@@ -50,7 +50,7 @@ test("offline gate gives a plain explanation before online-only navigation", () 
   assert.equal(h.window.test.notice.textContent, "Buffalo Timer benötigt eine Internetverbindung.");
   assert.match(section("function showTrottlMenu", "function showFischteichDiceScreen"), /if \(!requireOnline\("3ER TROTTL"\)\) return/);
   assert.match(section("function openBuffaloTimerModal", "function closeBuffaloTimerModal"), /if \(!requireOnline\("Buffalo Timer"\)\) return/);
-  assert.match(section("function startRoulette()", "document.querySelector(\"#start-two-teams\")"), /if \(!requireOnline\("Roulette-Drehungen"\)\) return/);
+  assert.doesNotMatch(section("function startRoulette()", "document.querySelector(\"#start-two-teams\")"), /requireOnline/);
   assert.match(script, /if \(!requireOnline\("3ER TROTTL Classic"\)\) return/);
   assert.match(script, /if \(!requireOnline\("3ER TROTTL Special"\)\) return/);
 });
@@ -99,5 +99,5 @@ test("phase-one offline cache structure and push handlers remain intact", () => 
   assert.match(worker, /self\.addEventListener\("push"/);
   assert.match(worker, /self\.addEventListener\("notificationclick"/);
   assert.match(worker, /"\.\/style\.css\?v=193"/);
-  assert.match(worker, /"\.\/script\.js\?v=96"/);
+  assert.match(worker, /"\.\/script\.js\?v=97"/);
 });

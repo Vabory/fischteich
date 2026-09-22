@@ -61,13 +61,13 @@ test("offline manifest covers every boot script, stylesheet, icon and visible ma
   const links = [...html.matchAll(/<link rel="(?:stylesheet|manifest|icon|apple-touch-icon)"[^>]*href="([^"]+)"/g)].map(match => match[1]);
   const firstScreen = html.split('<section class="screen teams-menu-screen"')[0];
   const menuImages = [...firstScreen.matchAll(/<img[^>]*src="(\.\/assets\/[^"]+)"/g)].map(match => match[1]);
-  assert.equal(scripts.length, 42);
+  assert.equal(scripts.length, 43);
   assert.equal(menuImages.length, 9);
   for (const url of ["./index.html", "./assets/icon-512.png", ...scripts, ...links, ...menuImages]) assert.ok(shell.has(url), `missing boot URL ${url}`);
-  assert.equal(shell.size, 58);
+  assert.equal(shell.size, 59);
   assert.equal(h.self.offlineTest.team.length, 6);
   assert.equal(h.self.offlineTest.roulette.length, 10);
-  assert.equal(new Set(h.self.offlineTest.urls).size, 74);
+  assert.equal(new Set(h.self.offlineTest.urls).size, 75);
   const bytes = h.self.offlineTest.urls.reduce((total, url) => total + fs.statSync(path.join(root, decodeURIComponent(new URL(url).pathname.slice(new URL(scope).pathname.length)))).size, 0);
   assert.ok(bytes < 9 * 1024 * 1024);
 });
@@ -100,7 +100,7 @@ test("install caches the explicit shell, activate removes only old Fischteich of
   h.stores.set("fischteich-offline-v0", new Map());
   await h.lifecycle("install");
   assert.equal(h.skipped, 1);
-  assert.equal(h.stores.get("fischteich-offline-v1").size, 74);
+  assert.equal(h.stores.get("fischteich-offline-v1").size, 75);
   await h.lifecycle("activate");
   assert.equal(h.claimed, 1);
   assert.equal(h.stores.has("fischteich-offline-v0"), false);

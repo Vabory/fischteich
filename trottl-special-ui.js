@@ -61,6 +61,9 @@
     const fishCount = global.TrottlSpecialFishCount?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Antwort wird erneut geladen."; void refresh(); } });
+    const catchMe = global.TrottlSpecialCatchMe?.create({ root: game, service,
+      onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
+      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fangfortschritt wird erneut geladen."; void refresh(); } });
     const debug = global.TrottlSpecialDebug?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id) { acceptSnapshot(next); renderSession(); } } });
     // Results and transitions come exclusively from the Special intent RPC.
@@ -423,6 +426,7 @@
       stopFish?.update(snapshot);
       poisonFish?.update(snapshot);
       fishCount?.update(snapshot);
+      catchMe?.update(snapshot);
       debug?.update(snapshot);
     }
     function distributionCount() {
@@ -660,6 +664,7 @@
       stopFish?.suspend();
       poisonFish?.suspend();
       fishCount?.suspend();
+      catchMe?.suspend();
       debug?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearTimeout(state.hintTimer); state.hintTimer = null;

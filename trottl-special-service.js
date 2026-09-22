@@ -70,6 +70,8 @@
       ? await rpc("get_trottl_special_poison_fish_view", { p_session_id: sessionId }) : null;
     const fishCountView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_08"
       ? await rpc("get_trottl_special_fish_count_view", { p_session_id: sessionId }) : null;
+    const catchMeView = s.data.status === "playing" && s.data.game_state?.phase === "minigame_active" && s.data.game_state?.minigame?.minigame_type === "special_minigame_09"
+      ? await rpc("get_trottl_special_catch_me_view", { p_session_id: sessionId }) : null;
     const players = (p.data ?? []).filter(row => row.lifecycle_status !== "left").map(row => {
       const base = presentation.normalizePlayer(row);
       if (!base) return null;
@@ -128,6 +130,16 @@
       || !Number.isFinite(Date.parse(fishCountView.answer_started_at)) || !Number.isFinite(Date.parse(fishCountView.answer_deadline))
       || Date.parse(fishCountView.answer_deadline) - Date.parse(fishCountView.answer_started_at) !== 10000
       || typeof fishCountView.answered !== "boolean" || typeof fishCountView.player_id !== "string")) throw new Error("Invalid fish count view response");
+    if (catchMeView !== null && (typeof catchMeView !== "object" || !Number.isInteger(Number(catchMeView.seed))
+      || Number(catchMeView.seed) < 1 || Number(catchMeView.seed) > 2147483646
+      || !Array.isArray(catchMeView.positions) || catchMeView.positions.length !== 10
+      || catchMeView.positions.some(point => typeof point !== "object" || !Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))
+        || Number(point.x) < .16 || Number(point.x) > .84 || Number(point.y) < .13 || Number(point.y) > .87)
+      || !Number.isInteger(Number(catchMeView.progress)) || Number(catchMeView.progress) < 0 || Number(catchMeView.progress) > 10
+      || !["open", "completed", "timeout"].includes(catchMeView.status) || typeof catchMeView.player_id !== "string"
+      || !Number.isFinite(Date.parse(catchMeView.started_at)) || !Number.isFinite(Date.parse(catchMeView.deadline))
+      || Date.parse(catchMeView.deadline) - Date.parse(catchMeView.started_at) !== 30000
+      || (catchMeView.status === "completed") !== (Number(catchMeView.progress) === 10))) throw new Error("Invalid catch me view response");
     return Object.freeze({ session: normalizeSession(s.data), players: Object.freeze(players), identity,
       membershipRole: membership.membershipRole, spectatorCount: membership.spectatorCount, panicSubmittedCount,
       reactionRun: reactionRun === null ? null : Object.freeze({ ...reactionRun, delay_ms: Number(reactionRun.delay_ms), reaction_ms: reactionRun.reaction_ms === null ? null : Number(reactionRun.reaction_ms) }),
@@ -137,7 +149,9 @@
         guess_count: Number(fishMemoryView.guess_count), errors: fishMemoryView.errors === null ? null : Number(fishMemoryView.errors), pattern: Object.freeze([...fishMemoryView.pattern]) }),
       stopFishView: stopFishView === null ? null : Object.freeze({ ...stopFishView, distance_units: Number(stopFishView.distance_units), tap_elapsed_ms: stopFishView.tap_elapsed_ms === null ? null : Number(stopFishView.tap_elapsed_ms) }),
       poisonFishView: poisonFishView === null ? null : Object.freeze({ ...poisonFishView, movement_seed: Number(poisonFishView.movement_seed), score: Number(poisonFishView.score), events: Object.freeze([...poisonFishView.events]) }),
-      fishCountView: fishCountView === null ? null : Object.freeze({ ...fishCountView, seed: Number(fishCountView.seed), reveal_duration_ms: Number(fishCountView.reveal_duration_ms), choices: Object.freeze([...fishCountView.choices]) }) });
+      fishCountView: fishCountView === null ? null : Object.freeze({ ...fishCountView, seed: Number(fishCountView.seed), reveal_duration_ms: Number(fishCountView.reveal_duration_ms), choices: Object.freeze([...fishCountView.choices]) }),
+      catchMeView: catchMeView === null ? null : Object.freeze({ ...catchMeView, seed: Number(catchMeView.seed), progress: Number(catchMeView.progress),
+        positions: Object.freeze(catchMeView.positions.map(point => Object.freeze({ x: Number(point.x), y: Number(point.y) }))) }) });
   }
   async function loadMembership(sessionId) {
     const rows = await rpc("get_trottl_special_membership", { p_session_id: sessionId });
@@ -222,6 +236,8 @@
     finalizePoisonFish: async (id, roundId) => { await rpc("finalize_trottl_special_poison_fish", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     answerFishCount: async (id, roundId, answer, elapsed) => { await rpc("answer_trottl_special_fish_count", { p_session_id: id, p_round_id: roundId, p_selected_answer: answer, p_tap_elapsed_ms: elapsed }); return loadSession(id); },
     finalizeFishCount: async (id, roundId) => { await rpc("finalize_trottl_special_fish_count", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
+    submitCatchMe: async (id, roundId, events) => { await rpc("submit_trottl_special_catch_me", { p_session_id: id, p_round_id: roundId, p_events: events }); return loadSession(id); },
+    finalizeCatchMe: async (id, roundId) => { await rpc("finalize_trottl_special_catch_me", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },
     actRoulette: async (id, roundId, action, value = null, target = null) => {
       await rpc("act_trottl_special_roulette", { p_session_id: id, p_round_id: roundId, p_action: action, p_value: value, p_target: target });
       return loadSession(id);

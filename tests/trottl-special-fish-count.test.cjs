@@ -134,6 +134,6 @@ test("SQL migration isolates correctness, ranks all wrong players and reuses com
   assert.match(sql, /answer_trottl_special_fish_count/);
   assert.ok(!sql.slice(sql.indexOf("create function public.get_trottl_special_fish_count_view"), sql.indexOf("create function public.special_fish_count_finalize_locked")).includes("'correct_count'"));
   assert.match(fixture, /special_fish_count_reveal_ms\(5\)<>1000/);
-  assert.match(fixture, /special_minigame_pick\(0\.875\)/);
+  assert.match(fixture, /special_minigame_pick\(0\.777778\)/);
   assert.ok(fixture.startsWith("begin;\n") && fixture.endsWith("rollback;\n"));
 });

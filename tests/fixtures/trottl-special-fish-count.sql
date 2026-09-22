@@ -3,7 +3,7 @@ begin;
 do $$
 declare seed bigint;count_value integer;choices jsonb;duration integer;previous integer:=0;
 begin
- if (select count(*) from public.trottl_special_minigame_registry where implemented and enabled)<>8 then raise exception 'Fish count pool must contain eight games';end if;
+ if (select count(*) from public.trottl_special_minigame_registry where implemented and enabled)<>9 then raise exception 'Productive pool must contain nine games';end if;
  for seed in 1..140 loop
   count_value:=public.special_fish_count_for_seed(seed);
   if count_value not between 5 and 18 then raise exception 'Fish count outside range';end if;
@@ -21,9 +21,9 @@ begin
   previous:=duration;
  end loop;
  if public.special_fish_count_reveal_ms(5)<>1000 or public.special_fish_count_reveal_ms(18)<>2000 then raise exception 'Reveal duration endpoints wrong';end if;
- if public.special_minigame_pick(0)<>'special_minigame_01' or public.special_minigame_pick(0.125)<>'special_minigame_02'
-  or public.special_minigame_pick(0.875)<>'special_minigame_08' or public.special_minigame_pick(0,'special_minigame_08')<>'special_minigame_08'
-  then raise exception 'Eight-way picker or TEST override wrong';end if;
+ if public.special_minigame_pick(0)<>'special_minigame_01' or public.special_minigame_pick(0.111112)<>'special_minigame_02'
+  or public.special_minigame_pick(0.777778)<>'special_minigame_08' or public.special_minigame_pick(0.888889)<>'special_minigame_09'
+  or public.special_minigame_pick(0,'special_minigame_09')<>'special_minigame_09' then raise exception 'Nine-way picker or TEST override wrong';end if;
 end; $$;
 
 rollback;

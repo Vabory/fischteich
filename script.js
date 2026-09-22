@@ -4961,7 +4961,7 @@ async function persistCompletedRouletteSpin(resultType) {
   let recordedStats;
   try {
     if (!window.rouletteService?.recordRouletteSpin) throw new Error("Roulette service is unavailable");
-    recordedStats = await window.rouletteService.recordRouletteSpin(resultType);
+    recordedStats = await window.rouletteService.recordRouletteSpin(spin);
   } catch (error) {
     console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
     showConnectivityNotice("Online-Speicherung fehlgeschlagen. Der Spin bleibt lokal gespeichert.");
@@ -4977,7 +4977,7 @@ async function persistCompletedRouletteSpin(resultType) {
 
   try {
     const refreshes = [loadGlobalRouletteStats()];
-    if (!rouletteLeaderboardModal.hidden && !updateOpenRouletteLeaderboardFromServerRow(recordedStats)) {
+    if (!rouletteLeaderboardModal.hidden && !updateOpenRouletteLeaderboardFromServerRow(recordedStats.stats)) {
       refreshes.push(loadRouletteLeaderboard({ force: true }));
     }
     if (!personalRouletteStatsModal.hidden) {

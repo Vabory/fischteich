@@ -6,36 +6,54 @@ const ROULETTE_RESULT_TYPES = Object.freeze([
   "goldfish",
 ]);
 
-async function recordRouletteSpin(resultType) {
-  if (!ROULETTE_RESULT_TYPES.includes(resultType)) {
-    throw new TypeError("resultType must be turbolachs, nitroforelle, or goldfish");
+async function recordRouletteSpin(spinEvent) {
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!spinEvent || !uuidPattern.test(spinEvent.id) || !uuidPattern.test(spinEvent.deviceId)
+    || typeof spinEvent.displayName !== "string"
+    || spinEvent.displayName.trim() !== spinEvent.displayName
+    || spinEvent.displayName.length < 1 || spinEvent.displayName.length > 24
+    || !ROULETTE_RESULT_TYPES.includes(spinEvent.result)
+    || typeof spinEvent.createdAt !== "string"
+    || !Number.isFinite(Date.parse(spinEvent.createdAt))) {
+    throw new TypeError("Invalid roulette spin event");
   }
 
-  const identity = getLocalIdentity();
-
-  if (!identity) {
-    throw new Error("A local identity is required to record a roulette spin");
-  }
-
-  const rpcName = resultType === "goldfish"
-    ? "record_roulette_gold_spin"
-    : "record_roulette_spin";
-  const parameters = resultType === "goldfish"
-    ? {
-      p_device_id: identity.deviceId,
-      p_display_name: identity.displayName,
-    }
-    : {
-      p_display_name: identity.displayName,
-      p_result_type: resultType,
-    };
-  const { data, error } = await supabaseClient.rpc(rpcName, parameters);
+  const { data, error } = await supabaseClient.rpc("record_roulette_spin_event", {
+    p_spin_id: spinEvent.id,
+    p_device_id: spinEvent.deviceId,
+    p_display_name: spinEvent.displayName,
+    p_result: spinEvent.result,
+    p_client_created_at: spinEvent.createdAt,
+  });
 
   if (error) {
     throw error;
   }
 
+  if (!data || !["processed", "already_processed"].includes(data.status)) {
+    throw new Error("Roulette spin was not confirmed by the server");
+  }
+
   return data;
+}
+
+let pendingRouletteSync = null;
+function syncPendingRouletteSpins() {
+  if (pendingRouletteSync) return pendingRouletteSync;
+  pendingRouletteSync = (async () => {
+    let confirmed = 0;
+    if (window.fischteichConnectivity?.isOnline() === false) return { confirmed, offline: true };
+    const pending = await window.rouletteOfflineQueue.getPendingSpins();
+    pending.sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+    for (const spin of pending) {
+      if (window.fischteichConnectivity?.isOnline() === false) return { confirmed, offline: true };
+      await recordRouletteSpin(spin);
+      await window.rouletteOfflineQueue.removeSpin(spin.id);
+      confirmed += 1;
+    }
+    return { confirmed, offline: false };
+  })().finally(() => { pendingRouletteSync = null; });
+  return pendingRouletteSync;
 }
 
 async function getRouletteLeaderboard() {
@@ -126,6 +144,7 @@ async function getGoldHitEvents(afterEventId) {
 
 window.rouletteService = Object.freeze({
   recordRouletteSpin,
+  syncPendingRouletteSpins,
   getRouletteLeaderboard,
   getPersonalRouletteStats,
   getGlobalRouletteStats,

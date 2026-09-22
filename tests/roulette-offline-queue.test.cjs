@@ -129,7 +129,7 @@ function appHarness(online = false, options = {}) {
     removeSpin: async id => { await queue.removeSpin(id); calls.push(["remove"]); },
   };
   const window = { rouletteOfflineQueue: queueAdapter, rouletteService: {
-    async recordRouletteSpin(result) { calls.push(["server", result]); if (options.serverError) throw new Error("network"); return { result }; },
+    async recordRouletteSpin(spinEvent) { calls.push(["server", spinEvent]); if (options.serverError) throw new Error("network"); return { status: "processed", stats: { display_name: spinEvent.displayName } }; },
   } };
   const context = vm.createContext({ window, state, connectivityOnline: online,
     ROULETTE_STAT_KEY_BY_WINNER_INDEX: { 0: "turbolachs", 1: "nitroforelle", 2: "gold" },
@@ -177,6 +177,7 @@ test("online spin commits queue before server and removes it after success, then
   await h.record(1);
   const kinds = h.indexedDB.calls.map(([kind]) => kind);
   assert.deepEqual(h.calls.map(([kind]) => kind), ["local", "render", "queue", "server", "remove", "global"]);
+  assert.equal(h.calls.find(([kind]) => kind === "server")[1].id, h.indexedDB.calls.find(([kind]) => kind === "add")[1].id);
   assert.deepEqual(kinds.filter(kind => ["add", "delete"].includes(kind)), ["add", "delete"]);
   assert.equal(await h.queue.getPendingSpinCount(), 0);
   assert.equal(h.state.rouletteStats.totalSpins, 1);
@@ -185,15 +186,15 @@ test("online spin commits queue before server and removes it after success, then
 test("a pending event survives app closure while the online server request is unresolved", async () => {
   const h = appHarness(true);
   let releaseServer;
-  h.window.rouletteService.recordRouletteSpin = async result => {
-    h.calls.push(["server", result]);
+  h.window.rouletteService.recordRouletteSpin = async spinEvent => {
+    h.calls.push(["server", spinEvent]);
     return new Promise(resolve => { releaseServer = resolve; });
   };
   const completion = h.record(0);
   while (!releaseServer) await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.state.rouletteStats.totalSpins, 1);
   assert.equal(await queueHarness(h.indexedDB).queue.getPendingSpinCount(), 1);
-  releaseServer({ result: "turbolachs" });
+  releaseServer({ status: "processed", stats: { display_name: "Fabian" } });
   await completion;
   assert.equal(await h.queue.getPendingSpinCount(), 0);
 });

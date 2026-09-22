@@ -48,5 +48,5 @@ test("final UI polish assets use their dedicated cache versions", () => {
   const html = read("index.html");
   assert.match(html, /trottl-special\.css\?v=31/);
   assert.match(html, /team-division-v2-logic\.js\?v=2/);
-  assert.match(html, /script\.js\?v=97/);
+  assert.match(html, /script\.js\?v=98/);
 });

@@ -121,7 +121,7 @@ test("spin IDs use crypto UUID with a secure v4 fallback", () => {
 function appHarness(online = false, options = {}) {
   const indexedDB = fakeIndexedDB();
   const { queue } = queueHarness(indexedDB);
-  const calls = [], notices = [], errors = [];
+  const calls = [], notices = [], errors = [], pendingRefreshes = [];
   const state = { rouletteStats: { totalSpins: 0, turbolachs: 0, nitroforelle: 0, gold: 0, lastGoldHit: null }, rouletteStatsRequestId: 0, globalRouletteStats: null };
   const queueAdapter = {
     createSpinId: () => queue.createSpinId(),
@@ -132,6 +132,8 @@ function appHarness(online = false, options = {}) {
     async recordRouletteSpin(spinEvent) { calls.push(["server", spinEvent]); if (options.serverError) throw new Error("network"); return { status: "processed", stats: { display_name: spinEvent.displayName } }; },
   } };
   const context = vm.createContext({ window, state, connectivityOnline: online,
+    rouletteScreen: { hidden: true }, roulettePendingStatus: { hidden: true, textContent: "" },
+    refreshRoulettePendingCount: () => { pendingRefreshes.push("refresh"); },
     ROULETTE_STAT_KEY_BY_WINNER_INDEX: { 0: "turbolachs", 1: "nitroforelle", 2: "gold" },
     ROULETTE_RESULT_TYPE_BY_WINNER_INDEX: { 0: "turbolachs", 1: "nitroforelle", 2: "goldfish" },
     getLocalIdentity: () => ({ deviceId: "device-1", displayName: options.name || "Fabian" }),
@@ -145,7 +147,7 @@ function appHarness(online = false, options = {}) {
     console: { error: (...args) => errors.push(args) }, Date, Promise,
   });
   vm.runInContext(appSection, context);
-  return { context, state, queue, indexedDB, calls, notices, errors, window,
+  return { context, state, queue, indexedDB, calls, notices, errors, pendingRefreshes, window,
     record: winner => vm.runInContext(`recordCompletedRouletteSpin(${winner})`, context) };
 }
 
@@ -227,6 +229,18 @@ test("queue failure reports the error and does not start a server request", asyn
   assert.equal(h.calls.some(([kind]) => kind === "server"), false);
   assert.match(h.notices[0], /nicht für die spätere Synchronisierung gespeichert/);
   assert.equal(h.errors.length, 1);
+});
+
+test("pending display refreshes after offline enqueue, online failure, and online confirmation", async () => {
+  const offline = appHarness(false);
+  await offline.record(0);
+  assert.equal(offline.pendingRefreshes.length, 1);
+  const failed = appHarness(true, { serverError: true });
+  await failed.record(0);
+  assert.equal(failed.pendingRefreshes.length, 1);
+  const confirmed = appHarness(true);
+  await confirmed.record(0);
+  assert.equal(confirmed.pendingRefreshes.length, 2);
 });
 
 test("restarting with pending spins neither syncs them nor recounts local statistics", async () => {

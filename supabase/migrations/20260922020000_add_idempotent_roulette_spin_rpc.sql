@@ -114,10 +114,7 @@ revoke all on function public.record_roulette_spin_event(uuid, uuid, text, text,
 grant execute on function public.record_roulette_spin_event(uuid, uuid, text, text, timestamptz)
   to anon, authenticated;
 
--- Browser writes must use the receipt-backed RPC after this migration.
-revoke all on function public.record_roulette_spin(text, text)
-  from public, anon, authenticated;
-revoke all on function public.record_roulette_gold_spin(text, uuid)
-  from public, anon, authenticated;
+-- Keep legacy RPC grants during the client transition. The separate rollout
+-- script revokes them after active old clients have had time to update.
 
 commit;

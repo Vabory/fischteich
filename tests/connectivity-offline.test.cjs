@@ -59,7 +59,7 @@ test("offline Roulette opens local screen without global requests, while Trottl 
   const calls = [], screen = {}, result = { textContent: "", classList: { remove() {} } }, status = { hidden: true };
   const context = vm.createContext({ connectivityOnline: false, rouletteOfflineStatus: status, rouletteScreen: screen, rouletteResult: result,
     requireOnline: () => false, stopRoulette: () => calls.push("stop"), showScreen: () => calls.push("screen"),
-    renderRouletteStats: () => calls.push("local-stats"), startRouletteLastAnglerTimer: () => calls.push("timer"),
+    renderRouletteStats: () => calls.push("local-stats"), refreshRoulettePendingCount: () => {}, startRouletteLastAnglerTimer: () => calls.push("timer"),
     startRouletteStatsRealtime: () => calls.push("realtime"), startRouletteGoldEventUpdates: () => calls.push("gold"),
     loadGlobalRouletteStats: () => calls.push("global"), initializeRoulette: () => calls.push("tiles"),
     trottlMenuFeedback: { textContent: "" }, trottlMenuScreen: {}, leaveModal: {}, fingerRedistributeModal: {},
@@ -86,7 +86,7 @@ test("local entry points stay available while global Roulette fetches are gated"
 
 test("offline startup avoids auth and Buffalo initialization and reports a reconnect limit", () => {
   assert.match(script, /if \(connectivityOnline\) \{\s*initializeBuffaloTimer\(\);\s*void initializeBuffaloPush\(\);/);
-  assert.match(script, /if \(connectivityOnline\) \{\s*void initializeAppAuth\(\)\.then\(restoreTrottlAfterAuth\);\s*\} else \{/);
+  assert.match(script, /if \(connectivityOnline\) \{\s*void initializeAppAuth\(\)\.then\(restoreTrottlAfterAuth\);\s*void runAutomaticRouletteSync\(\);\s*\} else \{/);
   assert.match(script, /Die Online-Sitzung kann ohne Internet nicht wiederhergestellt werden\./);
   assert.match(script, /if \(!connectivityOnline\) return \[\];\s*if \(!window\.buffaloService\?\.loadActiveEvents\)/);
   assert.match(script, /if \(!connectivityOnline\) return false;\s*if \(state\.rouletteStatsLoading\)/);
@@ -98,6 +98,6 @@ test("phase-one offline cache structure and push handlers remain intact", () => 
   assert.match(worker, /fischteich-offline-v/);
   assert.match(worker, /self\.addEventListener\("push"/);
   assert.match(worker, /self\.addEventListener\("notificationclick"/);
-  assert.match(worker, /"\.\/style\.css\?v=193"/);
-  assert.match(worker, /"\.\/script\.js\?v=98"/);
+  assert.match(worker, /"\.\/style\.css\?v=194"/);
+  assert.match(worker, /"\.\/script\.js\?v=99"/);
 });

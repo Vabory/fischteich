@@ -8184,3 +8184,5 @@ button.is-release-pressed {
 .connectivity-badge[hidden], .connectivity-notice[hidden] { display: none; }
 .roulette-offline-status { margin: 4px 0 8px; color: #ffe0c7; font-size: 12px; font-weight: 700; text-align: center; }
 .roulette-offline-status[hidden] { display: none; }
+.roulette-pending-status { margin: 0 0 5px; color: #d6e9f7; font-size: 11px; font-weight: 600; line-height: 1.15; text-align: center; }
+.roulette-pending-status[hidden] { display: none; }

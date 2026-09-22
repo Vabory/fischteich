@@ -43,15 +43,19 @@ function syncPendingRouletteSpins() {
   pendingRouletteSync = (async () => {
     let confirmed = 0;
     if (window.fischteichConnectivity?.isOnline() === false) return { confirmed, offline: true };
-    const pending = await window.rouletteOfflineQueue.getPendingSpins();
-    pending.sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
-    for (const spin of pending) {
-      if (window.fischteichConnectivity?.isOnline() === false) return { confirmed, offline: true };
-      await recordRouletteSpin(spin);
-      await window.rouletteOfflineQueue.removeSpin(spin.id);
-      confirmed += 1;
+    try {
+      const pending = await window.rouletteOfflineQueue.getPendingSpins();
+      pending.sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+      for (const spin of pending) {
+        if (window.fischteichConnectivity?.isOnline() === false) return { confirmed, offline: true };
+        await recordRouletteSpin(spin);
+        await window.rouletteOfflineQueue.removeSpin(spin.id);
+        confirmed += 1;
+      }
+      return { confirmed, offline: false };
+    } catch (error) {
+      return { confirmed, offline: false, error };
     }
-    return { confirmed, offline: false };
   })().finally(() => { pendingRouletteSync = null; });
   return pendingRouletteSync;
 }

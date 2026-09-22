@@ -93,7 +93,10 @@ const rouletteOfflineStatus = document.createElement("p");
 rouletteOfflineStatus.className = "roulette-offline-status";
 rouletteOfflineStatus.textContent = "Offline: lokale Werte auf diesem Gerät. Globale Statistik nicht verfügbar.";
 rouletteOfflineStatus.hidden = true;
-document.querySelector(".roulette-stats").prepend(rouletteOfflineStatus);
+const roulettePendingStatus = document.createElement("p");
+roulettePendingStatus.className = "roulette-pending-status";
+roulettePendingStatus.hidden = true;
+document.querySelector(".roulette-stats").prepend(rouletteOfflineStatus, roulettePendingStatus);
 const connectivityListeners = new Set();
 let connectivityOnline = window.navigator?.onLine !== false;
 let connectivityNoticeTimer = null;
@@ -4937,6 +4940,28 @@ function closeRouletteStatsModal(modal, returnFocusElement) {
   returnFocusElement.focus();
 }
 
+let roulettePendingCountRequestId = 0;
+function showRoulettePendingCount(count) {
+  roulettePendingCountRequestId += 1;
+  roulettePendingStatus.hidden = count < 1;
+  if (count > 0) {
+    roulettePendingStatus.textContent = count === 1
+      ? "1 Spin wartet auf Synchronisierung."
+      : `${count} Spins warten auf Synchronisierung.`;
+  }
+}
+
+async function refreshRoulettePendingCount() {
+  if (rouletteScreen.hidden || !window.rouletteOfflineQueue?.getPendingSpinCount) return;
+  const requestId = ++roulettePendingCountRequestId;
+  try {
+    const count = await window.rouletteOfflineQueue.getPendingSpinCount();
+    if (requestId === roulettePendingCountRequestId) showRoulettePendingCount(count);
+  } catch (error) {
+    console.warn("Roulette-Warteliste konnte nicht gelesen werden.", error);
+  }
+}
+
 async function persistCompletedRouletteSpin(resultType) {
   let spin;
   try {
@@ -4951,6 +4976,7 @@ async function persistCompletedRouletteSpin(resultType) {
       syncStatus: "pending",
     };
     await window.rouletteOfflineQueue.enqueueSpin(spin);
+    void refreshRoulettePendingCount();
   } catch (error) {
     console.error("Roulette-Spin konnte nicht für die spätere Synchronisierung gespeichert werden.", error);
     showConnectivityNotice("Der Spin konnte nicht für die spätere Synchronisierung gespeichert werden.");
@@ -4970,6 +4996,7 @@ async function persistCompletedRouletteSpin(resultType) {
 
   try {
     await window.rouletteOfflineQueue.removeSpin(spin.id);
+    void refreshRoulettePendingCount();
   } catch (error) {
     console.error("Gespeicherter Roulette-Spin konnte nicht aus der lokalen Queue entfernt werden.", error);
     showConnectivityNotice("Online gespeichert; die lokale Vormerkung konnte nicht bereinigt werden.");
@@ -5253,6 +5280,7 @@ function openRoulette() {
   rouletteResult.textContent = "";
   rouletteResult.classList.remove("is-visible");
   renderRouletteStats();
+  void refreshRoulettePendingCount();
   startRouletteLastAnglerTimer();
   if (rouletteOfflineStatus) rouletteOfflineStatus.hidden = connectivityOnline;
   if (connectivityOnline) {
@@ -5779,6 +5807,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     void refreshBuffaloTimer();
     trottlClassic.refresh();
+    if (connectivityOnline) void runAutomaticRouletteSync();
   } else {
     void trottlClassic.suspend();
   }
@@ -5864,6 +5893,47 @@ document.addEventListener("click", (event) => {
   event.stopImmediatePropagation();
   requireOnline("Turniere");
 }, true);
+let automaticRouletteSyncPromise = null;
+function runAutomaticRouletteSync() {
+  if (!connectivityOnline || !window.rouletteService?.syncPendingRouletteSpins
+    || !window.rouletteOfflineQueue?.getPendingSpinCount) return Promise.resolve(null);
+  if (automaticRouletteSyncPromise) return automaticRouletteSyncPromise;
+
+  automaticRouletteSyncPromise = (async () => {
+    const pendingBefore = await window.rouletteOfflineQueue.getPendingSpinCount();
+    if (pendingBefore === 0 || !connectivityOnline) return { confirmed: 0 };
+
+    const result = await window.rouletteService.syncPendingRouletteSpins();
+    let remaining = null;
+    try {
+      remaining = await window.rouletteOfflineQueue.getPendingSpinCount();
+    } catch (error) {
+      console.warn("Roulette-Warteliste konnte nach dem Sync nicht gelesen werden.", error);
+    }
+    if (!rouletteScreen.hidden) {
+      if (remaining !== null) showRoulettePendingCount(remaining);
+      if (result.confirmed > 0 && connectivityOnline) {
+        const refreshes = [loadGlobalRouletteStats()];
+        if (!rouletteLeaderboardModal.hidden) refreshes.push(loadRouletteLeaderboard({ force: true }));
+        if (!personalRouletteStatsModal.hidden) refreshes.push(loadPersonalRouletteStats({ force: true }));
+        await Promise.allSettled(refreshes);
+      }
+    }
+
+    if (result.confirmed > 0) {
+      const noun = result.confirmed === 1 ? "Offline-Spin" : "Offline-Spins";
+      const rest = remaining > 0 ? ` ${remaining} warten noch.` : "";
+      showConnectivityNotice(`${result.confirmed} ${noun} synchronisiert.${rest}`);
+    }
+    if (result.error) console.warn("Roulette-Synchronisierung wurde unterbrochen.", result.error);
+    return result;
+  })().catch((error) => {
+    console.warn("Roulette-Synchronisierung konnte nicht gestartet werden.", error);
+    return { confirmed: 0, error };
+  }).finally(() => { automaticRouletteSyncPromise = null; });
+
+  return automaticRouletteSyncPromise;
+}
 connectivityListeners.add((online) => {
   if (rouletteOfflineStatus) rouletteOfflineStatus.hidden = online || rouletteScreen.hidden;
   if (!online) {
@@ -5899,6 +5969,7 @@ connectivityListeners.add((online) => {
     if (!rouletteLeaderboardModal.hidden) void loadRouletteLeaderboard({ force: true });
     if (!personalRouletteStatsModal.hidden) void loadPersonalRouletteStats({ force: true });
   }
+  void runAutomaticRouletteSync();
 });
 renderRouletteStats();
 initializeLocalIdentity();
@@ -5937,6 +6008,7 @@ async function restoreTrottlAfterAuth() {
 }
 if (connectivityOnline) {
   void initializeAppAuth().then(restoreTrottlAfterAuth);
+  void runAutomaticRouletteSync();
 } else {
   const reconnectMode = window.TrottlStartupRouting?.getStartupReconnectMode() ?? null;
   if (reconnectMode) {

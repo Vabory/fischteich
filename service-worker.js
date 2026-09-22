@@ -11,7 +11,7 @@ const OFFLINE_CACHE_NAME = `${OFFLINE_CACHE_PREFIX}${OFFLINE_CACHE_VERSION}`;
 // Match the URLs requested by index.html, including their asset cache versions.
 const OFFLINE_APP_SHELL = [
   "./index.html",
-  "./style.css?v=193",
+  "./style.css?v=194",
   "./trottl-special.css?v=31",
   "./manifest.webmanifest",
   "./assets/icon-192.png",
@@ -24,7 +24,7 @@ const OFFLINE_APP_SHELL = [
   "./device-credential.js?v=1",
   "./auth.js?v=4",
   "./bobr-unlock.js?v=2",
-  "./roulette-service.js?v=7",
+  "./roulette-service.js?v=8",
   "./roulette-offline-queue.js?v=1",
   "./buffalo-service.js?v=5",
   "./pwa-service.js?v=1",
@@ -54,7 +54,7 @@ const OFFLINE_APP_SHELL = [
   "./trottl-special-admin.js?v=1",
   "./button-release.js?v=1",
   "./team-division-v2-logic.js?v=2",
-  "./script.js?v=98",
+  "./script.js?v=99",
   "./tournament-create.js?v=7",
   "./tournament-live.js?v=12",
   "./tournament-archive.js?v=2",

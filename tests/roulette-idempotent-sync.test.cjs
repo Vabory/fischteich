@@ -114,7 +114,9 @@ test("pending sync uses timestamp then ID order, removes successes, and never ch
 test("partial server failure stops after C and leaves C and D pending", async () => {
   const h = harness([spin(1), spin(2), spin(3), spin(4)]);
   h.setFailure(id(3));
-  await assert.rejects(h.service.syncPendingRouletteSpins(), /network/);
+  const result = await h.service.syncPendingRouletteSpins();
+  assert.equal(result.confirmed, 2);
+  assert.match(result.error.message, /network/);
   assert.deepEqual([...h.queue.keys()], [id(3), id(4)]);
   assert.deepEqual(h.calls.filter(([kind]) => kind === "rpc").map(([, , params]) => params.p_spin_id), [id(1), id(2), id(3)]);
 });
@@ -153,7 +155,25 @@ test("concurrent manual calls share one sync and send each spin once", async () 
   assert.equal(h.calls.filter(([kind]) => kind === "rpc").length, 1);
 });
 
-test("migration uses a receipt primary key, atomic conflict branch, restricted table, and old RPC revocation", () => {
+test("a new online spin during an older snapshot is sent directly without queue collision", async () => {
+  const h = harness([spin(1), spin(2)]);
+  let release;
+  h.hold(new Promise(resolve => { release = resolve; }));
+  const olderSync = h.service.syncPendingRouletteSpins();
+  await new Promise(resolve => setImmediate(resolve));
+  const latest = spin(3, "goldfish");
+  h.queue.set(latest.id, latest);
+  const direct = h.service.recordRouletteSpin(latest).then(async () => {
+    await h.window.rouletteOfflineQueue.removeSpin(latest.id);
+  });
+  release();
+  await Promise.all([olderSync, direct]);
+  assert.equal(h.queue.size, 0);
+  assert.equal(h.stats.get("Fabian").total_spins, 3);
+  assert.equal(h.calls.filter(([, , params]) => params?.p_spin_id === latest.id).length, 1);
+});
+
+test("migration uses a receipt primary key, atomic conflict branch, and restricted table", () => {
   assert.match(migration, /create table public\.roulette_spin_events\s*\(\s*spin_id uuid primary key/i);
   assert.match(migration, /on conflict \(spin_id\) do nothing[\s\S]*if v_inserted_id is null then/);
   assert.match(migration, /'already_processed'/);
@@ -162,7 +182,9 @@ test("migration uses a receipt primary key, atomic conflict branch, restricted t
   assert.match(migration, /alter table public\.roulette_spin_events enable row level security/);
   assert.match(migration, /revoke all on table public\.roulette_spin_events from public, anon, authenticated/);
   assert.match(migration, /grant execute on function public\.record_roulette_spin_event[\s\S]*to anon, authenticated/);
-  assert.match(migration, /revoke all on function public\.record_roulette_spin\(text, text\)/);
-  assert.match(migration, /revoke all on function public\.record_roulette_gold_spin\(text, uuid\)/);
+  const stagedRevoke = fs.readFileSync(path.join(root, "supabase/rollout/revoke_legacy_roulette_spin_rpcs.sql"), "utf8");
+  assert.doesNotMatch(migration, /revoke all on function public\.record_roulette_spin\(text, text\)/);
+  assert.match(stagedRevoke, /revoke all on function public\.record_roulette_spin\(text, text\)/);
+  assert.match(stagedRevoke, /revoke all on function public\.record_roulette_gold_spin\(text, uuid\)/);
   assert.ok(fs.existsSync(path.join(root, "tests/fixtures/roulette-spin-idempotency.sql")));
 });

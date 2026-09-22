@@ -98,16 +98,16 @@ test("install caches the explicit shell, activate removes only old Fischteich of
 
 test("navigation is network first online and falls back to cached index offline", async () => {
   const h = harness(); await h.lifecycle("install");
-  assert.equal((await h.request("./?app-build=20260922.8", "navigate")).source, "network");
+  assert.equal((await h.request("./?app-build=20260922.9", "navigate")).source, "network");
   h.setOnline(false);
-  const offline = await h.request("./?app-build=20260922.8", "navigate");
+  const offline = await h.request("./?app-build=20260922.9", "navigate");
   assert.equal(offline.source, "cache");
   assert.equal(offline.url, new URL("./index.html", scope).href);
 });
 
 test("only exact same-origin static URLs use cache; version and Supabase requests bypass it", async () => {
   const h = harness(); await h.lifecycle("install"); h.setOnline(false);
-  for (const url of ["./style.css?v=193", "./script.js?v=98", "./roulette-service.js?v=7", "./roulette-offline-queue.js?v=1", "./assets/menu-background.webp", "./assets/sidemenu-background.webp", "./assets/gold-feld.webp?v=1"]) {
+  for (const url of ["./style.css?v=194", "./script.js?v=99", "./roulette-service.js?v=8", "./roulette-offline-queue.js?v=1", "./assets/menu-background.webp", "./assets/sidemenu-background.webp", "./assets/gold-feld.webp?v=1"]) {
     assert.equal((await h.request(url)).source, "cache", url);
   }
   for (const url of ["./version.json?check=123", "./style.css?v=old", "./assets/mini-games/1-fish.webp", "https://qhgiqhuodkrevmmbwfeg.supabase.co/rest/v1/rooms", "https://example.test/fischteich/rest/v1/rooms"]) {

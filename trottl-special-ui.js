@@ -22,7 +22,7 @@
     const resultPanel = doc.createElement("section");
     resultPanel.className = "trottl-special-minigame-results"; resultPanel.hidden = true;
     resultPanel.setAttribute("aria-label", "Minigame-Ergebnis");
-    resultPanel.innerHTML = '<h2>Minigame</h2><p></p><ol></ol>';
+    resultPanel.innerHTML = '<h2>Minigame</h2><div class="trottl-special-fish-count-summary" hidden><strong class="trottl-special-fish-count-result-count"></strong><strong class="trottl-special-fish-count-all-wrong" hidden>NIEMAND HAT RICHTIG GEZÄHLT!</strong><span class="trottl-special-fish-count-all-drink" hidden>Alle trinken 4 Schlücke.</span></div><p></p><ol></ol>';
     const resultConfirm = doc.createElement("button"); resultConfirm.type = "button";
     resultConfirm.className = "trottl-special-panic-result-confirm"; resultConfirm.textContent = "✓ ERGEBNIS BESTÄTIGEN"; resultConfirm.hidden = true;
     resultConfirm.addEventListener("click", () => void gameAction("results_ack")); resultPanel.append(resultConfirm);
@@ -245,10 +245,16 @@
       if (!resultPanel.hidden) {
         const m = g.minigame;
         resultPanel.querySelector("h2").textContent = isPanicResult ? "Ergebnisse von Panik Event" : `Ergebnisse von „${m.title ?? m.minigame_type}“ Game`;
-        resultPanel.querySelector("p").textContent = m.minigame_type === "special_minigame_08"
-          ? `Es waren ${m.correct_count} Fische${m.all_wrong ? " · NIEMAND HAT RICHTIG GEZÄHLT! Alle trinken 4 Schlücke." : ""}`
-          : m.all_tied ? "Alle gleich – alle Gewinner · je 2 Schlücke verteilen" : m.draw ? "Unentschieden – keine Schlücke" : "Gewinner grün · Verlierer rot";
-        resultPanel.querySelector("p").hidden = showingResults && m.minigame_type !== "special_minigame_08";
+        const fishCountResult = m.minigame_type === "special_minigame_08";
+        const fishSummary = resultPanel.querySelector(".trottl-special-fish-count-summary");
+        fishSummary.hidden = !fishCountResult;
+        if (fishCountResult) {
+          fishSummary.querySelector(".trottl-special-fish-count-result-count").textContent = `Es waren ${m.correct_count} Fische!`;
+          fishSummary.querySelector(".trottl-special-fish-count-all-wrong").hidden = !m.all_wrong;
+          fishSummary.querySelector(".trottl-special-fish-count-all-drink").hidden = !m.all_wrong;
+        }
+        resultPanel.querySelector("p").textContent = m.all_tied ? "Alle gleich – alle Gewinner · je 2 Schlücke verteilen" : m.draw ? "Unentschieden – keine Schlücke" : "Gewinner grün · Verlierer rot";
+        resultPanel.querySelector("p").hidden = fishCountResult || showingResults;
         resultPanel.querySelector("ol").replaceChildren(...(m.results ?? []).map(row => {
           const name = row.display_name ?? snapshot.players.find(p => p.userId === row.player_id)?.displayName ?? m.participants.find(p => p.player_id === row.player_id)?.display_name ?? row.player_id;
           const item = node("li", `${row.is_winner ? "is-winner" : row.is_loser ? "is-loser" : ""}${row.is_penalty ? " is-penalty" : ""}`.trim());

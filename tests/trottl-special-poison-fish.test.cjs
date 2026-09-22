@@ -315,7 +315,7 @@ test("large shell, field clipping, normalized hitbox and wiring leave older game
   assert.match(css,/poison-fish-game[^}]*grid-template-rows: 48px minmax\(0, 1fr\)/);
   assert.match(css,/poison-fish-field[^}]*overflow: hidden/); assert.match(css,/poison-fish-field[^}]*touch-action: none/); assert.match(css,/poison-fish-fish[^}]*width: clamp\(42px, 11vw, 62px\)/);
   assert.match(source,/hitRadiusX: 0\.08, hitRadiusY: 0\.065/); assert.match(source,/HITBOX_SCALE = 1\.25/); assert.match(source,/bounds\.width/); assert.match(source,/bounds\.height/);
-  const html = read("index.html"); for (const part of ["trottl-special-poison-fish.js?v=4","trottl-special-minigames.js?v=8","trottl-special-service.js?v=19","trottl-special-ui.js?v=22","trottl-special.css?v=30"]) assert.ok(html.includes(part));
+  const html = read("index.html"); for (const part of ["trottl-special-poison-fish.js?v=4","trottl-special-minigames.js?v=8","trottl-special-service.js?v=19","trottl-special-ui.js?v=23","trottl-special.css?v=31"]) assert.ok(html.includes(part));
   const registry = read("trottl-special-minigames.js"); assert.match(registry,/active: i < 8, implemented: i < 8/); assert.match(read("trottl-special-debug.js"),/registry\.filter\(r => r\.active && r\.implemented\)/);
   assert.match(read("trottl-special-service.js"), /submitPoisonFish:[^\n]*return final \? loadSession\(id\) : null/);
   assert.match(read("trottl-special-ui.js"), /sharedWithoutRevision\) === JSON\.stringify\(incomingWithoutRevision\)/);

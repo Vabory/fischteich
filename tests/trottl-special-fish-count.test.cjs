@@ -20,7 +20,15 @@ function harness(role = "player") {
     async finalizeFishCount() { finalizeCount++; snapshot.session.gameState.phase = "minigame_results"; return snapshot; } };
   let controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => { throw error; } }); controller.update(snapshot);
   function clock(value) { now = value; for (const [key, item] of [...timers]) if (item.at <= now) { timers.delete(key); item.fn(); } controller.update(snapshot); }
-  return { api, root, doc, snapshot, view, service, clock, start, answerStart, count, get answerCount() { return answerCount; }, get finalizeCount() { return finalizeCount; },
+  function advance(value) {
+    while (true) {
+      const next = [...timers].filter(([, item]) => item.at <= value).sort((a, b) => a[1].at - b[1].at)[0];
+      if (!next) break;
+      now = next[1].at; timers.delete(next[0]); next[1].fn();
+    }
+    now = value;
+  }
+  return { api, root, doc, snapshot, view, service, clock, advance, start, answerStart, count, get answerCount() { return answerCount; }, get finalizeCount() { return finalizeCount; },
     recreate() { controller.suspend(); controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => { throw error; } }); controller.update(snapshot); } };
 }
 test("count, reveal interpolation, asset pool and deterministic overlap-safe normalized layout", () => {
@@ -44,6 +52,56 @@ test("countdown hides gameplay; absolute attention, reveal, answer and reconnect
   h.clock(h.start + 1110); assert.equal(fishes.hidden, false); assert.equal(fishes.querySelectorAll("img").length, h.count);
   h.clock(h.answerStart + 1); assert.equal(fishes.hidden, true); assert.equal(choices.hidden, false);
   h.recreate(); assert.equal(h.root.querySelector(".trottl-special-fish-count-fishes").hidden, true);
+});
+test("scheduled intro fade and every shared countdown step render before attention without early fish", () => {
+  const h = harness(), title = h.root.querySelector(".trottl-special-minigame-title"), copy = h.root.querySelector(".trottl-special-minigame-copy"), label = h.root.querySelector(".trottl-special-minigame-countdown"), fish = h.root.querySelector(".trottl-special-fish-count-fishes");
+  assert.equal(copy.textContent, "Zähle schnell die Fische und antworte richtig!");
+  h.advance(h.start - 3900); assert.equal(title.hidden, false); assert.equal(title.style.opacity, "1");
+  h.advance(h.start - 3400); assert.ok(Number(title.style.opacity) < 1); assert.equal(copy.style.opacity, title.style.opacity);
+  for (const [offset, expected] of [[-3000, "3"], [-2000, "2"], [-1000, "1"], [0, "START!"]]) {
+    h.advance(h.start + offset); assert.equal(label.textContent, expected); assert.equal(label.hidden, false);
+    assert.equal(fish.querySelectorAll("img").length, 0);
+    h.advance(h.start + offset + (expected === "START!" ? 350 : 900)); assert.equal(label.textContent, expected);
+    assert.equal(fish.querySelectorAll("img").length, 0);
+  }
+  h.advance(h.start + 400); assert.equal(label.hidden, true);
+  assert.equal(h.root.querySelector(".trottl-special-fish-count-attention").hidden, false);
+  h.advance(h.start + 1110); assert.equal(fish.hidden, false); assert.equal(fish.querySelectorAll("img").length, h.count);
+});
+test("answer timer follows deadline through warning, answered waiting, reconnect and resume", async () => {
+  const h = harness(), timer = h.root.querySelector(".trottl-special-fish-count-timer"), choices = h.root.querySelector(".trottl-special-fish-count-choices"), waiting = h.root.querySelector(".trottl-special-fish-count-waiting");
+  h.clock(h.answerStart); assert.equal(timer.textContent, "10 s"); assert.equal(timer.classList.contains("is-urgent"), false);
+  h.advance(h.answerStart + 1100); assert.equal(timer.textContent, "9 s");
+  h.clock(h.answerStart + 4000); assert.equal(timer.textContent, "6 s");
+  const button = choices.querySelector("button");
+  for (const fn of button.listeners.pointerdown ?? []) fn({ isTrusted: true, pointerType: "touch", timeStamp: h.answerStart + 4000, preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(choices.hidden, true); assert.equal(waiting.hidden, false);
+  assert.equal(waiting.querySelector("strong").textContent, "Antwort gespeichert");
+  assert.equal(waiting.querySelector("span").textContent, "Warte auf Antworten der anderen Spieler…");
+  assert.equal(timer.textContent, "6 s"); assert.equal(timer.parentNode, waiting);
+  h.recreate(); const resumed = h.root.querySelectorAll(".trottl-special-fish-count-timer").at(-1);
+  assert.equal(resumed.textContent, "6 s");
+  h.doc.visibilityState = "hidden"; h.clock(h.answerStart + 7100); h.doc.visibilityState = "visible"; h.clock(h.answerStart + 7100);
+  assert.equal(resumed.textContent, "3 s"); assert.equal(resumed.classList.contains("is-urgent"), true);
+  h.clock(h.answerStart + 10000); assert.equal(resumed.textContent, "");
+});
+test("spectator sees the same deadline and host waiting state without answer interaction", () => {
+  const h = harness("spectator"); h.clock(h.answerStart + 6200);
+  let timer = h.root.querySelector(".trottl-special-fish-count-timer");
+  assert.equal(timer.textContent, "4 s"); assert.equal(h.root.querySelector(".trottl-special-fish-count-choices").querySelector("button").disabled, true);
+  h.view.answered = true; h.clock(h.answerStart + 7300); timer = h.root.querySelector(".trottl-special-fish-count-timer");
+  assert.equal(timer.textContent, "3 s"); assert.equal(timer.parentNode.className, "trottl-special-fish-count-waiting");
+  assert.doesNotMatch(h.root.textContent, /Richtig|Falsch|Es waren/);
+});
+test("fish count result has separate count and all-wrong lines without changing settlement", () => {
+  const ui = read("trottl-special-ui.js"), css = read("trottl-special.css");
+  assert.match(ui, /class="trottl-special-fish-count-summary"[\s\S]*class="trottl-special-fish-count-result-count"[\s\S]*class="trottl-special-fish-count-all-wrong"[\s\S]*class="trottl-special-fish-count-all-drink"/);
+  assert.match(ui, /`Es waren \$\{m\.correct_count\} Fische!`/);
+  assert.match(ui, /NIEMAND HAT RICHTIG GEZÄHLT!<\/strong><span[^>]*>Alle trinken 4 Schlücke\.<\/span>/);
+  assert.match(ui, /fishSummary\.querySelector\("\.trottl-special-fish-count-all-wrong"\)\.hidden = !m\.all_wrong/);
+  assert.match(css, /\.trottl-special-fish-count-result-count \{[^}]*font-size: clamp/);
+  assert.match(read("supabase/migrations/20260922010000_add_trottl_special_fish_count.sql"), /'loser_drink_count',case when v_all_wrong then 4 else 2 end/);
 });
 test("first pointerdown records elapsed from answer start and neutral waiting without early correctness", async () => {
   const h = harness(); h.clock(h.answerStart + 1200);

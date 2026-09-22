@@ -39,13 +39,16 @@
   function create({ root, service, onSnapshot, onError }) {
     const doc = global.document, shell = global.TrottlSpecialMinigames.createShell(root);
     shell.panel.classList.add("is-fish-count");
-    shell.copy.textContent = "Zähle die Fische und antworte so schnell du kannst!";
-    const game = doc.createElement("div"), heading = doc.createElement("h3"), field = doc.createElement("div"), attention = doc.createElement("strong"), fishes = doc.createElement("div"), choices = doc.createElement("div"), waiting = doc.createElement("p");
-    game.className = "trottl-special-fish-count-game"; heading.className = "trottl-special-fish-count-heading";
+    shell.copy.textContent = "Zähle schnell die Fische und antworte richtig!";
+    const game = doc.createElement("div"), header = doc.createElement("div"), heading = doc.createElement("h3"), timerSlot = doc.createElement("div"), answerTimer = doc.createElement("strong"), field = doc.createElement("div"), attention = doc.createElement("strong"), fishes = doc.createElement("div"), choices = doc.createElement("div"), waiting = doc.createElement("div"), waitingTitle = doc.createElement("strong"), waitingCopy = doc.createElement("span");
+    game.className = "trottl-special-fish-count-game"; header.className = "trottl-special-fish-count-header"; heading.className = "trottl-special-fish-count-heading";
+    timerSlot.className = "trottl-special-fish-count-timer-slot"; answerTimer.className = "trottl-special-fish-count-timer";
     field.className = "trottl-special-fish-count-field"; attention.className = "trottl-special-fish-count-attention";
     fishes.className = "trottl-special-fish-count-fishes"; choices.className = "trottl-special-fish-count-choices";
-    waiting.className = "trottl-special-fish-count-waiting"; attention.textContent = "Achtung…"; waiting.textContent = "Antwort gespeichert";
-    field.append(attention, fishes, choices, waiting); game.append(heading, field); shell.content.append(game);
+    waiting.className = "trottl-special-fish-count-waiting"; attention.textContent = "Achtung…";
+    waitingTitle.textContent = "Antwort gespeichert"; waitingCopy.textContent = "Warte auf Antworten der anderen Spieler…";
+    timerSlot.append(answerTimer); waiting.append(waitingTitle, waitingCopy);
+    header.append(heading, timerSlot); field.append(attention, fishes, choices, waiting); game.append(header, field); shell.content.append(game);
     void preloadAssets();
     let snapshot = null, key = null, timer = null, finalizing = false, submitting = false, localAnswered = false, renderedSeed = null, renderedChoices = null, retryAt = 0;
     const view = () => snapshot?.fishCountView ?? null;
@@ -102,15 +105,20 @@
       clearTimer();
       if (!snapshot || root.hidden || doc.visibilityState === "hidden" || !view()) return;
       const now = service.serverNow(); if (!Number.isFinite(now)) return;
-      const v = view(), start = Date.parse(snapshot.session.gameState.minigame.start_at), answerStart = Date.parse(v.answer_started_at), deadline = Date.parse(v.answer_deadline);
-      const next = [start, start + CONFIG.startLabelMs, start + CONFIG.startLabelMs + CONFIG.attentionMs, answerStart, deadline]
-        .find(time => Number.isFinite(time) && time > now + 5);
-      if (next) timer = global.setTimeout(() => { timer = null; paint(); }, Math.max(20, next - now + 10));
+      const m = snapshot.session.gameState.minigame, v = view(), start = Date.parse(m.start_at), titleEnd = Date.parse(m.title_ends_at), answerStart = Date.parse(v.answer_started_at), deadline = Date.parse(v.answer_deadline);
+      const fadeStart = titleEnd - 800;
+      const boundaries = [fadeStart, titleEnd, titleEnd + 1000, titleEnd + 2000, start, start + CONFIG.startLabelMs,
+        start + CONFIG.startLabelMs + CONFIG.attentionMs, answerStart, deadline];
+      if (now >= fadeStart && now < titleEnd) boundaries.push(Math.min(titleEnd, now + 50));
+      if (now >= answerStart && now < deadline) boundaries.push(Math.min(deadline, deadline - (Math.ceil((deadline - now) / 1000) - 1) * 1000));
+      const next = Math.min(...boundaries.filter(time => Number.isFinite(time) && time > now));
+      if (Number.isFinite(next)) timer = global.setTimeout(() => { timer = null; paint(); }, Math.max(10, next - now));
       else if (now >= deadline) timer = global.setTimeout(() => { timer = null; void finalize(); }, Math.max(100, retryAt - now));
     }
     function paint() {
       if (!snapshot || root.hidden || doc.visibilityState === "hidden") { shell.hide(); clearTimer(); return; }
       const m = snapshot.session.gameState.minigame, now = service.serverNow(), v = view(), sequence = shell.frame(m, now);
+      shell.copy.style.opacity = String(sequence.opacity);
       const stage = phaseAt(m, v, now);
       const gameplay = sequence.phase === "active" && sequence.label === "" && !!v && stage !== "sync";
       shell.panel.classList.toggle("is-gameplay", gameplay);
@@ -120,8 +128,15 @@
         const answered = localAnswered || v.answered;
         heading.textContent = stage === "attention" || stage === "reveal" ? "SCHAU GENAU HIN!" : "WIE VIELE FISCHE WAREN ES?";
         attention.hidden = stage !== "attention"; fishes.hidden = stage !== "reveal";
+        const showingAnswerTime = (stage === "answer" || stage === "waiting") && Number.isFinite(Date.parse(v.answer_deadline)) && now < Date.parse(v.answer_deadline);
+        const seconds = showingAnswerTime ? Math.ceil((Date.parse(v.answer_deadline) - now) / 1000) : 0;
+        answerTimer.textContent = showingAnswerTime ? `${seconds} s` : "";
+        answerTimer.classList.toggle("is-urgent", showingAnswerTime && seconds <= 3);
         choices.hidden = stage !== "answer" || answered; waiting.hidden = !(stage === "waiting" || stage === "answer" && answered);
-        waiting.textContent = answered ? "Antwort gespeichert" : "Zeit abgelaufen · Ergebnis wird geladen";
+        waitingTitle.textContent = answered ? "Antwort gespeichert" : "Zeit abgelaufen";
+        waitingCopy.hidden = !answered; answerTimer.hidden = !showingAnswerTime;
+        if (answered && showingAnswerTime) waiting.append(answerTimer);
+        else if (answerTimer.parentNode !== timerSlot) timerSlot.append(answerTimer);
         for (const button of choices.querySelectorAll("button")) button.disabled = !playable() || answered || submitting;
       }
       schedule();

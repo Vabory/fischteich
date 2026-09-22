@@ -36,9 +36,9 @@ test("avatar modal presents sixteen slots with a non-selectable locked mystery",
   assert.equal(presentation.selectedAvatarId, null);
   assert.equal(presentation.canConfirm, false);
   assert.ok(presentation.visibleAvatars.every((avatar) => avatar.displayName.length > 0));
-  assert.match(uiSource, /getTrottlAvatarChoices\(\{ mysticalBobrUnlocked \}\)/);
-  assert.match(uiSource, /bobrUnlockService[\s\S]*isMysticalBobrUnlocked\(profile\)/);
-  assert.match(uiSource, /getAppAuthState\(\)\.currentProfile/);
+  assert.match(uiSource, /getTrottlAvatarChoices\(\{\s*mysticalBobrUnlocked: bobrUnlocked/);
+  assert.match(uiSource, /bobrUnlockService[\s\S]*isMysticalBobrUnlocked\(authState\.currentProfile\)/);
+  assert.match(uiSource, /const authState = typeof global\.getAppAuthState/);
   assert.doesNotMatch(uiSource, /assets\/avatars\//);
 });
 
@@ -149,7 +149,7 @@ test("modal markup and CSS provide a focused two-column mobile dialog", () => {
   assert.match(html, /id="trottl-avatar-modal"[^>]*role="dialog"[^>]*aria-modal="true"/);
   assert.doesNotMatch(html, /aria-describedby="trottl-avatar-modal-description"/);
   assert.doesNotMatch(html, />3ER TROTTL<|Such dir deinen Fisch für diese Runde aus\./);
-  assert.match(html, /<header class="trottl-avatar-modal-header">\s*<h2 id="trottl-avatar-modal-title">Wähle deinen Avatar<\/h2>\s*<\/header>/);
+  assert.match(html, /<header class="trottl-avatar-modal-header">\s*<h2 id="trottl-avatar-modal-title">Wähle deinen Avatar<\/h2>\s*<pre class="trottl-avatar-debug"[^>]*>AVATAR DEBUG<\/pre>\s*<\/header>/);
   assert.match(html, /id="trottl-avatar-grid"[^>]*role="radiogroup"/);
   assert.match(uiSource, /role", "radio"[\s\S]*aria-checked/);
   assert.match(uiSource, /image\.alt = ""/);
@@ -198,4 +198,53 @@ test("invalid pending registry IDs remain non-confirmable without crashing", () 
   assert.equal(presentation.selectedAvatarId, null);
   assert.equal(presentation.canConfirm, false);
   assert.doesNotThrow(() => ui.createAvatarModalPresentation({ avatars: null, pendingAvatarId: null }));
+});
+
+test("runtime diagnostics use the exact choice output and report its profile input and DOM count", () => {
+  const renderer = uiSource.match(/function renderAvatarModal\([\s\S]*?\n    }\n\n    function openAvatarModal/)?.[0] ?? "";
+  const runtime = uiSource.match(/function getAvatarChoiceRuntime\(\)[\s\S]*?\n    }/)?.[0] ?? "";
+  const debug = uiSource.match(/function updateAvatarDebug\([\s\S]*?\n    }/)?.[0] ?? "";
+  assert.match(runtime, /getTrottlAvatarChoices\(\{\s*mysticalBobrUnlocked: bobrUnlocked/);
+  assert.match(renderer, /getAvatarModalPresentation\(runtime\.choices\)/);
+  assert.match(debug, /runtime\.choices\.length/);
+  assert.match(debug, /runtime\.bobrUnlocked/);
+  assert.match(debug, /renderedNodes/);
+  assert.match(debug, /avatarService: v/);
+  assert.match(debug, /classicUI: v/);
+  for (const event of ["modal-open", "profile", "choices", "rendered", "asset"]) {
+    assert.match(uiSource, new RegExp(`logAvatarDebug\\("${event}"`));
+  }
+});
+
+test("sixteen choices create sixteen nodes and a locked image failure keeps its visible slot", () => {
+  const { avatarService, ui } = loadServices();
+  const choices = avatarService.getTrottlAvatarChoices({ mysticalBobrUnlocked: false });
+  const nodes = ui.createAvatarChoiceNodes(choices, (avatar) => ({ avatar, visible: true }));
+  assert.equal(choices.length, 16);
+  assert.equal(nodes.length, 16);
+  assert.equal(nodes.at(-1).avatar.displayName, "Mystical ???");
+  assert.equal(nodes.at(-1).avatar.selectable, false);
+
+  const image = {};
+  let assetStatus = "not-requested";
+  ui.watchLockedAvatarAsset(image, (status) => { assetStatus = status; });
+  image.onerror();
+  assert.equal(assetStatus, "error");
+  assert.equal(nodes.length, 16);
+  assert.equal(nodes.at(-1).visible, true);
+  assert.match(uiSource, /button\.append\(image, name\)/);
+  assert.doesNotMatch(uiSource.match(/watchLockedAvatarAsset\(image,[\s\S]*?\n          \}\);/)?.[0] ?? "", /remove|replaceChildren/);
+});
+
+test("the final avatar row scrolls independently above the persistent footer", () => {
+  const cardCss = Array.from(css.matchAll(/\.trottl-avatar-modal-card\s*\{[^}]*\}/g), ([block]) => block)
+    .find((block) => block.includes("grid-template-rows")) ?? "";
+  const gridCss = Array.from(css.matchAll(/\.trottl-avatar-grid\s*\{[^}]*\}/g), ([block]) => block)
+    .find((block) => block.includes("grid-template-columns")) ?? "";
+  assert.match(html, /id="trottl-avatar-grid"[\s\S]*<footer class="trottl-avatar-modal-actions">/);
+  assert.match(cardCss, /grid-template-rows:\s*auto minmax\(0, 1fr\) auto auto/);
+  assert.match(gridCss, /min-height:\s*0/);
+  assert.match(gridCss, /padding:\s*14px 3px 10px/);
+  assert.match(gridCss, /overflow-y:\s*auto/);
+  assert.doesNotMatch(css, /trottl-avatar-option(?::last-child|:nth-child)[^{]*\{[^}]*(?:display:\s*none|visibility:\s*hidden|opacity:\s*0|height:\s*0)/s);
 });

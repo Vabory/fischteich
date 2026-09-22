@@ -127,6 +127,14 @@
       const element = node("button", className, text); element.type = "button";
       element.disabled = disabled || state.busy; element.addEventListener("click", action); return element;
     }
+    function getAvatarChoices() {
+      const profile = typeof getAppAuthState === "function" ? getAppAuthState().currentProfile : null;
+      const mysticalBobrUnlocked = global.bobrUnlockService?.isMysticalBobrUnlocked(profile);
+      return global.trottlAvatarService.getTrottlAvatarChoices({ mysticalBobrUnlocked });
+    }
+    function preloadAvatarChoices(choices = getAvatarChoices()) {
+      void global.trottlAvatarService.preloadTrottlAvatars(choices);
+    }
     function renderRooms() {
       roomList.replaceChildren(...state.rooms.map(room => {
         const item = button("trottl-classic-room", "", () => void joinRoom(room.roomSlot),
@@ -536,29 +544,33 @@
       }
       return success;
     }
-    function renderAvatar() {
+    function renderAvatar(avatars = getAvatarChoices()) {
       const self = state.snapshot.players.find(player => player.userId === state.snapshot.identity.userId);
-      const profile = typeof getAppAuthState === "function" ? getAppAuthState().currentProfile : null;
-      const avatars = global.trottlAvatarService.getVisibleTrottlAvatars({
-        mysticalBobrUnlocked: global.bobrUnlockService?.isMysticalBobrUnlocked(profile) === true });
       q("avatar-grid").replaceChildren(...avatars.map(record => {
-        const selected = record.id === state.pendingAvatar;
-        const option = button(`trottl-avatar-option${selected ? " is-selected" : ""}`, "", () => {
-          state.pendingAvatar = record.id; renderAvatar();
-        }, self.isReady);
-        option.setAttribute("role", "radio"); option.setAttribute("aria-checked", String(selected));
+        const selectable = record.selectable !== false;
+        const selected = selectable && record.id === state.pendingAvatar;
+        const option = node("button", `trottl-avatar-option${selected ? " is-selected" : ""}${selectable ? "" : " is-locked"}`);
+        option.type = "button";
+        option.disabled = state.busy || self.isReady || !selectable;
         option.setAttribute("aria-label", record.displayName);
-        option.dataset.avatarId = record.id;
+        if (selectable) {
+          option.setAttribute("role", "radio"); option.setAttribute("aria-checked", String(selected));
+          option.dataset.avatarId = record.id;
+          option.addEventListener("click", () => { state.pendingAvatar = record.id; renderAvatar(); });
+        } else option.setAttribute("aria-disabled", "true");
         const image = node("img"); image.src = record.src; image.alt = ""; image.width = image.height = 128; image.draggable = false;
         option.append(image, node("span", "", record.displayName)); return option;
       }));
-      q("avatar-confirm").disabled = state.busy || self.isReady || !state.pendingAvatar;
+      const selectedAvatar = avatars.find(record => record.selectable !== false && record.id === state.pendingAvatar);
+      q("avatar-confirm").disabled = state.busy || self.isReady || !selectedAvatar;
     }
     function openAvatar() {
       const self = state.snapshot?.players.find(player => player.userId === state.snapshot.identity.userId);
       if (!self || self.isReady || state.snapshot.session.status !== "lobby") return;
       state.pendingAvatar = self.avatarId; q("avatar-modal-feedback").textContent = "";
-      renderAvatar(); openModal("avatar");
+      const avatars = getAvatarChoices();
+      preloadAvatarChoices(avatars);
+      renderAvatar(avatars); openModal("avatar");
     }
     function stopPresence() {
       global.clearInterval(state.heartbeatTimer); state.heartbeatTimer = null;
@@ -822,7 +834,9 @@
       if (state.modal === "start" && state.snapshot) void mutate(() => service.startSession(state.snapshot.session.id));
     });
     q("avatar-confirm").addEventListener("click", () => {
-      if (state.pendingAvatar) void mutate(() => service.setAvatar(state.snapshot.session.id, state.pendingAvatar));
+      const selectedAvatar = getAvatarChoices()
+        .find(record => record.selectable !== false && record.id === state.pendingAvatar);
+      if (selectedAvatar) void mutate(() => service.setAvatar(state.snapshot.session.id, selectedAvatar.id));
     });
     q("kick-confirm").addEventListener("click", () => {
       if (state.kickTarget) void mutate(() => service.kickPlayer(state.snapshot.session.id, state.kickTarget.userId));

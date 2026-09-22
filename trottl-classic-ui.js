@@ -124,16 +124,6 @@
     });
   }
 
-  function createAvatarChoiceNodes(avatars, createNode) {
-    const source = Array.isArray(avatars) ? avatars : [];
-    return source.map(createNode);
-  }
-
-  function watchLockedAvatarAsset(image, onStatus) {
-    image.onload = () => onStatus("loaded");
-    image.onerror = () => onStatus("error");
-  }
-
   function createEventPresentation(context) {
     const {
       phase,
@@ -340,7 +330,6 @@
     const avatarModal = document.querySelector("#trottl-avatar-modal");
     const avatarModalCard = avatarModal.querySelector(".trottl-avatar-modal-card");
     const avatarGrid = document.querySelector("#trottl-avatar-grid");
-    const avatarDebug = document.querySelector("#trottl-avatar-debug");
     const avatarModalFeedback = document.querySelector("#trottl-avatar-modal-feedback");
     const avatarCancelButton = document.querySelector("#trottl-avatar-cancel");
     const avatarConfirmButton = document.querySelector("#trottl-avatar-confirm");
@@ -403,8 +392,6 @@
       avatarSubmitting: false,
       avatarReadyConflict: false,
       avatarModalReturnFocus: null,
-      avatarDebugRenderId: 0,
-      avatarLockedAssetStatus: "not-requested",
       lobbyHeartbeatTimer: null,
       lobbyHeartbeatSessionId: null,
       lobbyHeartbeatRequest: null,
@@ -466,26 +453,17 @@
       return localLobbyPlayer(snapshot) !== null;
     }
 
-    function getAvatarChoiceRuntime() {
-      const authState = typeof global.getAppAuthState === "function"
-        ? global.getAppAuthState()
-        : null;
-      const profileLoaded = authState?.isInitialized === true && authState.currentProfile !== null;
-      const bobrUnlocked = profileLoaded
-        ? global.bobrUnlockService?.isMysticalBobrUnlocked(authState.currentProfile)
-        : undefined;
-      const choices = global.trottlAvatarService.getTrottlAvatarChoices({
-        mysticalBobrUnlocked: bobrUnlocked,
-      });
-      return Object.freeze({ profileLoaded, bobrUnlocked, choices });
-    }
-
     function getAvailableAvatarChoices() {
-      return getAvatarChoiceRuntime().choices;
+      const profile = typeof global.getAppAuthState === "function"
+        ? global.getAppAuthState().currentProfile
+        : null;
+      const mysticalBobrUnlocked = global.bobrUnlockService
+        ?.isMysticalBobrUnlocked(profile) === true;
+      return global.trottlAvatarService.getTrottlAvatarChoices({ mysticalBobrUnlocked });
     }
 
-    function preloadAvailableAvatarChoices(choices = getAvailableAvatarChoices()) {
-      void global.trottlAvatarService.preloadTrottlAvatars(choices);
+    function preloadAvailableAvatarChoices() {
+      void global.trottlAvatarService.preloadTrottlAvatars(getAvailableAvatarChoices());
     }
 
     function stopLobbyHeartbeat() {
@@ -749,49 +727,9 @@
       }
     }
 
-    function getLoadedAssetVersion(fileName) {
-      const source = document.querySelector(`script[src*="/${fileName}"]`)?.src;
-      if (!source) return "unknown";
-      return new URL(source, document.baseURI).searchParams.get("v") ?? "unknown";
-    }
-
-    function getAvatarDebugMetadata() {
-      return Object.freeze({
-        build: document.querySelector('meta[name="fischteich-build"]')?.content ?? "unknown",
-        avatarService: getLoadedAssetVersion("trottl-avatar-service.js"),
-        classicUi: getLoadedAssetVersion("trottl-classic-ui.js"),
-      });
-    }
-
-    function getAvatarDebugIds(choices) {
-      return choices.map((avatar) => avatar?.id ?? (avatar ? "locked-placeholder" : "empty-choice"));
-    }
-
-    function updateAvatarDebug(runtime, renderedNodes = avatarGrid.children.length) {
-      const metadata = getAvatarDebugMetadata();
-      const ids = getAvatarDebugIds(runtime.choices);
-      avatarDebug.textContent = [
-        "AVATAR DEBUG",
-        `profileLoaded: ${runtime.profileLoaded}`,
-        `bobrUnlocked: ${String(runtime.bobrUnlocked)}`,
-        `choices: ${runtime.choices.length}`,
-        `ids: ${ids.join(", ")}`,
-        `renderedNodes: ${renderedNodes}`,
-        `lockedAsset: ${state.avatarLockedAssetStatus}`,
-        `build: ${metadata.build}`,
-        `avatarService: v${metadata.avatarService}`,
-        `classicUI: v${metadata.classicUi}`,
-      ].join("\n");
-      return Object.freeze({ metadata, ids, renderedNodes });
-    }
-
-    function logAvatarDebug(event, detail) {
-      console.warn(`[AVATAR-DEBUG] ${event}`, detail);
-    }
-
-    function getAvatarModalPresentation(choices = getAvailableAvatarChoices()) {
+    function getAvatarModalPresentation() {
       return createAvatarModalPresentation({
-        avatars: choices,
+        avatars: getAvailableAvatarChoices(),
         currentAvatarId: state.avatarModalServerAvatarId,
         pendingAvatarId: state.pendingAvatarId,
         required: state.avatarModalRequired,
@@ -800,20 +738,17 @@
       });
     }
 
-    function renderAvatarModal({ focusSelected = false, choiceRuntime = null } = {}) {
+    function renderAvatarModal({ focusSelected = false } = {}) {
       avatarModal.hidden = !state.avatarModalOpen;
       if (!state.avatarModalOpen) return;
-      const runtime = choiceRuntime ?? getAvatarChoiceRuntime();
-      const presentation = getAvatarModalPresentation(runtime.choices);
-      const renderId = state.avatarDebugRenderId + 1;
-      state.avatarDebugRenderId = renderId;
+      const presentation = getAvatarModalPresentation();
       avatarModal.dataset.required = String(state.avatarModalRequired);
       avatarModalCard.setAttribute("aria-busy", String(state.avatarSubmitting));
       avatarCancelButton.hidden = state.avatarModalRequired;
       avatarCancelButton.disabled = !presentation.canCancel;
       avatarConfirmButton.disabled = !presentation.canConfirm;
       avatarConfirmButton.textContent = state.avatarSubmitting ? "Wird gespeichert …" : "Auswählen";
-      const avatarNodes = createAvatarChoiceNodes(presentation.visibleAvatars, (avatar) => {
+      avatarGrid.replaceChildren(...presentation.visibleAvatars.map((avatar) => {
         const button = document.createElement("button");
         const image = document.createElement("img");
         const name = document.createElement("span");
@@ -831,14 +766,6 @@
           button.setAttribute("aria-disabled", "true");
         }
         button.disabled = !selectable || state.avatarSubmitting || localLobbyPlayer()?.isReady === true;
-        if (!selectable) {
-          watchLockedAvatarAsset(image, (status) => {
-            if (state.avatarDebugRenderId !== renderId) return;
-            state.avatarLockedAssetStatus = status;
-            updateAvatarDebug(runtime);
-            logAvatarDebug("asset", { src: avatar.src, status });
-          });
-        }
         image.src = avatar.src;
         image.alt = "";
         image.width = 128;
@@ -848,15 +775,7 @@
         button.append(image, name);
         if (selectable) button.addEventListener("click", () => selectPendingAvatar(avatar.id));
         return button;
-      });
-      avatarGrid.replaceChildren(...avatarNodes);
-      const debug = updateAvatarDebug(runtime, avatarGrid.children.length);
-      logAvatarDebug("profile", {
-        profileLoaded: runtime.profileLoaded,
-        bobrUnlocked: runtime.bobrUnlocked,
-      });
-      logAvatarDebug("choices", { count: runtime.choices.length, ids: debug.ids });
-      logAvatarDebug("rendered", { nodes: debug.renderedNodes });
+      }));
       if (focusSelected) {
         requestAnimationFrame(() => {
           avatarGrid.querySelector(".is-selected")?.focus({ preventScroll: true });
@@ -881,15 +800,9 @@
       state.pendingAvatarId = player.avatarId;
       state.avatarReadyConflict = false;
       state.avatarModalReturnFocus = document.activeElement;
-      state.avatarLockedAssetStatus = "not-requested";
       avatarModalFeedback.textContent = "";
-      const choiceRuntime = getAvatarChoiceRuntime();
-      logAvatarDebug("modal-open", {
-        profileLoaded: choiceRuntime.profileLoaded,
-        bobrUnlocked: choiceRuntime.bobrUnlocked,
-      });
-      preloadAvailableAvatarChoices(choiceRuntime.choices);
-      renderAvatarModal({ choiceRuntime });
+      preloadAvailableAvatarChoices();
+      renderAvatarModal();
       requestAnimationFrame(() => {
         const target = avatarGrid.querySelector(".is-selected")
           ?? avatarGrid.querySelector(".trottl-avatar-option");
@@ -2626,8 +2539,6 @@
     getLobbyHeaderAsset,
     lobbyBackgroundAsset: LOBBY_BACKGROUND_ASSET,
     createAvatarModalPresentation,
-    createAvatarChoiceNodes,
-    watchLockedAvatarAsset,
     getLobbyAvatarById,
     avatarSelectRequestEvent: AVATAR_SELECT_REQUEST_EVENT,
   });

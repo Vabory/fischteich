@@ -10,8 +10,9 @@ const read = f => fs.readFileSync(path.join(__dirname, "..", f), "utf8").replace
 const sql = read("supabase/migrations/20260913010000_add_trottl_special_foundation.sql");
 const flush = async () => { for (let i=0; i<8; i++) await new Promise(resolve => setImmediate(resolve)); };
 
-function harness(count=3) {
-  const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[], timeouts=new Map(), intervals=new Map(), events={}; let timeoutId=0, inputId=0, intervalId=0;
+function harness(count=3, options={}) {
+  const doc = createDocument(read("index.html")), calls=[], channels=[], store=new Map(), spectators=[], timeouts=new Map(), intervals=new Map(), events={}, images=[]; let timeoutId=0, inputId=0, intervalId=0;
+  const bobrUnlocked = Object.hasOwn(options, "bobrUnlocked") ? options.bobrUnlocked : false;
   let userId = "u0", gameRPC = null, rouletteRPC = null, numberHuntRPC = null, lobbyRPC = null, serverTime = null;
   const players = Array.from({length:count}, (_,seat_index) => ({ session_id:"special-1",user_id:`u${seat_index}`,
     seat_index,display_name_snapshot:`Spieler ${seat_index}`,avatar_id:"turbo-lachs",is_ready:true,lives:3,lifecycle_status:"alive",critical_used:false,joined_at:"2026-09-13",last_seen_at:"2026-09-13" }));
@@ -58,21 +59,70 @@ function harness(count=3) {
     channel(name){const ch={name,handlers:[],on(type,options,fn){this.handlers.push({type,options,fn});return this;},subscribe(){return this;}};channels.push(ch);return ch;},
     async removeChannel(ch){channels.splice(channels.indexOf(ch),1);}
   };
-  const win={document:doc,crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++inputId).padStart(12,"0")}`},localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
+  class FakeImage { set src(value) { this.currentSrc=value; images.push(this); } get src() { return this.currentSrc; } }
+  const win={document:doc,Image:FakeImage,bobrUnlockService:{isMysticalBobrUnlocked:profile=>profile?.bobrUnlocked},crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++inputId).padStart(12,"0")}`},localStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
     addEventListener(type,fn){(events[type]??=[]).push(fn);},requestAnimationFrame(){return 1;},MutationObserver:class{observe(){}},
     setInterval(fn,ms){const id=++intervalId;intervals.set(id,{fn,ms});return id;},clearInterval(id){intervals.delete(id);},setTimeout(fn,ms){const id=++timeoutId;timeouts.set(id,{fn,ms});return id;},clearTimeout(id){timeouts.delete(id);}};
   const context=vm.createContext({window:win,document:doc,console,supabaseClient:client,
     getLocalIdentity:()=>({displayName:"Spieler 0",deviceId:"device"}),initializeAppAuth:async()=>{},
-    syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0"}})});
+    syncCurrentAuthProfileDisplayName:async()=>{},getAppAuthState:()=>({currentAuthUser:{id:userId},currentProfile:{displayName:"Spieler 0",bobrUnlocked}})});
   for(const file of ["trottl-avatar-service.js","trottl-classic-service.js","trottl-classic-ui.js","classic-background-fit.js","trottl-special-service.js","trottl-special-presentation.js","trottl-special-panic.js","trottl-special-roulette.js","trottl-special-minigames.js","trottl-special-number-hunt.js","trottl-special-fish-catch.js","trottl-special-debug.js","trottl-special-ui.js"])vm.runInContext(read(file),context);
   win.FischteichDice={mount:({mountPoint,rollOnClick})=>{assert.equal(rollOnClick,false);const die=doc.createElement("button");die.className="fischteich-die";mountPoint.append(die);return {setResultInstant(){}};}};
   const ui=win.TrottlSpecialUI.create({showScreen:screen=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item!==screen;},showTrottlMenu:()=>{for(const item of doc.querySelectorAll(".screen"))item.hidden=item.id!=="trottl-menu-screen";}});
-  return {doc,win,ui,calls,channels,rows,players,spectators,store,timeouts,intervals,events,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setLobbyRPC:fn=>{lobbyRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},setNumberHuntRPC:fn=>{numberHuntRPC=fn;},setServerTime:t=>{serverTime=t;},service:win.trottlSpecialService};
+  return {doc,win,ui,calls,channels,rows,players,spectators,store,timeouts,intervals,events,images,setUser:id=>{userId=id;},setGameRPC:fn=>{gameRPC=fn;},setLobbyRPC:fn=>{lobbyRPC=fn;},setRouletteRPC:fn=>{rouletteRPC=fn;},setNumberHuntRPC:fn=>{numberHuntRPC=fn;},setServerTime:t=>{serverTime=t;},service:win.trottlSpecialService};
 }
 
 async function openLobby(h) {
  await h.ui.openRooms();await flush();h.doc.querySelector("#trottl-special-room-list").children[0].click();await flush();
 }
+async function openAvatarLobby(h) {
+  h.players[0].avatar_id=null;h.players[0].is_ready=false;
+  await openLobby(h);
+  assert.equal(h.doc.querySelector("#trottl-special-avatar-modal").hidden,false);
+  return h.doc.querySelector("#trottl-special-avatar-grid");
+}
+
+test("Special locked avatar choices keep the sixteenth mystery visible and non-selectable",async()=>{
+  const h=harness(3,{bobrUnlocked:false}),grid=await openAvatarLobby(h);
+  const defaults=Array.from(h.win.trottlAvatarService.getDefaultVisibleTrottlAvatars(),avatar=>avatar.id);
+  assert.equal(grid.children.length,16);
+  assert.deepEqual(grid.children.slice(0,15).map(option=>option.dataset.avatarId),defaults);
+  const locked=grid.children.at(-1);
+  assert.equal(locked.textContent,"Mystical ???");assert.equal(locked.children[0].src,"./assets/avatars/locked-avatar.webp");
+  assert.equal(locked.disabled,true);assert.equal(locked.classList.contains("is-locked"),true);assert.equal(locked.dataset.avatarId,undefined);
+  locked.click();assert.equal(h.doc.querySelector("#trottl-special-avatar-confirm").disabled,true);
+  h.doc.querySelector("#trottl-special-avatar-confirm").click();await flush();
+  assert.equal(h.calls.some(call=>call.name==="set_trottl_special_avatar"),false);
+  assert.equal(h.calls.some(call=>call.name==="set_trottl_special_ready"),false);
+  const avatarImages=h.images.filter(image=>image.src.includes("/assets/avatars/"));
+  assert.equal(avatarImages.length,16);assert.equal(avatarImages.at(-1).src,"./assets/avatars/locked-avatar.webp");
+});
+
+test("Special unlocked avatar choices expose Mystical Bobr through the normal selection RPC",async()=>{
+  const h=harness(3,{bobrUnlocked:true}),grid=await openAvatarLobby(h);
+  assert.equal(grid.children.length,16);
+  const bobr=grid.children.at(-1);
+  assert.equal(bobr.textContent,"Mystical Bobr");assert.equal(bobr.children[0].src,"./assets/avatars/mystical-bobr.webp");
+  assert.equal(bobr.dataset.avatarId,"mystical-bobr");assert.equal(bobr.disabled,false);assert.equal(bobr.classList.contains("is-locked"),false);
+  bobr.click();assert.equal(h.doc.querySelector("#trottl-special-avatar-confirm").disabled,false);
+  h.doc.querySelector("#trottl-special-avatar-confirm").click();await flush();
+  const avatarCalls=h.calls.filter(call=>call.name==="set_trottl_special_avatar");
+  assert.equal(avatarCalls.length,1);assert.equal(avatarCalls[0].p.p_avatar_id,"mystical-bobr");
+  assert.equal(h.calls.some(call=>call.name==="set_trottl_special_ready"),false);
+  const avatarImages=h.images.filter(image=>image.src.includes("/assets/avatars/"));
+  assert.equal(avatarImages.length,16);assert.equal(avatarImages.at(-1).src,"./assets/avatars/mystical-bobr.webp");
+  assert.equal(avatarImages.some(image=>image.src.endsWith("locked-avatar.webp")),false);
+});
+
+test("Special treats an undefined unlock as locked and ships no temporary avatar diagnostics",async()=>{
+  const h=harness(3,{bobrUnlocked:undefined}),grid=await openAvatarLobby(h);
+  assert.equal(grid.children.length,16);assert.equal(grid.children.at(-1).textContent,"Mystical ???");
+  assert.equal(grid.children.at(-1).disabled,true);
+  assert.equal(h.images.filter(image=>image.src.includes("/assets/avatars/")).at(-1).src,"./assets/avatars/locked-avatar.webp");
+  const sources=[read("index.html"),read("trottl-classic-ui.js"),read("trottl-special-ui.js")].join("\n");
+  assert.doesNotMatch(sources,/AVATAR DEBUG|AVATAR-DEBUG|avatarDebug/);
+  assert.doesNotMatch(read("trottl-special-ui.js"),/setAvatar\([^\n]*locked-avatar/);
+});
 function lifecycle(h, payload) {
  const channel=h.channels.find(c=>c.name.includes("-session-"));
  assert.ok(channel);channel.handlers.find(x=>x.options.table===payload.table).fn(payload);
@@ -992,7 +1042,7 @@ test("server migration has independent keys, locked join/start validation and no
 });
 test("Classic code and stylesheet stay frozen after the Phase 6 startup-preload removal",()=>{
   const hashes={"style.css":"d714aec5128d8fa2712c5937433c1a73f170fbe52c8dde719a6e5b45ab99e52e",
-    "trottl-classic-ui.js":"bfda41534dd902820d1488f5d12cfb3f1cb797c9cf1f3b52f378a8ac3fb5d78c",
+    "trottl-classic-ui.js":"d888d0328ce81b83a161ec8692623591a5215bcafcea95a97ecdceb154d36981",
     "trottl-classic-service.js":"cfb53ae6de0d9133275849a7d5a11551ff6962e63de61e77c05aebb4a45f14c0",
     "classic-background-fit.js":"99c7395479f98673ab6a17299d6b54c8237038252569a23149ea19cce47b44b3"};
   for(const [f,hash]of Object.entries(hashes)) {

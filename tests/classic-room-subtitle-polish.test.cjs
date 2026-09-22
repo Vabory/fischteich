@@ -44,6 +44,6 @@ test("entire CSS is unchanged apart from the two deliberate room positioning adj
   assert.equal(hash(normalized), "74463057f9bd5915813bee1eb9bac17e58b60258a2054366d6afbcd9e055af47");
 });
 
-test("Classic rendering stays pinned to the avatar runtime diagnostics build", () => {
-  assert.equal(hash(read("trottl-classic-ui.js")), "bfda41534dd902820d1488f5d12cfb3f1cb797c9cf1f3b52f378a8ac3fb5d78c");
+test("Classic rendering, click handlers, seats and gameplay remain frozen after removing startup preloads", () => {
+  assert.equal(hash(read("trottl-classic-ui.js")), "d888d0328ce81b83a161ec8692623591a5215bcafcea95a97ecdceb154d36981");
 });

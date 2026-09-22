@@ -93,14 +93,13 @@ test("image failures resolve safely and are not retried indefinitely", async () 
 });
 
 test("lobby render and modal open start the same non-blocking safety preload", () => {
-  const helper = uiSource.match(/function preloadAvailableAvatarChoices\([^)]*\)[\s\S]*?\n    }/)?.[0] ?? "";
+  const helper = uiSource.match(/function preloadAvailableAvatarChoices\(\)[\s\S]*?\n    }/)?.[0] ?? "";
   const lobby = uiSource.match(/function renderLobby\(snapshot\)[\s\S]*?\n    }\n\n    function requestAvatarSelection/)?.[0] ?? "";
   const open = uiSource.match(/function openAvatarModal[\s\S]*?\n    }\n\n    function closeAvatarModal/)?.[0] ?? "";
-  assert.match(helper, /choices = getAvailableAvatarChoices\(\)/);
-  assert.match(helper, /preloadTrottlAvatars\(choices\)/);
+  assert.match(helper, /preloadTrottlAvatars\(getAvailableAvatarChoices\(\)\)/);
   assert.doesNotMatch(helper, /await|\.then\(/);
   assert.match(lobby, /syncAvatarModalWithSnapshot\(snapshot\);\s*syncKickModalWithSnapshot\(snapshot\);\s*preloadAvailableAvatarChoices\(\)/);
-  assert.match(open, /preloadAvailableAvatarChoices\(choiceRuntime\.choices\);\s*renderAvatarModal\(\{ choiceRuntime \}\)/);
+  assert.match(open, /preloadAvailableAvatarChoices\(\);\s*renderAvatarModal\(\)/);
   assert.doesNotMatch(open, /await preload|preload[\s\S]*?\.then\(/);
   assert.doesNotMatch(html, /<link[^>]+rel="preload"[^>]+assets\/avatars/i);
   assert.doesNotMatch(avatarSource, /localStorage|indexedDB|base64|fetch\(/i);

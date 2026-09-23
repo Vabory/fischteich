@@ -1,7 +1,7 @@
 "use strict";
 (function installTrottlSpecialCatchMe(global) {
   const CONFIG = Object.freeze({ totalHits: 10, maxDurationMs: 30000, minPositionDistance: 0.30,
-    safeInsetX: 0.16, safeInsetY: 0.13, hitboxScale: 1.25, serverHitRadiusX: 0.15, serverHitRadiusY: 0.13 });
+    safeInsetX: 0.11, safeInsetY: 0.08, hitboxScale: 1.25, serverHitRadiusX: 0.13, serverHitRadiusY: 0.10 });
   const ASSET = "./assets/mini-games/gold-fish.png";
   let preloadPromise = null;
   function preloadAsset() {
@@ -23,8 +23,8 @@
       let point = null;
       for (let attempt = 0; attempt < 64; attempt++) {
         const left = zone % 2 === 0, top = zone < 2;
-        const xUnits = (left ? 1600 : 5200) + hash(seed, index, attempt, 1) % 3201;
-        const yUnits = (top ? 1300 : 5200) + hash(seed, index, attempt, 2) % 3501;
+        const xUnits = (left ? 1100 : 5200) + hash(seed, index, attempt, 1) % 3701;
+        const yUnits = (top ? 800 : 5200) + hash(seed, index, attempt, 2) % 4001;
         const candidate = Object.freeze({ x: xUnits / 10000, y: yUnits / 10000 });
         if (!points.length || Math.hypot(candidate.x - points.at(-1).x, candidate.y - points.at(-1).y) >= CONFIG.minPositionDistance) { point = candidate; break; }
       }
@@ -66,7 +66,7 @@
     const clearTimer = () => { if (timer !== null) global.clearTimeout(timer); timer = null; };
     function measure() {
       const bounds = field.getBoundingClientRect(), viewport = global.innerWidth || doc.documentElement?.clientWidth || bounds.width || 390;
-      geometry = { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, fishSize: Math.max(72, Math.min(viewport * .18, 105)) };
+      geometry = { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, fishSize: Math.max(56, Math.min(viewport * .14, 82)) };
       return geometry;
     }
     function drawFish() {

@@ -126,7 +126,7 @@
       || Number(fishCountView.seed) < 1 || Number(fishCountView.seed) > 2147483646
       || !Array.isArray(fishCountView.choices) || fishCountView.choices.length !== 4
       || new Set(fishCountView.choices).size !== 4 || fishCountView.choices.some(n => !Number.isInteger(n) || n < 1 || n > 21)
-      || !Number.isInteger(Number(fishCountView.reveal_duration_ms)) || Number(fishCountView.reveal_duration_ms) < 1000 || Number(fishCountView.reveal_duration_ms) > 2000
+      || !Number.isInteger(Number(fishCountView.reveal_duration_ms)) || Number(fishCountView.reveal_duration_ms) < 2000 || Number(fishCountView.reveal_duration_ms) > 4000
       || !Number.isFinite(Date.parse(fishCountView.answer_started_at)) || !Number.isFinite(Date.parse(fishCountView.answer_deadline))
       || Date.parse(fishCountView.answer_deadline) - Date.parse(fishCountView.answer_started_at) !== 10000
       || typeof fishCountView.answered !== "boolean" || typeof fishCountView.player_id !== "string")) throw new Error("Invalid fish count view response");

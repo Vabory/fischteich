@@ -11,7 +11,7 @@
     return preloadPromise;
   }
   function fishCount(seed) { return CONFIG.minCount + seed % (CONFIG.maxCount - CONFIG.minCount + 1); }
-  function revealDuration(count) { return 1000 + Math.round((count - CONFIG.minCount) * 1000 / (CONFIG.maxCount - CONFIG.minCount)); }
+  function revealDuration(count) { return 2000 + Math.round((count - CONFIG.minCount) * 2000 / (CONFIG.maxCount - CONFIG.minCount)); }
   function pattern(seed) {
     const count = fishCount(seed), columns = count <= 8 ? 4 : count <= 13 ? 5 : 6, rows = Math.ceil(count / columns);
     let state = seed >>> 0;

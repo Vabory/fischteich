@@ -2,7 +2,7 @@
 const test = require("node:test"), assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
 const { createDocument } = require("./helpers/trottl-special-dom.cjs");
 const read = file => fs.readFileSync(path.join(__dirname, "..", file), "utf8").replace(/\r/g, "");
-function harness(role = "player") {
+function harness(role = "player", seed = 14) {
   const start = 200000, doc = createDocument('<body><div id="root"></div></body>'), root = doc.querySelector("#root");
   let now = start - 5000, id = 0, answerCount = 0, finalizeCount = 0;
   const timers = new Map();
@@ -11,7 +11,7 @@ function harness(role = "player") {
     setTimeout(fn, delay) { const key = ++id; timers.set(key, { fn, at: now + delay }); return key; }, clearTimeout(key) { timers.delete(key); } };
   vm.runInNewContext(read("trottl-special-minigames.js"), { window: win, Date, Math, Number, Object, Array, JSON });
   vm.runInNewContext(read("trottl-special-fish-count.js"), { window: win, Date, Math, Number, Object, Array, JSON, Promise });
-  const api = win.TrottlSpecialFishCount, seed = 14, count = api.fishCount(seed), reveal = api.revealDuration(count), answerStart = start + 1100 + reveal;
+  const api = win.TrottlSpecialFishCount, count = api.fishCount(seed), reveal = api.revealDuration(count), answerStart = start + 1100 + reveal;
   const view = { seed, reveal_duration_ms: reveal, choices: [count - 2, count, count + 1, count - 1], answer_started_at: new Date(answerStart).toISOString(), answer_deadline: new Date(answerStart + 10000).toISOString(), answered: false };
   const snapshot = { membershipRole: role, identity: { userId: role === "player" ? "u0" : "spectator" }, players: [{ userId: "u0", lifecycle: "alive" }], fishCountView: view,
     session: { id: "s", status: "playing", gameState: { phase: "minigame_active", minigame: { minigame_id: "r", minigame_type: "special_minigame_08", title: "Fische zählen",
@@ -34,7 +34,8 @@ function harness(role = "player") {
 test("count, reveal interpolation, asset pool and deterministic overlap-safe normalized layout", () => {
   const h = harness(), { api } = h;
   assert.equal(api.fishCount(14), 5); assert.equal(api.fishCount(13), 18);
-  assert.equal(api.revealDuration(5), 1000); assert.equal(api.revealDuration(18), 2000);
+  assert.equal(api.revealDuration(5), 2000); assert.equal(api.revealDuration(18), 4000);
+  assert.deepEqual([8,11,14].map(api.revealDuration), [2462,2923,3385]);
   for (let seed = 1; seed <= 140; seed++) {
     const fish = api.pattern(seed), count = api.fishCount(seed);
     assert.equal(fish.length, count);
@@ -52,6 +53,14 @@ test("countdown hides gameplay; absolute attention, reveal, answer and reconnect
   h.clock(h.start + 1110); assert.equal(fishes.hidden, false); assert.equal(fishes.querySelectorAll("img").length, h.count);
   h.clock(h.answerStart + 1); assert.equal(fishes.hidden, true); assert.equal(choices.hidden, false);
   h.recreate(); assert.equal(h.root.querySelector(".trottl-special-fish-count-fishes").hidden, true);
+});
+test("18-fish reconnect and background use only the remaining absolute reveal time", () => {
+  const h = harness("player", 13), fishes = h.root.querySelector(".trottl-special-fish-count-fishes");
+  assert.equal(h.count, 18); assert.equal(h.answerStart, h.start + 5100);
+  h.clock(h.start + 3600); assert.equal(fishes.hidden, false);
+  h.recreate(); assert.equal(h.root.querySelectorAll(".trottl-special-fish-count-fishes").at(-1).hidden, false);
+  h.doc.visibilityState = "hidden"; h.clock(h.answerStart + 1); h.doc.visibilityState = "visible"; h.clock(h.answerStart + 2);
+  assert.equal(h.root.querySelectorAll(".trottl-special-fish-count-fishes").at(-1).hidden, true); h.recreate(); assert.equal(h.root.querySelectorAll(".trottl-special-fish-count-fishes").at(-1).hidden, true);
 });
 test("scheduled intro fade and every shared countdown step render before attention without early fish", () => {
   const h = harness(), title = h.root.querySelector(".trottl-special-minigame-title"), copy = h.root.querySelector(".trottl-special-minigame-copy"), label = h.root.querySelector(".trottl-special-minigame-countdown"), fish = h.root.querySelector(".trottl-special-fish-count-fishes");
@@ -123,7 +132,7 @@ test("spectator sees choices but cannot answer; background and deadline use abso
   await new Promise(resolve => setImmediate(resolve)); assert.ok(h.finalizeCount >= 1);
 });
 test("SQL migration isolates correctness, ranks all wrong players and reuses common settlement", () => {
-  const sql = read("supabase/migrations/20260922010000_add_trottl_special_fish_count.sql"), fixture = read("tests/fixtures/trottl-special-fish-count.sql");
+  const sql = read("supabase/migrations/20260922010000_add_trottl_special_fish_count.sql"), polish = read("supabase/migrations/20260923000000_polish_trottl_special_catch_me_and_fish_count.sql"), fixture = read("tests/fixtures/trottl-special-fish-count.sql");
   assert.match(sql, /create table public\.trottl_special_fish_count_rounds/);
   assert.match(sql, /create table public\.trottl_special_fish_count_runs/);
   assert.match(sql, /revoke all on public\.trottl_special_fish_count_rounds,public\.trottl_special_fish_count_runs/);
@@ -133,7 +142,9 @@ test("SQL migration isolates correctness, ranks all wrong players and reuses com
   assert.match(sql, /'correct_count',r\.fish_count/);
   assert.match(sql, /answer_trottl_special_fish_count/);
   assert.ok(!sql.slice(sql.indexOf("create function public.get_trottl_special_fish_count_view"), sql.indexOf("create function public.special_fish_count_finalize_locked")).includes("'correct_count'"));
-  assert.match(fixture, /special_fish_count_reveal_ms\(5\)<>1000/);
+  assert.match(polish, /select 2000\+round\(\(p_count-5\)\*2000\.0\/13\)::integer/);
+  assert.match(polish, /drop constraint trottl_special_fish_count_rounds_reveal_duration_ms_check/);
+  assert.match(fixture, /special_fish_count_reveal_ms\(5\)<>2000/);
   assert.match(fixture, /special_minigame_pick\(0\.777778\)/);
   assert.ok(fixture.startsWith("begin;\n") && fixture.endsWith("rollback;\n"));
 });

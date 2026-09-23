@@ -11,7 +11,7 @@ begin
   if points is distinct from again or jsonb_array_length(points)<>10 then raise exception 'Catch me determinism mismatch';end if;
   previous:=null;
   for point in select value from jsonb_array_elements(points) loop
-   if (point->>'x')::numeric not between .16 and .84 or (point->>'y')::numeric not between .13 and .87 then raise exception 'Catch me bounds mismatch';end if;
+   if (point->>'x')::numeric not between .11 and .89 or (point->>'y')::numeric not between .08 and .92 then raise exception 'Catch me bounds mismatch';end if;
    if previous is not null and sqrt(power((point->>'x')::numeric-(previous->>'x')::numeric,2)+power((point->>'y')::numeric-(previous->>'y')::numeric,2))<.30
     then raise exception 'Catch me minimum distance mismatch';end if;
    previous:=point;

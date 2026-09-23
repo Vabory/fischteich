@@ -31,23 +31,25 @@ function harness(role = "player", initialProgress = 0) {
 }
 
 test("seeded sequence has ten safe, separated positions and full quadrant coverage", () => {
-  const h = harness();
+  const h = harness(), extrema = { minX: 1, maxX: 0, minY: 1, maxY: 0 };
   for (let seed = 1; seed <= 500; seed++) {
     const points = h.api.positionSequence(seed); assert.equal(points.length, 10);
     assert.deepEqual(JSON.parse(JSON.stringify(h.api.positionSequence(seed))), JSON.parse(JSON.stringify(points)));
-    for (const point of points) { assert.ok(point.x >= .16 && point.x <= .84); assert.ok(point.y >= .13 && point.y <= .87); }
+    for (const point of points) { assert.ok(point.x >= .11 && point.x <= .89); assert.ok(point.y >= .08 && point.y <= .92);
+      extrema.minX = Math.min(extrema.minX, point.x); extrema.maxX = Math.max(extrema.maxX, point.x); extrema.minY = Math.min(extrema.minY, point.y); extrema.maxY = Math.max(extrema.maxY, point.y); }
     for (let i = 1; i < points.length; i++) assert.ok(Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y) >= .30 - 1e-12, `${seed}:${i}`);
     assert.equal(new Set(points.slice(0, 4).map(point => `${point.x < .5}:${point.y < .5}`)).size, 4);
   }
   assert.notDeepEqual(JSON.parse(JSON.stringify(h.api.positionSequence(12345))), JSON.parse(JSON.stringify(h.api.positionSequence(54321))));
+  assert.ok(extrema.minX < .12 && extrema.maxX > .88 && extrema.minY < .09 && extrema.maxY > .91, JSON.stringify(extrema));
 });
 
-test("center, visible edge and enlarged hitbox hit while a clear outside tap misses", () => {
-  const h = harness(), point = h.positions[0], geometry = { width: 390, height: 600, fishSize: 72 };
+test("smaller visible fish keeps the 1.25 touch scale and proportionally shrinks its hitbox", () => {
+  const h = harness(), point = h.positions[0], geometry = { width: 390, height: 600, fishSize: 56 };
   assert.equal(h.api.hitTest(point, point.x, point.y, geometry), true);
   assert.equal(h.api.hitTest(point, point.x + 35 / 390, point.y, geometry), true);
-  assert.equal(h.api.hitTest(point, point.x + 44 / 390, point.y, geometry), true);
-  assert.equal(h.api.hitTest(point, point.x + 50 / 390, point.y, geometry), false);
+  assert.equal(h.api.hitTest(point, point.x + 36 / 390, point.y, geometry), false);
+  assert.equal(56 * h.api.CONFIG.hitboxScale, 70);
   assert.equal(h.api.CONFIG.hitboxScale, 1.25);
 });
 
@@ -85,17 +87,24 @@ test("absolute deadline survives background and triggers safety finalization", a
 });
 
 test("production wiring, server authority, ranking and responsive large shell are present", () => {
-  const source = read("trottl-special-catch-me.js"), service = read("trottl-special-service.js"), ui = read("trottl-special-ui.js"), css = read("trottl-special.css"), html = read("index.html"), sql = read("supabase/migrations/20260922030000_add_trottl_special_catch_me.sql");
+  const source = read("trottl-special-catch-me.js"), service = read("trottl-special-service.js"), ui = read("trottl-special-ui.js"), css = read("trottl-special.css"), html = read("index.html"), sql = read("supabase/migrations/20260922030000_add_trottl_special_catch_me.sql"), polish = read("supabase/migrations/20260923000000_polish_trottl_special_catch_me_and_fish_count.sql");
   assert.ok(fs.existsSync(path.join(__dirname, "..", "assets/mini-games/gold-fish.png")));
   assert.match(source, /ASSET = "\.\/assets\/mini-games\/gold-fish\.png"/); assert.match(source, /image\.decode/); assert.match(source, /addEventListener\("pointerdown"/);
-  assert.match(css, /is-catch-me\.is-gameplay[^}]*top: calc\([^}]*bottom: calc\(/); assert.match(css, /catch-me-field[^}]*flex: 1 1 auto[^}]*overflow: hidden[^}]*touch-action: none/);
-  assert.match(css, /catch-me-fish[^}]*width: clamp\(72px, 18vw, 105px\)[^}]*will-change: transform/);
-  for (const item of ["trottl-special-catch-me.js?v=1","trottl-special-minigames.js?v=9","trottl-special-service.js?v=20","trottl-special-ui.js?v=25","trottl-special.css?v=32"]) assert.ok(html.includes(item));
+  assert.match(css, /is-catch-me\.is-gameplay[^}]*clamp\(60px, 7\.5dvh, 76px\)[^}]*right: max\(10px[^}]*clamp\(40px, 5dvh, 52px\)[^}]*left: max\(10px/); assert.match(css, /catch-me-field[^}]*flex: 1 1 auto[^}]*overflow: hidden[^}]*touch-action: none/);
+  assert.match(css, /catch-me-fish[^}]*width: clamp\(56px, 14vw, 82px\)[^}]*will-change: transform/);
+  const oldShell = { width: 350, height: 844 - (47 + 92.84) - (34 + 67.52) }, nextShell = { width: 370, height: 844 - (47 + 63.3) - (34 + 42.2) };
+  const oldField = { width: oldShell.width - 22, height: oldShell.height - 82 }, nextField = { width: nextShell.width - 22, height: nextShell.height - 82 };
+  assert.ok(nextShell.width > oldShell.width && nextShell.height > oldShell.height); assert.ok(nextField.width * nextField.height > oldField.width * oldField.height * 1.17);
+  for (const point of [{x:.11,y:.08},{x:.89,y:.08},{x:.11,y:.92},{x:.89,y:.92}]) assert.ok(point.x * 278 >= 28 && (1-point.x) * 278 >= 28 && point.y * 450 >= 28 && (1-point.y) * 450 >= 28);
+  for (const item of ["trottl-special-catch-me.js?v=2","trottl-special-minigames.js?v=9","trottl-special-service.js?v=21","trottl-special-ui.js?v=25","trottl-special.css?v=33"]) assert.ok(html.includes(item));
   assert.match(service, /get_trottl_special_catch_me_view/); assert.match(service, /submitCatchMe: async/); assert.match(ui, /catchMe\?\.update\(snapshot\)/);
   for (const pattern of [/create table public\.trottl_special_catch_me_rounds/,/create table public\.trottl_special_catch_me_runs/,/special_catch_me_positions\(v_seed\)/,
     /fish_index<>new_progress/,/abs\(tap_x-\(expected->>'x'\)::numeric\)>\.15/,/new_progress=10/,/server_elapsed-previous_ms>5000/,
     /coalesce\(r\.elapsed_ms,30001\)/,/perform public\.special_minigame_finalize_locked\(p_id,v_round,inputs\)/,
     /chosen='special_minigame_09' then perform public\.special_catch_me_begin_locked\(p_id\)/]) assert.match(sql, pattern);
+  for (const pattern of [/special_fish_count_reveal_ms/,/between 1000 and 4000/,/then 1100 else 5200/,/then 800 else 5200/,
+    /abs\(tap_x-\(expected->>'x'\)::numeric\)>\.13/,/abs\(tap_y-\(expected->>'y'\)::numeric\)>\.10/]) assert.match(polish, pattern);
+  assert.equal(harness().api.CONFIG.hitboxScale, 1.25); assert.equal(harness().api.CONFIG.serverHitRadiusX, .13); assert.equal(harness().api.CONFIG.serverHitRadiusY, .10);
   assert.match(sql, /'Zeit abgelaufen'/); assert.match(sql, /'all_timeout',all_timeout/); assert.doesNotMatch(sql, /trottl_classic|finale|panic/i);
   const fixture = read("tests/fixtures/trottl-special-catch-me.sql"); assert.ok(fixture.startsWith("begin;\n") && fixture.endsWith("rollback;\n"));
   for (const pattern of [/special_catch_me_positions\(seed\)/,/minimum distance mismatch/,/coverage mismatch/,/full tie mismatch/,/timeout ranking mismatch/,/all-timeout tie mismatch/]) assert.match(fixture, pattern);

@@ -89,18 +89,21 @@ connectivityNotice.setAttribute("role", "status");
 connectivityNotice.setAttribute("aria-live", "polite");
 connectivityNotice.hidden = true;
 document.body.append(connectivityBadge, connectivityNotice);
-const rouletteOfflineStatus = document.createElement("p");
-rouletteOfflineStatus.className = "roulette-offline-status";
-rouletteOfflineStatus.textContent = "Offline: lokale Werte auf diesem Gerät. Globale Statistik nicht verfügbar.";
-rouletteOfflineStatus.hidden = true;
+const rouletteOfflineStatus = document.querySelector("#roulette-offline-status");
 const roulettePendingStatus = document.createElement("p");
 roulettePendingStatus.className = "roulette-pending-status";
 roulettePendingStatus.hidden = true;
-document.querySelector(".roulette-stats").prepend(rouletteOfflineStatus, roulettePendingStatus);
+document.querySelector(".roulette-stats").prepend(roulettePendingStatus);
 const connectivityListeners = new Set();
 let connectivityOnline = window.navigator?.onLine !== false;
 let connectivityNoticeTimer = null;
 let offlineStartup = !connectivityOnline;
+function updateConnectivityPresentation() {
+  const modal = document.querySelector("#settings-modal");
+  const settingsOpen = modal?.hidden === false;
+  connectivityBadge.hidden = connectivityOnline || settingsOpen;
+  modal?.classList?.toggle("is-offline", !connectivityOnline);
+}
 function showConnectivityNotice(message) {
   if (!connectivityNotice) return;
   connectivityNotice.textContent = message;
@@ -116,11 +119,11 @@ function requireOnline(feature) {
 function setConnectivityOnline(online) {
   if (connectivityOnline === online) return;
   connectivityOnline = online;
-  if (connectivityBadge) connectivityBadge.hidden = online;
+  updateConnectivityPresentation();
   showConnectivityNotice(online ? "Internetverbindung wiederhergestellt." : "Offline-Modus – lokale Funktionen bleiben verfügbar.");
   for (const listener of connectivityListeners) listener(online);
 }
-if (connectivityBadge) connectivityBadge.hidden = connectivityOnline;
+updateConnectivityPresentation();
 window.addEventListener?.("online", () => setConnectivityOnline(true));
 window.addEventListener?.("offline", () => setConnectivityOnline(false));
 window.fischteichConnectivity = Object.freeze({
@@ -1928,7 +1931,7 @@ async function handleBobrEasterEggTap(event) {
 }
 
 function openSettingsModal() {
-  void ensureImagesLoaded(settingsModal);
+  if (connectivityOnline) void ensureImagesLoaded(settingsModal);
   state.bobrTapSequence.enable();
   renderBobrUnlockState(getAppAuthState().currentProfile);
   renderSettingsIdentity();
@@ -1938,6 +1941,7 @@ function openSettingsModal() {
   void renderBuffaloPushSettings();
   appElement.inert = true;
   settingsModal.hidden = false;
+  updateConnectivityPresentation();
   activateBobrTapListeners();
   document.querySelector("#close-settings").focus({ preventScroll: true });
 }
@@ -2019,6 +2023,7 @@ function closeSettingsModal() {
   deactivateBobrTapListeners({ reset: true });
   clearBobrUnlockSparkle();
   settingsModal.hidden = true;
+  updateConnectivityPresentation();
   appElement.inert = false;
   openSettingsButton.focus({ preventScroll: true });
 }
@@ -6013,6 +6018,7 @@ function runAutomaticRouletteSync() {
 }
 connectivityListeners.add((online) => {
   if (rouletteOfflineStatus) rouletteOfflineStatus.hidden = online || rouletteScreen.hidden;
+  if (online && !settingsModal.hidden) void ensureImagesLoaded(settingsModal);
   if (!online) {
     buffaloLiveStatus.hidden = true;
     if (!settingsModal.hidden) {

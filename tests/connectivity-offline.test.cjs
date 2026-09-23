@@ -1,22 +1,31 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
 const root = path.join(__dirname, "..");
+const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+const css = fs.readFileSync(path.join(root, "style.css"), "utf8");
 const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
 const section = (start, end) => script.slice(script.indexOf(start), script.indexOf(end, script.indexOf(start)));
 
 function connectivityHarness(initialOnline) {
   const events = new Map(), app = { children: [], append(...nodes) { this.children.push(...nodes); } }, stats = { children: [], prepend(node) { this.children.unshift(node); } };
+  const settings = { hidden: true, classes: new Set(), classList: { toggle(name, enabled) { enabled ? settings.classes.add(name) : settings.classes.delete(name); } } };
+  const offlineStatus = { hidden: true };
   const document = {
     body: app,
     createElement() { return { hidden: false, textContent: "", setAttribute() {} }; },
-    querySelector(selector) { return selector === "#app" ? app : stats; },
+    querySelector(selector) {
+      if (selector === "#app") return app;
+      if (selector === "#settings-modal") return settings;
+      if (selector === "#roulette-offline-status") return offlineStatus;
+      return stats;
+    },
   };
   let scheduled = 0;
   const window = { navigator: { onLine: initialOnline }, addEventListener(name, fn) { events.set(name, fn); },
     clearTimeout() {}, setTimeout() { scheduled++; return scheduled; } };
   const context = vm.createContext({ window, document, Set, Object });
-  vm.runInContext(`${section("const connectivityBadge", "const ROULETTE_WINNERS")}\nwindow.test = { requireOnline, badge: connectivityBadge, notice: connectivityNotice };`, context);
-  return { window, events, get scheduled() { return scheduled; } };
+  vm.runInContext(`${section("const connectivityBadge", "const ROULETTE_WINNERS")}\nwindow.test = { requireOnline, updateConnectivityPresentation, badge: connectivityBadge, notice: connectivityNotice };`, context);
+  return { window, events, settings, get scheduled() { return scheduled; } };
 }
 
 test("initial connectivity follows navigator.onLine and marks offline without a transition toast", () => {
@@ -42,6 +51,37 @@ test("online and offline events update once, notify subscribers and avoid repeat
   assert.equal(h.scheduled, 2);
   assert.deepEqual(changes, [false, true]);
   unsubscribe(); h.events.get("offline")(); assert.deepEqual(changes, [false, true]);
+});
+
+test("offline badge yields to the settings modal and returns after it closes", () => {
+  const h = connectivityHarness(false);
+  assert.equal(h.window.test.badge.hidden, false);
+  assert.equal(h.settings.classes.has("is-offline"), true);
+  h.settings.hidden = false;
+  h.window.test.updateConnectivityPresentation();
+  assert.equal(h.window.test.badge.hidden, true);
+  h.settings.hidden = true;
+  h.window.test.updateConnectivityPresentation();
+  assert.equal(h.window.test.badge.hidden, false);
+  h.events.get("online")();
+  assert.equal(h.window.test.badge.hidden, true);
+  assert.equal(h.settings.classes.has("is-offline"), false);
+});
+
+test("offline polish keeps the badge clear of controls and Roulette status outside statistics", () => {
+  const spinIndex = html.indexOf('id="spin-roulette"');
+  const offlineIndex = html.indexOf('id="roulette-offline-status"');
+  const speedIndex = html.indexOf('id="roulette-speed-selector"');
+  const statsIndex = html.indexOf('class="roulette-stats"');
+  assert.ok(spinIndex >= 0 && spinIndex < offlineIndex);
+  assert.ok(offlineIndex < speedIndex && offlineIndex < statsIndex);
+  assert.match(html, /<p class="roulette-offline-status" id="roulette-offline-status" role="status" hidden>Offline: Globale Statistik nicht verfügbar\.<\/p>/);
+  assert.doesNotMatch(html.slice(statsIndex, html.indexOf("</div>", statsIndex)), /roulette-offline-status/);
+  assert.match(css, /\.connectivity-badge \{[^}]*z-index: 9;[^}]*top: max\(10px, env\(safe-area-inset-top, 0px\)\);[^}]*left: calc\(max\(10px, env\(safe-area-inset-left, 0px\)\) \+ 48px\)/s);
+  assert.match(css, /\.roulette-offline-status \{[^}]*position: absolute;[^}]*top: calc\(50% \+ 63px\);[^}]*text-align: center/s);
+  assert.match(css, /\.settings-modal-backdrop\.is-offline \.version-beaver-scene \{ display: none; \}/);
+  assert.match(section("function openSettingsModal", "function setAdminLoginRunning"), /if \(connectivityOnline\) void ensureImagesLoaded\(settingsModal\);[\s\S]*settingsModal\.hidden = false;[\s\S]*updateConnectivityPresentation\(\)/);
+  assert.match(section("function closeSettingsModal", "function openDisplayNameRenameModal"), /settingsModal\.hidden = true;[\s\S]*updateConnectivityPresentation\(\)/);
 });
 
 test("offline gate gives a plain explanation before online-only navigation", () => {
@@ -98,6 +138,6 @@ test("phase-one offline cache structure and push handlers remain intact", () => 
   assert.match(worker, /fischteich-offline-v/);
   assert.match(worker, /self\.addEventListener\("push"/);
   assert.match(worker, /self\.addEventListener\("notificationclick"/);
-  assert.match(worker, /"\.\/style\.css\?v=194"/);
-  assert.match(worker, /"\.\/script\.js\?v=101"/);
+  assert.match(worker, /"\.\/style\.css\?v=195"/);
+  assert.match(worker, /"\.\/script\.js\?v=102"/);
 });

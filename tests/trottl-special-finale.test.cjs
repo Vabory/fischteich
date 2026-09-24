@@ -2,6 +2,7 @@
 const test = require("node:test"), assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
 const root = path.join(__dirname,".."), read = file => fs.readFileSync(path.join(root,file),"utf8");
 const migration = read("supabase/migrations/20260924010000_add_trottl_special_finale_and_winner_flow.sql");
+const joinFix = read("supabase/migrations/20260925000000_fix_trottl_special_room_join_after_finale.sql");
 function model(overrides={}) {
   const win = {}; vm.runInNewContext(read("trottl-special-finale.js"),{window:win,Set,Map,Object,Array,Number,Date});
   const finale = { active:true, phase:"ready", finalists:[
@@ -22,6 +23,15 @@ test("migration enters at two, resolves one and zero, and invalidates critical r
   assert.match(migration,/if v_count>2 then return false/);assert.match(migration,/lifecycle_status='critical' and lives=0/);
   assert.match(migration,/v_count=1[\s\S]*normal_finale_win/);assert.match(migration,/v_count=0[\s\S]*no_finalists/);
   assert.match(migration,/order by seat_index/);assert.match(migration,/special_finale_auto_enter_player/);
+});
+test("follow-up keeps legacy lobby joins safe by resolving session and player trigger rows in separate branches",()=>{
+  assert.match(joinFix,/if tg_table_name='trottl_special_sessions' then[\s\S]*v_id:=coalesce\(new\.id,old\.id\)[\s\S]*else[\s\S]*v_id:=coalesce\(new\.session_id,old\.session_id\)/);
+  assert.doesNotMatch(joinFix,/case when tg_table_name/);assert.match(joinFix,/maybe_enter_trottl_special_finale_locked\(v_id\)/);
+});
+test("normal room join keeps the existing retry recovery path after a rejected RPC or session load",()=>{
+  const ui=read("trottl-special-ui.js"),join=ui.match(/async function joinRoom\(slot\)[\s\S]*?\n    \}/)?.[0]??"";
+  assert.match(join,/service\.recoverSession\(room\.sessionId\).*service\.joinRoom\(slot\)/s);
+  assert.match(join,/catch \(error\).*room-feedback/s);assert.match(join,/finally \{[\s\S]*state\.busy = false[\s\S]*renderRooms\(\)/);
 });
 test("ready barrier is locked, idempotent and launches exactly the existing dispatcher",()=>{
   assert.match(migration,/pg_advisory_xact_lock\(337734,slot::integer\)/);assert.match(migration,/if coalesce\(\(f->'ready'->>v_user::text\)::boolean,false\) then return/);

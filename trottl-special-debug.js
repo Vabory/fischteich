@@ -6,13 +6,14 @@
     button.type = "button"; button.className = "trottl-special-test-button"; button.textContent = "TEST"; button.hidden = true;
     panel.className = "trottl-special-test-panel"; panel.hidden = true; panel.setAttribute("aria-label", "Temporäre Special-Teststeuerung");
     let snapshot = null, open = false, busy = false, error = "", serverSelection = null;
-    const roll = doc.createElement("select"), minigame = doc.createElement("select"), status = doc.createElement("p"), save = doc.createElement("button");
+    const roll = doc.createElement("select"), minigame = doc.createElement("select"), status = doc.createElement("p"), save = doc.createElement("button"), startFinale = doc.createElement("button");
     function option(select, value, title) { const o = doc.createElement("option"); o.value = value; o.textContent = title; select.append(o); }
     option(roll, "", "Zufällig"); for (let n = 1; n <= 6; n++) option(roll, String(n), String(n));
     option(minigame, "", "Zufällig"); for (const r of global.TrottlSpecialMinigames.registry.filter(r => r.active && r.implemented)) option(minigame, r.id, r.title);
     function label(text, input) { const l = doc.createElement("label"); l.textContent = text; l.append(input); return l; }
     save.type = "button"; save.textContent = "Next-Overrides setzen";
-    panel.append(label("Nächster Würfel", roll), label("Nächstes Minigame", minigame), save, status); root.append(button, panel);
+    startFinale.type = "button"; startFinale.textContent = "Finale mit 2 starten";
+    panel.append(label("Nächster Würfel", roll), label("Nächstes Minigame", minigame), save, startFinale, status); root.append(button, panel);
     function allowed() { return snapshot?.session.status === "playing" && snapshot.membershipRole === "player" && snapshot.session.hostUserId === snapshot.identity.userId && snapshot.players.some(p => p.userId === snapshot.identity.userId && p.lifecycle !== "left"); }
     function update(next) {
       if (snapshot?.session.id !== next?.session.id) { open = false; serverSelection = null; error = ""; }
@@ -23,7 +24,7 @@
       if (!open || selection !== serverSelection) { roll.value = d.next_roll == null ? "" : String(d.next_roll); minigame.value = d.next_minigame ?? ""; }
       serverSelection = selection;
       status.textContent = error || `Nächster Würfel: ${d.next_roll ?? "Zufällig"} · Nächstes Minigame: ${global.TrottlSpecialMinigames.registry.find(r => r.id === d.next_minigame)?.title ?? "Zufällig"}`;
-      save.disabled = busy; roll.disabled = busy; minigame.disabled = busy;
+      save.disabled = busy; startFinale.disabled = busy || Boolean(snapshot?.session.gameState.finale?.active); roll.disabled = busy; minigame.disabled = busy;
     }
     button.addEventListener("click", () => { if (allowed()) { open = !open; update(snapshot); } });
     save.addEventListener("click", async () => {
@@ -32,6 +33,13 @@
       busy = true; error = ""; save.disabled = true;
       try { const next = await service.setDebugNext(id, n, type); if (snapshot?.session.id === id) onSnapshot(next); }
       catch { error = "Testauswahl nicht gespeichert. Bitte erneut versuchen."; }
+      finally { busy = false; update(snapshot); }
+    });
+    startFinale.addEventListener("click", async () => {
+      if (!allowed() || busy || snapshot.session.gameState.finale?.active) return;
+      const id = snapshot.session.id; busy = true; error = ""; update(snapshot);
+      try { const next = await service.startFinaleTest(id); if (snapshot?.session.id === id) onSnapshot(next); }
+      catch { error = "Finale-Test benötigt zwei aktive Spieler."; }
       finally { busy = false; update(snapshot); }
     });
     return Object.freeze({ update, suspend: () => { snapshot = null; open = false; button.hidden = true; panel.hidden = true; } });

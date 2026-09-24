@@ -174,7 +174,7 @@ test("production wiring, server authority, ranking and responsive large shell ar
   const oldField = { width: oldShell.width - 22, height: oldShell.height - 82 }, nextField = { width: nextShell.width - 22, height: nextShell.height - 82 };
   assert.ok(nextShell.width > oldShell.width && nextShell.height > oldShell.height); assert.ok(nextField.width * nextField.height > oldField.width * oldField.height * 1.17);
   for (const point of [{x:.11,y:.08},{x:.89,y:.08},{x:.11,y:.92},{x:.89,y:.92}]) assert.ok(point.x * 278 >= 28 && (1-point.x) * 278 >= 28 && point.y * 450 >= 28 && (1-point.y) * 450 >= 28);
-  for (const item of ["trottl-special-catch-me.js?v=3","trottl-special-minigames.js?v=9","trottl-special-service.js?v=22","trottl-special-ui.js?v=26","trottl-special.css?v=33"]) assert.ok(html.includes(item));
+  for (const item of ["trottl-special-catch-me.js?v=3","trottl-special-minigames.js?v=9","trottl-special-service.js?v=23","trottl-special-ui.js?v=27","trottl-special.css?v=34"]) assert.ok(html.includes(item));
   assert.match(service, /get_trottl_special_catch_me_view/); assert.match(service, /submitCatchMe: async/); assert.match(ui, /catchMe\?\.update\(snapshot\)/);
   assert.match(service, /Number\(point\.x\) < \.11[^\n]+Number\(point\.x\) > \.89[^\n]+Number\(point\.y\) < \.08[^\n]+Number\(point\.y\) > \.92/);
   for (const pattern of [/create table public\.trottl_special_catch_me_rounds/,/create table public\.trottl_special_catch_me_runs/,/special_catch_me_positions\(v_seed\)/,

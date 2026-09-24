@@ -25,6 +25,19 @@
     if (response.error) throw response.error;
     return response.data;
   }
+  function normalizeFinale(value) {
+    if (value == null) return null;
+    const phases = ["transition","ready","minigame","round_result","winner"];
+    if (typeof value !== "object" || value.active !== true || !phases.includes(value.phase)
+      || !Array.isArray(value.finalists) || (value.phase === "winner" ? value.finalists.length > 2 : value.finalists.length !== 2)
+      || new Set(value.finalists.map(player => player?.player_id)).size !== value.finalists.length
+      || value.finalists.some(player => typeof player?.player_id !== "string" || !Number.isInteger(Number(player.seat_index))
+        || typeof player.display_name !== "string")) throw new Error("Invalid Special finale response");
+    const finalists = [...value.finalists].sort((a,b) => Number(a.seat_index)-Number(b.seat_index))
+      .map(player => Object.freeze({ ...player, seat_index: Number(player.seat_index) }));
+    return Object.freeze({ ...value, finalists: Object.freeze(finalists), ready: Object.freeze({ ...(value.ready ?? {}) }),
+      result: value.result == null ? null : Object.freeze({ ...value.result }) });
+  }
   function normalizeSession(row) {
     if (!row || row.mode !== MODE || typeof row.id !== "string" || ![1,2].includes(Number(row.room_slot))
       || !["lobby","playing","finished"].includes(row.status) || typeof row.host_user_id !== "string"
@@ -34,7 +47,7 @@
     return Object.freeze({ id: row.id, mode: MODE, roomSlot: Number(row.room_slot), status: row.status,
       hostUserId: row.host_user_id, playerCount: Number(row.player_count), startedAt: row.started_at,
       currentTurnSeat: row.current_turn_seat === null ? null : Number(row.current_turn_seat),
-      gameState: Object.freeze({ ...row.game_state, debug_test: row.debug_test ?? {} }) });
+      gameState: Object.freeze({ ...row.game_state, finale: normalizeFinale(row.game_state?.finale), debug_test: row.debug_test ?? {} }) });
   }
   async function loadRooms() {
     // Pure room-summary normalizer, shared visual data shape, isolated RPC.
@@ -164,7 +177,7 @@
     const rows = await rpc("get_trottl_special_memberships");
     for (const row of [...(rows ?? [])].sort((a,b) => Number(b.session_id === preferredSessionId) - Number(a.session_id === preferredSessionId))) {
       const snapshot = await recoverSession(row.session_id);
-      if (["lobby","playing"].includes(snapshot.session.status)
+      if (["lobby","playing","finished"].includes(snapshot.session.status)
         && snapshot.membershipRole !== "none") return snapshot;
     }
     return null;
@@ -214,6 +227,9 @@
       if (typeof result !== "boolean") throw new Error("Invalid Special reset response");return result;
     },
     setDebugNext: async (id, roll, minigame) => { await rpc("set_trottl_special_debug_next", { p_session_id: id, p_roll: roll, p_minigame: minigame }); return loadSession(id); },
+    setFinaleReady: async id => { await rpc("set_trottl_special_finale_ready", { p_session_id: id }); return loadSession(id); },
+    syncFinale: async id => { await rpc("sync_trottl_special_finale", { p_session_id: id }); return loadSession(id); },
+    startFinaleTest: async id => { await rpc("start_trottl_special_finale_test", { p_session_id: id }); return loadSession(id); },
     saveFishCatch: async (id, roundId, score, hits, final) => { await rpc("save_trottl_special_fish_catch", { p_session_id: id, p_round_id: roundId, p_score: score, p_hits: hits, p_final: final }); return loadSession(id); },
     submitReaction: async (id, roundId, elapsed) => { await rpc("submit_trottl_special_reaction", { p_session_id: id, p_round_id: roundId, p_tap_elapsed_ms: elapsed }); return loadSession(id); },
     finalizeReaction: async (id, roundId) => { await rpc("finalize_trottl_special_reaction", { p_session_id: id, p_round_id: roundId }); return loadSession(id); },

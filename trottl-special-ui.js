@@ -66,6 +66,8 @@
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fangfortschritt wird erneut geladen."; return refresh(); } });
     const debug = global.TrottlSpecialDebug?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id) { acceptSnapshot(next); renderSession(); } } });
+    const finale = global.TrottlSpecialFinale?.create({ root: game, service,
+      onReady: () => void finaleReady(), onSync: () => void finaleSync() });
     // Results and transitions come exclusively from the Special intent RPC.
     dieButton.disabled = true;
     dieButton.setAttribute("aria-label", "Special-Würfel werfen");
@@ -207,6 +209,17 @@
       const snapshot = state.snapshot, preset = view.getTableSeatPreset(snapshot.players.length);
       const spectator = snapshot.membershipRole === "spectator";
       const g = snapshot.session.gameState, local = snapshot.players.find(p => p.userId === snapshot.identity.userId);
+      mount.hidden = false;
+      if (g.finale?.active) {
+        mount.hidden = true; layer.replaceChildren(); resultPanel.hidden = true; resultToggle.hidden = true;
+        q("event-player").textContent = ""; q("event-copy").textContent = ""; q("event-roll").hidden = q("event-action").hidden = q("event-meta").hidden = true;
+        q("rule-controls").hidden = true; dieButton.disabled = true;
+        panic?.update(snapshot); roulette?.update(snapshot, state.gameBusy); numberHunt?.update(snapshot); fishCatch?.update(snapshot);
+        reactionTest?.update(snapshot); colorChaos?.update(snapshot); fishMemory?.update(snapshot); stopFish?.update(snapshot);
+        poisonFish?.update(snapshot); fishCount?.update(snapshot); catchMe?.update(snapshot); debug?.update(snapshot); finale?.update(snapshot, state.busy);
+        return;
+      }
+      finale?.update(snapshot, state.busy);
       const playable = !spectator && local && local.lifecycle !== "eliminated";
       const actor = playable && g.actor === snapshot.identity.userId;
       const distribution = playable ? service.getGameDistribution(g, snapshot.identity.userId) : null;
@@ -509,13 +522,15 @@
     function renderSession() {
       if (!state.snapshot) return;
       const playing = state.snapshot.session.status === "playing";
+      const finaleWinner = state.snapshot.session.status === "finished" && state.snapshot.session.gameState.phase === "finale_winner";
+      const gameVisible = playing || finaleWinner;
       eyeCounter.hidden = !playing;
       eyeCounter.querySelector("span").textContent = String(state.snapshot.spectatorCount);
       eyeCounter.setAttribute("aria-label", `${state.snapshot.spectatorCount} Zuschauer`);
-      background.src = playing ? view.gameBackgroundAsset : view.lobbyBackgroundAsset;
-      background.classList.toggle("is-ingame-background", playing); session.classList.toggle("is-playing", playing);
-      q("session-header").hidden = playing; lobby.hidden = playing; game.hidden = !playing;
-      if (playing) {
+      background.src = gameVisible ? view.gameBackgroundAsset : view.lobbyBackgroundAsset;
+      background.classList.toggle("is-ingame-background", gameVisible); session.classList.toggle("is-playing", gameVisible);
+      q("session-header").hidden = gameVisible; lobby.hidden = gameVisible; game.hidden = !gameVisible;
+      if (gameVisible) {
         if (["start", "avatar", "kick"].includes(state.modal) && !state.busy) closeModal();
         renderGame();
       } else renderLobby();
@@ -547,6 +562,17 @@
         }
       }
       return success;
+    }
+    async function finaleReady() {
+      const current = state.snapshot;
+      if (!current?.session.gameState.finale?.active || current.session.gameState.finale.phase !== "ready") return;
+      await mutate(() => service.setFinaleReady(current.session.id));
+    }
+    async function finaleSync() {
+      const current = state.snapshot, generation = state.generation;
+      if (!current?.session.gameState.finale?.active || current.session.status !== "playing") return;
+      try { const next = await service.syncFinale(current.session.id); if (generation === state.generation && state.snapshot?.session.id === current.session.id) { acceptSnapshot(next); renderSession(); } }
+      catch { if (generation === state.generation) void refresh(); }
     }
     function renderAvatar(avatars = getAvatarChoices()) {
       const self = state.snapshot.players.find(player => player.userId === state.snapshot.identity.userId);
@@ -583,7 +609,7 @@
     }
     async function presence(kind) {
       const s = state.snapshot, generation = state.generation, field = kind === "heartbeat" ? "heartbeatFlight" : "cleanupFlight";
-      if (!s || session.hidden || doc.visibilityState === "hidden" || state[field]) return;
+      if (!s || s.session.status === "finished" || session.hidden || doc.visibilityState === "hidden" || state[field]) return;
       if (kind === "cleanup" && (s.membershipRole !== "player" || s.session.status !== "lobby")) return;
       const token = {}; state[field] = token;
       try {
@@ -595,7 +621,7 @@
       } finally { if (state[field] === token) state[field] = null; }
     }
     function startPresence() {
-      if (!state.snapshot || session.hidden || doc.visibilityState === "hidden") return;
+      if (!state.snapshot || state.snapshot.session.status === "finished" || session.hidden || doc.visibilityState === "hidden") { stopPresence(); return; }
       if (state.heartbeatTimer === null) state.heartbeatTimer = global.setInterval(() => void presence("heartbeat"), 30_000);
       if (state.snapshot.membershipRole === "player" && state.snapshot.session.status === "lobby") {
         if (state.cleanupTimer === null) state.cleanupTimer = global.setInterval(() => void presence("cleanup"), 20_000);
@@ -609,7 +635,7 @@
       const ownTable = s.membershipRole === "spectator" ? service.tables.spectators : service.tables.players;
       if ((payload?.eventType === "DELETE" && payload.table === ownTable && payload.old?.session_id === s.session.id && payload.old?.user_id === s.identity.userId)
         || (payload?.eventType === "DELETE" && payload.table === service.tables.sessions && payload.old?.id === s.session.id)
-        || (payload?.eventType === "UPDATE" && payload.table === service.tables.sessions && payload.new?.id === s.session.id && payload.new.status === "finished")
+        || (payload?.eventType === "UPDATE" && payload.table === service.tables.sessions && payload.new?.id === s.session.id && payload.new.status === "finished" && payload.new?.game_state?.phase !== "finale_winner")
         || (payload?.eventType === "UPDATE" && payload.table === service.tables.players && payload.new?.session_id === s.session.id && payload.new?.user_id === s.identity.userId && payload.new.lifecycle_status === "left")) {
         void forceExit(s.session.id); return;
       }
@@ -665,6 +691,7 @@
       poisonFish?.suspend();
       fishCount?.suspend();
       catchMe?.suspend();
+      finale?.suspend();
       debug?.suspend();
       global.clearTimeout(state.deadlineTimer); state.deadlineTimer = null;
       global.clearTimeout(state.hintTimer); state.hintTimer = null;
@@ -690,7 +717,8 @@
       startPresence();
     }
     async function openSnapshot(snapshot) {
-      if (snapshot.membershipRole === "none" || snapshot.session.status === "finished") { await openRooms(); return; }
+      const finaleWinner = snapshot.session.status === "finished" && snapshot.session.gameState.phase === "finale_winner";
+      if (snapshot.membershipRole === "none" || (snapshot.session.status === "finished" && !finaleWinner)) { await openRooms(); return; }
       const generation = ++state.generation; await stopConnection();
       if (generation !== state.generation) return;
       state.snapshot = snapshot;
@@ -699,7 +727,7 @@
       state.queue = []; state.processing = false; state.gameBusy = false; state.animatedKey = null;
       try { global.localStorage.setItem("fischteich:trottl-special-session", snapshot.session.id); } catch {}
       rememberMode("special"); showScreen(session); renderSession(); connect();
-      await presence("heartbeat");
+      if (snapshot.session.status !== "finished") await presence("heartbeat");
       if (state.snapshot?.session.id !== snapshot.session.id) return;
       doc.querySelector("#close-trottl-special-session").focus();
       if (snapshot.session.status === "lobby" && snapshot.players.some(p => p.userId === snapshot.identity.userId && p.avatarId === null)) openAvatar();
@@ -743,7 +771,8 @@
           } else if (snapshot) {
             const loaded = await service.loadSession(snapshot.session.id);
             if (generation !== state.generation) return;
-            if (loaded.session.status === "finished" || loaded.membershipRole === "none") {
+            const finaleWinner = loaded.session.status === "finished" && loaded.session.gameState.phase === "finale_winner";
+            if ((loaded.session.status === "finished" && !finaleWinner) || loaded.membershipRole === "none") {
               await forceExit(snapshot.session.id); return;
             }
             if (!state.processing) { acceptSnapshot(loaded); feedback.textContent = ""; renderSession(); startPresence(); }
@@ -790,7 +819,13 @@
       if (state.modal) { closeModal(); return; }
       if (!session.hidden) {
         if (state.snapshot?.membershipRole === "spectator") void leave();
-        else if (state.snapshot?.session.status === "playing") openModal("leave");
+        else if (state.snapshot?.session.status === "playing") {
+          const activeFinalist = state.snapshot.session.gameState.finale?.active && state.snapshot.session.gameState.finale.finalists
+            .some(player => player.player_id === state.snapshot.identity.userId);
+          q("leave-modal-title").textContent = activeFinalist ? "Finale aufgeben?" : "Raum verlassen?";
+          q("leave-modal-copy").textContent = activeFinalist ? "Wenn du jetzt gehst, gewinnt der andere Finalist sofort. Eine Rückkehr in dieses Spiel ist nicht möglich." : "Du kannst dem laufenden Spiel später wieder beitreten.";
+          q("leave-confirm").textContent = activeFinalist ? "Finale verlassen" : "Ja"; openModal("leave");
+        }
         else void leave();
       } else {
         ++state.generation; void stopConnection(); closeModal(); showTrottlMenu({ focusSelector: "#open-trottl-deluxe" });

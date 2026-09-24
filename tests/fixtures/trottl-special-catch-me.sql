@@ -1,8 +1,13 @@
 begin;
 
 do $$
-declare seed bigint;points jsonb;again jsonb;point jsonb;previous jsonb;quadrants integer;ranked jsonb;
+declare seed bigint;points jsonb;again jsonb;point jsonb;previous jsonb;quadrants integer;ranked jsonb;submit_definition text;
 begin
+ select pg_get_functiondef('public.submit_trottl_special_catch_me(uuid,uuid,jsonb)'::regprocedure) into submit_definition;
+ if submit_definition not like '%abs(tap_x-(expected->>''x'')::numeric)>.16%'
+  or submit_definition not like '%abs(tap_y-(expected->>''y'')::numeric)>.12%' then
+  raise exception 'Catch me server hit tolerance mismatch';
+ end if;
  if (select count(*) from public.trottl_special_minigame_registry where implemented and enabled)<>9 then raise exception 'Catch me pool must contain nine games';end if;
  if public.special_minigame_pick(0)<>'special_minigame_01' or public.special_minigame_pick(0.888889)<>'special_minigame_09'
   or public.special_minigame_pick(0,'special_minigame_09')<>'special_minigame_09' then raise exception 'Nine-way pool or override mismatch';end if;

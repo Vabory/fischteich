@@ -134,7 +134,7 @@
       || Number(catchMeView.seed) < 1 || Number(catchMeView.seed) > 2147483646
       || !Array.isArray(catchMeView.positions) || catchMeView.positions.length !== 10
       || catchMeView.positions.some(point => typeof point !== "object" || !Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))
-        || Number(point.x) < .16 || Number(point.x) > .84 || Number(point.y) < .13 || Number(point.y) > .87)
+        || Number(point.x) < .11 || Number(point.x) > .89 || Number(point.y) < .08 || Number(point.y) > .92)
       || !Number.isInteger(Number(catchMeView.progress)) || Number(catchMeView.progress) < 0 || Number(catchMeView.progress) > 10
       || !["open", "completed", "timeout"].includes(catchMeView.status) || typeof catchMeView.player_id !== "string"
       || !Number.isFinite(Date.parse(catchMeView.started_at)) || !Number.isFinite(Date.parse(catchMeView.deadline))

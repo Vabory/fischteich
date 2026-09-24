@@ -20,14 +20,16 @@ function harness(role = "player", initialProgress = 0) {
       title_started_at: new Date(countdownStart - 5000).toISOString(), title_ends_at: new Date(countdownStart - 3000).toISOString(), start_at: new Date(countdownStart).toISOString(), participants: [{ player_id: "u0" }] } } } };
   const service = { serverNow: () => now, async submitCatchMe(_s, _r, events) { submitCount++; this.batches ??= []; this.batches.push(events); view.progress = Math.max(view.progress, ...events.map(event => event.fish_index + 1)); if (view.progress === 10) view.status = "completed"; return snapshot; },
     async finalizeCatchMe() { finalizeCount++; view.status = view.progress === 10 ? "completed" : "timeout"; snapshot.session.gameState.phase = "minigame_results"; return snapshot; } };
-  let controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => { throw error; } });
+  let errorHandler = error => { throw error; };
+  let controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => errorHandler(error) });
   const field = root.querySelector(".trottl-special-catch-me-field"); field.getBoundingClientRect = () => ({ left: 0, top: 0, width: 390, height: 600 }); controller.update(snapshot);
   function clock(value) { now = value; controller.update(snapshot); }
   function tap(x, y, timestamp = now) { for (const fn of field.listeners.pointerdown ?? []) fn({ isTrusted: true, pointerType: "touch", clientX: x * 390, clientY: y * 600, timeStamp: timestamp, preventDefault() {} }); }
   function tapCurrent() { const point = positions[Number(root.querySelector(".trottl-special-catch-me-fish").dataset.spawnId)]; tap(point.x, point.y); }
   return { api, root, doc, service, snapshot, view, positions, clock, tap, tapCurrent, countdownStart, playStart,
     get submitCount() { return submitCount; }, get finalizeCount() { return finalizeCount; }, get decodeCount() { return decodeCount; },
-    recreate() { controller.suspend(); controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => { throw error; } }); const latest = root.querySelectorAll(".trottl-special-catch-me-field").at(-1); latest.getBoundingClientRect = field.getBoundingClientRect; controller.update(snapshot); } };
+    setErrorHandler(handler) { errorHandler = handler; }, sync() { controller.update(snapshot); },
+    recreate() { controller.suspend(); controller = api.create({ root, service, onSnapshot: next => controller.update(next), onError: error => errorHandler(error) }); const latest = root.querySelectorAll(".trottl-special-catch-me-field").at(-1); latest.getBoundingClientRect = field.getBoundingClientRect; controller.update(snapshot); } };
 }
 
 test("seeded sequence has ten safe, separated positions and full quadrant coverage", () => {
@@ -53,6 +55,18 @@ test("smaller visible fish keeps the 1.25 touch scale and proportionally shrinks
   assert.equal(h.api.CONFIG.hitboxScale, 1.25);
 });
 
+test("client hitbox edge remains inside the deliberately tolerant server box on supported mobile sizes", () => {
+  const h = harness(), point = { x: .5, y: .5 };
+  for (const geometry of [{ viewport: 320, width: 278, height: 450 }, { viewport: 390, width: 348, height: 576 }, { viewport: 600, width: 348, height: 576 }]) {
+    const fishSize = Math.max(56, Math.min(geometry.viewport * .14, 82));
+    const radius = fishSize * h.api.CONFIG.hitboxScale / 2;
+    const edge = { x: point.x + radius / geometry.width, y: point.y + radius / geometry.height };
+    assert.equal(h.api.hitTest(point, edge.x, edge.y, { ...geometry, fishSize }), true, JSON.stringify(geometry));
+    assert.ok(edge.x - point.x <= h.api.CONFIG.serverHitRadiusX);
+    assert.ok(edge.y - point.y <= h.api.CONFIG.serverHitRadiusY);
+  }
+});
+
 test("shared intro fade renders 3, 2, 1 and START before fish one", () => {
   const h = harness(), label = h.root.querySelector(".trottl-special-minigame-countdown"), fish = h.root.querySelector(".trottl-special-catch-me-fish"), shell = h.root.querySelector(".is-catch-me");
   assert.equal(h.root.querySelector(".trottl-special-minigame-copy").textContent, "Fange den Goldfisch 10-mal so schnell du kannst!");
@@ -73,6 +87,70 @@ test("miss is neutral; ten pointer hits reposition one node immediately and stop
   await flush(); await flush(); assert.ok(h.submitCount >= 1); assert.equal(h.view.progress, 10); assert.equal(h.view.status, "completed");
 });
 
+test("rapid optimistic hits stay immediate while submissions remain strictly ordered", async () => {
+  const h = harness(); h.clock(h.playStart + 10);
+  const calls = []; let releaseFirst;
+  const firstGate = new Promise(resolve => { releaseFirst = resolve; });
+  h.service.submitCatchMe = async (_session, _round, events) => {
+    calls.push(events.map(event => ({ ...event })));
+    if (calls.length === 1) await firstGate;
+    const expected = h.view.progress;
+    for (const event of events) { assert.equal(event.fish_index, h.view.progress); h.view.progress += 1; }
+    assert.equal(events[0].fish_index, expected);
+    return h.snapshot;
+  };
+  h.tapCurrent(); h.clock(h.playStart + 11); h.tapCurrent(); h.clock(h.playStart + 12); h.tapCurrent();
+  assert.equal(h.root.querySelector(".trottl-special-catch-me-progress").textContent, "3 / 10");
+  assert.equal(calls.length, 1);
+  releaseFirst(); await flush(); await flush(); await flush();
+  assert.deepEqual(calls.flat().map(event => event.fish_index), [0, 1, 2]);
+  assert.deepEqual(calls.flat().map(event => event.t), [10, 11, 12]);
+  assert.equal(h.view.progress, 3);
+});
+
+for (const [label, failure] of [["RPC reject", new Error("SPECIAL_INVALID_CATCH_ME_HIT")], ["network error", new Error("Failed to fetch")]]) {
+  test(`${label} clears stale optimism, resyncs and unlocks the current server fish`, async () => {
+    const h = harness(); h.clock(h.playStart + 10);
+    let attempts = 0, recoveries = 0;
+    h.service.submitCatchMe = async (_session, _round, events) => {
+      attempts += 1;
+      if (attempts === 1) throw failure;
+      assert.equal(events[0].fish_index, h.view.progress);
+      h.view.progress += events.length;
+      return h.snapshot;
+    };
+    h.setErrorHandler(async () => { recoveries += 1; h.sync(); if (label === "network error") throw new Error("refresh failed"); });
+    h.tapCurrent();
+    assert.equal(h.root.querySelector(".trottl-special-catch-me-progress").textContent, "1 / 10");
+    await flush(); await flush();
+    assert.equal(recoveries, 1);
+    assert.equal(h.root.querySelector(".trottl-special-catch-me-progress").textContent, "0 / 10");
+    assert.equal(h.root.querySelector(".trottl-special-catch-me-fish").dataset.spawnId, "0");
+    h.clock(h.playStart + 20); h.tapCurrent(); await flush(); await flush();
+    assert.equal(attempts, 2);
+    assert.equal(h.view.progress, 1);
+    assert.equal(h.root.querySelector(".trottl-special-catch-me-fish").dataset.spawnId, "1");
+  });
+}
+
+test("ten rapid hits preserve pointer timestamps, complete exactly at ten and never render fish eleven", async () => {
+  const h = harness(); h.clock(h.playStart + 100);
+  const recorded = [];
+  h.service.submitCatchMe = async (_session, _round, events) => {
+    recorded.push(...events.map(event => ({ ...event })));
+    for (const event of events) { assert.equal(event.fish_index, h.view.progress); h.view.progress += 1; }
+    if (h.view.progress === 10) h.view.status = "completed";
+    return h.snapshot;
+  };
+  for (let index = 0; index < 10; index++) { h.clock(h.playStart + 100 + index); h.tapCurrent(); }
+  assert.equal(h.root.querySelector(".trottl-special-catch-me-progress").textContent, "10 / 10");
+  assert.equal(h.root.querySelector(".trottl-special-catch-me-fish").hidden, true);
+  await flush(); await flush(); await flush();
+  assert.deepEqual(recorded.map(event => event.fish_index), Array.from({ length: 10 }, (_, index) => index));
+  assert.deepEqual(recorded.map(event => event.t), Array.from({ length: 10 }, (_, index) => 100 + index));
+  assert.equal(h.view.progress, 10); assert.equal(h.view.status, "completed");
+});
+
 test("reconnect restores confirmed fish index; spectator shares host sequence but cannot tap", () => {
   const player = harness("player", 4); player.clock(player.playStart + 1000);
   assert.equal(player.root.querySelector(".trottl-special-catch-me-progress").textContent, "4 / 10"); assert.equal(player.root.querySelector(".trottl-special-catch-me-fish").dataset.spawnId, "4");
@@ -87,7 +165,7 @@ test("absolute deadline survives background and triggers safety finalization", a
 });
 
 test("production wiring, server authority, ranking and responsive large shell are present", () => {
-  const source = read("trottl-special-catch-me.js"), service = read("trottl-special-service.js"), ui = read("trottl-special-ui.js"), css = read("trottl-special.css"), html = read("index.html"), sql = read("supabase/migrations/20260922030000_add_trottl_special_catch_me.sql"), polish = read("supabase/migrations/20260923000000_polish_trottl_special_catch_me_and_fish_count.sql");
+  const source = read("trottl-special-catch-me.js"), service = read("trottl-special-service.js"), ui = read("trottl-special-ui.js"), css = read("trottl-special.css"), html = read("index.html"), sql = read("supabase/migrations/20260922030000_add_trottl_special_catch_me.sql"), polish = read("supabase/migrations/20260923000000_polish_trottl_special_catch_me_and_fish_count.sql"), fix = read("supabase/migrations/20260924000000_fix_trottl_special_catch_me_hit_validation.sql");
   assert.ok(fs.existsSync(path.join(__dirname, "..", "assets/mini-games/gold-fish.png")));
   assert.match(source, /ASSET = "\.\/assets\/mini-games\/gold-fish\.png"/); assert.match(source, /image\.decode/); assert.match(source, /addEventListener\("pointerdown"/);
   assert.match(css, /is-catch-me\.is-gameplay[^}]*clamp\(60px, 7\.5dvh, 76px\)[^}]*right: max\(10px[^}]*clamp\(40px, 5dvh, 52px\)[^}]*left: max\(10px/); assert.match(css, /catch-me-field[^}]*flex: 1 1 auto[^}]*overflow: hidden[^}]*touch-action: none/);
@@ -96,15 +174,19 @@ test("production wiring, server authority, ranking and responsive large shell ar
   const oldField = { width: oldShell.width - 22, height: oldShell.height - 82 }, nextField = { width: nextShell.width - 22, height: nextShell.height - 82 };
   assert.ok(nextShell.width > oldShell.width && nextShell.height > oldShell.height); assert.ok(nextField.width * nextField.height > oldField.width * oldField.height * 1.17);
   for (const point of [{x:.11,y:.08},{x:.89,y:.08},{x:.11,y:.92},{x:.89,y:.92}]) assert.ok(point.x * 278 >= 28 && (1-point.x) * 278 >= 28 && point.y * 450 >= 28 && (1-point.y) * 450 >= 28);
-  for (const item of ["trottl-special-catch-me.js?v=2","trottl-special-minigames.js?v=9","trottl-special-service.js?v=21","trottl-special-ui.js?v=25","trottl-special.css?v=33"]) assert.ok(html.includes(item));
+  for (const item of ["trottl-special-catch-me.js?v=3","trottl-special-minigames.js?v=9","trottl-special-service.js?v=22","trottl-special-ui.js?v=26","trottl-special.css?v=33"]) assert.ok(html.includes(item));
   assert.match(service, /get_trottl_special_catch_me_view/); assert.match(service, /submitCatchMe: async/); assert.match(ui, /catchMe\?\.update\(snapshot\)/);
+  assert.match(service, /Number\(point\.x\) < \.11[^\n]+Number\(point\.x\) > \.89[^\n]+Number\(point\.y\) < \.08[^\n]+Number\(point\.y\) > \.92/);
   for (const pattern of [/create table public\.trottl_special_catch_me_rounds/,/create table public\.trottl_special_catch_me_runs/,/special_catch_me_positions\(v_seed\)/,
     /fish_index<>new_progress/,/abs\(tap_x-\(expected->>'x'\)::numeric\)>\.15/,/new_progress=10/,/server_elapsed-previous_ms>5000/,
     /coalesce\(r\.elapsed_ms,30001\)/,/perform public\.special_minigame_finalize_locked\(p_id,v_round,inputs\)/,
     /chosen='special_minigame_09' then perform public\.special_catch_me_begin_locked\(p_id\)/]) assert.match(sql, pattern);
   for (const pattern of [/special_fish_count_reveal_ms/,/between 1000 and 4000/,/then 1100 else 5200/,/then 800 else 5200/,
     /abs\(tap_x-\(expected->>'x'\)::numeric\)>\.13/,/abs\(tap_y-\(expected->>'y'\)::numeric\)>\.10/]) assert.match(polish, pattern);
-  assert.equal(harness().api.CONFIG.hitboxScale, 1.25); assert.equal(harness().api.CONFIG.serverHitRadiusX, .13); assert.equal(harness().api.CONFIG.serverHitRadiusY, .10);
+  assert.equal(harness().api.CONFIG.hitboxScale, 1.25); assert.equal(harness().api.CONFIG.serverHitRadiusX, .16); assert.equal(harness().api.CONFIG.serverHitRadiusY, .12);
+  assert.match(fix, /create or replace function public\.submit_trottl_special_catch_me/);
+  assert.match(fix, /abs\(tap_x-\(expected->>'x'\)::numeric\)>\.16/); assert.match(fix, /abs\(tap_y-\(expected->>'y'\)::numeric\)>\.12/);
+  assert.doesNotMatch(fix, /special_fish_count|reveal_duration/);
   assert.match(sql, /'Zeit abgelaufen'/); assert.match(sql, /'all_timeout',all_timeout/); assert.doesNotMatch(sql, /trottl_classic|finale|panic/i);
   const fixture = read("tests/fixtures/trottl-special-catch-me.sql"); assert.ok(fixture.startsWith("begin;\n") && fixture.endsWith("rollback;\n"));
   for (const pattern of [/special_catch_me_positions\(seed\)/,/minimum distance mismatch/,/coverage mismatch/,/full tie mismatch/,/timeout ranking mismatch/,/all-timeout tie mismatch/]) assert.match(fixture, pattern);

@@ -63,7 +63,7 @@
       onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Antwort wird erneut geladen."; void refresh(); } });
     const catchMe = global.TrottlSpecialCatchMe?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id && state.snapshot.session.gameState.minigame?.minigame_id === next.session.gameState.minigame?.minigame_id) { acceptSnapshot(next); renderSession(); } },
-      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fangfortschritt wird erneut geladen."; void refresh(); } });
+      onError: () => { q("game-feedback").textContent = "Verbindung wird geprüft. Fangfortschritt wird erneut geladen."; return refresh(); } });
     const debug = global.TrottlSpecialDebug?.create({ root: game, service,
       onSnapshot: next => { if (state.snapshot?.session.id === next.session.id) { acceptSnapshot(next); renderSession(); } } });
     // Results and transitions come exclusively from the Special intent RPC.

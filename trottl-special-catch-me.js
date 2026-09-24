@@ -1,7 +1,7 @@
 "use strict";
 (function installTrottlSpecialCatchMe(global) {
   const CONFIG = Object.freeze({ totalHits: 10, maxDurationMs: 30000, minPositionDistance: 0.30,
-    safeInsetX: 0.11, safeInsetY: 0.08, hitboxScale: 1.25, serverHitRadiusX: 0.13, serverHitRadiusY: 0.10 });
+    safeInsetX: 0.11, safeInsetY: 0.08, hitboxScale: 1.25, serverHitRadiusX: 0.16, serverHitRadiusY: 0.12 });
   const ASSET = "./assets/mini-games/gold-fish.png";
   let preloadPromise = null;
   function preloadAsset() {
@@ -57,8 +57,8 @@
     fish.className = "trottl-special-catch-me-fish"; fish.src = ASSET; fish.alt = "Goldfisch"; fish.draggable = false; fish.decoding = "async";
     waiting.className = "trottl-special-catch-me-waiting"; waiting.textContent = "Geschafft! Warte auf die anderen Spieler …"; waiting.hidden = true;
     header.append(heading, progress); field.append(fish, waiting); game.append(header, field); shell.content.append(game); void preloadAsset();
-    let snapshot = null, key = null, timer = null, geometry = null, events = [], sentCount = 0, localProgress = 0;
-    let syncing = false, finalizing = false, retryAt = 0, finalizeRetryAt = 0, listening = false;
+    let snapshot = null, key = null, timer = null, geometry = null, events = [], localProgress = 0;
+    let syncing = false, recovering = false, finalizing = false, finalizeRetryAt = 0, listening = false;
     const view = () => snapshot?.catchMeView ?? null;
     const positions = () => view()?.positions ?? positionSequence(view()?.seed);
     const playable = () => snapshot?.membershipRole === "player" && snapshot.players.some(p => p.userId === snapshot.identity.userId && ["alive", "critical"].includes(p.lifecycle))
@@ -78,7 +78,7 @@
     }
     function pointer(event) {
       const v = view(), receivedAt = service.serverNow();
-      if (event.isTrusted === false || event.pointerType === "mouse" && event.button !== 0 || !snapshot || !playable() || v?.status !== "open"
+      if (event.isTrusted === false || event.pointerType === "mouse" && event.button !== 0 || !snapshot || !playable() || recovering || v?.status !== "open"
         || doc.visibilityState === "hidden" || !Number.isFinite(receivedAt) || receivedAt < Date.parse(v?.started_at) || receivedAt >= Date.parse(v?.deadline)
         || localProgress >= CONFIG.totalHits) return;
       const bounds = geometry ?? measure(), x = (event.clientX - bounds.left) / bounds.width, y = (event.clientY - bounds.top) / bounds.height;
@@ -95,14 +95,33 @@
     }
     field.addEventListener("pointerdown", pointer);
     async function drain() {
-      if (syncing || !snapshot || !playable() || sentCount >= events.length || (service.serverNow() ?? 0) < retryAt) return;
-      const ownKey = key, batch = events.slice(sentCount); syncing = true;
+      if (syncing || recovering || !snapshot || !playable() || !events.length) return;
+      const ownKey = key, batch = events.slice(); syncing = true;
       try {
         const next = await service.submitCatchMe(snapshot.session.id, snapshot.session.gameState.minigame.minigame_id, batch);
         if (key !== ownKey) return;
-        sentCount += batch.length; onSnapshot(next);
-      } catch (error) { if (key === ownKey) { retryAt = (service.serverNow() ?? 0) + 1000; onError?.(error); schedule(); } }
-      finally { syncing = false; if (key === ownKey && sentCount < events.length) void drain(); }
+        const accepted = new Set(batch.map(event => event.input_id));
+        events = events.filter(event => !accepted.has(event.input_id));
+        onSnapshot(next);
+      } catch (error) {
+        if (key === ownKey) {
+          recovering = true;
+          events = [];
+          localProgress = view()?.progress ?? 0;
+          paint();
+          try { await onError?.(error); } catch {}
+          finally {
+            if (key === ownKey) {
+              localProgress = view()?.progress ?? 0;
+              recovering = false;
+              paint();
+            }
+          }
+        }
+      } finally {
+        syncing = false;
+        if (key === ownKey && !recovering && events.length) void drain();
+      }
     }
     async function finalize() {
       const now = service.serverNow(), v = view();
@@ -118,7 +137,6 @@
       const now = service.serverNow(), m = snapshot.session.gameState.minigame, v = view(); if (!Number.isFinite(now)) return;
       const titleEnd = Date.parse(m.title_ends_at), start = Date.parse(m.start_at), play = Date.parse(v.started_at), deadline = Date.parse(v.deadline), fade = titleEnd - 800;
       const boundaries = [fade, titleEnd, titleEnd + 1000, titleEnd + 2000, start, start + 400, play, deadline];
-      if (sentCount < events.length && retryAt > now) boundaries.push(retryAt);
       if (now >= fade && now < titleEnd) boundaries.push(Math.min(titleEnd, now + 50));
       const next = Math.min(...boundaries.filter(value => Number.isFinite(value) && value > now));
       if (Number.isFinite(next)) timer = global.setTimeout(() => { timer = null; paint(); }, Math.max(10, next - now));
@@ -132,7 +150,8 @@
       shell.panel.classList.toggle("is-gameplay", large); shell.content.hidden = !large; game.hidden = !large;
       if (large && v) {
         if (!geometry) measure();
-        localProgress = Math.max(localProgress, v.progress);
+        const optimisticProgress = events.length ? events.at(-1).fish_index + 1 : v.progress;
+        localProgress = Math.max(v.progress, optimisticProgress);
         progress.textContent = `${localProgress} / ${CONFIG.totalHits}`;
         const active = Number.isFinite(now) && now >= Date.parse(v.started_at) && now < Date.parse(v.deadline) && v.status === "open" && localProgress < CONFIG.totalHits;
         const expired = now >= Date.parse(v.deadline);
@@ -141,7 +160,7 @@
         waiting.hidden = active || sequence.label !== "" || !expired && localProgress < CONFIG.totalHits && v.status === "open";
         field.classList.toggle("is-finished", !active && sequence.label === "");
         if (active) drawFish(); else fish.hidden = true;
-        if (playable() && sentCount < events.length && now >= retryAt) void drain();
+        if (playable() && events.length) void drain();
         if (now >= Date.parse(v.deadline)) void finalize();
       }
       schedule();
@@ -152,13 +171,16 @@
       snapshot = next;
       if (!next || next.session.status !== "playing" || next.session.gameState.phase !== "minigame_active" || next.session.gameState.minigame?.minigame_type !== "special_minigame_09") { suspend(); return; }
       const nextKey = `${next.session.id}:${next.session.gameState.minigame.minigame_id}:${next.catchMeView?.player_id}`;
-      if (key !== nextKey) { key = nextKey; events = []; sentCount = 0; localProgress = next.catchMeView?.progress ?? 0; retryAt = 0; finalizeRetryAt = 0; geometry = null; }
-      else localProgress = Math.max(localProgress, next.catchMeView?.progress ?? 0);
+      if (key !== nextKey) { key = nextKey; events = []; localProgress = next.catchMeView?.progress ?? 0; recovering = false; finalizeRetryAt = 0; geometry = null; }
+      else {
+        const serverProgress = next.catchMeView?.progress ?? 0;
+        localProgress = events.length ? Math.max(serverProgress, events.at(-1).fish_index + 1) : serverProgress;
+      }
       if (!listening) { global.addEventListener?.("resize", onResize); global.addEventListener?.("orientationchange", onResize); doc.addEventListener("visibilitychange", onVisibility); listening = true; }
       paint();
     }
     function suspend() {
-      clearTimer(); snapshot = null; key = null; geometry = null; events = []; sentCount = 0; syncing = false; finalizing = false;
+      clearTimer(); snapshot = null; key = null; geometry = null; events = []; syncing = false; recovering = false; finalizing = false;
       if (listening) { global.removeEventListener?.("resize", onResize); global.removeEventListener?.("orientationchange", onResize); doc.removeEventListener("visibilitychange", onVisibility); listening = false; }
       shell.hide();
     }

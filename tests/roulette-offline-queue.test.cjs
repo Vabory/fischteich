@@ -89,15 +89,21 @@ function spin(id = "spin-1", result = "turbolachs") {
     createdAt: "2026-09-22T12:00:00.000Z", syncStatus: "pending" };
 }
 
-test("IndexedDB opens version 1, creates the pending store, and preserves records across service restart", async () => {
+test("production epoch isolates pre-release queues and preserves new records across service restart", async () => {
   const indexedDB = fakeIndexedDB();
+  indexedDB.databases.set("fischteich-offline", { stores: new Map([
+    ["roulette_pending_spins", new Map([["old-spin", spin("old-spin")]])],
+  ]) });
   const first = queueHarness(indexedDB).queue;
   await first.enqueueSpin(spin());
-  assert.deepEqual(indexedDB.calls[0], ["open", "fischteich-offline", 1]);
-  assert.ok(indexedDB.databases.get("fischteich-offline").stores.has("roulette_pending_spins"));
+  assert.equal(first.persistenceEpoch, "production-v1");
+  assert.equal(first.statsStorageKey, "fischteich-roulette-stats-production-v1");
+  assert.deepEqual(indexedDB.calls[0], ["open", "fischteich-offline-production-v1", 1]);
+  assert.ok(indexedDB.databases.get("fischteich-offline-production-v1").stores.has("roulette_pending_spins"));
   const second = queueHarness(indexedDB).queue;
   assert.deepEqual(JSON.parse(JSON.stringify(await second.getPendingSpins())), [spin()]);
   assert.equal(await second.getPendingSpinCount(), 1);
+  assert.equal(indexedDB.databases.get("fischteich-offline").stores.get("roulette_pending_spins").size, 1);
   assert.equal(indexedDB.calls.some(([kind]) => kind === "delete"), false);
 });
 

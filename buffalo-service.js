@@ -1,7 +1,7 @@
 "use strict";
 
 const BUFFALO_DURATION_MS = 3 * 60 * 1000;
-const BUFFALO_STORAGE_KEY = "fischteich-buffalo-events-v1";
+const BUFFALO_STORAGE_KEY = "fischteich-buffalo-events-production-v1";
 const BUFFALO_EVENT_VERSION = 3;
 const BUFFALO_REALTIME_CHANNEL = "buffalo-events-global";
 const BUFFALO_MAX_ACTIVE = 5;

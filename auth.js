@@ -282,6 +282,21 @@ function registerAuthStateListener() {
   authStateSubscription = data.subscription;
 }
 
+function isInvalidPersistedAuthSession(error) {
+  const status = Number(error?.status);
+  return status === 401
+    || status === 403
+    || ["bad_jwt", "refresh_token_not_found", "session_not_found", "user_not_found"]
+      .includes(error?.code);
+}
+
+async function replaceInvalidPersistedAuthSession() {
+  const { error } = await supabaseClient.auth.signOut({ scope: "local" });
+  if (error) throw error;
+  await queueAuthSessionReconciliation(null);
+  return ensureAnonymousAuthSession({ allowRetry: true });
+}
+
 function initializeAppAuth() {
   if (authInitializationPromise) {
     return authInitializationPromise;
@@ -297,7 +312,22 @@ function initializeAppAuth() {
       }
 
       if (data.session) {
-        await queueAuthSessionReconciliation(data.session, {
+        // getSession() can return a locally cached JWT for a user that was
+        // removed during the production cutover. Verify it once server-side so
+        // those clients receive a fresh anonymous identity automatically.
+        const { data: verifiedData, error: verificationError } = await supabaseClient.auth.getUser(
+          data.session.access_token,
+        );
+        if (verificationError && isInvalidPersistedAuthSession(verificationError)) {
+          await replaceInvalidPersistedAuthSession();
+          return getAppAuthState();
+        }
+        if (verificationError) throw verificationError;
+        if (!verifiedData.user || verifiedData.user.id !== data.session.user?.id) {
+          await replaceInvalidPersistedAuthSession();
+          return getAppAuthState();
+        }
+        await queueAuthSessionReconciliation({ ...data.session, user: verifiedData.user }, {
           forceProfileReload: true,
         });
       } else {

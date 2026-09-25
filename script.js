@@ -62,7 +62,8 @@ const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
 const ROULETTE_REDUCED_MOTION_DURATION = 650;
-const ROULETTE_STATS_STORAGE_KEY = "fischteich-roulette-stats";
+const ROULETTE_STATS_STORAGE_KEY = window.rouletteOfflineQueue?.statsStorageKey
+  ?? "fischteich-roulette-stats-production-v1";
 const ROULETTE_GOLD_WINNER_INDEX = 2;
 const ROULETTE_RANDOM_BUCKET_COUNT = 200;
 const ROULETTE_GOLD_BUCKET_COUNT = 2;

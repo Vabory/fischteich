@@ -18,10 +18,11 @@ const DEVICE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const DEVICE_MANAGEMENT_KEY = "d".repeat(43);
 
-function createAuthHarness({ initialSession = null, profileExists = true } = {}) {
+function createAuthHarness({ initialSession = null, profileExists = true, getUserError = null } = {}) {
   let session = initialSession;
   let signInCalls = 0;
   let getSessionCalls = 0;
+  let signOutCalls = 0;
   const rpcCalls = [];
   const profile = { user_id: USER_ID, display_name: "Fabian", app_role: "user" };
   const window = {
@@ -36,6 +37,16 @@ function createAuthHarness({ initialSession = null, profileExists = true } = {})
       async getSession() {
         getSessionCalls += 1;
         return { data: { session }, error: null };
+      },
+      async getUser() {
+        return getUserError
+          ? { data: { user: null }, error: getUserError }
+          : { data: { user: session?.user ?? null }, error: null };
+      },
+      async signOut() {
+        signOutCalls += 1;
+        session = null;
+        return { error: null };
       },
       async signInAnonymously() {
         signInCalls += 1;
@@ -78,6 +89,7 @@ function createAuthHarness({ initialSession = null, profileExists = true } = {})
     getSession: () => session,
     getSignInCalls: () => signInCalls,
     getSessionCalls: () => getSessionCalls,
+    getSignOutCalls: () => signOutCalls,
   };
 }
 
@@ -100,6 +112,18 @@ test("a valid persisted session is reused without anonymous signup", async () =>
   const harness = createAuthHarness({ initialSession: session });
   await harness.context.initializeAppAuth();
   assert.equal(harness.getSignInCalls(), 0);
+  assert.equal(harness.context.getAppAuthState().currentAuthUser.id, USER_ID);
+});
+
+test("a deleted persisted auth user is replaced with a fresh anonymous session", async () => {
+  const staleSession = { access_token: "deleted-user-jwt", user: { id: "deleted-user", is_anonymous: true } };
+  const harness = createAuthHarness({
+    initialSession: staleSession,
+    getUserError: { status: 401, code: "user_not_found", message: "User not found" },
+  });
+  await harness.context.initializeAppAuth();
+  assert.equal(harness.getSignOutCalls(), 1);
+  assert.equal(harness.getSignInCalls(), 1);
   assert.equal(harness.context.getAppAuthState().currentAuthUser.id, USER_ID);
 });
 

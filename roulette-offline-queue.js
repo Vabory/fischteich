@@ -1,8 +1,13 @@
 "use strict";
 
-const ROULETTE_OFFLINE_DB_NAME = "fischteich-offline";
+// A new epoch deliberately makes pre-release test spins unreachable. Keeping
+// the old database intact avoids a destructive client migration while ensuring
+// it can never be replayed into the production counters by this build.
+const ROULETTE_PERSISTENCE_EPOCH = "production-v1";
+const ROULETTE_OFFLINE_DB_NAME = `fischteich-offline-${ROULETTE_PERSISTENCE_EPOCH}`;
 const ROULETTE_OFFLINE_DB_VERSION = 1;
 const ROULETTE_PENDING_STORE = "roulette_pending_spins";
+const ROULETTE_STATS_STORAGE_KEY = `fischteich-roulette-stats-${ROULETTE_PERSISTENCE_EPOCH}`;
 
 function openRouletteOfflineDb() {
   return new Promise((resolve, reject) => {
@@ -74,6 +79,8 @@ function removeSpin(id) {
 }
 
 window.rouletteOfflineQueue = Object.freeze({
+  persistenceEpoch: ROULETTE_PERSISTENCE_EPOCH,
+  statsStorageKey: ROULETTE_STATS_STORAGE_KEY,
   createSpinId: createRouletteSpinId,
   enqueueSpin,
   markLocalStatsApplied,

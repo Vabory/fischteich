@@ -13,6 +13,7 @@ const appAuthState = {
 let authInitializationPromise = null;
 let anonymousSignInPromise = null;
 let anonymousSignInFailed = false;
+let invalidSessionRecoveryPromise = null;
 let authStateSubscription = null;
 let authReconcileQueue = Promise.resolve();
 
@@ -286,15 +287,24 @@ function isInvalidPersistedAuthSession(error) {
   const status = Number(error?.status);
   return status === 401
     || status === 403
+    || error?.name === "AuthSessionMissingError"
     || ["bad_jwt", "refresh_token_not_found", "session_not_found", "user_not_found"]
       .includes(error?.code);
 }
 
 async function replaceInvalidPersistedAuthSession() {
-  const { error } = await supabaseClient.auth.signOut({ scope: "local" });
-  if (error) throw error;
-  await queueAuthSessionReconciliation(null);
-  return ensureAnonymousAuthSession({ allowRetry: true });
+  if (invalidSessionRecoveryPromise) return invalidSessionRecoveryPromise;
+
+  invalidSessionRecoveryPromise = (async () => {
+    const { error } = await supabaseClient.auth.signOut({ scope: "local" });
+    if (error && !isInvalidPersistedAuthSession(error)) throw error;
+    await queueAuthSessionReconciliation(null);
+    return ensureAnonymousAuthSession({ allowRetry: true });
+  })().finally(() => {
+    invalidSessionRecoveryPromise = null;
+  });
+
+  return invalidSessionRecoveryPromise;
 }
 
 function initializeAppAuth() {
@@ -302,11 +312,15 @@ function initializeAppAuth() {
     return authInitializationPromise;
   }
 
-  authInitializationPromise = (async () => {
+  const initialization = (async () => {
     try {
       registerAuthStateListener();
       const { data, error } = await supabaseClient.auth.getSession();
 
+      if (error && isInvalidPersistedAuthSession(error)) {
+        await replaceInvalidPersistedAuthSession();
+        return getAppAuthState();
+      }
       if (error) {
         throw error;
       }
@@ -327,9 +341,29 @@ function initializeAppAuth() {
           await replaceInvalidPersistedAuthSession();
           return getAppAuthState();
         }
-        await queueAuthSessionReconciliation({ ...data.session, user: verifiedData.user }, {
-          forceProfileReload: true,
-        });
+        try {
+          await queueAuthSessionReconciliation({ ...data.session, user: verifiedData.user }, {
+            forceProfileReload: true,
+            throwOnProfileError: true,
+          });
+        } catch (profileError) {
+          // A user can disappear between getUser() and profile repair. Recheck
+          // only this exceptional path; a valid user with a missing profile is
+          // still repaired by ensure_my_app_profile above.
+          const { data: recheckedData, error: recheckError } = await supabaseClient.auth.getUser(
+            data.session.access_token,
+          );
+          if (recheckError && isInvalidPersistedAuthSession(recheckError)) {
+            await replaceInvalidPersistedAuthSession();
+            return getAppAuthState();
+          }
+          if (recheckError) throw recheckError;
+          if (!recheckedData?.user) {
+            await replaceInvalidPersistedAuthSession();
+            return getAppAuthState();
+          }
+          throw profileError;
+        }
       } else {
         await ensureAnonymousAuthSession();
       }
@@ -342,6 +376,17 @@ function initializeAppAuth() {
 
     return getAppAuthState();
   })();
+
+  authInitializationPromise = initialization;
+  void initialization.then(() => {
+    // A transient network failure must not permanently cache a failed startup.
+    // Parallel callers still share the current promise; a later online retry
+    // receives a fresh attempt without deleting the persisted session.
+    if (appAuthState.lastError
+      && authInitializationPromise === initialization) {
+      authInitializationPromise = null;
+    }
+  });
 
   return authInitializationPromise;
 }

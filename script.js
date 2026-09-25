@@ -1304,7 +1304,13 @@ function completeLocalIdentitySetup() {
 function initializeLocalIdentity() {
   if (!hasLocalIdentity()) {
     openWelcomeIdentityModal();
+    return;
   }
+
+  // Startup must never inherit a stale Welcome lock when the deliberately
+  // preserved device identity is already complete.
+  welcomeIdentityModal.hidden = true;
+  appElement.inert = false;
 }
 
 function renderSettingsIdentity() {

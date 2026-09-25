@@ -15,7 +15,7 @@ const service = read("roulette-service.js");
 assert.match(html, /style\.css\?v=195/);
 assert.match(html, /roulette-service\.js\?v=9/);
 assert.match(html, /button-release\.js\?v=1/);
-assert.match(html, /script\.js\?v=105/);
+assert.match(html, /script\.js\?v=106/);
 
 assert.match(html, /class="version-beaver-scene"/);
 assert.match(html, /class="version-beaver" data-src="\.\/assets\/settings\/beaver\.webp\?v=1"/);

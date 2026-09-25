@@ -18,11 +18,29 @@ const DEVICE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const DEVICE_MANAGEMENT_KEY = "d".repeat(43);
 
-function createAuthHarness({ initialSession = null, profileExists = true, getUserError = null } = {}) {
+function createAuthHarness({
+  initialSession = null,
+  profileExists = true,
+  getSessionError = null,
+  getUserError = null,
+  profileReadError = null,
+  localDisplayName = "Fabian",
+  emitAuthEvents = false,
+} = {}) {
   let session = initialSession;
+  let currentGetSessionError = getSessionError;
+  let currentGetUserError = getUserError;
+  let currentProfileReadError = profileReadError;
   let signInCalls = 0;
   let getSessionCalls = 0;
+  let getUserCalls = 0;
   let signOutCalls = 0;
+  let anonymousMetadata = null;
+  let authStateCallback = null;
+  const identityStorage = new Map([
+    ["fischteich_device_id", DEVICE_ID],
+    ["fischteich_display_name", localDisplayName],
+  ]);
   const rpcCalls = [];
   const profile = { user_id: USER_ID, display_name: "Fabian", app_role: "user" };
   const window = {
@@ -30,27 +48,39 @@ function createAuthHarness({ initialSession = null, profileExists = true, getUse
     removeEventListener() {},
     dispatchEvent() {},
     setTimeout(callback) { callback(); },
+    localStorage: {
+      getItem(key) { return identityStorage.get(key) ?? null; },
+      setItem(key, value) { identityStorage.set(key, value); },
+      removeItem(key) { identityStorage.delete(key); },
+    },
   };
   const supabaseClient = {
     auth: {
-      onAuthStateChange() { return { data: { subscription: {} } }; },
+      onAuthStateChange(callback) {
+        authStateCallback = callback;
+        return { data: { subscription: {} } };
+      },
       async getSession() {
         getSessionCalls += 1;
-        return { data: { session }, error: null };
+        return { data: { session }, error: currentGetSessionError };
       },
       async getUser() {
-        return getUserError
-          ? { data: { user: null }, error: getUserError }
+        getUserCalls += 1;
+        return currentGetUserError
+          ? { data: { user: null }, error: currentGetUserError }
           : { data: { user: session?.user ?? null }, error: null };
       },
       async signOut() {
         signOutCalls += 1;
         session = null;
+        if (emitAuthEvents) authStateCallback?.("SIGNED_OUT", null);
         return { error: null };
       },
-      async signInAnonymously() {
+      async signInAnonymously(options) {
         signInCalls += 1;
+        anonymousMetadata = options?.options?.data ?? null;
         session = { access_token: "anonymous-jwt", user: { id: USER_ID, is_anonymous: true } };
+        if (emitAuthEvents) authStateCallback?.("SIGNED_IN", session);
         return { data: { session }, error: null };
       },
     },
@@ -59,7 +89,10 @@ function createAuthHarness({ initialSession = null, profileExists = true, getUse
         select() { return this; },
         eq() { return this; },
         async maybeSingle() {
-          return { data: profileExists ? profile : null, error: null };
+          return {
+            data: currentProfileReadError ? null : (profileExists ? profile : null),
+            error: currentProfileReadError,
+          };
         },
       };
     },
@@ -71,12 +104,12 @@ function createAuthHarness({ initialSession = null, profileExists = true, getUse
   const context = vm.createContext({
     window,
     supabaseClient,
-    getDisplayName: () => "Fabian",
+    getDisplayName: () => localDisplayName,
     normalizeDisplayName: (value) => typeof value === "string" && value.trim()
       ? value.trim()
       : null,
     CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init.detail; } },
-    console,
+    console: { error() {}, warn() {}, log() {} },
     Promise,
     Object,
     Error,
@@ -89,7 +122,13 @@ function createAuthHarness({ initialSession = null, profileExists = true, getUse
     getSession: () => session,
     getSignInCalls: () => signInCalls,
     getSessionCalls: () => getSessionCalls,
+    getUserCalls: () => getUserCalls,
     getSignOutCalls: () => signOutCalls,
+    getAnonymousMetadata: () => anonymousMetadata,
+    setGetSessionError(error) { currentGetSessionError = error; },
+    setGetUserError(error) { currentGetUserError = error; },
+    setProfileReadError(error) { currentProfileReadError = error; },
+    getIdentityStorage: () => identityStorage,
   };
 }
 
@@ -124,7 +163,70 @@ test("a deleted persisted auth user is replaced with a fresh anonymous session",
   await harness.context.initializeAppAuth();
   assert.equal(harness.getSignOutCalls(), 1);
   assert.equal(harness.getSignInCalls(), 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(harness.getAnonymousMetadata())), { display_name: "Fabian" });
   assert.equal(harness.context.getAppAuthState().currentAuthUser.id, USER_ID);
+  assert.equal(harness.context.getAppAuthState().currentProfile.displayName, "Fabian");
+});
+
+test("a deleted user reported during getSession refresh is recovered exactly once", async () => {
+  const staleSession = { access_token: "expired-deleted-user-jwt", user: { id: "deleted-user" } };
+  const harness = createAuthHarness({
+    initialSession: staleSession,
+    getSessionError: { status: 403, code: "user_not_found", message: "User not found" },
+    emitAuthEvents: true,
+  });
+  await Promise.all([
+    harness.context.initializeAppAuth(),
+    harness.context.initializeAppAuth(),
+    harness.context.initializeAppAuth(),
+  ]);
+  assert.equal(harness.getSessionCalls(), 1);
+  assert.equal(harness.getSignOutCalls(), 1);
+  assert.equal(harness.getSignInCalls(), 1);
+  assert.equal(harness.context.getAppAuthState().isInitialized, true);
+  assert.equal(harness.context.getAppAuthState().currentAuthUser.id, USER_ID);
+  assert.equal(harness.getIdentityStorage().get("fischteich_device_id"), DEVICE_ID);
+  assert.equal(harness.getIdentityStorage().get("fischteich_display_name"), "Fabian");
+});
+
+test("network validation failure preserves the session and permits a later retry", async () => {
+  const session = { access_token: "offline-jwt", user: { id: USER_ID, is_anonymous: true } };
+  const harness = createAuthHarness({
+    initialSession: session,
+    getUserError: { name: "TypeError", message: "Failed to fetch" },
+  });
+  await harness.context.initializeAppAuth();
+  assert.equal(harness.getSignOutCalls(), 0);
+  assert.equal(harness.getSignInCalls(), 0);
+  assert.equal(harness.getSession(), session);
+  assert.equal(harness.context.getAppAuthState().isInitialized, true);
+
+  harness.setGetUserError(null);
+  await harness.context.initializeAppAuth();
+  assert.equal(harness.getSessionCalls(), 2);
+  assert.equal(harness.getSignOutCalls(), 0);
+  assert.equal(harness.getSignInCalls(), 0);
+  assert.equal(harness.context.getAppAuthState().currentAuthUser.id, USER_ID);
+});
+
+test("temporary profile failure retries the same valid user without anonymous-user spam", async () => {
+  const session = { access_token: "valid-jwt", user: { id: USER_ID, is_anonymous: true } };
+  const harness = createAuthHarness({
+    initialSession: session,
+    profileReadError: { message: "temporary database timeout" },
+  });
+  await harness.context.initializeAppAuth();
+  assert.equal(harness.getSignOutCalls(), 0);
+  assert.equal(harness.getSignInCalls(), 0);
+  assert.equal(harness.context.getAppAuthState().currentAuthUser.id, USER_ID);
+  assert.equal(harness.context.getAppAuthState().currentProfile, null);
+
+  harness.setProfileReadError(null);
+  await harness.context.initializeAppAuth();
+  assert.equal(harness.getSessionCalls(), 2);
+  assert.equal(harness.getSignOutCalls(), 0);
+  assert.equal(harness.getSignInCalls(), 0);
+  assert.equal(harness.context.getAppAuthState().currentProfile.displayName, "Fabian");
 });
 
 test("missing app profile is repaired for auth.uid without replacing local identity", async () => {

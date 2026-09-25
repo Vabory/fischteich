@@ -119,7 +119,7 @@ test("navigation is network first online and falls back to cached index offline"
 
 test("only exact same-origin static URLs use cache; version and Supabase requests bypass it", async () => {
   const h = harness(); await h.lifecycle("install"); h.setOnline(false);
-  for (const url of ["./style.css?v=195", "./script.js?v=105", "./roulette-service.js?v=9", "./roulette-offline-queue.js?v=3", "./assets/menu-background.webp", "./assets/sidemenu-background.webp", "./assets/gold-feld.webp?v=1"]) {
+  for (const url of ["./style.css?v=195", "./script.js?v=106", "./roulette-service.js?v=9", "./roulette-offline-queue.js?v=3", "./assets/menu-background.webp", "./assets/sidemenu-background.webp", "./assets/gold-feld.webp?v=1"]) {
     assert.equal((await h.request(url)).source, "cache", url);
   }
   for (const url of ["./version.json?check=123", "./style.css?v=old", "./assets/mini-games/1-fish.webp", "https://qhgiqhuodkrevmmbwfeg.supabase.co/rest/v1/rooms", "https://example.test/fischteich/rest/v1/rooms"]) {
@@ -140,7 +140,7 @@ test("updated shell uses the exact new script URL offline even if the old versio
     assert.equal((await h.request(url)).source, "cache", url);
     assert.ok(h.self.offlineTest.urls.includes(new URL(url, scope).href), `new shell missed ${url}`);
   }
-  assert.ok(bootUrls.includes("./script.js?v=105"));
-  assert.equal((await h.request("./script.js?v=105")).url, new URL("./script.js?v=105", scope).href);
-  assert.equal(await h.request("./script.js?v=106"), null);
+  assert.ok(bootUrls.includes("./script.js?v=106"));
+  assert.equal((await h.request("./script.js?v=106")).url, new URL("./script.js?v=106", scope).href);
+  assert.equal(await h.request("./script.js?v=107"), null);
 });

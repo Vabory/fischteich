@@ -21,6 +21,7 @@ test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI ca
     .replace(/^    <link rel="preload" as="image" href="\.\/assets\/mini-games\/(?:lachs|red|blue|green|yellow)-(?:fish|shadow)\.(?:png|webp)">\n/gm, "")
     .replace(/script.js\?v=\d+/, "script.js?v=87")
     .replace(/roulette-service.js\?v=\d+/, "roulette-service.js?v=6")
+    .replace(/shortcut-service.js\?v=\d+/, "shortcut-service.js?v=7")
     .replace(/^    <script src="\.\/roulette-offline-queue\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/^    <script src="\.\/team-division-v2-logic\.js\?v=\d+" defer><\/script>\n/m, "")
     .replace(/^            <section class="settings-trottl-admin-reset" aria-labelledby="settings-special-reset-title">[\s\S]*?^            <\/section>\n/m, "")

@@ -1,7 +1,7 @@
 "use strict";
 
 // Official reviewed share URL for the universal Buffalo shortcut template.
-const APPLE_BUFFALO_SHORTCUT_URL = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
+const APPLE_BUFFALO_SHORTCUT_URL = "https://www.icloud.com/shortcuts/2e496e7f8a8f414591417260e12c3f1f";
 const BUFFALO_SHORTCUT_ENDPOINT = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/buffalo-shortcut`;
 const SHORTCUT_MANAGEMENT_TIMEOUT_MS = 12000;
 

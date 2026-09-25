@@ -89,8 +89,10 @@ test("settings expose exactly one platform panel through non-security-critical d
 });
 
 test("Apple share link uses the final genuine iCloud URL", () => {
-  const shortcutUrl = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
+  const shortcutUrl = "https://www.icloud.com/shortcuts/2e496e7f8a8f414591417260e12c3f1f";
+  const retiredShortcutUrl = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
   assert.match(serviceSource, new RegExp(`const APPLE_BUFFALO_SHORTCUT_URL = "${shortcutUrl}"`));
+  assert.doesNotMatch(serviceSource, new RegExp(retiredShortcutUrl));
   assert.equal(createPlatformHarness({ userAgent: "desktop" }).appleShortcutUrl, shortcutUrl);
   assert.match(serviceSource, /hostname === "www\.icloud\.com"/);
   assert.match(html, /id="apple-shortcut-share-link"[^>]*hidden>Buffalo Vorlage öffnen<\/a>/);
@@ -99,7 +101,7 @@ test("Apple share link uses the final genuine iCloud URL", () => {
 });
 
 test("configured Apple template uses the exact central URL without personal credentials", () => {
-  const shortcutUrl = "https://www.icloud.com/shortcuts/263b2df954434fd5944157ed79f747e7";
+  const shortcutUrl = "https://www.icloud.com/shortcuts/2e496e7f8a8f414591417260e12c3f1f";
   assert.equal(createPlatformHarness({ userAgent: "desktop" }).appleShortcutUrl, shortcutUrl);
   const shareRendering = script.match(/function renderAppleShortcutTemplateAction\(\) \{([\s\S]*?)\n\}/)[1];
   assert.match(shareRendering, /appleShortcutShareLink\.href = shareUrl/);

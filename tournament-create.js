@@ -84,7 +84,9 @@ function markTournamentDirty() {
 }
 
 function syncCentralParticipants() {
-  state.selectedParticipants = tournamentCreateState.participants.map(normalizeTournamentParticipant);
+  window.FischteichTournamentParticipants.replace(
+    tournamentCreateState.participants.map(normalizeTournamentParticipant),
+  );
   renderParticipantSelection();
 }
 
@@ -830,8 +832,7 @@ function closeTournamentGuestModal() {
 
 function resetTournamentParticipants() {
   tournamentCreateState.participants = [];
-  state.selectedParticipants = [];
-  state.nextGuestId = 1;
+  window.FischteichTournamentParticipants.reset();
   invalidateTournamentStructure();
   markTournamentDirty();
   renderParticipantSelection();
@@ -841,7 +842,9 @@ function resetTournamentParticipants() {
 function openTournamentWizard() {
   tournamentEntitySequence = 0;
   tournamentCreateState = createInitialTournamentState();
-  tournamentCreateState.participants = state.selectedParticipants.map(normalizeTournamentParticipant);
+  tournamentCreateState.participants = window.FischteichTournamentParticipants
+    .snapshot()
+    .map(normalizeTournamentParticipant);
   lastCreatedTournamentId = null;
   renderTournamentWizard();
   showScreen(tournamentCreateScreen);
@@ -1073,8 +1076,7 @@ tournamentGuestForm.addEventListener("submit", (event) => {
     tournamentGuestInput.focus({ preventScroll: true });
     return;
   }
-  const participant = { id: `guest-${state.nextGuestId}`, name, type: "guest", sourceUserId: null };
-  state.nextGuestId += 1;
+  const participant = window.FischteichTournamentParticipants.createGuest(name);
   tournamentCreateState.participants.push(participant);
   invalidateTournamentStructure();
   syncCentralParticipants();

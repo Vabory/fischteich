@@ -63,10 +63,16 @@ elements.get("#tournament-start-modal").hidden = true;
 elements.get("#tournament-progress").children = Array.from({ length: 5 }, () => new FakeElement("span"));
 
 let rpcImplementation = async () => ({ data: null, error: null });
+let centralParticipants = [];
+let nextGuestId = 1;
 const context = vm.createContext({
   assert,
   console: { debug() {}, error() {} },
   crypto: webcrypto,
+  FRIEND_PARTICIPANTS: [
+    { id: "friend-1", name: "Tobi", type: "friend" },
+    { id: "friend-2", name: "Luana", type: "friend" },
+  ],
   requestAnimationFrame(callback) { callback(); },
   document: {
     activeElement: null,
@@ -74,9 +80,20 @@ const context = vm.createContext({
     querySelector: (selector) => elements.get(selector) ?? null,
     querySelectorAll: () => [],
   },
-  window: { addEventListener() {} },
+  window: {
+    addEventListener() {},
+    FischteichTournamentParticipants: {
+      snapshot: () => centralParticipants.map((participant) => ({ ...participant })),
+      replace(participants) { centralParticipants = participants.map((participant) => ({ ...participant })); },
+      reset() { centralParticipants = []; nextGuestId = 1; },
+      createGuest(name) {
+        const participant = { id: `guest-${nextGuestId}`, name, type: "guest", sourceUserId: null };
+        nextGuestId += 1;
+        return participant;
+      },
+    },
+  },
   appElement: { inert: false },
-  state: { selectedParticipants: [], nextGuestId: 1 },
   renderParticipantSelection() {},
   showScreen() {},
   showMenu() {},
@@ -86,6 +103,9 @@ const context = vm.createContext({
     isInitialized: true,
   }),
   subscribeToAppAuthState() {},
+  seedCentralParticipants(participants) {
+    centralParticipants = participants.map((participant) => ({ ...participant }));
+  },
   setRpcImplementation(implementation) { rpcImplementation = implementation; },
   supabaseClient: { rpc: (...args) => rpcImplementation(...args) },
 });
@@ -97,7 +117,8 @@ assert.doesNotMatch(source, /Turnier erstellt|Entwurf gespeichert|is-create-tour
 assert.match(source, /is-start-tournament/);
 assert.match(styles, /#tournament-step-next\.is-start-tournament/);
   assert.match(html, /style\.css\?v=195/);
-assert.match(html, /tournament-create\.js\?v=7/);
+assert.match(html, /tournament-create\.js\?v=8/);
+assert.doesNotMatch(source, /\bstate\b/);
 const tests = `
 function validStepFiveState() {
   const next = createInitialTournamentState();
@@ -119,6 +140,21 @@ function validStepFiveState() {
 
 globalThis.runTournamentCreateStartFlowTests = async function runTournamentCreateStartFlowTests() {
   const draftId = "11111111-1111-4111-8111-111111111111";
+
+  seedCentralParticipants([
+    { id: "friend-1", name: "Tobi", type: "friend", sourceUserId: null },
+    { id: "friend-2", name: "Luana", type: "friend", sourceUserId: null },
+  ]);
+  const openFromButton = tournamentCreateButton.listeners.get("click");
+  assert.equal(typeof openFromButton, "function");
+  openFromButton();
+  assert.equal(tournamentCreateState.step, 1);
+  assert.deepEqual(tournamentCreateState.participants.map(({ name }) => name), ["Tobi", "Luana"]);
+  const firstRequestId = tournamentCreateState.requestId;
+  requestTournamentWizardClose();
+  openFromButton();
+  assert.notEqual(tournamentCreateState.requestId, firstRequestId, "reopen must build a fresh wizard state");
+  assert.deepEqual(tournamentCreateState.participants.map(({ name }) => name), ["Tobi", "Luana"]);
 
   tournamentCreateState = validStepFiveState();
   renderTournamentWizard();

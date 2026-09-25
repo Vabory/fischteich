@@ -568,6 +568,30 @@ const state = {
   adminTrottlResetReturnFocus: null,
 };
 
+window.FischteichTournamentParticipants = Object.freeze({
+  snapshot() {
+    return state.selectedParticipants.map((participant) => ({ ...participant }));
+  },
+  replace(participants) {
+    if (!Array.isArray(participants)) throw new TypeError("Tournament participants must be an array");
+    state.selectedParticipants = participants.map((participant) => ({ ...participant }));
+  },
+  reset() {
+    state.selectedParticipants = [];
+    state.nextGuestId = 1;
+  },
+  createGuest(name) {
+    const participant = {
+      id: `guest-${state.nextGuestId}`,
+      name,
+      type: "guest",
+      sourceUserId: null,
+    };
+    state.nextGuestId += 1;
+    return participant;
+  },
+});
+
 let rouletteAssetPreloadPromise = null;
 let rouletteAssetsReady = false;
 

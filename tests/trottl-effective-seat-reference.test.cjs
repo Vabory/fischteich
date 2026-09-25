@@ -20,6 +20,7 @@ test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI ca
     .replace(/^    <(?:script|link)[^\n]*trottl-special[^\n]*\n/gm, "")
     .replace(/^    <link rel="preload" as="image" href="\.\/assets\/mini-games\/(?:lachs|red|blue|green|yellow)-(?:fish|shadow)\.(?:png|webp)">\n/gm, "")
     .replace(/script.js\?v=\d+/, "script.js?v=87")
+    .replace(/tournament-create.js\?v=\d+/, "tournament-create.js?v=7")
     .replace(/auth.js\?v=\d+/, "auth.js?v=4")
     .replace(/buffalo-service.js\?v=\d+/, "buffalo-service.js?v=5")
     .replace(/roulette-service.js\?v=\d+/, "roulette-service.js?v=6")

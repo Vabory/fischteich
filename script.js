@@ -62,8 +62,6 @@ const ROULETTE_INITIAL_FISH_COLOR_INDEXES = Object.freeze([0, 1]);
 const ROULETTE_SPEEDS = Object.freeze([1, 2, 3]);
 const ROULETTE_BASE_DURATION = 4700;
 const ROULETTE_REDUCED_MOTION_DURATION = 650;
-const ROULETTE_STATS_STORAGE_KEY = window.rouletteOfflineQueue?.statsStorageKey
-  ?? "fischteich-roulette-stats-production-v1";
 const ROULETTE_GOLD_WINNER_INDEX = 2;
 const ROULETTE_RANDOM_BUCKET_COUNT = 200;
 const ROULETTE_GOLD_BUCKET_COUNT = 2;
@@ -448,7 +446,7 @@ function normalizeRouletteStats(value) {
 
 function loadRouletteStats() {
   try {
-    const storedValue = window.localStorage.getItem(ROULETTE_STATS_STORAGE_KEY);
+    const storedValue = window.localStorage.getItem(window.rouletteOfflineQueue.statsStorageKey);
 
     if (storedValue === null) {
       return createDefaultRouletteStats();
@@ -462,7 +460,7 @@ function loadRouletteStats() {
 
 function saveRouletteStats(stats = state.rouletteStats) {
   window.localStorage.setItem(
-    ROULETTE_STATS_STORAGE_KEY,
+    window.rouletteOfflineQueue.statsStorageKey,
     JSON.stringify(stats),
   );
 }

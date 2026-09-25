@@ -140,11 +140,14 @@ test("spin IDs use crypto UUID with a secure v4 fallback", () => {
 
 test("local counter and applied spin ID are persisted in the same localStorage value", () => {
   const stored = new Map();
-  const window = { localStorage: {
-    getItem: key => stored.get(key) ?? null,
-    setItem: (key, value) => stored.set(key, value),
-  } };
-  const context = vm.createContext({ window, ROULETTE_STATS_STORAGE_KEY: "stats", Number, Date, JSON, Set });
+  const window = {
+    localStorage: {
+      getItem: key => stored.get(key) ?? null,
+      setItem: (key, value) => stored.set(key, value),
+    },
+    rouletteOfflineQueue: { statsStorageKey: "stats" },
+  };
+  const context = vm.createContext({ window, Number, Date, JSON, Set });
   vm.runInContext(statsStorageSection, context);
   const next = { totalSpins: 1, turbolachs: 1, nitroforelle: 0, gold: 0, lastGoldHit: null, appliedSpinIds: ["spin-a"] };
   context.next = next;

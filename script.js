@@ -5049,7 +5049,6 @@ async function persistCompletedRouletteSpin(resultType) {
       localStatsApplied: false,
     };
     await window.rouletteOfflineQueue.enqueueSpin(spin);
-    void refreshRoulettePendingCount();
   } catch (error) {
     console.error("Roulette-Spin konnte nicht für die spätere Synchronisierung gespeichert werden.", error);
     showConnectivityNotice("Der Spin konnte nicht für die spätere Synchronisierung gespeichert werden.");
@@ -5061,6 +5060,7 @@ async function persistCompletedRouletteSpin(resultType) {
   } catch (error) {
     console.error("Roulette-Spin konnte nicht lokal gezählt werden.", error);
     showConnectivityNotice("Der gespeicherte Spin konnte noch nicht zur lokalen Statistik hinzugefügt werden.");
+    void refreshRoulettePendingCount();
     return;
   }
 
@@ -5071,10 +5071,14 @@ async function persistCompletedRouletteSpin(resultType) {
   } catch (error) {
     console.error("Lokale Roulette-Zählung konnte nicht bestätigt werden.", error);
     showConnectivityNotice("Der Spin bleibt gespeichert und wird beim nächsten Start geprüft.");
+    void refreshRoulettePendingCount();
     return;
   }
 
-  if (!connectivityOnline) return;
+  if (!connectivityOnline) {
+    void refreshRoulettePendingCount();
+    return;
+  }
   let recordedStats;
   try {
     if (!window.rouletteService?.recordRouletteSpin) throw new Error("Roulette service is unavailable");
@@ -5082,6 +5086,7 @@ async function persistCompletedRouletteSpin(resultType) {
   } catch (error) {
     console.error("Roulette-Statistik konnte nicht an Supabase übertragen werden.", error);
     showConnectivityNotice("Online-Speicherung fehlgeschlagen. Der Spin bleibt lokal gespeichert.");
+    void refreshRoulettePendingCount();
     return;
   }
 
@@ -5091,6 +5096,7 @@ async function persistCompletedRouletteSpin(resultType) {
   } catch (error) {
     console.error("Gespeicherter Roulette-Spin konnte nicht aus der lokalen Queue entfernt werden.", error);
     showConnectivityNotice("Online gespeichert; die lokale Vormerkung konnte nicht bereinigt werden.");
+    void refreshRoulettePendingCount();
   }
 
   try {

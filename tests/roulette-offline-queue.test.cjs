@@ -151,21 +151,38 @@ test("local counter and applied spin ID are persisted in the same localStorage v
 function appHarness(online = false, options = {}) {
   const indexedDB = fakeIndexedDB();
   const { queue } = queueHarness(indexedDB);
-  const calls = [], notices = [], errors = [], pendingRefreshes = [];
+  const calls = [], notices = [], errors = [], pendingRefreshes = [], visiblePendingMessages = [];
+  const pendingStatus = { hidden: true, textContent: "" };
   const state = { rouletteStats: { totalSpins: 0, turbolachs: 0, nitroforelle: 0, gold: 0, lastGoldHit: null, appliedSpinIds: [] }, rouletteStatsRequestId: 0, globalRouletteStats: null };
   const queueAdapter = {
     createSpinId: () => queue.createSpinId(),
     enqueueSpin: async spinEvent => { await queue.enqueueSpin(spinEvent); calls.push(["queue"]); },
     getPendingSpins: () => queue.getPendingSpins(),
+    getPendingSpinCount: () => queue.getPendingSpinCount(),
     markLocalStatsApplied: async spinEvent => { await queue.markLocalStatsApplied(spinEvent); calls.push(["mark"]); },
     removeSpin: async id => { await queue.removeSpin(id); calls.push(["remove"]); },
   };
   const window = { rouletteOfflineQueue: queueAdapter, rouletteService: {
-    async recordRouletteSpin(spinEvent) { calls.push(["server", spinEvent]); if (options.serverError) throw new Error("network"); return { status: "processed", stats: { display_name: spinEvent.displayName } }; },
+    async recordRouletteSpin(spinEvent) {
+      calls.push(["server", spinEvent]);
+      if (options.serverError) throw new Error("network");
+      if (options.recordSpin) return options.recordSpin(spinEvent);
+      return { status: "processed", stats: { display_name: spinEvent.displayName } };
+    },
   } };
   const context = vm.createContext({ window, state, connectivityOnline: online,
-    rouletteScreen: { hidden: true }, roulettePendingStatus: { hidden: true, textContent: "" },
-    refreshRoulettePendingCount: () => { pendingRefreshes.push("refresh"); },
+    rouletteScreen: { hidden: false }, roulettePendingStatus: pendingStatus,
+    refreshRoulettePendingCount: async () => {
+      pendingRefreshes.push("refresh");
+      const count = await queueAdapter.getPendingSpinCount();
+      pendingStatus.hidden = count < 1;
+      if (count > 0) {
+        pendingStatus.textContent = count === 1
+          ? "1 Spin wartet auf Synchronisierung."
+          : `${count} Spins warten auf Synchronisierung.`;
+        visiblePendingMessages.push(pendingStatus.textContent);
+      }
+    },
     ROULETTE_STAT_KEY_BY_RESULT_TYPE: { turbolachs: "turbolachs", nitroforelle: "nitroforelle", goldfish: "gold" },
     ROULETTE_RESULT_TYPE_BY_WINNER_INDEX: { 0: "turbolachs", 1: "nitroforelle", 2: "goldfish" },
     getLocalIdentity: () => ({ deviceId: "device-1", displayName: options.name || "Fabian" }),
@@ -180,7 +197,8 @@ function appHarness(online = false, options = {}) {
     console: { error: (...args) => errors.push(args) }, Date, Promise,
   });
   vm.runInContext(appSection, context);
-  return { context, state, queue, indexedDB, calls, notices, errors, pendingRefreshes, window,
+  return { context, state, queue, indexedDB, calls, notices, errors, pendingRefreshes,
+    pendingStatus, visiblePendingMessages, window,
     record: winner => vm.runInContext(`recordCompletedRouletteSpin(${winner})`, context),
     recover: () => vm.runInContext("recoverPendingRouletteLocalStats()", context) };
 }
@@ -188,12 +206,15 @@ function appHarness(online = false, options = {}) {
 test("offline completed spin increments local stats once and queues one event without Supabase", async () => {
   const h = appHarness(false);
   await h.record(0);
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.state.rouletteStats.totalSpins, 1);
   assert.equal(h.state.rouletteStats.turbolachs, 1);
   assert.equal(await h.queue.getPendingSpinCount(), 1);
   assert.equal(h.calls.filter(([kind]) => kind === "render").length, 1);
   assert.equal(h.calls.some(([kind]) => kind === "server"), false);
   assert.equal(h.notices.length, 0);
+  assert.equal(h.pendingStatus.textContent, "1 Spin wartet auf Synchronisierung.");
+  assert.equal(h.pendingStatus.hidden, false);
   assert.deepEqual(Object.keys((await h.queue.getPendingSpins())[0]), ["id", "deviceId", "displayName", "result", "createdAt", "syncStatus", "localStatsApplied"]);
   assert.equal((await h.queue.getPendingSpins())[0].localStatsApplied, true);
   assert.deepEqual(JSON.parse(JSON.stringify(h.state.rouletteStats.appliedSpinIds)), []);
@@ -299,11 +320,44 @@ test("a pending event survives app closure while the online server request is un
 test("server failure retains one counted spin and pending event with plain user feedback", async () => {
   const h = appHarness(true, { serverError: true });
   await h.record(0);
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.state.rouletteStats.totalSpins, 1);
   assert.equal(await h.queue.getPendingSpinCount(), 1);
   assert.deepEqual(h.calls.map(([kind]) => kind), ["queue", "local", "render", "mark", "local", "server"]);
   assert.match(h.notices[0], /Spin bleibt lokal gespeichert/);
   assert.equal(h.errors.length, 1);
+  assert.equal(h.pendingStatus.textContent, "1 Spin wartet auf Synchronisierung.");
+  assert.equal(h.pendingStatus.hidden, false);
+});
+
+test("normal and slow successful online syncs never expose their transient pending entry", async () => {
+  let resolveServer;
+  const serverResponse = new Promise(resolve => { resolveServer = resolve; });
+  const h = appHarness(true, { recordSpin: () => serverResponse });
+  const completion = h.record(0);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(await h.queue.getPendingSpinCount(), 1);
+  assert.equal(h.pendingRefreshes.length, 0);
+  assert.equal(h.pendingStatus.hidden, true);
+
+  resolveServer({ status: "processed", stats: { display_name: "Fabian" } });
+  await completion;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(await h.queue.getPendingSpinCount(), 0);
+  assert.equal(h.pendingStatus.hidden, true);
+  assert.deepEqual(h.visiblePendingMessages, []);
+});
+
+test("three successful online spins update stats without pending-status flicker", async () => {
+  const h = appHarness(true);
+  for (const winner of [0, 1, 2]) {
+    await h.record(winner);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.pendingStatus.hidden, true);
+  }
+  assert.equal(h.state.rouletteStats.totalSpins, 3);
+  assert.equal(h.calls.filter(([kind]) => kind === "server").length, 3);
+  assert.deepEqual(h.visiblePendingMessages, []);
 });
 
 test("connection loss before persistence leaves the locally counted spin pending and makes no request", async () => {
@@ -442,7 +496,7 @@ test("pending display refreshes after offline enqueue, online failure, and onlin
   assert.equal(failed.pendingRefreshes.length, 1);
   const confirmed = appHarness(true);
   await confirmed.record(0);
-  assert.equal(confirmed.pendingRefreshes.length, 2);
+  assert.equal(confirmed.pendingRefreshes.length, 1);
 });
 
 test("restarting with pending spins neither syncs them nor recounts local statistics", async () => {

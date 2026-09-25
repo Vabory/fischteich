@@ -14,6 +14,9 @@ const script = read("script.js");
 const html = read("index.html");
 const style = read("style.css");
 const migration = read("supabase/migrations/20260902000000_create_buffalo_shortcut_access.sql");
+const friendsMigration = read(
+  "supabase/migrations/20260925010000_update_buffalo_shortcut_friends.sql",
+);
 const tokenCiphertextMigration = read(
   "supabase/migrations/20260904000000_add_buffalo_shortcut_token_ciphertext.sql",
 );
@@ -179,12 +182,18 @@ test("unknown, mismatched and revoked device credentials all return unauthorized
   assert.match(edgeFunction, /error: "unauthorized"/);
 });
 
-test("FRIENDS allowlist matches the frontend snapshot exactly", () => {
+test("FRIENDS allowlist migrations match the frontend snapshot exactly", () => {
   const frontendBlock = script.match(/const FRIENDS = Object\.freeze\(\[([\s\S]*?)\]\);/)[1];
   const frontendNames = [...frontendBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
-  const migrationNames = [...migration.matchAll(/\('([^']+)',\s*'[^']+'\)/g)]
+  const initialNames = [...migration.matchAll(/\('([^']+)',\s*'[^']+'\)/g)]
     .map((match) => match[1]);
-  assert.deepEqual(migrationNames, frontendNames);
+  const effectiveNames = initialNames
+    .map((name) => name === "Julian" ? "Poidl" : name)
+    .filter((name) => name !== "Vivienne");
+  assert.deepEqual(effectiveNames, frontendNames);
+  assert.match(friendsMigration, /update public\.buffalo_shortcut_targets[\s\S]*display_name = 'Poidl'[\s\S]*where display_name = 'Julian'/i);
+  assert.match(friendsMigration, /delete from public\.buffalo_shortcut_targets[\s\S]*where display_name = 'Vivienne'/i);
+  assert.doesNotMatch(friendsMigration, /buffalo_events|target_friend_name|target_display_name/i);
   assert.match(migration, /regexp_replace\(pg_catalog\.btrim\(p_target\), '\\s\+', ' ', 'g'\)/);
   assert.match(migration, /pg_catalog\.lower/);
   assert.match(migration, /'invalid_target'/);

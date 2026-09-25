@@ -23,7 +23,7 @@ const FRIENDS = Object.freeze([
   "Julia",
   "Patschi",
   "Chris",
-  "Julian",
+  "Poidl",
   "Fabian",
   "Kathi",
   "Juli",
@@ -35,7 +35,6 @@ const FRIENDS = Object.freeze([
   "Hannah",
   "Melvin",
   "Clemens",
-  "Vivienne",
 ]);
 
 const FRIEND_PARTICIPANTS = Object.freeze(

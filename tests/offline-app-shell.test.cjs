@@ -100,7 +100,7 @@ test("install caches the explicit shell, activate removes only old Fischteich of
   h.stores.set("fischteich-offline-v0", new Map());
   await h.lifecycle("install");
   assert.equal(h.skipped, 1);
-  assert.equal(h.stores.get("fischteich-offline-v2").size, 77);
+  assert.equal(h.stores.get("fischteich-offline-v3").size, 77);
   await h.lifecycle("activate");
   assert.equal(h.claimed, 1);
   assert.equal(h.stores.has("fischteich-offline-v0"), false);

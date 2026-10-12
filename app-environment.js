@@ -9,18 +9,19 @@
     supabaseUrl: "https://qhgiqhuodkrevmmbwfeg.supabase.co",
     supabasePublishableKey: "sb_publishable_Ex5JLH1PpN-N1gGZPDcNtQ_RbO9y7P-",
   });
-  // Later fill in the real DEV origin, URL and browser publishable key here.
+  // DEV uses its own exact origin and public browser configuration.
   // An incomplete configuration must never activate Development.
   const development = Object.freeze({
-    origin: null,
-    supabaseUrl: null,
-    supabasePublishableKey: null,
+    origin: "https://fischteich-dev.pages.dev",
+    supabaseUrl: "https://vifxrzecsvdfpdmzquom.supabase.co",
+    supabasePublishableKey: "sb_publishable_zeT9WAdU2s75ve0M0uKhJA_J7hJ6uho",
   });
   const { origin, pathname } = window.location;
   const isProduction = origin === "https://vabory.github.io"
     && (pathname === "/fischteich" || pathname.startsWith("/fischteich/"));
-  const isDevelopment = Boolean(development.origin && development.supabaseUrl
-    && development.supabasePublishableKey && origin === development.origin);
+  const isDevelopment = Boolean(development.origin && origin === development.origin
+    && /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(development.supabaseUrl ?? "")
+    && /^sb_publishable_[A-Za-z0-9_-]+$/.test(development.supabasePublishableKey ?? ""));
   window.FischteichEnvironment = isProduction ? production : Object.freeze({
     name: isDevelopment ? "development" : "unknown",
     isProduction: false,

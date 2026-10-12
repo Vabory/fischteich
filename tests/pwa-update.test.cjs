@@ -116,7 +116,7 @@ test("build metadata has one synchronized source and keeps product version V1.0"
   assert.equal(embeddedBuild, version.build);
   assert.match(buildTool, /version\.build = build/);
   assert.match(buildTool, /meta name="fischteich-build"/);
-  assert.match(html, /pwa-service\.js\?v=1[\s\S]*push-service\.js\?v=2/);
+  assert.match(html, /pwa-service\.js\?v=2[\s\S]*push-service\.js\?v=2/);
 });
 
 test("equal build shows no update notice", async () => {
@@ -226,7 +226,7 @@ test("service worker is registered once globally and receives an explicit update
     harness.service.registerServiceWorker(),
   ]);
   assert.equal(harness.registerCalls.length, 1);
-  assert.equal(harness.registerCalls[0].url, "./service-worker.js?v=1");
+  assert.equal(harness.registerCalls[0].url, "./service-worker.js?v=2");
   assert.equal(harness.registerCalls[0].options.scope, "./");
   assert.equal(harness.registerCalls[0].options.updateViaCache, "none");
   assert.equal(harness.getUpdateCalls(), 1);

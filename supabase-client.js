@@ -1,11 +1,11 @@
 "use strict";
 
-const SUPABASE_URL = "https://qhgiqhuodkrevmmbwfeg.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Ex5JLH1PpN-N1gGZPDcNtQ_RbO9y7P-";
+const SUPABASE_URL = window.FischteichEnvironment?.supabaseUrl ?? "";
+const SUPABASE_PUBLISHABLE_KEY = window.FischteichEnvironment?.supabasePublishableKey ?? "";
 
 // Im Browser ausschließlich Publishable Keys verwenden – niemals service_role,
 // Secret Keys, Datenbank-Passwörter oder andere serverseitige Geheimnisse.
-const supabaseClient = window.supabase.createClient(
+const supabaseClient = SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY ? window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY,
   {
@@ -15,6 +15,6 @@ const supabaseClient = window.supabase.createClient(
       detectSessionInUrl: false,
     },
   },
-);
+): null;
 
-console.info("Supabase client initialized");
+if (supabaseClient) console.info("Supabase client initialized");

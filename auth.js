@@ -308,6 +308,7 @@ async function replaceInvalidPersistedAuthSession() {
 }
 
 function initializeAppAuth() {
+  if (window.FischteichEnvironment?.name === "unknown") return Promise.resolve(getAppAuthState());
   if (authInitializationPromise) {
     return authInitializationPromise;
   }

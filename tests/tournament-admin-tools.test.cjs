@@ -26,8 +26,8 @@ assert.match(html, /id="admin-logout"/);
 assert.match(html, /id="tournament-hard-delete-name"/);
 assert.match(html, /id="confirm-tournament-hard-delete"[^>]*disabled/);
 assert.match(html, /id="tournament-correction-modal"/);
-assert.match(html, /auth\.js\?v=6/);
-assert.match(html, /script\.js\?v=108/);
+assert.match(html, /auth\.js\?v=7/);
+assert.match(html, /script\.js\?v=109/);
 
 assert.match(script, /await signInAdminWithPassword\(email, password\)/);
 assert.match(script, /await signOutAdmin\(\)/);

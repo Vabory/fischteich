@@ -115,6 +115,7 @@ function requireOnline(feature) {
   return false;
 }
 function setConnectivityOnline(online) {
+  if (window.FischteichEnvironment?.name === "unknown") return;
   if (connectivityOnline === online) return;
   connectivityOnline = online;
   updateConnectivityPresentation();
@@ -5938,7 +5939,7 @@ window.addEventListener("pagehide", () => {
   void trottlClassic.suspend();
 });
 window.addEventListener("pageshow", (event) => {
-  if (event.persisted) {
+  if (event.persisted && window.FischteichEnvironment?.name !== "unknown") {
     initializeBuffaloTimer();
     trottlClassic.refresh();
   }
@@ -6088,6 +6089,7 @@ connectivityListeners.add((online) => {
   }
   void runAutomaticRouletteSync();
 });
+if (window.FischteichEnvironment?.name !== "unknown") {
 renderRouletteStats();
 initializeLocalIdentity();
 void recoverPendingRouletteLocalStats();
@@ -6133,4 +6135,6 @@ if (connectivityOnline) {
     window.TrottlStartupRouting.clearReconnectIntent(reconnectMode);
     showConnectivityNotice("Die Online-Sitzung kann ohne Internet nicht wiederhergestellt werden.");
   }
+}
+
 }

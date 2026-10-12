@@ -134,10 +134,10 @@ test("offline startup avoids auth and Buffalo initialization and reports a recon
 
 test("phase-one offline cache structure and push handlers remain intact", () => {
   const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
-  assert.match(worker, /OFFLINE_CACHE_VERSION = 1/);
+  assert.match(worker, /OFFLINE_CACHE_VERSION = 2/);
   assert.match(worker, /fischteich-offline-v/);
   assert.match(worker, /self\.addEventListener\("push"/);
   assert.match(worker, /self\.addEventListener\("notificationclick"/);
   assert.match(worker, /"\.\/style\.css\?v=195"/);
-  assert.match(worker, /"\.\/script\.js\?v=108"/);
+  assert.match(worker, /"\.\/script\.js\?v=109"/);
 });

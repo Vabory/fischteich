@@ -6,6 +6,7 @@
 # Local dependencies and generated test output
 node_modules/
 coverage/
+dist-dev/
 
 # Supabase CLI state
 supabase/.temp/

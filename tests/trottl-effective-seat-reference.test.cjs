@@ -17,6 +17,7 @@ test("seat CSS geometry remains frozen after final polish", () => {
 
 test("HTML parent hierarchy equals deployment 257 apart from build and CSS/UI cache metadata", () => {
   const html=read("index.html")
+    .replace(/^        <span class="development-badge" id="development-badge" hidden>DEV<\/span>\n/m, "")
     .replace(/^    <(?:script|link)[^\n]*trottl-special[^\n]*\n/gm, "")
     .replace(/^    <link rel="preload" as="image" href="\.\/assets\/mini-games\/(?:lachs|red|blue|green|yellow)-(?:fish|shadow)\.(?:png|webp)">\n/gm, "")
     .replace(/^    <script src="\.\/app-environment\.js\?v=\d+" defer><\/script>\n/m, "")

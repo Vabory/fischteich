@@ -328,6 +328,12 @@ const displayNameRenameForm = document.querySelector("#display-name-rename-form"
 const displayNameRenameInput = document.querySelector("#display-name-rename-input");
 const displayNameRenameError = document.querySelector("#display-name-rename-error");
 settingsAppVersionText.textContent = `Fischteich Version ${FISCHTEICH_APP_VERSION}.0`;
+if (window.FischteichEnvironment?.isDevelopment) {
+  document.title = window.FischteichEnvironment.appName;
+  document.querySelector("#development-badge").hidden = false;
+  settingsAppVersionText.textContent = `${window.FischteichEnvironment.appName} Version ${FISCHTEICH_APP_VERSION}.0`;
+  document.querySelector("#welcome-identity-title").textContent = "Willkommen im Fischteich DEV!";
+}
 const leaveModal = document.querySelector("#leave-modal");
 const fingerRedistributeModal = document.querySelector("#finger-redistribute-modal");
 const rageCageReshuffleModal = document.querySelector("#rage-cage-reshuffle-modal");

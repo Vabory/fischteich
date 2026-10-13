@@ -1,6 +1,6 @@
 "use strict";
 
-const FISCHTEICH_SERVICE_WORKER_URL = "./service-worker.js?v=3";
+const FISCHTEICH_SERVICE_WORKER_URL = "./service-worker.js?v=4";
 const FISCHTEICH_SERVICE_WORKER_SCOPE = "./";
 const FISCHTEICH_VERSION_CHECK_INTERVAL = 5 * 60 * 1000;
 const FISCHTEICH_VERSION_CHECK_TIMEOUT = 8000;

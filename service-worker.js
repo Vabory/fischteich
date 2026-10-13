@@ -5,20 +5,20 @@ const FISCHTEICH_NOTIFICATION_ICON = new URL(
   "./assets/icon-192.png",
   self.registration.scope,
 ).href;
-const OFFLINE_CACHE_VERSION = 3;
+const OFFLINE_CACHE_VERSION = 4;
 const OFFLINE_CACHE_PREFIX = "fischteich-offline-v";
 const OFFLINE_CACHE_NAME = `${OFFLINE_CACHE_PREFIX}${OFFLINE_CACHE_VERSION}`;
 // Match the URLs requested by index.html, including their asset cache versions.
 const OFFLINE_APP_SHELL = [
   "./index.html",
-  "./style.css?v=195",
+  "./style.css?v=196",
   "./trottl-special.css?v=34",
   "./manifest.webmanifest",
   "./assets/icon-192.png",
   "./assets/apple-touch-icon.png",
   "./assets/icon-512.png",
   "./vendor/supabase.js?v=2.112.4",
-  "./app-environment.js?v=2",
+  "./app-environment.js?v=3",
   "./supabase-client.js?v=3",
   "./local-identity.js?v=2",
   "./trottl-startup-routing.js?v=1",
@@ -28,7 +28,7 @@ const OFFLINE_APP_SHELL = [
   "./roulette-service.js?v=9",
   "./roulette-offline-queue.js?v=3",
   "./buffalo-service.js?v=6",
-  "./pwa-service.js?v=3",
+  "./pwa-service.js?v=4",
   "./push-service.js?v=2",
   "./shortcut-service.js?v=8",
   "./dice-service.js?v=3",
@@ -57,7 +57,7 @@ const OFFLINE_APP_SHELL = [
   "./trottl-special-admin.js?v=1",
   "./button-release.js?v=1",
   "./team-division-v2-logic.js?v=2",
-  "./script.js?v=109",
+  "./script.js?v=110",
   "./tournament-create.js?v=8",
   "./tournament-live.js?v=12",
   "./tournament-archive.js?v=2",

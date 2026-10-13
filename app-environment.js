@@ -26,7 +26,7 @@
     name: isDevelopment ? "development" : "unknown",
     isProduction: false,
     isDevelopment,
-    appName: "Fischteich",
+    appName: isDevelopment ? "Fischteich DEV" : "Fischteich",
     supabaseUrl: isDevelopment ? development.supabaseUrl : null,
     supabasePublishableKey: isDevelopment ? development.supabasePublishableKey : null,
   });
